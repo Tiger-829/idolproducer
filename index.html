@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>アイドルグループ育成マネージャー</title>
+  <title>日本一のアイドル事務所を作ろう</title>
   
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#e91e63">
@@ -44,6 +44,65 @@
       gap: 12px;
       box-shadow: 0 0 20px rgba(0,0,0,0.05);
     }
+    .title-screen {
+      width: 100%;
+      max-width: 520px;
+      min-height: 100vh;
+      padding: 28px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: var(--panel);
+    }
+    .title-screen[hidden], .game-container[hidden] { display: none; }
+    .title-heading {
+      padding: 22px 14px;
+      background: #fdf2f4;
+      border-left: 4px solid var(--primary);
+    }
+    .title-heading h1 { margin-bottom: 8px; }
+    .title-heading p { margin: 0; color: #666; font-size: 12px; text-align: center; }
+    .save-slots { display: flex; flex-direction: column; gap: 10px; }
+    .save-slot {
+      padding: 12px;
+      border: 1px solid #eadde1;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .save-slot-heading { display: flex; justify-content: space-between; align-items: baseline; }
+    .save-slot-heading h2 { margin: 0; font-size: 14px; }
+    .save-slot-info { min-height: 36px; margin: 8px 0; color: #666; font-size: 11px; line-height: 1.6; }
+    .save-slot-actions { display: flex; gap: 6px; align-items: center; }
+    .save-slot-actions .main-btn { flex: 1; }
+    .slot-delete-btn { min-width: 40px; min-height: 40px; }
+    .weekly-event-note {
+      padding: 10px 12px;
+      background: #fdf2f4;
+      border-left: 4px solid var(--primary);
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .weekly-event-note ul { margin: 6px 0 0; padding-left: 20px; }
+    .weekly-member-target { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+    .weekly-member-target select { padding: 8px; font-size: 12px; }
+    .weekly-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .weekly-action-grid .main-btn { min-height: 48px; padding: 8px 6px; font-size: 12px; }
+    .weekly-action-grid .main-btn:disabled { background: #aaa; cursor: not-allowed; }
+    .office-facilities { display: flex; flex-direction: column; gap: 8px; }
+    .office-facility-list { display: flex; flex-direction: column; border-top: 1px solid #eee; }
+    .office-facility-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 2px;
+      border-bottom: 1px solid #eee;
+    }
+    .office-facility-name { font-size: 12px; font-weight: bold; }
+    .office-facility-meta { margin-top: 3px; color: #777; font-size: 10px; line-height: 1.4; }
+    .office-facility-row button { min-width: 88px; padding: 8px 6px; font-size: 10px; }
+    .office-maintenance-note { color: #777; font-size: 10px; }
     h1 {
       font-size: 18px;
       margin: 0;
@@ -59,6 +118,170 @@
       border-radius: 8px;
       font-size: 13px;
       font-weight: bold;
+    }
+    .calendar-date-label { color: #777; font-size: 11px; font-weight: normal; }
+    .calendar-card {
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #eadde1;
+      border-radius: 6px;
+    }
+    .calendar-sheet { transform-origin: top center; }
+    .calendar-sheet.calendar-turn { animation: calendar-turn 360ms ease-out both; }
+    .calendar-month-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .calendar-month-heading strong { color: var(--primary); font-size: 14px; }
+    .calendar-month-heading span { color: #777; font-size: 10px; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+    .calendar-weekday, .calendar-day { display: grid; place-items: center; min-height: 28px; font-size: 10px; }
+    .calendar-weekday { color: #777; font-weight: bold; }
+    .calendar-weekday:first-child, .calendar-day.sunday { color: #c94f68; }
+    .calendar-day { position: relative; border-radius: 4px; color: #444; }
+    .calendar-day.wednesday { background: #f5f1f2; }
+    .calendar-day.live-day::after { position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%; background: #4f8877; content: ''; }
+    .calendar-day.rival-live-day::before { position: absolute; top: 2px; width: 4px; height: 4px; border-radius: 50%; background: #c88738; content: ''; }
+    .calendar-day.today { background: var(--primary); color: #fff; font-weight: bold; }
+    .calendar-day.today::after { background: #fff; }
+    @keyframes calendar-turn {
+      from { opacity: 0.55; transform: rotateX(-12deg) translateY(3px); }
+      to { opacity: 1; transform: rotateX(0) translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .calendar-sheet { animation: none; }
+    }
+    .page-nav {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-bottom: 1px solid #f0d5de;
+    }
+    .page-tab {
+      min-height: 42px;
+      padding: 8px 2px;
+      color: #777;
+      background: transparent;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .page-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .page-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .page-panel[hidden] { display: none; }
+    .page-title {
+      margin: 0;
+      font-size: 15px;
+      color: var(--primary);
+    }
+    .funds-card {
+      padding: 14px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 8px;
+    }
+    .funds-total {
+      margin-top: 4px;
+      font-size: 24px;
+      font-weight: 900;
+      font-family: monospace;
+    }
+    .team-fans-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .team-fans-count { font-size: 18px; font-family: monospace; }
+    .member-fan-count { display: block; color: #777; font-size: 9px; }
+    .fund-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .fund-stat {
+      padding: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+    }
+    .fund-stat-label { display: block; color: #777; font-size: 11px; }
+    .fund-stat-value { font-size: 15px; font-weight: bold; }
+    .song-list, .offer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .song-row, .offer-row {
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .song-sales-summary {
+      margin-bottom: 6px;
+      padding: 10px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .offer-row select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 8px;
+      font-size: 12px;
+    }
+    .seat-settings {
+      margin-top: 6px;
+      padding: 6px;
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .seat-settings summary {
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .seat-settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .seat-price-field {
+      min-width: 0;
+      padding: 6px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+    .seat-price-field input[type="number"] {
+      width: 100%;
+      min-width: 0;
+      margin-top: 4px;
+      padding: 5px;
+      font-size: 12px;
+    }
+    .seat-availability {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      color: #555;
     }
     
     /* チーム総合力カード */
@@ -133,7 +356,7 @@
       font-weight: bold;
     }
     .roster-list {
-      max-height: 180px;
+      max-height: min(55vh, 420px);
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -149,6 +372,39 @@
       border-radius: 4px;
       font-size: 11px;
     }
+    .member-details {
+      border: 1px solid #eee;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .member-details summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .member-details summary::-webkit-details-marker { display: none; }
+    .member-summary::after {
+      content: '＋';
+      color: var(--primary);
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .member-details[open] .member-summary::after { content: '−'; }
+    .member-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+      padding: 8px;
+    }
+    .member-stat {
+      min-width: 0;
+      padding: 5px 2px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .member-stat span { display: block; color: #777; font-size: 9px; }
+    .member-stat strong { font-size: 12px; }
 
     /* アクション・進行 */
     .actions {
@@ -210,52 +466,129 @@
 </head>
 <body>
 
-<div class="game-container">
+<main class="title-screen" id="title-screen">
+  <header class="title-heading">
+    <h1>アイドルグループ育成マネージャー</h1>
+    <p>セーブデータを選択してください</p>
+  </header>
+  <div class="save-slots" id="save-slots"></div>
+</main>
+
+<div class="game-container" id="game-screen" hidden>
   <h1>アイドルグループ育成マネージャー</h1>
 
   <div class="header-info">
-    <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週</div>
-    <div>資金: <span id="txt-funds">10,000,000</span> 円</div>
+    <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
+    <span id="active-slot-label">セーブ枠</span>
   </div>
 
-  <!-- チーム総合力カード -->
-  <div class="team-summary-card">
-    <div class="team-header">
-      <div>
-        <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
-        <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
+  <nav class="page-nav" role="tablist" aria-label="ゲームページ">
+    <button class="page-tab active" id="page-tab-group" type="button" role="tab" aria-selected="true" aria-controls="page-group" onclick="switchPage('group')">グループ</button>
+    <button class="page-tab" id="page-tab-formation" type="button" role="tab" aria-selected="false" aria-controls="page-formation" onclick="switchPage('formation')">編成</button>
+    <button class="page-tab" id="page-tab-office" type="button" role="tab" aria-selected="false" aria-controls="page-office" onclick="switchPage('office')">事務所</button>
+    <button class="page-tab" id="page-tab-funds" type="button" role="tab" aria-selected="false" aria-controls="page-funds" onclick="switchPage('funds')">資金</button>
+    <button class="page-tab" id="page-tab-records" type="button" role="tab" aria-selected="false" aria-controls="page-records" onclick="switchPage('records')">記録</button>
+  </nav>
+
+  <section class="page-panel" id="page-group" role="tabpanel" aria-labelledby="page-tab-group">
+    <!-- チーム総合力カード -->
+    <div class="team-summary-card">
+      <div class="team-header">
+        <div>
+          <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
+          <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span id="team-overall-score" class="overall-score">--</span>
+          <span id="team-rank-badge" class="rank-badge">-</span>
+        </div>
       </div>
-      <div style="display:flex; align-items:center; gap:6px;">
-        <span id="team-overall-score" class="overall-score">--</span>
-        <span id="team-rank-badge" class="rank-badge">-</span>
+      <div class="avg-grid" id="team-avg-grid"></div>
+    </div>
+    <div class="team-fans-card">
+      <span>グループ推定ファン数</span>
+      <span><strong class="team-fans-count" id="txt-group-fans">--</strong> 人</span>
+    </div>
+    <div class="team-fans-card">
+      <span>グループ危機回避力</span>
+      <span><strong class="team-fans-count" id="txt-group-crisis">--</strong><small> 実効 <span id="txt-effective-crisis">--</span></small></span>
+    </div>
+    <div>
+      <h2 class="page-title" style="margin-bottom:8px;">楽曲</h2>
+      <div class="song-sales-summary" id="song-sales-summary"></div>
+      <div class="song-list" id="song-list-ui"></div>
+    </div>
+  </section>
+
+  <section class="page-panel" id="page-formation" role="tabpanel" aria-labelledby="page-tab-formation" hidden>
+    <!-- 所属メンバー名簿 -->
+    <div class="roster-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-weight:bold; font-size:12px;">所属メンバー (<span id="txt-roster-count">0</span>名)</span>
+        <span style="font-size:10px; color:#888;">選抜枠: 16名</span>
+      </div>
+      <div class="roster-tabs">
+        <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
+        <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
+      </div>
+      <div class="roster-list" id="roster-list-ui"></div>
+    </div>
+  </section>
+
+  <section class="page-panel" id="page-office" role="tabpanel" aria-labelledby="page-tab-office" hidden>
+    <div class="calendar-card" id="calendar-visual"></div>
+    <div class="weekly-action-panel" id="weekly-action-panel"></div>
+    <div class="office-maintenance-note" id="goods-sales-stats"></div>
+    <section class="office-facilities">
+      <h2 class="page-title">事務所設備</h2>
+      <div class="office-maintenance-note">Lv.1は維持費なし。Lv.2以降は毎週維持費が発生します。</div>
+      <div class="office-facility-list" id="office-upgrades-ui"></div>
+    </section>
+    <!-- アクションボタン -->
+    <div class="actions">
+      <div style="display:flex; gap:6px;">
+        <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
+        <button class="danger-btn" style="flex:1;" onclick="returnToTitle()">タイトルへ戻る</button>
       </div>
     </div>
-    <div class="avg-grid" id="team-avg-grid"></div>
-  </div>
+  </section>
 
-  <!-- 所属メンバー名簿 -->
-  <div class="roster-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <span style="font-weight:bold; font-size:12px;">所属メンバー (<span id="txt-roster-count">0</span>名)</span>
-      <span style="font-size:10px; color:#888;">選抜枠: 16名</span>
+  <section class="page-panel" id="page-funds" role="tabpanel" aria-labelledby="page-tab-funds" hidden>
+    <h2 class="page-title">資金</h2>
+    <div class="funds-card">
+      <span class="fund-stat-label">現在の資金</span>
+      <div class="funds-total"><span id="txt-funds">10,000,000</span> 円</div>
     </div>
-    <div class="roster-tabs">
-      <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
-      <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
+    <div class="fund-stat-grid">
+      <div class="fund-stat"><span class="fund-stat-label">今年の売上</span><span class="fund-stat-value" id="txt-year-sales">0 枚</span></div>
+      <div class="fund-stat"><span class="fund-stat-label">今年のライブ動員</span><span class="fund-stat-value" id="txt-year-audience">0 人</span></div>
     </div>
-    <div class="roster-list" id="roster-list-ui"></div>
-  </div>
+  </section>
 
-  <!-- アクションボタン -->
-  <div class="actions">
-    <button class="main-btn" onclick="advanceOneWeek()">1週間進める（レッスン・業務推進）</button>
-    <div style="display:flex; gap:6px;">
-      <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
-      <button class="danger-btn" style="flex:1;" onclick="resetAllData()">データをリセット</button>
+  <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
+    <h2 class="page-title">最新の記録</h2>
+    <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
+  </section>
+</div>
+
+<div class="modal-overlay" id="music-offer-modal">
+  <div class="modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">音楽番組の出演打診</h3>
+    <p style="font-size:12px; color:#666;">出演する番組と披露する楽曲を選んでください。</p>
+    <div class="offer-list" id="music-offer-rows"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="resolveMusicOffers()">出演内容を決定</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="equipment-event-modal">
+  <div class="modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">設備強化イベント</h3>
+    <p id="equipment-event-description" style="font-size:12px; color:#555; line-height:1.6;"></p>
+    <div class="actions">
+      <button class="main-btn" id="equipment-event-upgrade" onclick="resolveEquipmentUpgradeEvent(true)">設備を強化</button>
+      <button class="danger-btn" onclick="resolveEquipmentUpgradeEvent(false)">今回は見送る</button>
     </div>
   </div>
-
-  <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
 </div>
 
 <!-- 半年計画策定モーダル -->
@@ -400,6 +733,7 @@ const STATUS_KEYS = [
   { id: 'dance',      name: 'ダンス' },
   { id: 'stamina',    name: '体力' },
   { id: 'talk',       name: 'トーク力' },
+  { id: 'sns',        name: 'SNS運用' },
   { id: 'variety',    name: 'バラエティ耐性' },
   { id: 'academics',  name: '学力' },
   { id: 'athletics',  name: '運動能力' },
@@ -449,6 +783,35 @@ const VENUE_DATA = [
 
 const CAPACITY_MAP = { SS: 47500, S: 38500, A: 30000, B: 20000, C: 12500, D: 7500 };
 const EASE_MULTIPLIER = { SS: 1.30, S: 1.15, A: 1.00, B: 0.85, C: 0.70 };
+const CD_BENEFITS = [
+  { id: 'web-greeting', name: '特典ウェブ挨拶', cost: 2000000 },
+  { id: 'real-greeting', name: 'リアル挨拶', cost: 5000000 },
+  { id: 'web-sign', name: 'ウェブサイン', cost: 4000000 },
+  { id: 'real-sign', name: 'リアルサインイベント', cost: 10000000 }
+];
+const SEAT_TYPES = [
+  { id: 'arena', name: 'アリーナ', defaultPrice: 12000 },
+  { id: 'stand1', name: '1Fスタンド', defaultPrice: 9000 },
+  { id: 'stand2', name: '2Fスタンド', defaultPrice: 7000 },
+  { id: 'stand3', name: '3Fスタンド', defaultPrice: 5000, domeOnly: true },
+  { id: 'stand4', name: '4Fスタンド', defaultPrice: 4000, domeOnly: true },
+  { id: 'annotation', name: '注釈', defaultPrice: 6000, optional: true },
+  { id: 'stageBack', name: 'ステージバック', defaultPrice: 3000, optional: true }
+];
+const OFFICE_FACILITIES = [
+  { id: 'lessons', name: 'レッスン', baseCost: 750000, baseMaintenance: 75000, effect: 'レッスン効果を強化' },
+  { id: 'dormitory', name: '寮', baseCost: 1200000, baseMaintenance: 100000, effect: '育成時の体力回復を強化' },
+  { id: 'analytics', name: 'データ分析', baseCost: 1500000, baseMaintenance: 125000, effect: 'グループ危機回避力を強化' },
+  { id: 'snsTraining', name: 'SNS教育', baseCost: 1000000, baseMaintenance: 100000, effect: 'SNS運用と危機回避力を強化' },
+  { id: 'liveProduction', name: 'ライブ演出', baseCost: 1800000, baseMaintenance: 150000, effect: 'ライブ動員を強化' },
+  { id: 'merchandise', name: 'グッズ', baseCost: 1000000, baseMaintenance: 75000, effect: 'ライブでのグッズ収益を強化' }
+];
+const MUSIC_PROGRAMS = [
+  { id: 'song-station', name: 'Song Station' },
+  { id: 'ctv', name: 'CTV' },
+  { id: 'm-con', name: 'Mコン' }
+];
+const SONG_TITLES = ['ひかりの約束', 'キミ色サイン', '青空レター', '恋するステップ', '未来へのメロディ', '星屑のリボン', 'まっすぐな夢', '花咲く頃に'];
 
 // ランク判定定義
 function getRankData(val) {
@@ -469,9 +832,35 @@ function getRankData(val) {
 let currentYear = 1;
 let currentMonth = 1;
 let currentWeek = 1; // 1〜4週
+let gameDate = '';
+let calendarYear = 0;
+let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
 let currentRosterTab = 'selected';
+let merchandiseProducts = 0;
+let merchandiseStock = 0;
+let merchandiseUnitsSold = 0;
+let merchandiseSellThrough = null;
+let nextLivePromotionPoints = 0;
+let crisisCheckWeekKey = '';
+let crisisEventWeekKey = '';
+let crisisEventType = '';
+let industryOfferCheckWeekKey = '';
+let pendingIndustryOffer = null;
+let specialLiveEvents = [];
+let pendingEquipmentEvent = null;
+let equipmentEventCheckWeekKey = '';
+let groupCrisis = 55;
+let officeUpgrades = createInitialOfficeUpgrades();
+let activeSaveSlot = null;
+const SAVE_SLOT_COUNT = 3;
+const LEGACY_SAVE_KEY = 'idol_manager_save';
+let songs = [];
+let pendingPerformanceOffers = [];
+let scheduledPerformances = [];
+let specialOffersSent = [];
+let rivalLiveBookings = [];
 
 let idolRoster = [];
 let productionSchedule = {
@@ -484,14 +873,106 @@ let yearlyStats = { sales: 0, audience: 0 };
 let funds = 10000000;
 
 // 競合チーム（初期6チーム）
-let leagueTeams = [
-  { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
-  { id: 'rival_1', name: 'スターライト・クイーン', sales: 0, audience: 0, basePower: 92 },
-  { id: 'rival_2', name: 'ネオ・エレメンツ', sales: 0, audience: 0, basePower: 85 },
-  { id: 'rival_3', name: 'サクラ・シンフォニー', sales: 0, audience: 0, basePower: 78 },
-  { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
-  { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
-];
+function createInitialLeagueTeams() {
+  return [
+    { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
+    { id: 'rival_1', name: 'スターライト・クイーン', sales: 0, audience: 0, basePower: 92 },
+    { id: 'rival_2', name: 'ネオ・エレメンツ', sales: 0, audience: 0, basePower: 85 },
+    { id: 'rival_3', name: 'サクラ・シンフォニー', sales: 0, audience: 0, basePower: 78 },
+    { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
+    { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
+  ];
+}
+
+function createInitialOfficeUpgrades() {
+  return { lessons: 0, dormitory: 0, analytics: 0, snsTraining: 0, liveProduction: 0, merchandise: 0 };
+}
+
+let leagueTeams = createInitialLeagueTeams();
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
+}
+
+function getGameDateObject(value = gameDate) {
+  return new Date(`${value}T12:00:00`);
+}
+
+function getFirstWednesday(year, monthIndex = 0) {
+  const date = new Date(year, monthIndex, 1, 12);
+  const offset = (3 - date.getDay() + 7) % 7;
+  date.setDate(date.getDate() + offset);
+  return date;
+}
+
+function getNextWednesday(date) {
+  const nextDate = new Date(date);
+  const daysUntilWednesday = (3 - nextDate.getDay() + 7) % 7 || 7;
+  nextDate.setDate(nextDate.getDate() + daysUntilWednesday);
+  return nextDate;
+}
+
+function getLastWednesday(year, monthIndex) {
+  const date = new Date(year, monthIndex + 1, 0, 12);
+  const daysSinceWednesday = (date.getDay() - 3 + 7) % 7;
+  date.setDate(date.getDate() - daysSinceWednesday);
+  return date;
+}
+
+function ensureRivalLiveBookings(gameYear, month) {
+  const actualYear = calendarYear + (gameYear - currentYear);
+  leagueTeams.filter(team => team.id !== 'player').forEach(team => {
+    const bookingId = `${team.id}-${actualYear}-${month}`;
+    if (rivalLiveBookings.some(booking => booking.id === bookingId)) return;
+    if (Math.random() >= 0.45) return;
+
+    const venuePool = Math.random() < 0.35
+      ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
+      : VENUE_DATA;
+    const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
+    const lastDay = new Date(actualYear, month, 0).getDate();
+    const liveDay = Math.floor(Math.random() * Math.min(28, lastDay)) + 1;
+    rivalLiveBookings.push({
+      id: bookingId,
+      groupName: team.name,
+      venue: venue.name,
+      liveDate: toDateKey(new Date(actualYear, month - 1, liveDay, 12))
+    });
+  });
+}
+
+function findRivalVenueConflict(venueName, dateKey) {
+  return rivalLiveBookings.find(booking => booking.venue === venueName && booking.liveDate === dateKey) || null;
+}
+
+function syncGameCalendar() {
+  const date = getGameDateObject();
+  if (calendarYear && date.getFullYear() !== calendarYear) {
+    currentYear += date.getFullYear() - calendarYear;
+  }
+  calendarYear = date.getFullYear();
+  currentMonth = date.getMonth() + 1;
+  currentWeek = Math.ceil(date.getDate() / 7);
+}
+
+function migrateLegacyGameDate(year, month, week) {
+  const firstWednesday = getFirstWednesday(new Date().getFullYear() + 1 + year - 1, month - 1);
+  firstWednesday.setDate(firstWednesday.getDate() + (week - 1) * 7);
+  return toDateKey(firstWednesday);
+}
 
 // ==========================================
 // 3. アイドル生成ロジック
@@ -517,14 +998,54 @@ function generateRandomStats(biasPolicy = null) {
   return stats;
 }
 
+function generateBirthday(preferredMonth = null, preferredWeek = null) {
+  const usedBirthdays = new Set(idolRoster
+    .filter(member => Number.isInteger(member.birthdayDay))
+    .map(member => `${member.birthdayMonth}-${member.birthdayDay}`));
+  const available = [];
+  for (let month = 1; month <= 12; month++) {
+    for (let day = 1; day <= 28; day++) {
+      const week = Math.ceil(day / 7);
+      const matchesPreference = preferredMonth === null || (month === preferredMonth && week === preferredWeek);
+      if (matchesPreference && !usedBirthdays.has(`${month}-${day}`)) available.push({ month, day, week });
+    }
+  }
+  if (!available.length && preferredMonth !== null) return generateBirthday();
+  return available.length
+    ? available[Math.floor(Math.random() * available.length)]
+    : { month: Math.floor(Math.random() * 12) + 1, day: Math.floor(Math.random() * 28) + 1, week: 1 };
+}
+
+function ensureMemberBirthdays() {
+  idolRoster.forEach(member => {
+    if (!member.stats) member.stats = {};
+    if (!Number.isFinite(member.stats.sns)) member.stats.sns = 45;
+    if (!Number.isInteger(member.birthdayMonth) || !Number.isInteger(member.birthdayDay)) {
+      const hasWeekBirthday = Number.isInteger(member.birthdayMonth) && Number.isInteger(member.birthdayWeek);
+      const birthday = generateBirthday(
+        hasWeekBirthday ? member.birthdayMonth : null,
+        hasWeekBirthday ? member.birthdayWeek : null
+      );
+      member.birthdayMonth = birthday.month;
+      member.birthdayDay = birthday.day;
+      member.birthdayWeek = birthday.week;
+    }
+    member.birthdayWeek = Math.ceil(member.birthdayDay / 7);
+  });
+}
+
 function createMember(age = null, policy = null) {
   const nameData = generateIdolName();
   const idolAge = age || (Math.floor(Math.random() * 8) + 13); // 13〜20
+  const birthday = generateBirthday();
   return {
     id: Date.now() + Math.floor(Math.random() * 10000),
     name: nameData.fullName,
     reading: nameData.reading,
     age: idolAge,
+    birthdayMonth: birthday.month,
+    birthdayDay: birthday.day,
+    birthdayWeek: birthday.week,
     joinAge: idolAge,
     yearsActive: 0,
     stats: generateRandomStats(policy),
@@ -534,27 +1055,44 @@ function createMember(age = null, policy = null) {
   };
 }
 
-function initGame() {
-  const saved = localStorage.getItem('idol_manager_save');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      currentYear = data.currentYear;
-      currentMonth = data.currentMonth;
-      currentWeek = data.currentWeek;
-      totalWeeksElapsed = data.totalWeeksElapsed;
-      draftCount = data.draftCount;
-      funds = data.funds;
-      yearlyStats = data.yearlyStats;
-      idolRoster = data.idolRoster;
-      productionSchedule = data.productionSchedule;
-      leagueTeams = data.leagueTeams;
-      updateUI();
-      return;
-    } catch(e) { console.error(e); }
-  }
+function initializeNewGameState() {
+  currentYear = 1;
+  currentMonth = 1;
+  currentWeek = 1;
+  gameDate = toDateKey(getFirstWednesday(new Date().getFullYear() + 1, 0));
+  calendarYear = getGameDateObject().getFullYear();
+  totalWeeksElapsed = 0;
+  draftCount = 0;
+  currentRosterTab = 'selected';
+  merchandiseProducts = 0;
+  merchandiseStock = 0;
+  merchandiseUnitsSold = 0;
+  merchandiseSellThrough = null;
+  nextLivePromotionPoints = 0;
+  crisisCheckWeekKey = '';
+  crisisEventWeekKey = '';
+  crisisEventType = '';
+  industryOfferCheckWeekKey = '';
+  pendingIndustryOffer = null;
+  specialLiveEvents = [];
+  pendingEquipmentEvent = null;
+  equipmentEventCheckWeekKey = '';
+  groupCrisis = 55;
+  officeUpgrades = createInitialOfficeUpgrades();
+  productionSchedule = {
+    '1-2': { release: 'single', liveVenue: null },
+    '1-5': { release: 'none', liveVenue: '原宿体育館' },
+    '1-6': { release: 'single', liveVenue: null }
+  };
+  yearlyStats = { sales: 0, audience: 0 };
+  funds = 10000000;
+  leagueTeams = createInitialLeagueTeams();
+  songs = [];
+  pendingPerformanceOffers = [];
+  scheduledPerformances = [];
+  specialOffersSent = [];
+  rivalLiveBookings = [];
 
-  // 初期化：30名体制
   idolRoster = [];
   for (let i = 0; i < 30; i++) {
     const startAge = Math.floor(Math.random() * 9) + 14; // 14〜22歳
@@ -565,7 +1103,143 @@ function initGame() {
     m.isCenter = (i === 0);
     idolRoster.push(m);
   }
+  ensureMemberBirthdays();
+}
+
+function applySavedGame(data) {
+  currentYear = data.currentYear || 1;
+  gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);
+  calendarYear = data.calendarYear || getGameDateObject().getFullYear();
+  syncGameCalendar();
+  totalWeeksElapsed = data.totalWeeksElapsed || 0;
+  draftCount = data.draftCount || 0;
+  merchandiseProducts = data.merchandiseProducts || 0;
+  merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
+  merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
+  merchandiseSellThrough = data.merchandiseSellThrough ?? null;
+  nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
+  crisisCheckWeekKey = data.crisisCheckWeekKey || '';
+  crisisEventWeekKey = data.crisisEventWeekKey || '';
+  crisisEventType = data.crisisEventType || '';
+  industryOfferCheckWeekKey = data.industryOfferCheckWeekKey || '';
+  pendingIndustryOffer = data.pendingIndustryOffer || null;
+  specialLiveEvents = data.specialLiveEvents || [];
+  pendingEquipmentEvent = data.pendingEquipmentEvent || null;
+  equipmentEventCheckWeekKey = data.equipmentEventCheckWeekKey || '';
+  groupCrisis = data.groupCrisis ?? 55;
+  officeUpgrades = { ...createInitialOfficeUpgrades(), ...(data.officeUpgrades || {}) };
+  funds = data.funds ?? 10000000;
+  yearlyStats = data.yearlyStats || { sales: 0, audience: 0 };
+  idolRoster = data.idolRoster || [];
+  ensureMemberBirthdays();
+  productionSchedule = data.productionSchedule || {};
+  leagueTeams = data.leagueTeams || createInitialLeagueTeams();
+  songs = data.songs || [];
+  pendingPerformanceOffers = data.pendingPerformanceOffers || [];
+  scheduledPerformances = data.scheduledPerformances || [];
+  specialOffersSent = data.specialOffersSent || [];
+  rivalLiveBookings = data.rivalLiveBookings || [];
+}
+
+function saveSlotKey(slot) {
+  return `idol_manager_save_slot_${slot}`;
+}
+
+function migrateLegacySave() {
+  const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
+  if (!legacySave) return;
+  const slotOneKey = saveSlotKey(1);
+  if (localStorage.getItem(slotOneKey)) {
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+    return;
+  }
+  try {
+    JSON.parse(legacySave);
+    localStorage.setItem(slotOneKey, legacySave);
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function readSaveSlot(slot) {
+  const rawSave = localStorage.getItem(saveSlotKey(slot));
+  if (!rawSave) return null;
+  try {
+    return JSON.parse(rawSave);
+  } catch (error) {
+    return { isCorrupt: true };
+  }
+}
+
+function renderSaveSlots() {
+  migrateLegacySave();
+  const slots = document.getElementById('save-slots');
+  slots.innerHTML = Array.from({ length: SAVE_SLOT_COUNT }, (_, index) => {
+    const slot = index + 1;
+    const save = readSaveSlot(slot);
+    const corrupted = save && save.isCorrupt;
+    const populated = save && !corrupted;
+    const savedAt = populated && save.savedAt ? new Date(save.savedAt).toLocaleString() : '日時記録なし';
+    const info = corrupted
+      ? 'セーブデータを読み込めません。削除して新しく開始してください。'
+      : populated
+        ? `${save.currentYear || 1}年目 ${save.currentMonth || 1}月 第${save.currentWeek || 1}週${save.gameDate ? `<br>${new Date(`${save.gameDate}T12:00:00`).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}` : ''}<br>所属 ${save.idolRoster?.length || 0}名 / 資金 ${Number(save.funds || 0).toLocaleString()}円<br>最終保存: ${savedAt}`
+        : '空き枠';
+    const actions = corrupted
+      ? `<button class="danger-btn slot-delete-btn" type="button" onclick="deleteSaveSlot(${slot})">削除</button>`
+      : populated
+        ? `<button class="main-btn" type="button" onclick="continueSavedGame(${slot})">続きから</button><button class="danger-btn" type="button" onclick="startNewGame(${slot})">新規開始</button><button class="danger-btn slot-delete-btn" type="button" aria-label="セーブ枠${slot}を削除" onclick="deleteSaveSlot(${slot})">削除</button>`
+        : `<button class="main-btn" type="button" onclick="startNewGame(${slot})">新規開始</button>`;
+    return `<section class="save-slot"><div class="save-slot-heading"><h2>セーブ枠 ${slot}</h2>${populated ? '<span>保存済み</span>' : ''}</div><div class="save-slot-info">${info}</div><div class="save-slot-actions">${actions}</div></section>`;
+  }).join('');
+}
+
+function openTitleScreen() {
+  document.getElementById('game-screen').hidden = true;
+  document.getElementById('title-screen').hidden = false;
+  renderSaveSlots();
+}
+
+function continueSavedGame(slot) {
+  initGame(slot, false);
+}
+
+function startNewGame(slot) {
+  if (readSaveSlot(slot) && !confirm(`セーブ枠${slot}のデータを上書きして新しく開始しますか？`)) return;
+  initGame(slot, true);
+}
+
+function deleteSaveSlot(slot) {
+  if (!confirm(`セーブ枠${slot}のデータを削除しますか？`)) return;
+  localStorage.removeItem(saveSlotKey(slot));
+  renderSaveSlots();
+}
+
+function returnToTitle() {
   updateUI();
+  activeSaveSlot = null;
+  openTitleScreen();
+}
+
+function initGame(slot, startFresh) {
+  if (!Number.isInteger(slot) || slot < 1 || slot > SAVE_SLOT_COUNT) return;
+  migrateLegacySave();
+  const saved = startFresh ? null : readSaveSlot(slot);
+  if (saved?.isCorrupt) {
+    alert('セーブデータを読み込めません。削除するか、新規開始してください。');
+    openTitleScreen();
+    return;
+  }
+  if (saved) applySavedGame(saved);
+  else initializeNewGameState();
+  activeSaveSlot = slot;
+  document.getElementById('title-screen').hidden = true;
+  document.getElementById('game-screen').hidden = false;
+  updateUI();
+  document.getElementById('active-slot-label').textContent = `セーブ枠 ${slot}`;
+  if (pendingEquipmentEvent) openEquipmentUpgradeEventModal();
+  else if (pendingPerformanceOffers.length) openMusicOfferModal();
 }
 
 // ==========================================
@@ -607,117 +1281,622 @@ function calculateSingleOverall(stats) {
   return Math.round(sum / Object.keys(stats).length);
 }
 
+function calculateMemberFans(member) {
+  const stats = member.stats || {};
+  return Math.round(
+    (stats.popularity || 0) * 800 +
+    ((stats.vocal || 0) + (stats.dance || 0)) * 120 +
+    (stats.talk || 0) * 80
+  );
+}
+
+function calculateGroupFans() {
+  const memberFanTotal = idolRoster.reduce((total, member) => total + calculateMemberFans(member), 0);
+  return Math.round(memberFanTotal * 0.65);
+}
+
 // ==========================================
 // 5. 進行 ＆ イベントシステム
 // ==========================================
 
-function advanceOneWeek() {
-  totalWeeksElapsed++;
+function getBirthdayMembersBetween(startDate, endDate) {
+  const birthdays = [];
+  const startTime = startDate.getTime();
+  const endTime = endDate.getTime();
+  idolRoster.forEach(member => {
+    for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+      const birthday = new Date(year, member.birthdayMonth - 1, member.birthdayDay || ((member.birthdayWeek - 1) * 7 + 1), 12);
+      if (birthday.getTime() > startTime && birthday.getTime() <= endTime) birthdays.push(member);
+    }
+  });
+  return birthdays;
+}
 
-  // ライバルの週間蓄積
-  leagueTeams.forEach(t => {
-    if (t.id === 'player') return;
-    t.sales += Math.floor((t.basePower * 550) + (Math.random() * 7000));
-    t.audience += Math.floor((t.basePower * 220) + (Math.random() * 3000));
+function processMemberBirthdays(startDate, endDate) {
+  const birthdayMembers = getBirthdayMembersBetween(startDate, endDate);
+  birthdayMembers.forEach(member => { member.age++; });
+  if (birthdayMembers.length) {
+    setLog(`【誕生日】${birthdayMembers.map(member => member.name).join('、')}が誕生日を迎えました。`);
+  }
+}
+
+function getCurrentWeekKey() {
+  return gameDate;
+}
+
+function isFirstWednesdayOfMonth(date = getGameDateObject()) {
+  return date.getDay() === 3 && date.getDate() <= 7;
+}
+
+function isLastWednesdayOfMonth(date = getGameDateObject()) {
+  return date.getDay() === 3 && date.getTime() === getLastWednesday(date.getFullYear(), date.getMonth()).getTime();
+}
+
+function getScheduledLiveDate(year, month, plan) {
+  if (plan.liveDate) return getGameDateObject(plan.liveDate);
+  return getLastWednesday(year, month - 1);
+}
+
+function findNextScheduledLiveDate(startDate, endDate) {
+  let nextLiveDate = null;
+  Object.entries(productionSchedule).forEach(([key, plan]) => {
+    if (!plan.liveVenue || plan.liveCompleted) return;
+    const [year, month] = key.split('-').map(Number);
+    const liveDate = getScheduledLiveDate(calendarYear + (year - currentYear), month, plan);
+    if (liveDate > startDate && liveDate <= endDate && (!nextLiveDate || liveDate < nextLiveDate)) {
+      nextLiveDate = liveDate;
+    }
+  });
+  specialLiveEvents.forEach(event => {
+    if (event.completed) return;
+    const liveDate = getGameDateObject(event.liveDate);
+    if (liveDate > startDate && liveDate <= endDate && (!nextLiveDate || liveDate < nextLiveDate)) {
+      nextLiveDate = liveDate;
+    }
+  });
+  rivalLiveBookings.forEach(booking => {
+    const liveDate = getGameDateObject(booking.liveDate);
+    if (liveDate > startDate && liveDate <= endDate && (!nextLiveDate || liveDate < nextLiveDate)) {
+      nextLiveDate = liveDate;
+    }
+  });
+  return nextLiveDate;
+}
+
+function rollWeeklyCrisisEvent() {
+  const weekKey = getCurrentWeekKey();
+  if (crisisCheckWeekKey === weekKey) return;
+
+  crisisCheckWeekKey = weekKey;
+  crisisEventWeekKey = '';
+  crisisEventType = '';
+  const risk = Math.max(0.5, (100 - calculateGroupCrisisResilience()) * 0.12);
+  if (Math.random() * 100 < risk) {
+    crisisEventWeekKey = weekKey;
+    crisisEventType = Math.random() < 0.5 ? 'information-leak' : 'sns-scandal';
+  }
+}
+
+function calculateGroupCrisisResilience() {
+  const selectedMembers = idolRoster.filter(member => member.isSelected);
+  const targets = selectedMembers.length ? selectedMembers : idolRoster;
+  const averageSns = targets.length
+    ? targets.reduce((total, member) => total + (member.stats.sns || 0), 0) / targets.length
+    : 0;
+  const dataBonus = ((officeUpgrades.analytics || 1) - 1) * 5;
+  const snsBonus = ((officeUpgrades.snsTraining || 1) - 1) * 7;
+  return Math.min(100, Math.round(groupCrisis * 0.6 + averageSns * 0.4 + dataBonus + snsBonus));
+}
+
+function rollWeeklyIndustryOffer() {
+  if (getGameDateObject().getDay() !== 3) return;
+  const weekKey = getCurrentWeekKey();
+  if (industryOfferCheckWeekKey === weekKey || pendingIndustryOffer) return;
+  industryOfferCheckWeekKey = weekKey;
+  if (Math.random() >= 0.035) return;
+
+  const isFestival = Math.random() < 0.5;
+  const venues = isFestival
+    ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
+    : VENUE_DATA.filter(venue => ['C', 'D'].includes(venue.cap));
+  const venue = venues[Math.floor(Math.random() * venues.length)];
+  const offerDate = getGameDateObject();
+  offerDate.setDate(offerDate.getDate() + (isFestival ? 60 : 45));
+  pendingIndustryOffer = {
+    id: `industry-${gameDate}-${isFestival ? 'festival' : 'battle'}`,
+    type: isFestival ? 'festival' : 'battle',
+    name: isFestival ? '大型フェス出演打診' : '有名アーティストとの対バン打診',
+    venue: venue.name,
+    liveDate: toDateKey(offerDate)
+  };
+}
+
+function rollEquipmentUpgradeEvent() {
+  if (getGameDateObject().getDay() !== 3) return;
+  const weekKey = getCurrentWeekKey();
+  if (equipmentEventCheckWeekKey === weekKey || pendingEquipmentEvent) return;
+  equipmentEventCheckWeekKey = weekKey;
+
+  const candidates = [];
+  const currentScore = calculateTeamAverages().overall;
+  const rivalTeams = leagueTeams.filter(team => team.id !== 'player');
+  const rivalAverage = rivalTeams.length
+    ? rivalTeams.reduce((total, team) => total + team.basePower, 0) / rivalTeams.length
+    : currentScore;
+  const strongestRival = rivalTeams.reduce((strongest, team) => Math.max(strongest, team.basePower), 0);
+
+  if (crisisEventType === 'sns-scandal' && crisisEventWeekKey === weekKey) {
+    candidates.push({ facilityId: 'snsTraining', reason: 'SNSスキャンダルを受け、メンバーのSNS教育が必要です。' });
+  }
+  if (Number.isFinite(merchandiseSellThrough) && merchandiseSellThrough < 0.5) {
+    candidates.push({ facilityId: 'analytics', reason: `グッズの直近完売率が${Math.round(merchandiseSellThrough * 100)}%です。販売データの分析が必要です。` });
+  }
+  if (currentScore + 8 < rivalAverage) {
+    candidates.push({ facilityId: 'lessons', reason: '他グループよりアイドル能力が低く、レッスン環境の強化が必要です。' });
+  }
+  if (strongestRival > currentScore + 12) {
+    candidates.push({ facilityId: 'analytics', reason: '他グループの影響力が強く、市場データの分析が必要です。' });
+  }
+
+  const activeCandidates = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < 5);
+  const eventChance = activeCandidates.length ? 0.22 : 0.018;
+  if (Math.random() >= eventChance) return;
+
+  const candidate = activeCandidates.length
+    ? activeCandidates[Math.floor(Math.random() * activeCandidates.length)]
+    : { facilityId: OFFICE_FACILITIES[Math.floor(Math.random() * OFFICE_FACILITIES.length)].id, reason: '経営会議で事務所設備の強化が提案されました。' };
+  const facility = OFFICE_FACILITIES.find(item => item.id === candidate.facilityId);
+  if (!facility || (officeUpgrades[facility.id] || 0) >= 5) return;
+  pendingEquipmentEvent = { ...candidate, name: facility.name, eventDate: gameDate };
+}
+
+function openEquipmentUpgradeEventModal() {
+  if (!pendingEquipmentEvent) return;
+  const facility = OFFICE_FACILITIES.find(item => item.id === pendingEquipmentEvent.facilityId);
+  if (!facility) return;
+  const level = officeUpgrades[facility.id] || 0;
+  const cost = getOfficeUpgradeCost(facility);
+  const button = document.getElementById('equipment-event-upgrade');
+  button.disabled = funds < cost;
+  document.getElementById('equipment-event-description').textContent =
+    `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level + 1}へ強化しますか？ 開発費 ${cost.toLocaleString()}円 / 強化後の週維持費 ${getOfficeMaintenanceCost(facility, level + 1).toLocaleString()}円。${funds < cost ? '資金が不足しています。' : ''}`;
+  document.getElementById('equipment-event-modal').style.display = 'flex';
+}
+
+function resolveEquipmentUpgradeEvent(accept) {
+  if (!pendingEquipmentEvent) return;
+  const event = pendingEquipmentEvent;
+  pendingEquipmentEvent = null;
+  document.getElementById('equipment-event-modal').style.display = 'none';
+  if (accept) {
+    const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
+    const level = officeUpgrades[event.facilityId] || 0;
+    const cost = getOfficeUpgradeCost(facility);
+    if (funds >= cost && level < 5) {
+      funds -= cost;
+      officeUpgrades[event.facilityId] = level + 1;
+      setLog(`【設備強化イベント】${facility.name}をLv.${level + 1}に強化しました。`);
+    } else {
+      setLog(`【設備強化イベント】${facility.name}の提案を資金不足で見送りました。`);
+    }
+  } else {
+    setLog(`【設備強化イベント】${event.name}の強化提案を見送りました。`);
+  }
+  updateUI();
+  if (pendingPerformanceOffers.length) openMusicOfferModal();
+}
+
+function resolveIndustryOffer() {
+  if (!pendingIndustryOffer) return;
+  const offer = pendingIndustryOffer;
+  pendingIndustryOffer = null;
+  if (!confirm(`【出演打診】${offer.name}\n${offer.liveDate} / ${offer.venue}\n出演を受諾しますか？`)) {
+    setLog(`【出演辞退】${offer.name}を辞退しました。`);
+    return;
+  }
+  specialLiveEvents.push({ ...offer, completed: false });
+  setLog(`【出演決定】${offer.name}を受諾しました（${offer.liveDate}）。`);
+}
+
+function getCurrentWeekEvents() {
+  const currentDate = getGameDateObject();
+  if (currentDate.getDay() === 3) {
+    rollWeeklyCrisisEvent();
+    rollWeeklyIndustryOffer();
+    rollEquipmentUpgradeEvent();
+  }
+  const events = [];
+  const weekKey = getCurrentWeekKey();
+  const birthdayMembers = getBirthdayMembersBetween(currentDate, getNextWednesday(currentDate));
+  if (birthdayMembers.length) events.push(`誕生日: ${birthdayMembers.map(member => member.name).join('、')}`);
+  const rivalEvents = rivalLiveBookings.filter(booking => booking.liveDate === gameDate);
+  if (rivalEvents.length) events.push(`他グループのライブ: ${rivalEvents.map(event => event.groupName).join('、')}`);
+
+  if (isFirstWednesdayOfMonth(currentDate)) {
+    const targetMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const targetYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    const releasePlan = productionSchedule[`${targetYear}-${targetMonth}`];
+    if (releasePlan?.release && releasePlan.release !== 'none' && !releasePlan.musicOfferSent) {
+      events.push('音楽番組の出演打診');
+    }
+    if ((targetMonth === 7 || targetMonth === 12) && !specialOffersSent.includes(`${targetYear}-${targetMonth}`)) {
+      events.push('大型音楽特番の出演打診');
+    }
+
+    const targetReleaseDate = new Date(currentDate);
+    targetReleaseDate.setDate(targetReleaseDate.getDate() + 84);
+    const targetReleaseYear = currentYear + targetReleaseDate.getFullYear() - calendarYear;
+    const targetReleaseMonth = targetReleaseDate.getMonth() + 1;
+    const selectionPlan = productionSchedule[`${targetReleaseYear}-${targetReleaseMonth}`];
+    if (selectionPlan?.release && selectionPlan.release !== 'none') events.push('選抜発表');
+    if (currentMonth === 1 || currentMonth === 7) events.push('半年活動計画');
+  }
+
+  Object.entries(productionSchedule).forEach(([key, plan]) => {
+    if (!plan.liveVenue || plan.liveCompleted) return;
+    const [year, month] = key.split('-').map(Number);
+    const liveDate = getScheduledLiveDate(calendarYear + (year - currentYear), month, plan);
+    if (toDateKey(liveDate) === gameDate) events.push(`ライブ開催: ${plan.liveName || plan.liveVenue}`);
+  });
+  specialLiveEvents.forEach(event => {
+    if (!event.completed && event.liveDate === gameDate) events.push(event.name);
   });
 
-  // 危機管理チェック（選抜の危機回避力平均）
-  const summary = calculateTeamAverages();
-  const crisisAvg = summary.averages.crisis;
-  if (Math.random() * 100 < (100 - crisisAvg) * 0.05) {
-    setLog("【SNSボヤ騒ぎ】一部ファンの間で噂が拡散し、対応に追われました。（人気 -2）");
-    idolRoster.forEach(m => { if (m.isSelected) m.stats.popularity = Math.max(0, m.stats.popularity - 2); });
+  if (isLastWednesdayOfMonth(currentDate)) {
+    const plan = productionSchedule[`${currentYear}-${currentMonth}`];
+    if (plan?.release && plan.release !== 'none') events.push('CD発売');
+    if (scheduledPerformances.some(performance =>
+      performance.airYear === currentYear && performance.airMonth === currentMonth
+    )) events.push('テレビ出演');
+    if (currentMonth === 12) events.push('年間アワード・卒業相談');
   }
 
-  // 12週前（3ヶ月前）の選抜発表チェック
-  checkSenbatsuTrigger();
+  if ((totalWeeksElapsed + 1) > 0 && (totalWeeksElapsed + 1) % 120 === 0) events.push('ドラフト会議');
+  if (crisisEventWeekKey === weekKey) {
+    events.push(crisisEventType === 'information-leak' ? '情報漏洩への対応' : 'SNSスキャンダル対応');
+  }
+  if (pendingIndustryOffer) events.push(pendingIndustryOffer.name);
+  if (pendingEquipmentEvent) events.push(`設備強化提案: ${pendingEquipmentEvent.name}`);
+  return events;
+}
 
-  // 月末・週イベント処理
-  if (currentWeek === 4) {
-    processMonthlyReleaseAndLive();
+function findUpcomingSinglePlan() {
+  return Object.entries(productionSchedule)
+    .map(([key, plan]) => {
+      const [year, month] = key.split('-').map(Number);
+      return { year, month, plan };
+    })
+    .filter(item => item.plan.release === 'single' && item.year * 12 + item.month >= currentYear * 12 + currentMonth)
+    .sort((a, b) => a.year - b.year || a.month - b.month)[0] || null;
+}
+
+function performWeeklyAction(action) {
+  if (getCurrentWeekEvents().length) return;
+  const selectedIndex = Number.parseInt(document.getElementById('weekly-member-target').value, 10);
+  const member = idolRoster[selectedIndex];
+
+  if (action === 'single-promotion') {
+    const upcoming = findUpcomingSinglePlan();
+    if (upcoming) {
+      const song = ensureScheduledSong(upcoming.year, upcoming.month, upcoming.plan);
+      song.promotionPoints = (song.promotionPoints || 0) + 1;
+      addSongExperience(song, 3);
+      setLog(`【シングル販促】「${song.title}」の販促を行いました。発売時の売上が上がります。`);
+    } else {
+      idolRoster.filter(idol => idol.isSelected).forEach(idol => {
+        idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
+      });
+      setLog('【シングル販促】選抜メンバーの人気を高めました。');
+    }
+  } else if (action === 'live-promotion') {
+    nextLivePromotionPoints++;
+    setLog('【ライブ広報】次回ライブの集客効果が上がります。');
+  } else if (action === 'goods-development') {
+    if (merchandiseProducts >= 5) return;
+    merchandiseProducts++;
+    merchandiseStock += 1000;
+    funds -= 500000;
+    setLog(`【グッズ開発】商品を開発しました（全${merchandiseProducts}種 / 在庫 ${merchandiseStock.toLocaleString()}個 / 開発費 500,000円）。`);
+  } else if (member && ['vocal', 'dance', 'variety', 'talk'].includes(action)) {
+    const skillGain = 2 + Math.max(0, officeUpgrades.lessons - 1);
+    const staminaGain = Math.max(0, officeUpgrades.dormitory - 1);
+    member.stats[action] = Math.min(100, (member.stats[action] || 0) + skillGain);
+    member.stats.stamina = Math.min(100, (member.stats.stamina || 0) + staminaGain);
+    const actionNames = { vocal: '歌唱レッスン', dance: 'ダンスレッスン', variety: 'バラエティ力育成', talk: 'トーク力育成' };
+    setLog(`【${actionNames[action]}】${member.name}の能力が上がりました。`);
+  } else {
+    return;
   }
 
-  // 年末イベント（12月4週）
-  if (currentMonth === 12 && currentWeek === 4) {
+  advanceOneWeek();
+}
+
+function advanceOneWeek() {
+  const currentDate = getGameDateObject();
+  const nextWednesday = getNextWednesday(currentDate);
+  const nextLiveDate = findNextScheduledLiveDate(currentDate, nextWednesday);
+  const nextDate = nextLiveDate || nextWednesday;
+  const wasWednesday = currentDate.getDay() === 3;
+  const previousMonth = currentMonth;
+  const previousYear = currentYear;
+
+  processMemberBirthdays(currentDate, nextDate);
+  if (wasWednesday) {
+    totalWeeksElapsed++;
+    rollWeeklyCrisisEvent();
+    rollEquipmentUpgradeEvent();
+    leagueTeams.forEach(team => {
+      if (team.id === 'player') return;
+      team.sales += Math.floor((team.basePower * 550) + (Math.random() * 7000));
+      team.audience += Math.floor((team.basePower * 220) + (Math.random() * 3000));
+    });
+
+    if (crisisEventWeekKey === getCurrentWeekKey()) {
+      if (crisisEventType === 'information-leak') {
+        groupCrisis = Math.max(0, groupCrisis - 5);
+        funds -= 250000;
+        setLog('【情報漏洩】内部情報が外部に流出しました。危機回避力が低下し、対応費が発生しました。');
+      } else {
+        groupCrisis = Math.max(0, groupCrisis - 7);
+        idolRoster.forEach(member => {
+          if (member.isSelected) member.stats.popularity = Math.max(0, member.stats.popularity - 3);
+        });
+        setLog('【SNSスキャンダル】SNS上の騒動が広がり、選抜メンバーの人気が低下しました。');
+      }
+    }
+
+    const summary = calculateTeamAverages();
+    checkSenbatsuTrigger();
+    checkMusicProgramOffers();
+    resolveIndustryOffer();
+    trainSongs(summary);
+    if (isLastWednesdayOfMonth(currentDate) && officeUpgrades.snsTraining > 1) {
+      const snsGain = officeUpgrades.snsTraining - 1;
+      idolRoster.filter(member => member.isSelected).forEach(member => {
+        member.stats.sns = Math.min(100, (member.stats.sns || 0) + snsGain);
+      });
+    }
+  }
+
+  processMonthlyReleaseAndLive();
+  if (wasWednesday) maintainOfficeFacilities();
+  if (wasWednesday && isLastWednesdayOfMonth(currentDate) && currentMonth === 12) {
     executeYearEndAwards();
     processYearEndAgingAndGraduation();
   }
+  if (wasWednesday && totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) triggerDraftMeeting();
 
-  // 2.5年ごと（120週ごと）のドラフト
-  if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
-    triggerDraftMeeting();
+  gameDate = toDateKey(nextDate);
+  syncGameCalendar();
+  if (currentYear > previousYear) {
+    yearlyStats = { sales: 0, audience: 0 };
+    leagueTeams.forEach(team => { team.sales = 0; team.audience = 0; });
   }
-
-  // カレンダー送り
-  currentWeek++;
-  if (currentWeek > 4) {
-    currentWeek = 1;
-    currentMonth++;
-    if (currentMonth > 12) {
-      currentMonth = 1;
-      currentYear++;
-      yearlyStats = { sales: 0, audience: 0 };
-      leagueTeams.forEach(t => { t.sales = 0; t.audience = 0; });
-    }
-
-    // 1月と7月の半年計画トリガー
-    if (currentMonth === 1) {
-      openDecisionModal("当年 7月〜12月 の計画策定", currentYear, 7, 12);
-    } else if (currentMonth === 7) {
-      openDecisionModal("翌年 1月〜6月 の計画策定", currentYear + 1, 1, 6);
-    }
+  if (currentMonth !== previousMonth && (currentMonth === 1 || currentMonth === 7)) {
+    if (currentMonth === 1) openDecisionModal("当年7月〜12月の計画策定", currentYear, 7, 12);
+    else openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
   }
 
   updateUI();
+  if (pendingEquipmentEvent) openEquipmentUpgradeEventModal();
+  else if (pendingPerformanceOffers.length) openMusicOfferModal();
+}
+
+function sellMerchandiseAtLive(audience) {
+  if (merchandiseProducts <= 0 || merchandiseStock <= 0) {
+    merchandiseSellThrough = merchandiseProducts > 0 ? 0 : null;
+    return { unitsSold: 0, revenue: 0 };
+  }
+  const demandMultiplier = 1 + Math.max(0, officeUpgrades.merchandise - 1) * 0.12 + Math.max(0, officeUpgrades.analytics - 1) * 0.08;
+  const demand = Math.max(1, Math.floor(audience * 0.1 * merchandiseProducts * demandMultiplier));
+  const startingStock = merchandiseStock;
+  const unitsSold = Math.min(startingStock, demand);
+  merchandiseStock -= unitsSold;
+  merchandiseUnitsSold += unitsSold;
+  merchandiseSellThrough = unitsSold / startingStock;
+  return { unitsSold, revenue: unitsSold * 2500 };
 }
 
 // 月ごとのリリース＆ライブ実行
 function processMonthlyReleaseAndLive() {
   const planKey = `${currentYear}-${currentMonth}`;
   const plan = productionSchedule[planKey];
-  if (!plan) return;
-
   const summary = calculateTeamAverages();
 
   // CDリリース
-  if (plan.release && plan.release !== 'none') {
+  if (plan && isLastWednesdayOfMonth() && plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
     const isSingle = (plan.release === 'single');
+    const song = ensureScheduledSong(currentYear, currentMonth, plan);
     const quality = (summary.averages.popularity * 0.6) + (summary.averages.vocal * 0.2) + (summary.averages.dance * 0.2);
     const multiplier = 1.0 + (summary.overall / 100);
     const base = isSingle ? 5000 : 7500;
-    const sales = Math.floor(quality * base * multiplier) + Math.floor(Math.random() * 30000);
+    const songMultiplier = 1 + ((song.level - 1) * 0.02);
+    const promotionMultiplier = 1 + ((song.promotionPoints || 0) * 0.05);
+    const qualitySales = quality * base * multiplier * songMultiplier * promotionMultiplier;
+    const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
+    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
 
     yearlyStats.sales += sales;
     funds += sales * (isSingle ? 300 : 600);
-    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！`);
+    song.totalSales = (song.totalSales || 0) + sales;
+    song.released = true;
+    song.promotionPoints = 0;
+    const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
+    if (benefit) funds -= benefit.cost;
+    plan.releaseCompleted = true;
+    const benefitText = benefit ? ` ${benefit.name}経費: ${benefit.cost.toLocaleString()}円。` : '';
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
   }
 
   // ライブ
-  if (plan.liveVenue) {
+  if (plan?.liveVenue && !plan.liveCompleted && toDateKey(getScheduledLiveDate(calendarYear, currentMonth, plan)) === gameDate) {
     const v = VENUE_DATA.find(item => item.name === plan.liveVenue);
     if (v) {
-      const cap = CAPACITY_MAP[v.cap];
       const ease = EASE_MULTIPLIER[v.ease];
-      const idolPower = (summary.averages.popularity * 500) + ((summary.averages.vocal + summary.averages.dance) * 200);
-      const audience = Math.min(cap, Math.floor(idolPower * ease));
-      const revenue = audience * 8000;
-      const cost = cap * 2500;
+      const seatCapacities = getLiveSeatCapacities(v, plan.seatOptions || {});
+      const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
+      let remainingDemand = Math.floor(calculateGroupFans() * 0.04 * ease * livePromotionMultiplier);
+      let audience = 0;
+      let revenue = 0;
+      seatCapacities.forEach(seat => {
+        const sold = Math.min(seat.capacity, remainingDemand);
+        audience += sold;
+        remainingDemand -= sold;
+        const configuredPrice = Number(plan.seatPrices?.[seat.id]);
+        const price = Number.isFinite(configuredPrice) ? configuredPrice : seat.defaultPrice;
+        revenue += sold * price;
+      });
+      const merchandiseSales = sellMerchandiseAtLive(audience);
+      revenue += merchandiseSales.revenue;
+      const totalCapacity = seatCapacities.reduce((sum, seat) => sum + seat.capacity, 0);
+      const cost = totalCapacity * 2500;
       const profit = revenue - cost;
 
       yearlyStats.audience += audience;
       funds += profit;
-      setLog(`【ライブ成功】${v.name}公演（動員: ${audience.toLocaleString()}人 / 収支: ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）！`);
+      nextLivePromotionPoints = 0;
+      plan.liveCompleted = true;
+      setLog(`【ライブ成功】${plan.liveName || v.name}（${v.name} / 動員: ${audience.toLocaleString()}人 / チケット・グッズ売上: ${revenue.toLocaleString()}円 / 収支: ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）！`);
+    }
+  }
+
+  if (isLastWednesdayOfMonth()) processScheduledPerformances();
+  processSpecialLiveEvents();
+}
+
+function processSpecialLiveEvents() {
+  specialLiveEvents.forEach(event => {
+    if (event.completed || event.liveDate !== gameDate) return;
+    const venue = VENUE_DATA.find(item => item.name === event.venue);
+    if (!venue) return;
+
+    const capacity = CAPACITY_MAP[venue.cap];
+    const eventMultiplier = (event.type === 'festival' ? 1.4 : 1.2) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
+    const audience = Math.min(capacity, Math.floor(
+      calculateGroupFans() * 0.04 * EASE_MULTIPLIER[venue.ease] * eventMultiplier
+    ));
+    const ticketRevenue = audience * 8000;
+    const merchandiseSales = sellMerchandiseAtLive(audience);
+    const venueCost = capacity * 2500;
+    const profit = ticketRevenue + merchandiseSales.revenue - venueCost;
+    yearlyStats.audience += audience;
+    funds += profit;
+    event.completed = true;
+    setLog(`【${event.name}】${venue.name}（動員 ${audience.toLocaleString()}人 / 収支 ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）。`);
+  });
+}
+
+function getLiveSeatCapacities(venue, seatOptions = {}) {
+  const capacity = CAPACITY_MAP[venue.cap];
+  const isDome = venue.name.includes('ドーム');
+  const shares = isDome
+    ? { arena: 0.28, stand1: 0.30, stand2: 0.24, stand3: 0.12, stand4: 0.06 }
+    : { arena: 0.40, stand1: 0.35, stand2: 0.25 };
+  const baseSeatIds = Object.keys(shares);
+  let assignedCapacity = 0;
+
+  return SEAT_TYPES.filter(seat => !seat.domeOnly || isDome)
+    .filter(seat => !seat.optional || seatOptions[seat.id])
+    .map(seat => {
+      let seatCapacity;
+      if (seat.optional) {
+        seatCapacity = Math.floor(capacity * (seat.id === 'annotation' ? 0.05 : 0.10));
+      } else if (seat.id === baseSeatIds[baseSeatIds.length - 1]) {
+        seatCapacity = capacity - assignedCapacity;
+      } else {
+        seatCapacity = Math.floor(capacity * shares[seat.id]);
+        assignedCapacity += seatCapacity;
+      }
+      return { ...seat, capacity: seatCapacity };
+    });
+}
+
+function ensureScheduledSong(year, month, plan) {
+  let song = songs.find(item => item.id === plan.songId);
+  if (!song) {
+    const id = `song-${year}-${month}`;
+    song = songs.find(item => item.id === id);
+    if (!song) {
+      const title = plan.songName || SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)];
+      song = { id, title, releaseYear: year, releaseMonth: month, releaseType: plan.release, experience: 0, level: 1, released: false };
+      songs.push(song);
+    }
+    plan.songId = song.id;
+  }
+  if (plan.songName) song.title = plan.songName;
+  song.releaseType = plan.release;
+  return song;
+}
+
+function addSongExperience(song, amount) {
+  song.experience = (song.experience || 0) + amount;
+  song.level = Math.min(20, 1 + Math.floor(song.experience / 12));
+}
+
+function trainSongs(summary) {
+  const weeklyExperience = Math.max(1, Math.round((summary.averages.vocal + summary.averages.dance) / 40));
+  songs.forEach(song => addSongExperience(song, weeklyExperience));
+}
+
+function checkMusicProgramOffers() {
+  if (!isFirstWednesdayOfMonth()) return;
+
+  const targetMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+  const targetYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+  const targetKey = `${targetYear}-${targetMonth}`;
+  const releasePlan = productionSchedule[targetKey];
+
+  if (releasePlan && releasePlan.release && releasePlan.release !== 'none' && !releasePlan.musicOfferSent) {
+    const song = ensureScheduledSong(targetYear, targetMonth, releasePlan);
+    MUSIC_PROGRAMS.forEach(program => {
+      pendingPerformanceOffers.push({
+        id: `offer-${targetYear}-${targetMonth}-${program.id}`,
+        name: program.name,
+        airYear: targetYear,
+        airMonth: targetMonth,
+        songId: song.id
+      });
+    });
+    releasePlan.musicOfferSent = true;
+  }
+
+  if (targetMonth === 7 || targetMonth === 12) {
+    const offerKey = `${targetYear}-${targetMonth}`;
+    if (!specialOffersSent.includes(offerKey)) {
+      const isSummer = targetMonth === 7;
+      pendingPerformanceOffers.push({
+        id: `offer-${targetYear}-${targetMonth}-${isSummer ? 'summer' : 'winter'}-special`,
+        name: isSummer ? '夏の大型音楽特番' : '冬の大型音楽特番',
+        airYear: targetYear,
+        airMonth: targetMonth
+      });
+      specialOffersSent.push(offerKey);
     }
   }
 }
 
+function processScheduledPerformances() {
+  const remaining = [];
+  scheduledPerformances.forEach(performance => {
+    if (performance.airYear !== currentYear || performance.airMonth !== currentMonth) {
+      remaining.push(performance);
+      return;
+    }
+
+    const song = songs.find(item => item.id === performance.songId);
+    if (song) addSongExperience(song, 6);
+    setLog(`【テレビ出演】${performance.name}で「${song ? song.title : '楽曲'}」を披露しました。`);
+  });
+  scheduledPerformances = remaining;
+}
+
 // 12週前選抜発表
 function checkSenbatsuTrigger() {
-  if (currentWeek !== 1) return;
-  const targetWeeks = totalWeeksElapsed + 12;
-  const mIndex = Math.floor((targetWeeks - 1) / 4) + 1;
-  const targetYear = Math.floor((mIndex - 1) / 12) + 1;
-  const targetMonth = ((mIndex - 1) % 12) + 1;
+  if (!isFirstWednesdayOfMonth()) return;
+  const targetDate = getGameDateObject();
+  targetDate.setDate(targetDate.getDate() + 84);
+  const targetYear = currentYear + targetDate.getFullYear() - calendarYear;
+  const targetMonth = targetDate.getMonth() + 1;
   const targetKey = `${targetYear}-${targetMonth}`;
 
   const plan = productionSchedule[targetKey];
@@ -740,6 +1919,55 @@ function checkSenbatsuTrigger() {
 
     setLog(`【選抜決定】${targetMonth}月作のセンターは【${idolRoster[centerIndex].name}】！ 選抜${count}名体制を敷きました。`);
   }
+}
+
+function openMusicOfferModal() {
+  const rows = document.getElementById('music-offer-rows');
+  rows.innerHTML = pendingPerformanceOffers.map(offer => {
+    const songOptions = songs.map(song => {
+      const selected = song.id === offer.songId ? 'selected' : '';
+      const status = song.released ? '' : '（発売前）';
+      return `<option value="${song.id}" ${selected}>${escapeHtml(song.title)} Lv.${song.level}${status}</option>`;
+    }).join('');
+    return `
+      <div class="offer-row">
+        <strong>${offer.airYear}年${offer.airMonth}月放送：${escapeHtml(offer.name)}</strong>
+        <select id="offer-response-${offer.id}" aria-label="${offer.name}への出演">
+          <option value="accept">出演する</option>
+          <option value="decline">辞退する</option>
+        </select>
+        <select id="offer-song-${offer.id}" aria-label="${offer.name}で披露する楽曲">
+          <option value="">披露曲を選択</option>
+          ${songOptions}
+        </select>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('music-offer-modal').style.display = 'flex';
+}
+
+function resolveMusicOffers() {
+  const accepted = [];
+  for (const offer of pendingPerformanceOffers) {
+    const response = document.getElementById(`offer-response-${offer.id}`).value;
+    if (response !== 'accept') continue;
+
+    const songId = document.getElementById(`offer-song-${offer.id}`).value;
+    if (!songId) {
+      alert(`${offer.name}で披露する楽曲を選んでください。`);
+      return;
+    }
+    accepted.push({ ...offer, songId });
+  }
+
+  scheduledPerformances.push(...accepted);
+  const declinedCount = pendingPerformanceOffers.length - accepted.length;
+  pendingPerformanceOffers = [];
+  document.getElementById('music-offer-modal').style.display = 'none';
+  setLog(accepted.length
+    ? `【出演決定】${accepted.length}番組への出演を決定しました。${declinedCount ? ` ${declinedCount}件は辞退しました。` : ''}`
+    : '【出演辞退】今回の出演打診をすべて辞退しました。');
+  updateUI();
 }
 
 // 年末アワード
@@ -769,9 +1997,8 @@ function executeYearEndAwards() {
 
 // 加齢と卒業・慰留
 function processYearEndAgingAndGraduation() {
-  idolRoster.forEach(m => { m.age++; m.yearsActive++; });
+  idolRoster.forEach(m => { m.yearsActive++; });
   const remaining = [];
-  let logMsgs = [];
 
   for (let m of idolRoster) {
     let graduate = false;
@@ -787,8 +2014,18 @@ function processYearEndAgingAndGraduation() {
         } else {
           const nextCount = m.retainedCount + 1;
           const rateTxt = (nextCount === 1) ? "100%" : "50%";
-          const retain = confirm(`【卒業打診】${m.name}（${m.age}歳 / 在籍${m.yearsActive}年）から卒業の相談がありました。\n慰留しますか？（今回成功率: ${rateTxt}）`);
-          if (retain) {
+          const regularVenueName = productionSchedule[`${currentYear}-${currentMonth}`]?.liveVenue;
+          const regularVenue = VENUE_DATA.find(venue => venue.name === regularVenueName);
+          const venueNotice = regularVenue
+            ? `\n常設ライブ会場: ${regularVenue.name}（セレモニー利用料 ${Math.floor(CAPACITY_MAP[regularVenue.cap] * 500).toLocaleString()}円 / コンサート利用料 ${Math.floor(CAPACITY_MAP[regularVenue.cap] * 2500).toLocaleString()}円）`
+            : "\n会場を使う場合は会場を選択します。利用料は収容人数に比例します。";
+          let choice = Number.parseInt(prompt(
+            `【卒業打診】${m.name}（${m.age}歳 / 在籍${m.yearsActive}年）\n1: 慰留する（成功率 ${rateTxt}）\n2: 卒業を承認し、常設ライブ内でセレモニー\n3: 常設ライブに卒業コンサートを追加\n4: 単独の卒業コンサート\n5: 卒業グッズを制作${venueNotice}\n番号を選んでください。`,
+            "1"
+          ) || "1", 10);
+          if (!Number.isInteger(choice) || choice < 1 || choice > 5) choice = 1;
+
+          if (choice === 1) {
             if (nextCount === 1) {
               m.retainedCount = 1;
               alert(`【慰留成功】${m.name}はもう1年残留してくれることになりました。`);
@@ -799,19 +2036,20 @@ function processYearEndAgingAndGraduation() {
               } else {
                 alert(`【慰留失敗(50%)】本人の意志は固く、${m.name}の卒業が決まりました。`);
                 graduate = true;
+                choice = promptGraduationPlan(m);
               }
             }
           } else {
             graduate = true;
           }
+
+          if (graduate) runGraduationPlan(m, choice, regularVenueName);
         }
       }
     }
 
     if (!graduate) {
       remaining.push(m);
-    } else {
-      logMsgs.push(`${m.name}が卒業`);
     }
   }
 
@@ -819,6 +2057,59 @@ function processYearEndAgingAndGraduation() {
   if (!idolRoster.some(m => m.isCenter) && idolRoster.length > 0) {
     idolRoster[0].isCenter = true;
   }
+}
+
+function promptGraduationPlan(member) {
+  const choice = Number.parseInt(prompt(
+    `【卒業プラン】${member.name}の卒業方法を選んでください。\n2: 常設ライブ内でセレモニー\n3: 常設ライブに卒業コンサートを追加\n4: 単独の卒業コンサート\n5: 卒業グッズを制作`,
+    "2"
+  ) || "2", 10);
+  return Number.isInteger(choice) && choice >= 2 && choice <= 5 ? choice : 2;
+}
+
+function selectGraduationVenue(feeRate) {
+  const defaultIndex = Math.max(0, VENUE_DATA.findIndex(venue => venue.name === '原宿体育館'));
+  const venueOptions = VENUE_DATA.map((venue, index) =>
+    `${index + 1}: ${venue.name}（${venue.cap} / 利用料 ${Math.floor(CAPACITY_MAP[venue.cap] * feeRate).toLocaleString()}円）`
+  ).join('\n');
+  const selected = Number.parseInt(prompt(`会場を選んでください。\n${venueOptions}`, String(defaultIndex + 1)) || String(defaultIndex + 1), 10);
+  const index = Number.isInteger(selected) ? Math.max(0, Math.min(VENUE_DATA.length - 1, selected - 1)) : defaultIndex;
+  return VENUE_DATA[index];
+}
+
+function runGraduationPlan(member, choice, regularVenueName) {
+  if (choice === 5) {
+    const copies = Math.max(1, Math.floor(calculateMemberFans(member) * 0.1));
+    const revenue = copies * 3000;
+    const productionCost = copies * 1200 + 500000;
+    const profit = revenue - productionCost;
+    funds += profit;
+    setLog(`【卒業グッズ】${member.name}のグッズを${copies.toLocaleString()}個制作（収支: ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）。`);
+    return;
+  }
+
+  const isCeremony = choice === 2;
+  const isAttached = choice === 2 || choice === 3;
+  const feeRate = isCeremony ? 500 : 2500;
+  let venue = isAttached ? VENUE_DATA.find(item => item.name === regularVenueName) : null;
+  if (!venue) venue = selectGraduationVenue(feeRate);
+
+  const capacity = CAPACITY_MAP[venue.cap];
+  const venueFee = Math.floor(capacity * feeRate);
+  if (isCeremony) {
+    funds -= venueFee;
+    setLog(`【卒業セレモニー】${member.name}を常設ライブ内で送り出しました（${venue.name} / 会場利用料 ${venueFee.toLocaleString()}円）。`);
+    return;
+  }
+
+  const ease = EASE_MULTIPLIER[venue.ease];
+  const audience = Math.min(capacity, Math.floor(calculateGroupFans() * 0.04 * ease));
+  const revenue = audience * 8000;
+  const profit = revenue - venueFee;
+  funds += profit;
+  yearlyStats.audience += audience;
+  const eventName = choice === 3 ? '常設ライブ追加の卒業コンサート' : '単独卒業コンサート';
+  setLog(`【${eventName}】${member.name}（${venue.name} / 動員 ${audience.toLocaleString()}人 / 会場利用料 ${venueFee.toLocaleString()}円 / 収支 ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）。`);
 }
 
 // ドラフト会議
@@ -872,12 +2163,168 @@ function triggerDraftMeeting() {
 // 6. UI描画 ＆ モーダル操作
 // ==========================================
 
+function switchPage(page) {
+  const pages = ['group', 'formation', 'office', 'funds', 'records'];
+  if (!pages.includes(page)) return;
+
+  pages.forEach(name => {
+    const active = name === page;
+    document.getElementById(`page-tab-${name}`).classList.toggle('active', active);
+    document.getElementById(`page-tab-${name}`).setAttribute('aria-selected', active);
+    document.getElementById(`page-${name}`).hidden = !active;
+  });
+}
+
+function renderWeeklyActionPanel() {
+  const panel = document.getElementById('weekly-action-panel');
+  const events = getCurrentWeekEvents();
+  if (events.length) {
+    panel.innerHTML = `
+      <h2 class="page-title">今週の行動</h2>
+      <div class="weekly-event-note"><strong>イベント週</strong><ul>${events.map(event => `<li>${escapeHtml(event)}</li>`).join('')}</ul></div>
+      <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">イベントを進行</button>
+    `;
+    return;
+  }
+
+  const selectedIndex = idolRoster.findIndex(member => member.isSelected);
+  const memberOptions = idolRoster.map((member, index) =>
+    `<option value="${index}" ${index === selectedIndex ? 'selected' : ''}>${member.name}（${member.age}歳${member.isSelected ? '・選抜' : ''}）</option>`
+  ).join('');
+  panel.innerHTML = `
+    <h2 class="page-title">今週の行動</h2>
+    <label class="weekly-member-target" for="weekly-member-target">レッスン・育成するメンバー
+      <select id="weekly-member-target" ${idolRoster.length ? '' : 'disabled'}>${memberOptions || '<option value="">メンバーなし</option>'}</select>
+    </label>
+    <div class="weekly-action-grid">
+      <button class="main-btn" onclick="performWeeklyAction('single-promotion')">シングル販促</button>
+      <button class="main-btn" onclick="performWeeklyAction('live-promotion')">次のライブの広報</button>
+      <button class="main-btn" onclick="performWeeklyAction('goods-development')" ${merchandiseProducts >= 5 ? 'disabled' : ''}>グッズの開発${merchandiseProducts >= 5 ? '（上限）' : ''}</button>
+      <button class="main-btn" onclick="performWeeklyAction('vocal')" ${idolRoster.length ? '' : 'disabled'}>歌唱レッスン</button>
+      <button class="main-btn" onclick="performWeeklyAction('dance')" ${idolRoster.length ? '' : 'disabled'}>ダンスレッスン</button>
+      <button class="main-btn" onclick="performWeeklyAction('variety')" ${idolRoster.length ? '' : 'disabled'}>バラエティ力育成</button>
+      <button class="main-btn" onclick="performWeeklyAction('talk')" ${idolRoster.length ? '' : 'disabled'}>トーク力育成</button>
+    </div>
+  `;
+}
+
+function renderGameCalendar() {
+  const date = getGameDateObject();
+  const shouldFlip = Boolean(lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
+  lastRenderedCalendarDate = gameDate;
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const today = date.getDate();
+  const firstWeekday = new Date(year, month, 1, 12).getDay();
+  const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
+  const liveDates = new Set();
+  Object.entries(productionSchedule).forEach(([key, plan]) => {
+    if (!plan.liveVenue || plan.liveCompleted) return;
+    const [gameYear, gameMonth] = key.split('-').map(Number);
+    liveDates.add(toDateKey(getScheduledLiveDate(calendarYear + (gameYear - currentYear), gameMonth, plan)));
+  });
+  specialLiveEvents.forEach(event => {
+    if (!event.completed) liveDates.add(event.liveDate);
+  });
+  const rivalLiveDates = new Set(rivalLiveBookings.map(booking => booking.liveDate));
+
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  let cells = weekdays.map(day => `<span class="calendar-weekday">${day}</span>`).join('');
+  for (let cell = 0; cell < 42; cell++) {
+    const day = cell - firstWeekday + 1;
+    if (day < 1 || day > daysInMonth) {
+      cells += '<span class="calendar-day" aria-hidden="true"></span>';
+      continue;
+    }
+    const cellDate = new Date(year, month, day, 12);
+    const dateKey = toDateKey(cellDate);
+    const classes = [
+      'calendar-day',
+      cellDate.getDay() === 3 ? 'wednesday' : '',
+      cellDate.getDay() === 0 ? 'sunday' : '',
+      day === today ? 'today' : '',
+      liveDates.has(dateKey) ? 'live-day' : '',
+      rivalLiveDates.has(dateKey) ? 'rival-live-day' : ''
+    ].filter(Boolean).join(' ');
+    cells += `<span class="${classes}"${liveDates.has(dateKey) ? ' title="ライブ予定"' : ''}>${day}</span>`;
+  }
+
+  document.getElementById('calendar-visual').innerHTML = `
+    <div class="calendar-sheet${shouldFlip ? ' calendar-turn' : ''}">
+      <div class="calendar-month-heading"><strong>${year}年${month + 1}月</strong><span>水曜進行</span></div>
+      <div class="calendar-grid">${cells}</div>
+    </div>
+  `;
+}
+
+function getOfficeUpgradeCost(facility) {
+  const level = officeUpgrades[facility.id] ?? 0;
+  return facility.baseCost * (2 ** level);
+}
+
+function getOfficeMaintenanceCost(facility, level = officeUpgrades[facility.id] || 1) {
+  return level <= 1 ? 0 : facility.baseMaintenance * (2 ** (level - 2));
+}
+
+function upgradeOfficeFacility(facilityId) {
+  const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
+  if (!facility) return;
+  const level = officeUpgrades[facilityId] ?? 0;
+  if (level >= 5) return;
+  const cost = getOfficeUpgradeCost(facility);
+  if (funds < cost) {
+    alert(`資金が足りません。必要資金: ${cost.toLocaleString()}円`);
+    return;
+  }
+  funds -= cost;
+  officeUpgrades[facilityId] = level + 1;
+  setLog(`【設備投資】${facility.name}をLv.${level + 1}に強化しました。`);
+  updateUI();
+}
+
+function maintainOfficeFacilities() {
+  const cost = OFFICE_FACILITIES.reduce((total, facility) =>
+    total + getOfficeMaintenanceCost(facility), 0
+  );
+  if (!cost) return;
+  funds -= cost;
+  if (funds < 0) setLog(`【維持費】事務所設備の週維持費 ${cost.toLocaleString()}円を支払いました。資金が不足しています。`);
+}
+
+function renderOfficeUpgrades() {
+  const list = document.getElementById('office-upgrades-ui');
+  list.innerHTML = OFFICE_FACILITIES.map(facility => {
+    const level = officeUpgrades[facility.id] ?? 0;
+    const upgradeCost = getOfficeUpgradeCost(facility);
+    const nextMaintenance = getOfficeMaintenanceCost(facility, level + 1);
+    const currentMaintenance = getOfficeMaintenanceCost(facility, level);
+    const disabled = level >= 5 || funds < upgradeCost;
+    return `
+      <div class="office-facility-row">
+        <div>
+          <div class="office-facility-name">${facility.name} Lv.${level}</div>
+          <div class="office-facility-meta">${facility.effect}<br>現在の週維持費 ${currentMaintenance.toLocaleString()}円${level < 5 ? ` / 強化後 ${nextMaintenance.toLocaleString()}円` : ''}</div>
+        </div>
+        <button class="main-btn" onclick="upgradeOfficeFacility('${facility.id}')" ${disabled ? 'disabled' : ''}>${level >= 5 ? 'MAX' : `強化 ${upgradeCost.toLocaleString()}円`}</button>
+      </div>
+    `;
+  }).join('');
+}
+
 function updateUI() {
   document.getElementById('txt-year').textContent = currentYear;
   document.getElementById('txt-month').textContent = currentMonth;
   document.getElementById('txt-week').textContent = currentWeek;
+  document.getElementById('txt-calendar-date').textContent = getGameDateObject().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
   document.getElementById('txt-funds').textContent = funds.toLocaleString();
+  document.getElementById('txt-year-sales').textContent = `${yearlyStats.sales.toLocaleString()} 枚`;
+  document.getElementById('txt-year-audience').textContent = `${yearlyStats.audience.toLocaleString()} 人`;
   document.getElementById('txt-roster-count').textContent = idolRoster.length;
+  document.getElementById('txt-group-fans').textContent = calculateGroupFans().toLocaleString();
+  document.getElementById('txt-group-crisis').textContent = groupCrisis;
+  document.getElementById('txt-effective-crisis').textContent = calculateGroupCrisisResilience();
+  document.getElementById('goods-sales-stats').textContent =
+    `グッズ在庫 ${merchandiseStock.toLocaleString()}個 / 累計販売 ${merchandiseUnitsSold.toLocaleString()}個 / 直近完売率 ${Number.isFinite(merchandiseSellThrough) ? `${Math.round(merchandiseSellThrough * 100)}%` : '実績なし'}`;
 
   const summary = calculateTeamAverages();
   document.getElementById('txt-center-name').textContent = summary.centerName;
@@ -902,12 +2349,23 @@ function updateUI() {
     `;
   });
 
+  renderSongLibrary();
   renderRosterList();
+  renderOfficeUpgrades();
+  renderGameCalendar();
+  renderWeeklyActionPanel();
 
   // 自動セーブ
-  localStorage.setItem('idol_manager_save', JSON.stringify({
-    currentYear, currentMonth, currentWeek, totalWeeksElapsed, draftCount, funds,
-    yearlyStats, idolRoster, productionSchedule, leagueTeams
+  if (activeSaveSlot) localStorage.setItem(saveSlotKey(activeSaveSlot), JSON.stringify({
+    currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
+    merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
+    nextLivePromotionPoints, crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
+    industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
+    pendingEquipmentEvent, equipmentEventCheckWeekKey, groupCrisis, officeUpgrades,
+    yearlyStats, idolRoster, productionSchedule, leagueTeams,
+    songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
+    rivalLiveBookings,
+    savedAt: Date.now()
   }));
 }
 
@@ -916,6 +2374,30 @@ function switchRosterTab(tab) {
   document.getElementById('tab-btn-sel').classList.toggle('active', tab === 'selected');
   document.getElementById('tab-btn-und').classList.toggle('active', tab === 'under');
   renderRosterList();
+}
+
+function renderSongLibrary() {
+  const listUI = document.getElementById('song-list-ui');
+  const recordedSongs = songs.filter(song => Number.isFinite(song.totalSales));
+  const totalSales = recordedSongs.reduce((sum, song) => sum + song.totalSales, 0);
+  const averageSales = recordedSongs.length ? Math.round(totalSales / recordedSongs.length) : 0;
+  document.getElementById('song-sales-summary').innerHTML = `
+    <strong>楽曲累計売上: ${totalSales.toLocaleString()}枚</strong>
+    <div style="margin-top:4px; color:#666;">売上記録 ${recordedSongs.length}曲 / 1曲平均 ${averageSales.toLocaleString()}枚</div>
+  `;
+
+  if (!songs.length) {
+    listUI.innerHTML = '<div class="song-row">楽曲はまだ登録されていません。</div>';
+    return;
+  }
+
+  listUI.innerHTML = [...songs]
+    .sort((a, b) => b.releaseYear - a.releaseYear || b.releaseMonth - a.releaseMonth)
+    .map(song => {
+      const releaseStatus = song.released ? '発売済み' : `${song.releaseYear}年${song.releaseMonth}月発売予定`;
+      const sales = Number.isFinite(song.totalSales) ? `${song.totalSales.toLocaleString()}枚` : (song.released ? '過去データなし' : '未発売');
+      return `<div class="song-row"><strong>${escapeHtml(song.title)}</strong> Lv.${song.level} <span style="color:#777;">${releaseStatus} / 売上 ${sales}</span></div>`;
+    }).join('');
 }
 
 function renderRosterList() {
@@ -927,21 +2409,32 @@ function renderRosterList() {
     const overall = calculateSingleOverall(m.stats);
     const rInfo = getRankData(overall);
     listUI.innerHTML += `
-      <div class="member-row">
-        <div>
-          <span style="font-size:9px; color:#e91e63;">${m.reading}</span>
-          <span style="font-size:10px; color:#777;">(${m.age}歳/在籍${m.yearsActive}年)</span>
-          <div style="font-weight:bold;">
-            ${m.name} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''}
+      <details class="member-details">
+        <summary class="member-row member-summary">
+          <div>
+            <span style="font-size:9px; color:#e91e63;">${m.reading}</span>
+            <span style="font-size:10px; color:#777;">(${m.age}歳/在籍${m.yearsActive}年・誕生日 ${m.birthdayMonth}月${m.birthdayDay}日)</span>
+              <div style="font-weight:bold;">
+                ${escapeHtml(m.name)} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''}
+            </div>
+            <span class="member-fan-count">個人推定ファン ${calculateMemberFans(m).toLocaleString()}人</span>
           </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#666;">総評:${overall}</span>
+            <span class="rank-badge" style="color:${rInfo.color}; background:${rInfo.bg}; border:1px solid ${rInfo.color}; width:16px; height:16px; line-height:16px; font-size:10px;">
+              ${rInfo.rank}
+            </span>
+          </div>
+        </summary>
+        <div class="member-stats">
+          ${STATUS_KEYS.map(status => `
+            <div class="member-stat">
+              <span>${status.name}</span>
+              <strong>${m.stats[status.id] || 0}</strong>
+            </div>
+          `).join('')}
         </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="font-size:10px; color:#666;">総合:${overall}</span>
-          <span class="rank-badge" style="color:${rInfo.color}; background:${rInfo.bg}; border:1px solid ${rInfo.color}; width:16px; height:16px; line-height:16px; font-size:10px;">
-            ${rInfo.rank}
-          </span>
-        </div>
-      </div>
+      </details>
     `;
   });
 }
@@ -955,41 +2448,174 @@ let planYearTarget = 1, planStartM = 7, planEndM = 12;
 
 function openDecisionModal(title, y, sM, eM) {
   planYearTarget = y; planStartM = sM; planEndM = eM;
+  for (let month = sM; month <= eM; month++) ensureRivalLiveBookings(y, month);
   document.getElementById('modal-title').textContent = `【${y}年】${title}`;
   const rows = document.getElementById('plan-rows');
   rows.innerHTML = '';
 
   for (let m = sM; m <= eM; m++) {
     const existing = productionSchedule[`${y}-${m}`] || { release: 'none', liveVenue: '' };
+    const seatPrices = existing.seatPrices || {};
+    const seatOptions = existing.seatOptions || {};
+    const actualYear = calendarYear + (y - currentYear);
+    const rivalMonthSchedule = rivalLiveBookings
+      .filter(booking => booking.liveDate.startsWith(`${actualYear}-${String(m).padStart(2, '0')}-`))
+      .map(booking => `${Number(booking.liveDate.slice(-2))}日 ${booking.groupName}（${booking.venue}）`);
     rows.innerHTML += `
       <div style="margin-bottom:8px; padding:6px; background:#f9f9f9; border-radius:4px; font-size:11px;">
         <span style="font-weight:bold;">${m}月</span>
+        ${rivalMonthSchedule.length ? `<div style="margin-top:4px; color:#777;">他グループ予定: ${rivalMonthSchedule.join(' / ')}</div>` : ''}
         <div style="display:flex; gap:4px; margin-top:3px;">
-          <select id="sel-rel-${m}" style="flex:1; font-size:11px;">
+          <select id="sel-rel-${m}" style="flex:1; font-size:11px;" onchange="updateReleaseBenefitOptions(${m})">
             <option value="none" ${existing.release === 'none' ? 'selected' : ''}>リリースなし</option>
             <option value="single" ${existing.release === 'single' ? 'selected' : ''}>シングル発売</option>
             <option value="album" ${existing.release === 'album' ? 'selected' : ''}>アルバム発売</option>
           </select>
-          <select id="sel-ven-${m}" style="flex:1; font-size:11px;">
+          <select id="sel-ven-${m}" style="flex:1; font-size:11px;" onchange="updateSeatPlanOptions(${m}); updateLiveDateOptions(${m})">
             <option value="">ライブなし</option>
             ${VENUE_DATA.map(v => `<option value="${v.name}" ${existing.liveVenue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
           </select>
         </div>
+        <label class="weekly-member-target" for="song-name-${m}" style="margin-top:6px;">楽曲名（空欄は自動設定）
+          <input type="text" id="song-name-${m}" maxlength="40" value="${escapeHtml(existing.songName || '')}" placeholder="好きな楽曲名を入力">
+        </label>
+        <label class="weekly-member-target" for="live-name-${m}" style="margin-top:6px;">ライブ名
+          <input type="text" id="live-name-${m}" maxlength="40" value="${escapeHtml(existing.liveName || existing.liveVenue || '')}" placeholder="例: 春の全国ツアー">
+        </label>
+        <label class="weekly-member-target" for="live-date-${m}" style="margin-top:6px;">ライブ開催日
+          <input type="date" id="live-date-${m}" value="${existing.liveDate || ''}" onchange="updateLiveDateOptions(${m})">
+          <span id="live-date-note-${m}" style="color:#777;"></span>
+        </label>
+        <select id="sel-benefit-${m}" style="width:100%; margin-top:6px; font-size:11px;">
+          <option value="none" ${!existing.releaseBenefit || existing.releaseBenefit === 'none' ? 'selected' : ''}>CD特典なし</option>
+          ${CD_BENEFITS.map(benefit => `<option value="${benefit.id}" ${existing.releaseBenefit === benefit.id ? 'selected' : ''}>${benefit.name}（経費 ${benefit.cost.toLocaleString()}円）</option>`).join('')}
+        </select>
+        <details class="seat-settings">
+          <summary>ライブ席種・チケット価格</summary>
+          <div class="seat-settings-grid">
+            ${SEAT_TYPES.map(seat => {
+              const price = seatPrices[seat.id] ?? seat.defaultPrice;
+              const availability = seat.optional
+                ? `<label class="seat-availability"><input type="checkbox" id="seat-option-${m}-${seat.id}" ${seatOptions[seat.id] ? 'checked' : ''}>設置する</label>`
+                : '';
+              return `<div class="seat-price-field" id="seat-row-${m}-${seat.id}"><label for="seat-price-${m}-${seat.id}">${seat.name}（円）</label><input type="number" id="seat-price-${m}-${seat.id}" min="0" step="500" value="${price}">${availability}</div>`;
+            }).join('')}
+          </div>
+        </details>
       </div>
     `;
+  }
+  for (let m = sM; m <= eM; m++) {
+    updateReleaseBenefitOptions(m);
+    updateSeatPlanOptions(m);
+    updateLiveDateOptions(m);
   }
   document.getElementById('decision-modal').style.display = 'flex';
 }
 
+function updateReleaseBenefitOptions(month) {
+  document.getElementById(`sel-benefit-${month}`).disabled = document.getElementById(`sel-rel-${month}`).value === 'none';
+}
+
+function updateSeatPlanOptions(month) {
+  const venueName = document.getElementById(`sel-ven-${month}`).value;
+  const venue = VENUE_DATA.find(item => item.name === venueName);
+  const isDome = Boolean(venue && venue.name.includes('ドーム'));
+  ['stand3', 'stand4'].forEach(seatId => {
+    document.getElementById(`seat-row-${month}-${seatId}`).style.display = isDome ? '' : 'none';
+  });
+}
+
+function updateLiveDateOptions(month) {
+  const dateInput = document.getElementById(`live-date-${month}`);
+  const note = document.getElementById(`live-date-note-${month}`);
+  const venue = VENUE_DATA.find(item => item.name === document.getElementById(`sel-ven-${month}`).value);
+  if (!venue) {
+    dateInput.value = '';
+    dateInput.disabled = true;
+    note.textContent = '会場を選択してください';
+    return;
+  }
+
+  const planCalendarYear = calendarYear + (planYearTarget - currentYear);
+  const monthStart = new Date(planCalendarYear, month - 1, 1, 12);
+  const monthEnd = new Date(planCalendarYear, month, 0, 12);
+  const minimumDate = new Date(`${gameDate}T12:00:00`);
+  minimumDate.setDate(minimumDate.getDate() + (venue.name.includes('球場') || venue.name.includes('ドーム') ? 180 : 45));
+  const minimumKey = toDateKey(minimumDate);
+  const monthEndKey = toDateKey(monthEnd);
+  dateInput.min = minimumKey;
+  dateInput.max = monthEndKey;
+  if (minimumDate > monthEnd) {
+    dateInput.value = '';
+    dateInput.disabled = true;
+    note.textContent = `この会場は開催日の180日以上前に予約が必要です（最短 ${minimumKey}）`;
+    return;
+  }
+
+  dateInput.disabled = false;
+  const defaultDate = toDateKey(getLastWednesday(planCalendarYear, month - 1));
+  if (!dateInput.value || dateInput.value < minimumKey || dateInput.value < toDateKey(monthStart)) {
+    dateInput.value = defaultDate >= minimumKey ? defaultDate : minimumKey;
+  }
+  note.textContent = venue.name.includes('球場') || venue.name.includes('ドーム')
+    ? `野球日程調整のため180日前から予約（最短 ${minimumKey}）`
+    : `開催日の45日前から予約（最短 ${minimumKey}）`;
+  const conflict = dateInput.value && findRivalVenueConflict(venue.name, dateInput.value);
+  if (conflict) note.textContent += ` / ${conflict.groupName}が予約済み`;
+}
+
 function saveDecisionPlan() {
   for (let m = planStartM; m <= planEndM; m++) {
-    productionSchedule[`${planYearTarget}-${m}`] = {
-      release: document.getElementById(`sel-rel-${m}`).value,
-      liveVenue: document.getElementById(`sel-ven-${m}`).value || null
+    const release = document.getElementById(`sel-rel-${m}`).value;
+    const liveVenue = document.getElementById(`sel-ven-${m}`).value || null;
+    const songName = document.getElementById(`song-name-${m}`).value.trim();
+    const liveName = document.getElementById(`live-name-${m}`).value.trim();
+    const liveDate = document.getElementById(`live-date-${m}`).value || null;
+    if (liveVenue) {
+      const venue = VENUE_DATA.find(item => item.name === liveVenue);
+      const earliestDate = new Date(`${gameDate}T12:00:00`);
+      earliestDate.setDate(earliestDate.getDate() + (venue.name.includes('球場') || venue.name.includes('ドーム') ? 180 : 45));
+      const earliestKey = toDateKey(earliestDate);
+      if (!liveDate || liveDate < earliestKey) {
+        alert(`${liveVenue}は開催日の${venue.name.includes('球場') || venue.name.includes('ドーム') ? '180日' : '45日'}以上前から予約してください。`);
+        return;
+      }
+      const selectedLiveDate = getGameDateObject(liveDate);
+      const targetCalendarYear = calendarYear + (planYearTarget - currentYear);
+      if (selectedLiveDate.getFullYear() !== targetCalendarYear || selectedLiveDate.getMonth() + 1 !== m) {
+        alert(`${m}月のライブ日は${targetCalendarYear}年${m}月内で選択してください。`);
+        return;
+      }
+      const rivalConflict = findRivalVenueConflict(liveVenue, liveDate);
+      if (rivalConflict) {
+        alert(`${liveDate}は${rivalConflict.groupName}が${liveVenue}を予約しています。別の日程を選んでください。`);
+        return;
+      }
+    }
+    const seatPrices = {};
+    const seatOptions = {};
+    SEAT_TYPES.forEach(seat => {
+      const price = Number.parseInt(document.getElementById(`seat-price-${m}-${seat.id}`).value, 10);
+      seatPrices[seat.id] = Number.isFinite(price) ? Math.max(0, price) : seat.defaultPrice;
+      if (seat.optional) seatOptions[seat.id] = document.getElementById(`seat-option-${m}-${seat.id}`).checked;
+    });
+    const plan = {
+      release,
+      songName: songName || null,
+      liveVenue,
+      liveName: liveVenue ? (liveName || liveVenue) : null,
+      liveDate,
+      releaseBenefit: release === 'none' ? 'none' : document.getElementById(`sel-benefit-${m}`).value,
+      seatPrices,
+      seatOptions
     };
+    if (plan.release !== 'none') ensureScheduledSong(planYearTarget, m, plan);
+    productionSchedule[`${planYearTarget}-${m}`] = plan;
   }
   document.getElementById('decision-modal').style.display = 'none';
   setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+  updateUI();
 }
 
 function openPlanningManual() {
@@ -997,20 +2623,13 @@ function openPlanningManual() {
   else openDecisionModal("翌年1月〜6月の計画", currentYear + 1, 1, 6);
 }
 
-function resetAllData() {
-  if (confirm("全セーブデータを消去して最初からやり直しますか？")) {
-    localStorage.removeItem('idol_manager_save');
-    location.reload();
-  }
-}
-
 // サービスワーカー登録
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
-// 開始
-initGame();
+// タイトル画面
+openTitleScreen();
 </script>
 
 </body>
