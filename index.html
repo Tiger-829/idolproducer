@@ -806,6 +806,13 @@ const OFFICE_FACILITIES = [
   { id: 'liveProduction', name: 'ライブ演出', baseCost: 1800000, baseMaintenance: 150000, effect: 'ライブ動員を強化' },
   { id: 'merchandise', name: 'グッズ', baseCost: 1000000, baseMaintenance: 75000, effect: 'ライブでのグッズ収益を強化' }
 ];
+const INDIVIDUAL_EVENT_PROFILES = {
+  merchandise: { name: 'グッズ', capacity: 160, popularityMultiplier: 2.0, snsMultiplier: 0.25 },
+  'web-greeting': { name: 'ウェブ挨拶', capacity: 150, popularityMultiplier: 2.5, snsMultiplier: 0.35 },
+  'real-greeting': { name: 'リアル挨拶', capacity: 80, popularityMultiplier: 1.3, snsMultiplier: 0.15 },
+  'web-sign': { name: 'ウェブサイン', capacity: 115, popularityMultiplier: 2.0, snsMultiplier: 0.3 },
+  'real-sign': { name: 'リアルサイン', capacity: 55, popularityMultiplier: 1.0, snsMultiplier: 0.1 }
+};
 const MUSIC_PROGRAMS = [
   { id: 'song-station', name: 'Song Station' },
   { id: 'ctv', name: 'CTV' },
@@ -1020,6 +1027,7 @@ function ensureMemberBirthdays() {
   idolRoster.forEach(member => {
     if (!member.stats) member.stats = {};
     if (!Number.isFinite(member.stats.sns)) member.stats.sns = 45;
+    if (!Array.isArray(member.eventSalesHistory)) member.eventSalesHistory = [];
     if (!Number.isInteger(member.birthdayMonth) || !Number.isInteger(member.birthdayDay)) {
       const hasWeekBirthday = Number.isInteger(member.birthdayMonth) && Number.isInteger(member.birthdayWeek);
       const birthday = generateBirthday(
@@ -1049,6 +1057,7 @@ function createMember(age = null, policy = null) {
     joinAge: idolAge,
     yearsActive: 0,
     stats: generateRandomStats(policy),
+    eventSalesHistory: [],
     isCenter: false,
     isSelected: false,
     retainedCount: 0
@@ -1288,6 +1297,18 @@ function calculateMemberFans(member) {
     ((stats.vocal || 0) + (stats.dance || 0)) * 120 +
     (stats.talk || 0) * 80
   );
+}
+
+function getMemberEventSalesSummary(member) {
+  const history = Array.isArray(member.eventSalesHistory) ? member.eventSalesHistory : [];
+  const recentGoods = history.filter(event => event.eventType === 'merchandise').slice(-3);
+  const recentBenefits = history.filter(event => event.eventType !== 'merchandise').slice(-3);
+  const average = events => events.length
+    ? Math.round(events.reduce((total, event) => total + event.sellThrough, 0) / events.length * 100)
+    : null;
+  const goodsRate = average(recentGoods);
+  const benefitRate = average(recentBenefits);
+  return `グッズ${goodsRate === null ? '未実施' : `${goodsRate}%`} / 特典${benefitRate === null ? '未実施' : `${benefitRate}%`}`;
 }
 
 function calculateGroupFans() {
@@ -1682,18 +1703,59 @@ function advanceOneWeek() {
   else if (pendingPerformanceOffers.length) openMusicOfferModal();
 }
 
-function sellMerchandiseAtLive(audience) {
+function recordIndividualEventSale(member, eventType, available) {
+  const profile = INDIVIDUAL_EVENT_PROFILES[eventType];
+  if (!profile || available <= 0) return { available: 0, unitsSold: 0, sellThrough: null };
+  const popularity = member.stats.popularity || 0;
+  const sns = member.stats.sns || 0;
+  const demand = Math.floor(popularity * profile.popularityMultiplier + sns * profile.snsMultiplier);
+  const unitsSold = Math.min(available, demand);
+  const sellThrough = unitsSold / available;
+  if (!Array.isArray(member.eventSalesHistory)) member.eventSalesHistory = [];
+  member.eventSalesHistory.push({
+    eventType,
+    date: gameDate,
+    available,
+    unitsSold,
+    sellThrough
+  });
+  if (member.eventSalesHistory.length > 24) member.eventSalesHistory.shift();
+  return { available, unitsSold, sellThrough };
+}
+
+function recordReleaseBenefitSales(benefitId) {
+  const participants = idolRoster.filter(member => member.isSelected);
+  const results = participants.map(member =>
+    recordIndividualEventSale(member, benefitId, INDIVIDUAL_EVENT_PROFILES[benefitId].capacity)
+  );
+  const available = results.reduce((sum, result) => sum + result.available, 0);
+  const unitsSold = results.reduce((sum, result) => sum + result.unitsSold, 0);
+  return { available, unitsSold, sellThrough: available ? unitsSold / available : 0 };
+}
+
+function sellMerchandiseAtLive() {
   if (merchandiseProducts <= 0 || merchandiseStock <= 0) {
     merchandiseSellThrough = merchandiseProducts > 0 ? 0 : null;
     return { unitsSold: 0, revenue: 0 };
   }
-  const demandMultiplier = 1 + Math.max(0, officeUpgrades.merchandise - 1) * 0.12 + Math.max(0, officeUpgrades.analytics - 1) * 0.08;
-  const demand = Math.max(1, Math.floor(audience * 0.1 * merchandiseProducts * demandMultiplier));
+  const participants = idolRoster.length ? idolRoster : [];
+  if (!participants.length) return { unitsSold: 0, revenue: 0 };
   const startingStock = merchandiseStock;
-  const unitsSold = Math.min(startingStock, demand);
+  const baseStockPerMember = Math.floor(startingStock / participants.length);
+  let remainder = startingStock % participants.length;
+  let availableTotal = 0;
+  let unitsSold = 0;
+  participants.forEach(member => {
+    const share = baseStockPerMember + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    const available = Math.min(share, INDIVIDUAL_EVENT_PROFILES.merchandise.capacity + merchandiseProducts * 20);
+    const sale = recordIndividualEventSale(member, 'merchandise', available);
+    availableTotal += sale.available;
+    unitsSold += sale.unitsSold;
+  });
   merchandiseStock -= unitsSold;
   merchandiseUnitsSold += unitsSold;
-  merchandiseSellThrough = unitsSold / startingStock;
+  merchandiseSellThrough = availableTotal ? unitsSold / availableTotal : 0;
   return { unitsSold, revenue: unitsSold * 2500 };
 }
 
@@ -1723,8 +1785,11 @@ function processMonthlyReleaseAndLive() {
     song.promotionPoints = 0;
     const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
     if (benefit) funds -= benefit.cost;
+    const benefitSales = benefit ? recordReleaseBenefitSales(benefit.id) : null;
     plan.releaseCompleted = true;
-    const benefitText = benefit ? ` ${benefit.name}経費: ${benefit.cost.toLocaleString()}円。` : '';
+    const benefitText = benefit
+      ? ` ${benefit.name}経費: ${benefit.cost.toLocaleString()}円 / 参加メンバー平均完売率 ${Math.round(benefitSales.sellThrough * 100)}%。`
+      : '';
     setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
   }
 
@@ -1746,7 +1811,7 @@ function processMonthlyReleaseAndLive() {
         const price = Number.isFinite(configuredPrice) ? configuredPrice : seat.defaultPrice;
         revenue += sold * price;
       });
-      const merchandiseSales = sellMerchandiseAtLive(audience);
+      const merchandiseSales = sellMerchandiseAtLive();
       revenue += merchandiseSales.revenue;
       const totalCapacity = seatCapacities.reduce((sum, seat) => sum + seat.capacity, 0);
       const cost = totalCapacity * 2500;
@@ -1776,7 +1841,7 @@ function processSpecialLiveEvents() {
       calculateGroupFans() * 0.04 * EASE_MULTIPLIER[venue.ease] * eventMultiplier
     ));
     const ticketRevenue = audience * 8000;
-    const merchandiseSales = sellMerchandiseAtLive(audience);
+    const merchandiseSales = sellMerchandiseAtLive();
     const venueCost = capacity * 2500;
     const profit = ticketRevenue + merchandiseSales.revenue - venueCost;
     yearlyStats.audience += audience;
@@ -1907,7 +1972,7 @@ function checkSenbatsuTrigger() {
 
     let memberListTxt = "センターにするメンバーの番号を入力してください:\n";
     idolRoster.slice(0, 15).forEach((m, idx) => {
-      memberListTxt += `${idx + 1}: ${m.name} (総合:${calculateSingleOverall(m.stats)})\n`;
+      memberListTxt += `${idx + 1}: ${m.name} (総合:${calculateSingleOverall(m.stats)} / ${getMemberEventSalesSummary(m)})\n`;
     });
     const cIdx = prompt(memberListTxt, "1");
     const centerIndex = Math.max(0, Math.min(idolRoster.length - 1, (parseInt(cIdx) || 1) - 1));
