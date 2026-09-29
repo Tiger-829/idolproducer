@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>アイドルグループ育成マネージャー</title>
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#e91e63">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="アイドル育成">
+
+  <style>
+    :root {
+      --primary: #e91e63;
+      --bg: #fce4ec;
+      --panel: #ffffff;
+      --text: #333333;
+    }
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overscroll-behavior-y: none;
+      display: flex;
+      justify-content: center;
+    }
+    .game-container {
+      background: var(--panel);
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      color: var(--primary);
+      text-align: center;
+    }
+    .header-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fdf2f4;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    
+    /* チーム総合力カード */
+    .team-summary-card {
+      background: #fff;
+      border: 1px solid #f8bbd0;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .team-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .overall-score {
+      font-size: 24px;
+      font-weight: 900;
+      font-family: monospace;
+    }
+    .rank-badge {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      font-weight: 900;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .avg-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .avg-item {
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      padding: 3px 4px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .avg-label { font-size: 9px; color: #777; display: block; }
+    .avg-val { font-size: 11px; font-weight: bold; font-family: monospace; }
+
+    /* 名簿エリア */
+    .roster-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .roster-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .roster-tab-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 11px;
+      background: #eee;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .roster-tab-btn.active {
+      background: var(--primary);
+      color: white;
+      font-weight: bold;
+    }
+    .roster-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .member-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+      border: 1px solid #eee;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    /* アクション・進行 */
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    button.main-btn {
+      padding: 12px;
+      font-size: 14px;
+      font-weight: bold;
+      color: white;
+      background-color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button.main-btn:active { transform: scale(0.98); }
+    .danger-btn {
+      background-color: #757575;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    #log-box {
+      padding: 8px 10px;
+      background: #fafafa;
+      border-left: 4px solid var(--primary);
+      font-size: 11px;
+      min-height: 48px;
+      line-height: 1.4;
+      border-radius: 4px;
+    }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 420px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 16px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-container">
+  <h1>アイドルグループ育成マネージャー</h1>
+
+  <div class="header-info">
+    <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週</div>
+    <div>資金: <span id="txt-funds">10,000,000</span> 円</div>
+  </div>
+
+  <!-- チーム総合力カード -->
+  <div class="team-summary-card">
+    <div class="team-header">
+      <div>
+        <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
+        <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span id="team-overall-score" class="overall-score">--</span>
+        <span id="team-rank-badge" class="rank-badge">-</span>
+      </div>
+    </div>
+    <div class="avg-grid" id="team-avg-grid"></div>
+  </div>
+
+  <!-- 所属メンバー名簿 -->
+  <div class="roster-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <span style="font-weight:bold; font-size:12px;">所属メンバー (<span id="txt-roster-count">0</span>名)</span>
+      <span style="font-size:10px; color:#888;">選抜枠: 16名</span>
+    </div>
+    <div class="roster-tabs">
+      <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
+      <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
+    </div>
+    <div class="roster-list" id="roster-list-ui"></div>
+  </div>
+
+  <!-- アクションボタン -->
+  <div class="actions">
+    <button class="main-btn" onclick="advanceOneWeek()">1週間進める（レッスン・業務推進）</button>
+    <div style="display:flex; gap:6px;">
+      <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
+      <button class="danger-btn" style="flex:1;" onclick="resetAllData()">データをリセット</button>
+    </div>
+  </div>
+
+  <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
+</div>
+
+<!-- 半年計画策定モーダル -->
+<div class="modal-overlay" id="decision-modal">
+  <div class="modal-content">
+    <h3 id="modal-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画の策定</h3>
+    <p style="font-size:11px; color:#666;">各月のシングル/アルバム発売とライブ会場を決定してください。</p>
+    <div id="plan-rows"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="saveDecisionPlan()">この計画で決定する</button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. 定数・マスターデータ
+// ==========================================
+
+// 苗字上位100件
+const SURNAMES_TOP100 = [
+  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
+  "吉田", "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水",
+  "山崎", "森", "池田", "橋本", "阿部", "石川", "山下", "中島", "石井", "小川",
+  "前田", "岡田", "長谷川", "藤田", "後藤", "近藤", "村上", "遠藤", "青木", "坂本",
+  "斉藤", "福田", "藤井", "西村", "三浦", "岡本", "松田", "中川", "中野", "原田",
+  "小野", "田村", "竹内", "金子", "和田", "中山", "石田", "上田", "森田", "原",
+  "柴田", "酒井", "工藤", "横山", "宮崎", "宮本", "内田", "高木", "安藤", "谷口",
+  "大野", "丸山", "今井", "高田", "河野", "藤原", "武田", "村田", "上野", "杉山",
+  "増田", "平野", "大塚", "千葉", "久保", "松井", "小島", "岩崎", "桜井", "野口",
+  "松尾", "菊地", "野村", "新井", "渡部", "本田", "吉川", "菅原", "矢野", "市川"
+];
+
+// 女性の読み上位100個 ＆ 漢字候補
+const FEMALE_READINGS_MAP = {
+  "えま": ["咲茉", "依舞", "愛真", "絵麻", "えま"],
+  "つむぎ": ["紬", "紬希", "紡", "つむぎ"],
+  "さくら": ["桜", "咲良", "櫻", "さくら"],
+  "めい": ["芽依", "芽生", "明衣", "萌衣", "めい"],
+  "みお": ["澪", "美緒", "美桜", "心央", "みお"],
+  "こはる": ["心春", "小春", "心晴", "こはる"],
+  "ひまり": ["陽葵", "日茉莉", "陽莉", "ひまり"],
+  "あおい": ["葵", "碧", "蒼", "あおい"],
+  "ゆい": ["結衣", "由依", "結", "唯", "ゆい"],
+  "りん": ["凛", "凜", "鈴", "倫", "りん"],
+  "あかり": ["朱莉", "明莉", "灯", "あかり"],
+  "ひなた": ["日向", "陽菜", "日菜", "ひなた"],
+  "ほのか": ["穂乃花", "穂香", "歩乃果", "ほのか"],
+  "ゆな": ["結菜", "優奈", "佑奈", "ゆな"],
+  "いちご": ["一期", "苺", "一瑚", "いちご"],
+  "さな": ["紗奈", "咲那", "彩菜", "さな"],
+  "かのん": ["花音", "果音", "佳音", "かのん"],
+  "りこ": ["莉子", "理子", "里瑚", "りこ"],
+  "すず": ["鈴", "涼", "すず"],
+  "ふうか": ["楓香", "風花", "ふうか"],
+  "ゆづき": ["結月", "優月", "悠月", "ゆづき"],
+  "ことね": ["琴音", "琴乃", "ことね"],
+  "さら": ["紗良", "咲良", "沙良", "彩良", "さら"],
+  "ひな": ["陽菜", "日菜", "雛", "ひな"],
+  "みつき": ["美月", "光希", "充希", "みつき"],
+  "あすか": ["明日香", "飛鳥", "あすか"],
+  "ななみ": ["七海", "菜々美", "那奈美", "ななみ"],
+  "ゆいな": ["結菜", "唯奈", "由衣奈", "ゆいな"],
+  "こころ": ["心", "心結", "こころ"],
+  "るか": ["琉花", "瑠香", "留果", "るか"],
+  "のあ": ["乃愛", "野亜", "希空", "のあ"],
+  "ゆず": ["柚", "柚子", "優寿", "ゆず"],
+  "みれい": ["美玲", "美麗", "未麗", "みれい"],
+  "みゆ": ["美優", "未悠", "実優", "心結", "みゆ"],
+  "しおり": ["詩織", "栞", "汐里", "しおり"],
+  "まい": ["麻衣", "舞", "真衣", "まい"],
+  "みさき": ["美咲", "実咲", "海咲", "みさき"],
+  "まな": ["愛菜", "真菜", "愛", "まな"],
+  "れい": ["玲", "怜", "麗", "澪", "れい"],
+  "はな": ["花", "華", "羽奈", "はな"],
+  "ちひろ": ["千尋", "千裕", "千紘", "ちひろ"],
+  "みおり": ["澪莉", "美織", "心織", "みおり"],
+  "かんな": ["環奈", "栞奈", "柑奈", "かんな"],
+  "ゆめ": ["夢", "優芽", "結愛", "ゆめ"],
+  "あやね": ["綾音", "彩音", "絢音", "あやね"],
+  "るな": ["瑠奈", "月", "流奈", "るな"],
+  "はるか": ["春香", "遥", "晴香", "悠華", "はるか"],
+  "ちさと": ["千里", "知里", "千聖", "ちさと"],
+  "みく": ["美玖", "未来", "未久", "みく"],
+  "なのか": ["菜乃花", "七香", "七和", "なのか"],
+  "あいり": ["愛莉", "愛理", "藍梨", "あいり"],
+  "ゆり": ["百合", "由梨", "優里", "ゆり"],
+  "きこ": ["希子", "稀子", "季子", "きこ"],
+  "みなみ": ["美波", "南", "未奈美", "みなみ"],
+  "わかな": ["若菜", "和花奈", "和奏", "わかな"],
+  "みずき": ["瑞希", "美月", "水希", "みずき"],
+  "りお": ["莉央", "里桜", "理央", "りお"],
+  "ゆきの": ["雪乃", "幸乃", "有希乃", "ゆきの"],
+  "さほ": ["紗歩", "咲帆", "沙保", "さほ"],
+  "このか": ["好花", "心香", "このか"],
+  "ほなみ": ["穂波", "保奈美", "ほなみ"],
+  "ねね": ["寧々", "音々", "ねね"],
+  "うた": ["詩", "唄", "羽多", "うた"],
+  "おとは": ["乙葉", "音羽", "おとは"],
+  "ももか": ["百花", "萌々香", "桃香", "ももか"],
+  "なな": ["奈々", "七", "菜々", "なな"],
+  "しほ": ["志保", "詩歩", "志帆", "しほ"],
+  "ひより": ["日和", "陽依", "ひより"],
+  "そら": ["空", "昊", "そら"],
+  "まゆ": ["真優", "麻友", "茉由", "まゆ"],
+  "りんな": ["凛奈", "倫菜", "梨乃", "りんな"],
+  "みほ": ["美穂", "未歩", "実保", "みほ"],
+  "ひろか": ["広香", "裕香", "紘花", "ひろか"],
+  "あかね": ["茜", "明音", "あかね"],
+  "かすみ": ["霞", "香澄", "かすみ"],
+  "ことのは": ["言の葉", "琴葉", "ことのは"],
+  "みか": ["美香", "美夏", "実果", "みか"],
+  "さや": ["紗矢", "彩花", "沙耶", "さや"],
+  "ののか": ["野乃花", "乃々華", "ののか"],
+  "まほ": ["真帆", "万歩", "真歩", "まほ"],
+  "すずか": ["涼花", "鈴香", "すずか"],
+  "あやか": ["彩花", "絢香", "綾香", "あやか"],
+  "ちか": ["千夏", "智香", "知花", "ちか"],
+  "りな": ["莉奈", "里奈", "理名", "りな"],
+  "ともか": ["智香", "友香", "朋花", "ともか"],
+  "なつき": ["菜月", "奈月", "夏希", "なつき"],
+  "あんな": ["杏奈", "杏菜", "安奈", "あんな"],
+  "はづき": ["葉月", "羽月", "はづき"],
+  "せりな": ["芹奈", "芹菜", "せりな"],
+  "よりこ": ["頼子", "依子", "よりこ"],
+  "みやび": ["雅", "都", "美夜", "みやび"],
+  "かほ": ["果穂", "佳歩", "夏帆", "かほ"],
+  "ゆき": ["雪", "由紀", "優希", "ゆき"],
+  "えれな": ["恵令奈", "絵玲奈", "絵麗奈", "えれな"],
+  "りか": ["梨花", "里香", "理香", "りか"],
+  "みさ": ["美佐", "海砂", "実沙", "みさ"],
+  "はるの": ["春乃", "晴乃", "はるの"],
+  "たまき": ["環", "珠貴", "玉紀", "たまき"],
+  "あや": ["彩", "綾", "絢", "あや"],
+  "れな": ["玲奈", "麗奈", "怜菜", "れな"]
+};
+
+// 11ステータス定義
+const STATUS_KEYS = [
+  { id: 'popularity', name: '人気' },
+  { id: 'style',      name: 'スタイル' },
+  { id: 'fashion',    name: 'ファッション' },
+  { id: 'vocal',      name: '歌唱力' },
+  { id: 'dance',      name: 'ダンス' },
+  { id: 'stamina',    name: '体力' },
+  { id: 'talk',       name: 'トーク力' },
+  { id: 'variety',    name: 'バラエティ耐性' },
+  { id: 'academics',  name: '学力' },
+  { id: 'athletics',  name: '運動能力' },
+  { id: 'crisis',     name: '危機回避力' }
+];
+
+// 全37会場データ
+const VENUE_DATA = [
+  { name: "函館ドーム",       cap: "S",  ease: "C" },
+  { name: "札幌アリーナ",     cap: "C",  ease: "B" },
+  { name: "パルス真駒内",     cap: "D",  ease: "B" },
+  { name: "仙台球場",         cap: "B",  ease: "B" },
+  { name: "秋田アリーナ",     cap: "C",  ease: "C" },
+  { name: "水戸球場",         cap: "C",  ease: "A" },
+  { name: "高崎総合体育館",   cap: "B",  ease: "A" },
+  { name: "大宮アリーナ",     cap: "A",  ease: "A" },
+  { name: "新宿球場",         cap: "S",  ease: "B" },
+  { name: "原宿体育館",       cap: "C",  ease: "S" },
+  { name: "文京ドーム",       cap: "SS", ease: "A" },
+  { name: "パルス品川",       cap: "D",  ease: "A" },
+  { name: "パルス八王子",     cap: "D",  ease: "A" },
+  { name: "幕張球場",         cap: "A",  ease: "B" },
+  { name: "千葉アリーナ",     cap: "B",  ease: "S" },
+  { name: "パルス船橋",       cap: "C",  ease: "SS" },
+  { name: "横浜球場",         cap: "A",  ease: "A" },
+  { name: "川崎アリーナ",     cap: "B",  ease: "A" },
+  { name: "パルス湘南",       cap: "C",  ease: "B" },
+  { name: "熱海アリーナ",     cap: "C",  ease: "B" },
+  { name: "新潟球場",         cap: "B",  ease: "C" },
+  { name: "パルス富山",       cap: "C",  ease: "C" },
+  { name: "栄ドーム",         cap: "S",  ease: "B" },
+  { name: "名古屋アリーナ",   cap: "B",  ease: "B" },
+  { name: "パルス名古屋",     cap: "C",  ease: "A" },
+  { name: "京都アリーナ",     cap: "B",  ease: "B" },
+  { name: "難波ドーム",       cap: "S",  ease: "B" },
+  { name: "大阪スタジアム",   cap: "A",  ease: "A" },
+  { name: "西宮球場",         cap: "SS", ease: "B" },
+  { name: "パルス大阪",       cap: "C",  ease: "A" },
+  { name: "広島アリーナ",     cap: "C",  ease: "A" },
+  { name: "松山アリーナ",     cap: "D",  ease: "B" },
+  { name: "博多ドーム",       cap: "S",  ease: "A" },
+  { name: "天神アリーナ",     cap: "B",  ease: "A" },
+  { name: "パルス北九州",     cap: "D",  ease: "S" },
+  { name: "宮崎球場",         cap: "C",  ease: "A" },
+  { name: "那覇アリーナ",     cap: "C",  ease: "B" }
+];
+
+const CAPACITY_MAP = { SS: 47500, S: 38500, A: 30000, B: 20000, C: 12500, D: 7500 };
+const EASE_MULTIPLIER = { SS: 1.30, S: 1.15, A: 1.00, B: 0.85, C: 0.70 };
+
+// ランク判定定義
+function getRankData(val) {
+  if (val >= 90) return { rank: 'S', color: '#ff1493', bg: '#ffe4e1' };
+  if (val >= 80) return { rank: 'A', color: '#e60000', bg: '#ffebee' };
+  if (val >= 70) return { rank: 'B', color: '#ff8c00', bg: '#fff3e0' };
+  if (val >= 60) return { rank: 'C', color: '#2e7d32', bg: '#e8f5e9' };
+  if (val >= 50) return { rank: 'D', color: '#0277bd', bg: '#e1f5fe' };
+  if (val >= 40) return { rank: 'E', color: '#555555', bg: '#eeeeee' };
+  if (val >= 20) return { rank: 'F', color: '#455a64', bg: '#cfd8dc' };
+  return { rank: 'G', color: '#8d6e63', bg: '#d7ccc8' };
+}
+
+// ==========================================
+// 2. ゲーム状態（ステート）
+// ==========================================
+
+let currentYear = 1;
+let currentMonth = 1;
+let currentWeek = 1; // 1〜4週
+let totalWeeksElapsed = 0;
+let draftCount = 0;
+let currentRosterTab = 'selected';
+
+let idolRoster = [];
+let productionSchedule = {
+  "1-2": { release: "single", liveVenue: null },
+  "1-5": { release: "none",   liveVenue: "原宿体育館" },
+  "1-6": { release: "single", liveVenue: null }
+};
+
+let yearlyStats = { sales: 0, audience: 0 };
+let funds = 10000000;
+
+// 競合チーム（初期6チーム）
+let leagueTeams = [
+  { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
+  { id: 'rival_1', name: 'スターライト・クイーン', sales: 0, audience: 0, basePower: 92 },
+  { id: 'rival_2', name: 'ネオ・エレメンツ', sales: 0, audience: 0, basePower: 85 },
+  { id: 'rival_3', name: 'サクラ・シンフォニー', sales: 0, audience: 0, basePower: 78 },
+  { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
+  { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
+];
+
+// ==========================================
+// 3. アイドル生成ロジック
+// ==========================================
+
+function generateIdolName() {
+  const surname = SURNAMES_TOP100[Math.floor(Math.random() * SURNAMES_TOP100.length)];
+  const readKeys = Object.keys(FEMALE_READINGS_MAP);
+  const reading = readKeys[Math.floor(Math.random() * readKeys.length)];
+  const kanjiList = FEMALE_READINGS_MAP[reading];
+  const given = kanjiList[Math.floor(Math.random() * kanjiList.length)];
+  return { fullName: `${surname} ${given}`, reading };
+}
+
+function generateRandomStats(biasPolicy = null) {
+  const stats = {};
+  STATUS_KEYS.forEach(k => {
+    stats[k.id] = Math.floor(Math.random() * 50) + 25; // 25〜75
+  });
+  if (biasPolicy === 'vocal') stats.vocal = Math.min(100, stats.vocal + 20);
+  if (biasPolicy === 'dance') stats.dance = Math.min(100, stats.dance + 20);
+  if (biasPolicy === 'talk') stats.talk = Math.min(100, stats.talk + 20);
+  return stats;
+}
+
+function createMember(age = null, policy = null) {
+  const nameData = generateIdolName();
+  const idolAge = age || (Math.floor(Math.random() * 8) + 13); // 13〜20
+  return {
+    id: Date.now() + Math.floor(Math.random() * 10000),
+    name: nameData.fullName,
+    reading: nameData.reading,
+    age: idolAge,
+    joinAge: idolAge,
+    yearsActive: 0,
+    stats: generateRandomStats(policy),
+    isCenter: false,
+    isSelected: false,
+    retainedCount: 0
+  };
+}
+
+function initGame() {
+  const saved = localStorage.getItem('idol_manager_save');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      currentYear = data.currentYear;
+      currentMonth = data.currentMonth;
+      currentWeek = data.currentWeek;
+      totalWeeksElapsed = data.totalWeeksElapsed;
+      draftCount = data.draftCount;
+      funds = data.funds;
+      yearlyStats = data.yearlyStats;
+      idolRoster = data.idolRoster;
+      productionSchedule = data.productionSchedule;
+      leagueTeams = data.leagueTeams;
+      updateUI();
+      return;
+    } catch(e) { console.error(e); }
+  }
+
+  // 初期化：30名体制
+  idolRoster = [];
+  for (let i = 0; i < 30; i++) {
+    const startAge = Math.floor(Math.random() * 9) + 14; // 14〜22歳
+    const m = createMember(startAge);
+    m.yearsActive = Math.floor(Math.random() * 4);
+    m.joinAge = Math.max(13, startAge - m.yearsActive);
+    m.isSelected = (i < 16);
+    m.isCenter = (i === 0);
+    idolRoster.push(m);
+  }
+  updateUI();
+}
+
+// ==========================================
+// 4. 計算 ＆ 総合力ロジック
+// ==========================================
+
+function calculateTeamAverages() {
+  const active = idolRoster.filter(m => m.isSelected);
+  const targets = active.length > 0 ? active : idolRoster;
+  const count = targets.length;
+
+  const averages = {};
+  let total = 0;
+  STATUS_KEYS.forEach(k => {
+    const sum = targets.reduce((acc, m) => acc + (m.stats[k.id] || 0), 0);
+    const avg = Math.round((sum / count) * 10) / 10;
+    averages[k.id] = avg;
+    total += avg;
+  });
+
+  let overall = total / STATUS_KEYS.length;
+  const center = targets.find(m => m.isCenter);
+  if (center) {
+    const centerPower = (center.stats.popularity + center.stats.vocal + center.stats.dance) / 3;
+    const teamCoreAvg = (averages.popularity + averages.vocal + averages.dance) / 3;
+    if (centerPower > teamCoreAvg) {
+      overall += Math.min(5, (centerPower - teamCoreAvg) * 0.1);
+    }
+  }
+
+  const finalScore = Math.min(100, Math.round(overall));
+  const rankData = getRankData(finalScore);
+
+  return { averages, overall: finalScore, rankData, centerName: center ? center.name : 'なし' };
+}
+
+function calculateSingleOverall(stats) {
+  const sum = Object.values(stats).reduce((a, b) => a + b, 0);
+  return Math.round(sum / Object.keys(stats).length);
+}
+
+// ==========================================
+// 5. 進行 ＆ イベントシステム
+// ==========================================
+
+function advanceOneWeek() {
+  totalWeeksElapsed++;
+
+  // ライバルの週間蓄積
+  leagueTeams.forEach(t => {
+    if (t.id === 'player') return;
+    t.sales += Math.floor((t.basePower * 550) + (Math.random() * 7000));
+    t.audience += Math.floor((t.basePower * 220) + (Math.random() * 3000));
+  });
+
+  // 危機管理チェック（選抜の危機回避力平均）
+  const summary = calculateTeamAverages();
+  const crisisAvg = summary.averages.crisis;
+  if (Math.random() * 100 < (100 - crisisAvg) * 0.05) {
+    setLog("【SNSボヤ騒ぎ】一部ファンの間で噂が拡散し、対応に追われました。（人気 -2）");
+    idolRoster.forEach(m => { if (m.isSelected) m.stats.popularity = Math.max(0, m.stats.popularity - 2); });
+  }
+
+  // 12週前（3ヶ月前）の選抜発表チェック
+  checkSenbatsuTrigger();
+
+  // 月末・週イベント処理
+  if (currentWeek === 4) {
+    processMonthlyReleaseAndLive();
+  }
+
+  // 年末イベント（12月4週）
+  if (currentMonth === 12 && currentWeek === 4) {
+    executeYearEndAwards();
+    processYearEndAgingAndGraduation();
+  }
+
+  // 2.5年ごと（120週ごと）のドラフト
+  if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
+    triggerDraftMeeting();
+  }
+
+  // カレンダー送り
+  currentWeek++;
+  if (currentWeek > 4) {
+    currentWeek = 1;
+    currentMonth++;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear++;
+      yearlyStats = { sales: 0, audience: 0 };
+      leagueTeams.forEach(t => { t.sales = 0; t.audience = 0; });
+    }
+
+    // 1月と7月の半年計画トリガー
+    if (currentMonth === 1) {
+      openDecisionModal("当年 7月〜12月 の計画策定", currentYear, 7, 12);
+    } else if (currentMonth === 7) {
+      openDecisionModal("翌年 1月〜6月 の計画策定", currentYear + 1, 1, 6);
+    }
+  }
+
+  updateUI();
+}
+
+// 月ごとのリリース＆ライブ実行
+function processMonthlyReleaseAndLive() {
+  const planKey = `${currentYear}-${currentMonth}`;
+  const plan = productionSchedule[planKey];
+  if (!plan) return;
+
+  const summary = calculateTeamAverages();
+
+  // CDリリース
+  if (plan.release && plan.release !== 'none') {
+    const isSingle = (plan.release === 'single');
+    const quality = (summary.averages.popularity * 0.6) + (summary.averages.vocal * 0.2) + (summary.averages.dance * 0.2);
+    const multiplier = 1.0 + (summary.overall / 100);
+    const base = isSingle ? 5000 : 7500;
+    const sales = Math.floor(quality * base * multiplier) + Math.floor(Math.random() * 30000);
+
+    yearlyStats.sales += sales;
+    funds += sales * (isSingle ? 300 : 600);
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！`);
+  }
+
+  // ライブ
+  if (plan.liveVenue) {
+    const v = VENUE_DATA.find(item => item.name === plan.liveVenue);
+    if (v) {
+      const cap = CAPACITY_MAP[v.cap];
+      const ease = EASE_MULTIPLIER[v.ease];
+      const idolPower = (summary.averages.popularity * 500) + ((summary.averages.vocal + summary.averages.dance) * 200);
+      const audience = Math.min(cap, Math.floor(idolPower * ease));
+      const revenue = audience * 8000;
+      const cost = cap * 2500;
+      const profit = revenue - cost;
+
+      yearlyStats.audience += audience;
+      funds += profit;
+      setLog(`【ライブ成功】${v.name}公演（動員: ${audience.toLocaleString()}人 / 収支: ${profit > 0 ? '+' : ''}${profit.toLocaleString()}円）！`);
+    }
+  }
+}
+
+// 12週前選抜発表
+function checkSenbatsuTrigger() {
+  if (currentWeek !== 1) return;
+  const targetWeeks = totalWeeksElapsed + 12;
+  const mIndex = Math.floor((targetWeeks - 1) / 4) + 1;
+  const targetYear = Math.floor((mIndex - 1) / 12) + 1;
+  const targetMonth = ((mIndex - 1) % 12) + 1;
+  const targetKey = `${targetYear}-${targetMonth}`;
+
+  const plan = productionSchedule[targetKey];
+  if (plan && plan.release && plan.release !== 'none') {
+    const relName = plan.release === 'single' ? 'シングル' : 'アルバム';
+    const num = prompt(`【選抜発表】${targetYear}年${targetMonth}月発売の${relName}選抜を決定します。\n選抜人数を入力してください (5〜20名):`, "16");
+    const count = Math.max(5, Math.min(20, parseInt(num) || 16));
+
+    let memberListTxt = "センターにするメンバーの番号を入力してください:\n";
+    idolRoster.slice(0, 15).forEach((m, idx) => {
+      memberListTxt += `${idx + 1}: ${m.name} (総合:${calculateSingleOverall(m.stats)})\n`;
+    });
+    const cIdx = prompt(memberListTxt, "1");
+    const centerIndex = Math.max(0, Math.min(idolRoster.length - 1, (parseInt(cIdx) || 1) - 1));
+
+    idolRoster.forEach((m, idx) => {
+      m.isSelected = (idx < count);
+      m.isCenter = (idx === centerIndex);
+    });
+
+    setLog(`【選抜決定】${targetMonth}月作のセンターは【${idolRoster[centerIndex].name}】！ 選抜${count}名体制を敷きました。`);
+  }
+}
+
+// 年末アワード
+function executeYearEndAwards() {
+  const pTeam = leagueTeams.find(t => t.id === 'player');
+  pTeam.sales = yearlyStats.sales;
+  pTeam.audience = yearlyStats.audience;
+
+  const sortedForKohaku = [...leagueTeams].sort((a, b) => ((b.sales * 0.6) + (b.audience * 0.4)) - ((a.sales * 0.6) + (a.audience * 0.4)));
+  const sortedByAudience = [...leagueTeams].sort((a, b) => b.audience - a.audience);
+
+  const k1 = sortedForKohaku[0];
+  const k2 = sortedForKohaku[1];
+  const inKohaku = (k1.id === 'player' || k2.id === 'player');
+  const isCdTop = (yearlyStats.sales >= 3000000 && sortedByAudience[0].id === 'player');
+
+  let report = `===== 【${currentYear}年 年末アワード】 =====\n`;
+  report += `◆ 赤白歌対決（上位2枠）: 1位 ${k1.name} / 2位 ${k2.name}\n`;
+  report += inKohaku ? " ★自グループが赤白歌対決へ出場決定！\n" : " ×赤白出場を逃しました…\n";
+  report += `\n◆ 日本CD大賞: 売上300万枚(${yearlyStats.sales >= 3000000 ? '達成' : '未達'}) ＆ 動員1位(${sortedByAudience[0].id === 'player' ? '獲得' : '逃す'})\n`;
+  if (isCdTop) {
+    report += " ★★★ 栄冠！ 年間売上300万枚＆動員1位で【CD大賞】を受賞しました！ ★★★\n";
+    funds += 50000000;
+  }
+  alert(report);
+}
+
+// 加齢と卒業・慰留
+function processYearEndAgingAndGraduation() {
+  idolRoster.forEach(m => { m.age++; m.yearsActive++; });
+  const remaining = [];
+  let logMsgs = [];
+
+  for (let m of idolRoster) {
+    let graduate = false;
+    if (m.age >= 22) {
+      let chance = (m.age - 21) * 0.08;
+      if (m.joinAge <= 15 && m.yearsActive >= 7) chance += 0.20;
+      if (m.age >= 30) chance = 1.0;
+
+      if (Math.random() < chance) {
+        if (m.retainedCount >= 2 || m.age >= 31) {
+          alert(`【卒業】${m.name}（${m.age}歳）が活動をやり切り、グループを卒業しました。`);
+          graduate = true;
+        } else {
+          const nextCount = m.retainedCount + 1;
+          const rateTxt = (nextCount === 1) ? "100%" : "50%";
+          const retain = confirm(`【卒業打診】${m.name}（${m.age}歳 / 在籍${m.yearsActive}年）から卒業の相談がありました。\n慰留しますか？（今回成功率: ${rateTxt}）`);
+          if (retain) {
+            if (nextCount === 1) {
+              m.retainedCount = 1;
+              alert(`【慰留成功】${m.name}はもう1年残留してくれることになりました。`);
+            } else {
+              m.retainedCount = 2;
+              if (Math.random() < 0.5) {
+                alert(`【慰留成功(50%)】説得が通じ、${m.name}は残留を決めました！`);
+              } else {
+                alert(`【慰留失敗(50%)】本人の意志は固く、${m.name}の卒業が決まりました。`);
+                graduate = true;
+              }
+            }
+          } else {
+            graduate = true;
+          }
+        }
+      }
+    }
+
+    if (!graduate) {
+      remaining.push(m);
+    } else {
+      logMsgs.push(`${m.name}が卒業`);
+    }
+  }
+
+  idolRoster = remaining;
+  if (!idolRoster.some(m => m.isCenter) && idolRoster.length > 0) {
+    idolRoster[0].isCenter = true;
+  }
+}
+
+// ドラフト会議
+function triggerDraftMeeting() {
+  draftCount++;
+  if (draftCount % 2 === 0) {
+    const newTeamName = `新世代プロジェクト${draftCount / 2}期`;
+    leagueTeams.push({
+      id: `rival_${draftCount}`,
+      name: newTeamName,
+      sales: 0,
+      audience: 0,
+      basePower: 75 + Math.floor(Math.random() * 12)
+    });
+    alert(`【速報】第${draftCount}回ドラフトより、新グループ『${newTeamName}』が新規参入！`);
+  }
+
+  alert(`【第${draftCount}回 ドラフト会議】全国から13〜20歳の候補生が集結しました。`);
+  const picks = Math.floor(Math.random() * 6) + 10; // 10〜15名
+
+  // 1巡目
+  const p1 = createMember(Math.floor(Math.random() * 5) + 14, 'vocal');
+  const p2 = createMember(Math.floor(Math.random() * 5) + 14, 'dance');
+  const choice = prompt(`【1巡目入札】指名選手を選択:\n1: ${p1.name} (歌唱特化)\n2: ${p2.name} (ダンス特化)`, "1");
+  const firstChoice = (choice === "2") ? p2 : p1;
+
+  if (Math.random() < 0.5) {
+    alert(`【単独指名】${firstChoice.name}の交渉権を獲得！`);
+    idolRoster.push(firstChoice);
+  } else {
+    alert(`【競合抽選】他球団と重複！ クジを引きます…`);
+    if (Math.random() < 0.5) {
+      alert(`【当たり！】${firstChoice.name}を獲得！`);
+      idolRoster.push(firstChoice);
+    } else {
+      alert(`【ハズレ…】外れ1位で別有望株を獲得しました。`);
+      idolRoster.push(createMember());
+    }
+  }
+
+  // 2〜N巡目一括
+  for (let i = 2; i <= picks; i++) {
+    idolRoster.push(createMember());
+  }
+
+  alert(`【ドラフト終了】新人計${picks}名を指名・獲得しました！`);
+  setLog(`【ドラフト】新たに${picks}名のメンバーが加入しました。`);
+}
+
+// ==========================================
+// 6. UI描画 ＆ モーダル操作
+// ==========================================
+
+function updateUI() {
+  document.getElementById('txt-year').textContent = currentYear;
+  document.getElementById('txt-month').textContent = currentMonth;
+  document.getElementById('txt-week').textContent = currentWeek;
+  document.getElementById('txt-funds').textContent = funds.toLocaleString();
+  document.getElementById('txt-roster-count').textContent = idolRoster.length;
+
+  const summary = calculateTeamAverages();
+  document.getElementById('txt-center-name').textContent = summary.centerName;
+  document.getElementById('team-overall-score').textContent = summary.overall;
+  
+  const badge = document.getElementById('team-rank-badge');
+  badge.textContent = summary.rankData.rank;
+  badge.style.color = summary.rankData.color;
+  badge.style.backgroundColor = summary.rankData.bg;
+  badge.style.border = `1px solid ${summary.rankData.color}`;
+
+  const avgGrid = document.getElementById('team-avg-grid');
+  avgGrid.innerHTML = '';
+  STATUS_KEYS.forEach(k => {
+    const val = summary.averages[k.id] || 0;
+    const rInfo = getRankData(Math.round(val));
+    avgGrid.innerHTML += `
+      <div class="avg-item">
+        <span class="avg-label">${k.name}</span>
+        <span class="avg-val" style="color:${rInfo.color};">${val.toFixed(1)}</span>
+      </div>
+    `;
+  });
+
+  renderRosterList();
+
+  // 自動セーブ
+  localStorage.setItem('idol_manager_save', JSON.stringify({
+    currentYear, currentMonth, currentWeek, totalWeeksElapsed, draftCount, funds,
+    yearlyStats, idolRoster, productionSchedule, leagueTeams
+  }));
+}
+
+function switchRosterTab(tab) {
+  currentRosterTab = tab;
+  document.getElementById('tab-btn-sel').classList.toggle('active', tab === 'selected');
+  document.getElementById('tab-btn-und').classList.toggle('active', tab === 'under');
+  renderRosterList();
+}
+
+function renderRosterList() {
+  const listUI = document.getElementById('roster-list-ui');
+  listUI.innerHTML = '';
+  const filtered = idolRoster.filter(m => currentRosterTab === 'selected' ? m.isSelected : !m.isSelected);
+
+  filtered.forEach(m => {
+    const overall = calculateSingleOverall(m.stats);
+    const rInfo = getRankData(overall);
+    listUI.innerHTML += `
+      <div class="member-row">
+        <div>
+          <span style="font-size:9px; color:#e91e63;">${m.reading}</span>
+          <span style="font-size:10px; color:#777;">(${m.age}歳/在籍${m.yearsActive}年)</span>
+          <div style="font-weight:bold;">
+            ${m.name} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:10px; color:#666;">総合:${overall}</span>
+          <span class="rank-badge" style="color:${rInfo.color}; background:${rInfo.bg}; border:1px solid ${rInfo.color}; width:16px; height:16px; line-height:16px; font-size:10px;">
+            ${rInfo.rank}
+          </span>
+        </div>
+      </div>
+    `;
+  });
+}
+
+function setLog(msg) {
+  document.getElementById('log-box').textContent = msg;
+}
+
+// 半年計画モーダル
+let planYearTarget = 1, planStartM = 7, planEndM = 12;
+
+function openDecisionModal(title, y, sM, eM) {
+  planYearTarget = y; planStartM = sM; planEndM = eM;
+  document.getElementById('modal-title').textContent = `【${y}年】${title}`;
+  const rows = document.getElementById('plan-rows');
+  rows.innerHTML = '';
+
+  for (let m = sM; m <= eM; m++) {
+    const existing = productionSchedule[`${y}-${m}`] || { release: 'none', liveVenue: '' };
+    rows.innerHTML += `
+      <div style="margin-bottom:8px; padding:6px; background:#f9f9f9; border-radius:4px; font-size:11px;">
+        <span style="font-weight:bold;">${m}月</span>
+        <div style="display:flex; gap:4px; margin-top:3px;">
+          <select id="sel-rel-${m}" style="flex:1; font-size:11px;">
+            <option value="none" ${existing.release === 'none' ? 'selected' : ''}>リリースなし</option>
+            <option value="single" ${existing.release === 'single' ? 'selected' : ''}>シングル発売</option>
+            <option value="album" ${existing.release === 'album' ? 'selected' : ''}>アルバム発売</option>
+          </select>
+          <select id="sel-ven-${m}" style="flex:1; font-size:11px;">
+            <option value="">ライブなし</option>
+            ${VENUE_DATA.map(v => `<option value="${v.name}" ${existing.liveVenue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    `;
+  }
+  document.getElementById('decision-modal').style.display = 'flex';
+}
+
+function saveDecisionPlan() {
+  for (let m = planStartM; m <= planEndM; m++) {
+    productionSchedule[`${planYearTarget}-${m}`] = {
+      release: document.getElementById(`sel-rel-${m}`).value,
+      liveVenue: document.getElementById(`sel-ven-${m}`).value || null
+    };
+  }
+  document.getElementById('decision-modal').style.display = 'none';
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+}
+
+function openPlanningManual() {
+  if (currentMonth <= 6) openDecisionModal("当年7月〜12月の計画", currentYear, 7, 12);
+  else openDecisionModal("翌年1月〜6月の計画", currentYear + 1, 1, 6);
+}
+
+function resetAllData() {
+  if (confirm("全セーブデータを消去して最初からやり直しますか？")) {
+    localStorage.removeItem('idol_manager_save');
+    location.reload();
+  }
+}
+
+// サービスワーカー登録
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// 開始
+initGame();
+</script>
+
+</body>
+</html>
