@@ -104,7 +104,49 @@
     }
     .office-facility-name { font-size: 12px; font-weight: bold; }
     .office-facility-meta { margin-top: 3px; color: #777; font-size: 10px; line-height: 1.4; }
-    .office-facility-row button { min-width: 88px; padding: 8px 6px; font-size: 10px; }
+    .facility-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .icon-round-btn {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex: 0 0 auto;
+    }
+    .icon-round-btn svg { width: 20px; height: 20px; display: block; }
+    .icon-round-btn.up {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .icon-round-btn.up svg { stroke: #fff; fill: none; }
+    .icon-round-btn.up:disabled { background: #d5c9cd; border-color: #d5c9cd; cursor: not-allowed; }
+    .icon-round-btn.down {
+      background: #fff;
+      border-color: #bdbdbd;
+    }
+    .icon-round-btn.down svg { stroke: #757575; fill: none; }
+    .icon-round-btn.down:hover { background: #f5f5f5; }
+    .icon-round-btn.is-max {
+      background: #eee;
+      border-color: #ddd;
+      cursor: default;
+    }
+    .icon-round-btn.is-max svg { stroke: #9e9e9e; fill: none; }
+    .facility-action-label {
+      font-size: 9px;
+      color: #777;
+      text-align: right;
+      line-height: 1.3;
+    }
     .office-maintenance-note { color: #777; font-size: 10px; }
     h1 {
       font-size: 18px;
@@ -157,21 +199,43 @@
       border-bottom: 1px solid #f0d5de;
     }
     .page-tab {
-      min-height: 42px;
-      padding: 8px 2px;
+      min-height: 58px;
+      padding: 7px 2px 6px;
       color: #777;
       background: transparent;
       border: 0;
       border-bottom: 3px solid transparent;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
       cursor: pointer;
       touch-action: manipulation;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
     }
+    .page-tab .tab-icon {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #f5f1f2;
+      border: 2px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .page-tab .tab-icon svg { width: 20px; height: 20px; display: block; }
     .page-tab.active {
       color: var(--primary);
       border-bottom-color: var(--primary);
     }
+    .page-tab.active .tab-icon {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .page-tab.active .tab-icon svg { stroke: #fff; fill: none; }
+    .page-tab .tab-icon svg { stroke: #777; fill: none; }
     .page-panel {
       display: flex;
       flex-direction: column;
@@ -526,13 +590,7 @@
     <span id="active-slot-label">セーブ枠</span>
   </div>
 
-  <nav class="page-nav" role="tablist" aria-label="ゲームページ">
-    <button class="page-tab active" id="page-tab-group" type="button" role="tab" aria-selected="true" aria-controls="page-group" onclick="switchPage('group')">グループ</button>
-    <button class="page-tab" id="page-tab-formation" type="button" role="tab" aria-selected="false" aria-controls="page-formation" onclick="switchPage('formation')">編成</button>
-    <button class="page-tab" id="page-tab-office" type="button" role="tab" aria-selected="false" aria-controls="page-office" onclick="switchPage('office')">事務所</button>
-    <button class="page-tab" id="page-tab-funds" type="button" role="tab" aria-selected="false" aria-controls="page-funds" onclick="switchPage('funds')">資金</button>
-    <button class="page-tab" id="page-tab-records" type="button" role="tab" aria-selected="false" aria-controls="page-records" onclick="switchPage('records')">記録</button>
-  </nav>
+  <nav class="page-nav" id="page-nav" role="tablist" aria-label="ゲームページ"></nav>
 
   <section class="page-panel" id="page-group" role="tabpanel" aria-labelledby="page-tab-group">
     <!-- チーム総合力カード -->
@@ -826,8 +884,38 @@ const VENUE_DATA = [
   { name: "那覇アリーナ",     cap: "C",  ease: "B" }
 ];
 
-// 1月あたりに举办できるライブ回数の上限（メインライブを含む）
+// 1月あたりに開催できるライブ回数の上限（メインライブを含む）
+// 画面アイコン（外部アセット不要のためインラインSVGで描画する）
+const ICONS = {
+  // グループ：ステージ
+  group: '<path d="M4 20h16"/><path d="M6 20V11l6-4 6 4v9"/><path d="M10 20v-4h4v4"/>',
+  // 編成：名簿
+  formation: '<circle cx="8" cy="8" r="3"/><path d="M3 20c0-3 2.2-5 5-5s5 2 5 5"/><path d="M15 8h6"/><path d="M15 12h6"/><path d="M15 16h4"/>',
+  // 事務所：建物
+  office: '<path d="M4 21V6l7-3 7 3v15"/><path d="M9 21v-4h4v4"/><path d="M8 9h1M8 13h1M13 9h1M13 13h1"/>',
+  // 資金：財布
+  funds: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="17" cy="14.5" r="1.4"/>',
+  // 記録：帳面
+  records: '<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 3v18"/><path d="M10 8h6M10 12h6"/>',
+  // 強化：上矢印
+  upgrade: '<circle cx="12" cy="12" r="8"/><path d="M12 16V8"/><path d="M9 11l3-3 3 3"/>',
+  // ダウングレード：下矢印
+  downgrade: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/><path d="M9 13l3 3 3-3"/>',
+  // 費用：コイン
+  cost: '<circle cx="12" cy="12" r="8"/><path d="M12 7v10"/><path d="M9.5 10h4M9.5 14h4"/>',
+  // 売却額：返却矢印
+  refund: '<circle cx="12" cy="12" r="8"/><path d="M8 12a4 4 0 0 1 6.5-3.1"/><path d="M16 12a4 4 0 0 1-6.5 3.1"/><path d="M14 7v2.5h-2.5M10 17v-2.5h2.5"/>'
+};
+
+function getIconSvg(name) {
+  const body = ICONS[name];
+  if (!body) return '';
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+}
+
 const MAX_LIVES_PER_MONTH = 3;
+// 事務所設備の最大レベル
+const MAX_OFFICE_LEVEL = 10;
 
 const CAPACITY_MAP = { SS: 47500, S: 38500, A: 30000, B: 20000, C: 12500, D: 7500 };
 const EASE_MULTIPLIER = { SS: 1.30, S: 1.15, A: 1.00, B: 0.85, C: 0.70 };
@@ -906,6 +994,7 @@ let pendingIndustryOffer = null;
 let specialLiveEvents = [];
 let pendingEquipmentEvent = null;
 let equipmentEventCheckWeekKey = '';
+let equipmentDowngradeCheckWeekKey = '';
 let groupCrisis = 55;
 let officeUpgrades = createInitialOfficeUpgrades();
 let activeSaveSlot = null;
@@ -996,6 +1085,7 @@ function getMonthLiveEntries(plan) {
       liveVenue: plan.liveVenue,
       liveName: plan.liveName,
       liveDate: plan.liveDate || null,
+      liveDays: normalizeLiveDays(plan.liveDays),
       seatPrices: plan.seatPrices || {},
       seatOptions: plan.seatOptions || {},
       completed: Boolean(plan.liveCompleted)
@@ -1012,6 +1102,7 @@ function getMonthLiveEntries(plan) {
       liveVenue: live.liveVenue,
       liveName: live.liveName,
       liveDate: live.liveDate || null,
+      liveDays: normalizeLiveDays(live.liveDays),
       seatPrices: live.seatPrices || {},
       seatOptions: live.seatOptions || {},
       completed: Boolean(live.liveCompleted)
@@ -1024,6 +1115,19 @@ function getMonthLiveEntries(plan) {
 function getLiveEntryDate(entry, year, month) {
   if (entry.liveDate) return getGameDateObject(entry.liveDate);
   return getLastWednesday(year, month - 1);
+}
+
+// 複数日開催（2〜5day）は開始日から連続して日程を取る
+function getLiveEntryDateRange(entry) {
+  const start = getLiveEntryDate(entry, entry.calendarYear, entry.month);
+  const days = normalizeLiveDays(entry.liveDays);
+  const dates = [];
+  for (let i = 0; i < days; i++) {
+    const date = new Date(start);
+    date.setDate(date.getDate() + i);
+    dates.push(date);
+  }
+  return dates;
 }
 
 function markLiveEntryCompleted(entry) {
@@ -1100,25 +1204,40 @@ function getLastWednesday(year, monthIndex) {
   return date;
 }
 
+// Rival tour bookings. Requirement 5: a rival may hold several shows in one month.
 function ensureRivalLiveBookings(gameYear, month) {
   const actualYear = calendarYear + (gameYear - currentYear);
   leagueTeams.filter(team => team.id !== 'player').forEach(team => {
-    const bookingId = `${team.id}-${actualYear}-${month}`;
-    if (rivalLiveBookings.some(booking => booking.id === bookingId)) return;
+    const existingCount = rivalLiveBookings.filter(booking =>
+      booking.groupId === team.id && booking.monthKey === `${actualYear}-${month}`
+    ).length;
+    if (existingCount > 0) return;
     if (Math.random() >= 0.45) return;
 
-    const venuePool = Math.random() < 0.35
-      ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
-      : VENUE_DATA;
-    const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
-    const lastDay = new Date(actualYear, month, 0).getDate();
-    const liveDay = Math.floor(Math.random() * Math.min(28, lastDay)) + 1;
-    rivalLiveBookings.push({
-      id: bookingId,
-      groupName: team.name,
-      venue: venue.name,
-      liveDate: toDateKey(new Date(actualYear, month - 1, liveDay, 12))
-    });
+    // Stronger teams are more likely to run a double-header
+    const isBigTeam = team.basePower >= 80;
+    const showCount = Math.random() < (isBigTeam ? 0.45 : 0.2) ? 2 : 1;
+
+    for (let index = 0; index < showCount; index++) {
+      const venuePool = Math.random() < 0.35
+        ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
+        : VENUE_DATA;
+      const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
+      const lastDay = new Date(actualYear, month, 0).getDate();
+      const liveDay = Math.floor(Math.random() * Math.min(28, lastDay)) + 1;
+      const liveDate = toDateKey(new Date(actualYear, month - 1, liveDay, 12));
+      // 同じ会場・同じ日の重複を避ける
+      if (rivalLiveBookings.some(booking => booking.venue === venue.name && booking.liveDate === liveDate)) continue;
+      if (rivalLiveBookings.some(booking => booking.groupId === team.id && booking.liveDate === liveDate)) continue;
+      rivalLiveBookings.push({
+        id: `${team.id}-${actualYear}-${month}-${index}`,
+        groupId: team.id,
+        monthKey: `${actualYear}-${month}`,
+        groupName: team.name,
+        venue: venue.name,
+        liveDate
+      });
+    }
   });
 }
 
@@ -1247,6 +1366,7 @@ function initializeNewGameState() {
   specialLiveEvents = [];
   pendingEquipmentEvent = null;
   equipmentEventCheckWeekKey = '';
+  equipmentDowngradeCheckWeekKey = '';
   groupCrisis = 55;
   officeUpgrades = createInitialOfficeUpgrades();
   productionSchedule = {
@@ -1267,8 +1387,9 @@ function initializeNewGameState() {
   for (let i = 0; i < 30; i++) {
     const startAge = Math.floor(Math.random() * 9) + 14; // 14〜22歳
     const m = createMember(startAge);
-    m.yearsActive = Math.floor(Math.random() * 4);
-    m.joinAge = Math.max(13, startAge - m.yearsActive);
+    // 初期メンバーは全員が活動年数0からのスタート
+    m.yearsActive = 0;
+    m.joinAge = startAge;
     m.isSelected = (i < 16);
     m.isCenter = (i === 0);
     idolRoster.push(m);
@@ -1296,6 +1417,7 @@ function applySavedGame(data) {
   specialLiveEvents = data.specialLiveEvents || [];
   pendingEquipmentEvent = data.pendingEquipmentEvent || null;
   equipmentEventCheckWeekKey = data.equipmentEventCheckWeekKey || '';
+  equipmentDowngradeCheckWeekKey = data.equipmentDowngradeCheckWeekKey || '';
   groupCrisis = data.groupCrisis ?? 55;
   officeUpgrades = { ...createInitialOfficeUpgrades(), ...(data.officeUpgrades || {}) };
   funds = data.funds ?? 10000000;
@@ -1407,6 +1529,7 @@ function initGame(slot, startFresh) {
   document.getElementById('title-screen').hidden = true;
   document.getElementById('game-screen').hidden = false;
   updateUI();
+  renderPageNav('group');
   document.getElementById('active-slot-label').textContent = `セーブ枠 ${slot}`;
   if (pendingEquipmentEvent) openEquipmentUpgradeEventModal();
   else if (pendingPerformanceOffers.length) openMusicOfferModal();
@@ -1451,12 +1574,13 @@ function calculateSingleOverall(stats) {
   return Math.round(sum / Object.keys(stats).length);
 }
 
+// 個人推定ファン数（開始時のグループ合計がおよそ5万fanになるよう較正直している）
 function calculateMemberFans(member) {
   const stats = member.stats || {};
   return Math.round(
-    (stats.popularity || 0) * 800 +
-    ((stats.vocal || 0) + (stats.dance || 0)) * 120 +
-    (stats.talk || 0) * 80
+    (stats.popularity || 0) * 28 +
+    ((stats.vocal || 0) + (stats.dance || 0)) * 9 +
+    (stats.talk || 0) * 5
   );
 }
 
@@ -1615,7 +1739,16 @@ function rollEquipmentUpgradeEvent() {
     candidates.push({ facilityId: 'analytics', reason: '他グループの影響力が強く、市場データの分析が必要です。' });
   }
 
-  const activeCandidates = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < 5);
+  // 要件10: 他グループと比較し、明显落后于同业界平均水准的设备会被提名为改善对象
+  const myAverageLevel = OFFICE_FACILITIES.reduce((sum, f) => sum + (officeUpgrades[f.id] || 0), 0) / OFFICE_FACILITIES.length;
+  const behindRivals = OFFICE_FACILITIES.find(f =>
+    (officeUpgrades[f.id] || 0) < MAX_OFFICE_LEVEL && (officeUpgrades[f.id] || 0) + 1 < myAverageLevel
+  );
+  if (behindRivals && currentScore + 3 < rivalAverage) {
+    candidates.push({ facilityId: behindRivals.id, reason: `${behindRivals.name}のレベルが明显落后于同业界平均水准，需要改善。` });
+  }
+
+  const activeCandidates = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < MAX_OFFICE_LEVEL);
   const eventChance = activeCandidates.length ? 0.22 : 0.018;
   if (Math.random() >= eventChance) return;
 
@@ -1623,8 +1756,35 @@ function rollEquipmentUpgradeEvent() {
     ? activeCandidates[Math.floor(Math.random() * activeCandidates.length)]
     : { facilityId: OFFICE_FACILITIES[Math.floor(Math.random() * OFFICE_FACILITIES.length)].id, reason: '経営会議で事務所設備の強化が提案されました。' };
   const facility = OFFICE_FACILITIES.find(item => item.id === candidate.facilityId);
-  if (!facility || (officeUpgrades[facility.id] || 0) >= 5) return;
+  if (!facility || (officeUpgrades[facility.id] || 0) >= MAX_OFFICE_LEVEL) return;
   pendingEquipmentEvent = { ...candidate, name: facility.name, eventDate: gameDate };
+}
+
+// 資金難によるダウングレード提案（Lv.2以上の設備を対象にする）
+function rollEquipmentDowngradeEvent() {
+  if (getGameDateObject().getDay() !== 3) return;
+  if (pendingEquipmentEvent || equipmentDowngradeCheckWeekKey === getCurrentWeekKey()) return;
+  equipmentDowngradeCheckWeekKey = getCurrentWeekKey();
+
+  const weeklyCost = OFFICE_FACILITIES.reduce((sum, f) => sum + getOfficeMaintenanceCost(f), 0);
+  // 资金低于每周维护费的状况下才触发
+  if (funds >= weeklyCost || Math.random() >= 0.30) return;
+  const candidates = OFFICE_FACILITIES
+    .filter(f => (officeUpgrades[f.id] || 0) > 1)
+    .map(f => ({ facility: f, level: officeUpgrades[f.id] }))
+    .sort((a, b) => (getOfficeMaintenanceCost(b.facility, b.level) - getOfficeMaintenanceCost(a.facility, a.level)));
+  if (!candidates.length) return;
+
+  const target = candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
+  const refund = getOfficeDowngradeRefund(target.facility, target.level);
+  pendingEquipmentEvent = {
+    eventType: 'downgrade',
+    facilityId: target.facility.id,
+    name: target.facility.name,
+    reason: `資金繰りのため、${target.facility.name}のLv.${target.level}を見直す提案が出ました。`,
+    eventDate: gameDate
+  };
+  setLog(`【設備整理提案】${target.facility.name}をLv.${target.level - 1}に縮小すると ${formatMoney(refund)} 回収できます。`);
 }
 
 function openEquipmentUpgradeEventModal() {
@@ -1632,10 +1792,25 @@ function openEquipmentUpgradeEventModal() {
   const facility = OFFICE_FACILITIES.find(item => item.id === pendingEquipmentEvent.facilityId);
   if (!facility) return;
   const level = officeUpgrades[facility.id] || 0;
-  const cost = getOfficeUpgradeCost(facility);
   const button = document.getElementById('equipment-event-upgrade');
+  const description = document.getElementById('equipment-event-description');
+
+  if (pendingEquipmentEvent.eventType === 'downgrade') {
+    // ダウングレード提案：Lv.2以上の設備を1段階下げる（売却額は資金に戻る）
+    const refund = getOfficeDowngradeRefund(facility, level);
+    const saving = getOfficeMaintenanceCost(facility, level) - getOfficeMaintenanceCost(facility, level - 1);
+    button.disabled = level <= 1;
+    button.textContent = 'ダウングレード';
+    description.textContent =
+      `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level - 1}に下げますか？\n売却額: ${formatMoney(refund)} / 週間維持費の削減: ${formatMoney(saving)}${level <= 1 ? '（Lv.1未満にはできません）' : ''}`;
+    document.getElementById('equipment-event-modal').style.display = 'flex';
+    return;
+  }
+
+  const cost = getOfficeUpgradeCost(facility);
   button.disabled = funds < cost;
-  document.getElementById('equipment-event-description').textContent =
+  button.textContent = '設備を強化';
+  description.textContent =
     `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level + 1}へ強化しますか？ 開発費 ${formatMoney(cost)} / 強化後の週維持費 ${formatMoney(getOfficeMaintenanceCost(facility, level + 1))}。${funds < cost ? '資金が不足しています。' : ''}`;
   document.getElementById('equipment-event-modal').style.display = 'flex';
 }
@@ -1645,11 +1820,23 @@ function resolveEquipmentUpgradeEvent(accept) {
   const event = pendingEquipmentEvent;
   pendingEquipmentEvent = null;
   document.getElementById('equipment-event-modal').style.display = 'none';
-  if (accept) {
+
+  if (event.eventType === 'downgrade') {
+    const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
+    const level = officeUpgrades[event.facilityId] || 0;
+    if (accept && facility && level > 1) {
+      const refund = getOfficeDowngradeRefund(facility, level);
+      officeUpgrades[event.facilityId] = level - 1;
+      funds += refund;
+      setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
+    } else {
+      setLog(`【設備整理】${event.name}の縮小提案を見送りました。`);
+    }
+  } else if (accept) {
     const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
     const level = officeUpgrades[event.facilityId] || 0;
     const cost = getOfficeUpgradeCost(facility);
-    if (funds >= cost && level < 5) {
+    if (funds >= cost && level < MAX_OFFICE_LEVEL) {
       funds -= cost;
       officeUpgrades[event.facilityId] = level + 1;
       setLog(`【設備強化イベント】${facility.name}をLv.${level + 1}に強化しました。`);
@@ -1681,6 +1868,7 @@ function getCurrentWeekEvents() {
     rollWeeklyCrisisEvent();
     rollWeeklyIndustryOffer();
     rollEquipmentUpgradeEvent();
+    rollEquipmentDowngradeEvent();
   }
   const events = [];
   const weekKey = getCurrentWeekKey();
@@ -1946,37 +2134,50 @@ function processMonthlyReleaseAndLive() {
     setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
   }
 
-  // ライブ（1か月に複数回開催可。当日開催のライブをすべて処理する）
+  // ライブ（1か月に複数回開催可・1回あたり複数日開催も可）
   const todayLiveEntries = getScheduledLiveEntries()
-    .filter(entry => !entry.completed && toDateKey(entry.date) === gameDate);
+    .filter(entry => !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === gameDate);
   const liveLogs = [];
   todayLiveEntries.forEach(entry => {
     const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
     if (!v) return;
-    const ease = EASE_MULTIPLIER[v.ease];
+    const liveDays = normalizeLiveDays(entry.liveDays);
+    const dates = getLiveEntryDateRange(entry);
     const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);
     const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
-    let remainingDemand = Math.floor(calculateGroupFans() * 0.04 * ease * livePromotionMultiplier);
-    let audience = 0;
-    let revenue = 0;
-    seatCapacities.forEach(seat => {
-      const sold = Math.min(seat.capacity, remainingDemand);
-      audience += sold;
-      remainingDemand -= sold;
-      const configuredPrice = Number(entry.seatPrices[seat.id]);
-      const price = Number.isFinite(configuredPrice) ? configuredPrice : seat.defaultPrice;
-      revenue += sold * price;
+    // 開催日数と曜日の埋まりやすさを反映（日曜＞土曜＞金曜＞その他）
+    const weekdayAverage = dates.reduce((sum, date) => sum + getLiveWeekdayMultiplier(date), 0) / dates.length;
+    const perShowMultiplier = livePromotionMultiplier * weekdayAverage;
+    let totalAudience = 0;
+    let totalRevenue = 0;
+    dates.forEach(date => {
+      let remainingDemand = Math.floor(calculateGroupFans() * getLiveTurnOutRate(v) * perShowMultiplier);
+      seatCapacities.forEach(seat => {
+        const sold = Math.min(seat.capacity, remainingDemand);
+        totalAudience += sold;
+        remainingDemand -= sold;
+        const configuredPrice = Number(entry.seatPrices[seat.id]);
+        const price = Number.isFinite(configuredPrice) ? configuredPrice : seat.defaultPrice;
+        totalRevenue += sold * price;
+      });
     });
-    const merchandiseSales = sellMerchandiseAtLive();
-    revenue += merchandiseSales.revenue;
-    const totalCapacity = seatCapacities.reduce((sum, seat) => sum + seat.capacity, 0);
-    const cost = totalCapacity * 2500;
-    const profit = revenue - cost;
+    // グッズは会場日数ぶんの在庫が動く
+    let merchandiseRevenue = 0;
+    dates.forEach(() => {
+      merchandiseRevenue += sellMerchandiseAtLive().revenue;
+    });
+    const totalRevenueWithGoods = totalRevenue + merchandiseRevenue;
+    const costPerShow = seatCapacities.reduce((sum, seat) => sum + seat.capacity, 0) * 2500;
+    const totalCost = costPerShow * dates.length;
+    const profit = totalRevenueWithGoods - totalCost;
 
-    yearlyStats.audience += audience;
+    yearlyStats.audience += totalAudience;
     funds += profit;
     markLiveEntryCompleted(entry);
-    liveLogs.push(`【ライブ成功】${entry.liveName || v.name}（${v.name} / 動員: ${audience.toLocaleString()}人 / チケット・グッズ売上: ${formatMoney(revenue)} / 収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)}）！`);
+    const dayRangeText = dates.length > 1
+      ? `${toDateKey(dates[0].getTime() ? dates[0] : new Date())}〜${toDateKey(dates[dates.length - 1])}（${getLiveDayLabel(liveDays)}）`
+      : toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month));
+    liveLogs.push(`【ライブ成功】${entry.liveName || v.name}（${v.name} / ${dayRangeText} / 動員: ${totalAudience.toLocaleString()}人 / チケット・グッズ売上: ${formatMoney(totalRevenueWithGoods)} / 収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)}）！`);
   });
   // 広報効果は当日開催のライブで消費する
   if (todayLiveEntries.length) nextLivePromotionPoints = 0;
@@ -1995,7 +2196,7 @@ function processSpecialLiveEvents() {
     const capacity = CAPACITY_MAP[venue.cap];
     const eventMultiplier = (event.type === 'festival' ? 1.4 : 1.2) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
     const audience = Math.min(capacity, Math.floor(
-      calculateGroupFans() * 0.04 * EASE_MULTIPLIER[venue.ease] * eventMultiplier
+      calculateGroupFans() * getLiveTurnOutRate(venue) * eventMultiplier
     ));
     const ticketRevenue = audience * 8000;
     const merchandiseSales = sellMerchandiseAtLive();
@@ -2006,6 +2207,41 @@ function processSpecialLiveEvents() {
     event.completed = true;
     setLog(`【${event.name}】${venue.name}（動員 ${audience.toLocaleString()}人 / 収支 ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);
   });
+}
+
+// 開催日数（1〜5day）と曜日別の埋まりやすさ。曜日は日曜＞土曜＞金曜＞その他 の順で強い。
+const LIVE_DAY_OPTIONS = [1, 2, 3, 4, 5];
+const LIVE_DAY_LABELS = { 1: 'ワンデイ', 2: '2day', 3: '3day', 4: '4day', 5: '5day' };
+// 曜日（0=日, 6=土）ごとの動員倍率。日＞土＞金＞その他
+const LIVE_WEEKDAY_MULTIPLIER = {
+  0: 1.20, // 日曜
+  6: 1.12, // 土曜
+  5: 1.06, // 金曜
+  4: 0.96, // 木曜
+  3: 0.92, // 水曜（ゲームの基本進行日）
+  2: 0.92, // 火曜
+  1: 0.92  // 月曜
+};
+// ライブ1回の動員率。5万fanなら中規模会場が概ね埋まる水準に調整している
+const LIVE_TURN_OUT_RATE = 0.22;
+
+function getLiveWeekdayMultiplier(date) {
+  if (!date || typeof date.getDay !== 'function') return 1;
+  return LIVE_WEEKDAY_MULTIPLIER[date.getDay()] ?? 1;
+}
+
+function getLiveDayLabel(days) {
+  return LIVE_DAY_LABELS[days] || LIVE_DAY_LABELS[1];
+}
+
+function normalizeLiveDays(value) {
+  const days = Number.parseInt(value, 10);
+  return LIVE_DAY_OPTIONS.includes(days) ? days : 1;
+}
+
+
+function getLiveTurnOutRate(venue, bonusMultiplier = 1) {
+  return LIVE_TURN_OUT_RATE * EASE_MULTIPLIER[venue.ease] * bonusMultiplier;
 }
 
 function getLiveSeatCapacities(venue, seatOptions = {}) {
@@ -2324,8 +2560,7 @@ function runGraduationPlan(member, choice, regularVenueName) {
     return;
   }
 
-  const ease = EASE_MULTIPLIER[venue.ease];
-  const audience = Math.min(capacity, Math.floor(calculateGroupFans() * 0.04 * ease));
+  const audience = Math.min(capacity, Math.floor(calculateGroupFans() * getLiveTurnOutRate(venue)));
   const revenue = audience * 8000;
   const profit = revenue - venueFee;
   funds += profit;
@@ -2385,14 +2620,35 @@ function triggerDraftMeeting() {
 // 6. UI描画 ＆ モーダル操作
 // ==========================================
 
+const PAGE_TABS = [
+  { id: 'group', label: 'グループ', icon: 'group' },
+  { id: 'formation', label: '編成', icon: 'formation' },
+  { id: 'office', label: '事務所', icon: 'office' },
+  { id: 'funds', label: '資金', icon: 'funds' },
+  { id: 'records', label: '記録', icon: 'records' }
+];
+
+function renderPageNav(activePage = 'group') {
+  const nav = document.getElementById('page-nav');
+  if (!nav) return;
+  nav.innerHTML = PAGE_TABS.map(tab => {
+    const active = tab.id === activePage;
+    return `
+      <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
+        aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
+        onclick="switchPage('${tab.id}')">
+        <span class="tab-icon">${getIconSvg(tab.icon)}</span>${tab.label}
+      </button>`;
+  }).join('');
+}
+
 function switchPage(page) {
-  const pages = ['group', 'formation', 'office', 'funds', 'records'];
+  const pages = PAGE_TABS.map(tab => tab.id);
   if (!pages.includes(page)) return;
+  renderPageNav(page);
 
   pages.forEach(name => {
     const active = name === page;
-    document.getElementById(`page-tab-${name}`).classList.toggle('active', active);
-    document.getElementById(`page-tab-${name}`).setAttribute('aria-selected', active);
     document.getElementById(`page-${name}`).hidden = !active;
   });
 }
@@ -2441,7 +2697,8 @@ function renderGameCalendar() {
   const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
   const liveDates = new Set();
   getScheduledLiveEntries().forEach(entry => {
-    if (!entry.completed) liveDates.add(toDateKey(entry.date));
+    if (entry.completed) return;
+    getLiveEntryDateRange(entry).forEach(date => liveDates.add(toDateKey(date)));
   });
   specialLiveEvents.forEach(event => {
     if (!event.completed) liveDates.add(event.liveDate);
@@ -2477,20 +2734,25 @@ function renderGameCalendar() {
   `;
 }
 
-function getOfficeUpgradeCost(facility) {
-  const level = officeUpgrades[facility.id] ?? 0;
-  return facility.baseCost * (2 ** level);
+// 設備はLv.1が初期状態で維持費なし。Lv.2以降はレベルが上がるほど維持費が増える。
+// MaxはLv.10まで。Lv.2以上ならダウングレード（売却）も可能。
+const OFFICE_COST_GROWTH = 1.9;
+const OFFICE_MAINTENANCE_GROWTH = 1.6;
+
+function getOfficeUpgradeCost(facility, level = officeUpgrades[facility.id] ?? 0) {
+  return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
 }
 
 function getOfficeMaintenanceCost(facility, level = officeUpgrades[facility.id] || 1) {
-  return level <= 1 ? 0 : facility.baseMaintenance * (2 ** (level - 2));
+  if (level <= 1) return 0;
+  return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
 }
 
 function upgradeOfficeFacility(facilityId) {
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
   if (!facility) return;
   const level = officeUpgrades[facilityId] ?? 0;
-  if (level >= 5) return;
+  if (level >= MAX_OFFICE_LEVEL) return;
   const cost = getOfficeUpgradeCost(facility);
   if (funds < cost) {
     alert(`資金が足りません。必要資金: ${formatMoney(cost)}`);
@@ -2499,6 +2761,28 @@ function upgradeOfficeFacility(facilityId) {
   funds -= cost;
   officeUpgrades[facilityId] = level + 1;
   setLog(`【設備投資】${facility.name}をLv.${level + 1}に強化しました。`);
+  updateUI();
+}
+
+// ダウングレード：Lv.1未満にはできない。設備売却で開発費の50%が戻る。
+function getOfficeDowngradeRefund(facility, level = officeUpgrades[facility.id] ?? 0) {
+  if (level <= 1) return 0;
+  return Math.round(getOfficeUpgradeCost(facility, level - 1) * 0.5);
+}
+
+function downgradeOfficeFacility(facilityId) {
+  const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
+  if (!facility) return;
+  const level = officeUpgrades[facilityId] ?? 0;
+  if (level <= 1) {
+    alert(`${facility.name}はLv.1未満にはできません。`);
+    return;
+  }
+  const refund = getOfficeDowngradeRefund(facility, level);
+  if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n売却額: ${formatMoney(refund)}\n（能力は低下し、週間維持費も下がります）`)) return;
+  officeUpgrades[facilityId] = level - 1;
+  funds += refund;
+  setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
   updateUI();
 }
 
@@ -2518,14 +2802,32 @@ function renderOfficeUpgrades() {
     const upgradeCost = getOfficeUpgradeCost(facility);
     const nextMaintenance = getOfficeMaintenanceCost(facility, level + 1);
     const currentMaintenance = getOfficeMaintenanceCost(facility, level);
-    const disabled = level >= 5 || funds < upgradeCost;
+    const isMax = level >= MAX_OFFICE_LEVEL;
+    const disabled = isMax || funds < upgradeCost;
+    const refund = getOfficeDowngradeRefund(facility, level);
     return `
       <div class="office-facility-row">
         <div>
-          <div class="office-facility-name">${facility.name} Lv.${level}</div>
-          <div class="office-facility-meta">${facility.effect}<br>現在の週維持費 ${formatMoney(currentMaintenance)}${level < 5 ? ` / 強化後 ${formatMoney(nextMaintenance)}` : ''}</div>
+          <div class="office-facility-name">${facility.name} Lv.${level}${isMax ? '（MAX）' : ''}</div>
+          <div class="office-facility-meta">${facility.effect}<br>現在の週維持費 ${formatMoney(currentMaintenance)}${isMax ? '' : ` / 強化後 ${formatMoney(nextMaintenance)}`}</div>
         </div>
-        <button class="main-btn" onclick="upgradeOfficeFacility('${facility.id}')" ${disabled ? 'disabled' : ''}>${level >= 5 ? 'MAX' : `強化 ${formatMoney(upgradeCost)}`}</button>
+        <div class="facility-actions">
+          <div class="facility-action-label">
+            ${isMax ? '最大レベル' : `強化<br>${formatMoney(upgradeCost)}`}
+            ${level > 1 ? `<br>売却<br>+${formatMoney(refund)}` : ''}
+          </div>
+          <button class="icon-round-btn up" type="button"
+            onclick="upgradeOfficeFacility('${facility.id}')"
+            ${disabled ? 'disabled' : ''}
+            title="${isMax ? `${facility.name}は最大レベルです` : `${facility.name}をLv.${level + 1}に強化（${formatMoney(upgradeCost)}）`}"
+            aria-label="${facility.name}をLv.${level + 1}に強化">${getIconSvg('upgrade')}</button>
+          ${level > 1
+            ? `<button class="icon-round-btn down" type="button"
+                onclick="downgradeOfficeFacility('${facility.id}')"
+                title="${facility.name}をLv.${level - 1}にダウングレード（売却額 ${formatMoney(refund)}）"
+                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${getIconSvg('downgrade')}</button>`
+            : ''}
+        </div>
       </div>
     `;
   }).join('');
@@ -2585,7 +2887,7 @@ function updateUI() {
     merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
     nextLivePromotionPoints, crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
     industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
-    pendingEquipmentEvent, equipmentEventCheckWeekKey, groupCrisis, officeUpgrades,
+    pendingEquipmentEvent, equipmentEventCheckWeekKey, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
     yearlyStats, idolRoster, productionSchedule, leagueTeams,
     songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
     rivalLiveBookings,
@@ -2691,6 +2993,7 @@ function readLiveSlotInputs(month) {
       liveVenue: (document.getElementById(`sel-ven-${month}-${index}`) || {}).value || '',
       liveName: (document.getElementById(`live-name-${month}-${index}`) || {}).value?.trim() || '',
       liveDate: (document.getElementById(`live-date-${month}-${index}`) || {}).value || '',
+      liveDays: normalizeLiveDays((document.getElementById(`live-days-${month}-${index}`) || {}).value),
       seatPrices,
       seatOptions
     };
@@ -2723,6 +3026,11 @@ function renderLiveSlotHtml(month, index, slot) {
       <label class="weekly-member-target" for="live-date-${month}-${index}">ライブ開催日
         <input type="date" id="live-date-${month}-${index}" value="${slot.liveDate || ''}" onchange="updateLiveDateOptions(${month}, ${index})">
         <span id="live-date-note-${month}-${index}" style="color:#777;"></span>
+      </label>
+      <label class="weekly-member-target" for="live-days-${month}-${index}" style="margin-top:6px;">開催日数（日曜＞土曜＞金曜＞その他 の順で入りやすい）
+        <select id="live-days-${month}-${index}" onchange="updateLiveDateOptions(${month}, ${index})">
+          ${LIVE_DAY_OPTIONS.map(days => `<option value="${days}" ${normalizeLiveDays(slot.liveDays) === days ? 'selected' : ''}>${getLiveDayLabel(days)}</option>`).join('')}
+        </select>
       </label>
       <details class="seat-settings">
         <summary>席種・チケット価格</summary>
@@ -2881,22 +3189,61 @@ function updateLiveDateOptions(month, index = 0) {
 
   dateInput.disabled = false;
   const otherSlots = readLiveSlotInputs(month).filter((slot, slotIndex) => slotIndex !== index);
+  // 既定日程を他枠と重ならないようにする（利用者が選んだ日付はそのまま保持する）
   const usedDates = new Set(otherSlots.map(slot => slot.liveDate).filter(Boolean));
   const currentValue = dateInput.value;
-  if (!currentValue || currentValue < minimumKey || currentValue < monthStartKey || usedDates.has(currentValue)) {
+  if (!currentValue || currentValue < minimumKey || currentValue < monthStartKey) {
     dateInput.value = pickDefaultLiveDate(planCalendarYear, month, index, minimumKey, monthEndKey, usedDates);
   }
   note.textContent = isStadiumVenue(venue)
     ? `野球日程調整のため${leadDays}日前から予約（最短 ${minimumKey}）`
     : `開催日の${leadDays}日前から予約（最短 ${minimumKey}）`;
   if (!dateInput.value) return;
-  const rivalConflict = findRivalVenueConflict(venue.name, dateInput.value);
-  if (rivalConflict) note.textContent += ` / ${rivalConflict.groupName}が予約済み`;
-  if (findOwnLiveConflict(venue.name, dateInput.value, `${planYearTarget}-${month}`)) {
-    note.textContent += ' / 他の月の予定と重複';
+  // 複数日開催の場合は月の末尾を越えないようにする
+  const daysSelect = document.getElementById(`live-days-${month}-${index}`);
+  const liveDays = normalizeLiveDays(daysSelect ? daysSelect.value : 1);
+  const startDate = getGameDateObject(dateInput.value);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + liveDays - 1);
+  if (endDate > monthEnd) {
+    const latestStart = new Date(monthEnd);
+    latestStart.setDate(latestStart.getDate() - (liveDays - 1));
+    if (latestStart < minimumDate) {
+      note.textContent += ` / ${month}月内に${getLiveDayLabel(liveDays)}ぶんの日程が取れません`;
+    } else {
+      dateInput.value = toDateKey(latestStart);
+      note.textContent += ` / ${getLiveDayLabel(liveDays)}が${month}月内に収まるよう開始日を${dateInput.value}に変更`;
+    }
+  } else {
+    note.textContent += ` / ${getLiveDayLabel(liveDays)}（${['日', '月', '火', '水', '木', '金', '土'][startDate.getDay()]}曜始まり）`;
   }
-  if (otherSlots.some(slot => slot.liveVenue === venue.name && slot.liveDate === dateInput.value)) {
-    note.textContent += ' / 同月のライブと重複';
+  // 複数日開催では期間中のどの日かが他公演とぶつからないか確認する
+  const occupiedDates = [];
+  for (let i = 0; i < liveDays; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+    occupiedDates.push(toDateKey(date));
+  }
+  if (occupiedDates.length) {
+    const start = getGameDateObject(occupiedDates[0]);
+    const end = getGameDateObject(occupiedDates[occupiedDates.length - 1]);
+    const rivalClash = rivalLiveBookings.find(booking =>
+      booking.venue === venue.name && occupiedDates.includes(booking.liveDate)
+    );
+    if (rivalClash) note.textContent += ` / ${rivalClash.groupName}が${rivalClash.liveDate}に予約済み`;
+    const ownClash = getScheduledLiveEntries().find(other =>
+      other.planKey !== `${planYearTarget}-${month}`
+      && !other.completed
+      && other.liveVenue === venue.name
+      && other.liveDate
+      && occupiedDates.includes(other.liveDate)
+    );
+    if (ownClash) note.textContent += ' / 他の月の予定と重複';
+    const sameMonthClash = otherSlots.find(slot =>
+      slot.liveVenue === venue.name && slot.liveDate && occupiedDates.includes(slot.liveDate)
+    );
+    if (sameMonthClash) note.textContent += ' / 同月のライブと重複';
+    if (start > end) note.textContent += ' / 日程が不正です';
   }
 }
 
@@ -2961,6 +3308,7 @@ function saveDecisionPlan() {
       liveVenue: primary ? primary.liveVenue : null,
       liveName: primary ? (primary.liveName || primary.liveVenue) : null,
       liveDate: primary ? (primary.liveDate || null) : null,
+      liveDays: primary ? primary.liveDays : 1,
       releaseBenefit: release === 'none' ? 'none' : document.getElementById(`sel-benefit-${m}`).value,
       seatPrices: primary ? primary.seatPrices : (previousPlan.seatPrices || {}),
       seatOptions: primary ? primary.seatOptions : (previousPlan.seatOptions || {}),
@@ -2968,6 +3316,7 @@ function saveDecisionPlan() {
         liveVenue: slot.liveVenue,
         liveName: slot.liveName || slot.liveVenue,
         liveDate: slot.liveDate || null,
+        liveDays: slot.liveDays,
         seatPrices: slot.seatPrices,
         seatOptions: slot.seatOptions
       }))
@@ -3001,6 +3350,9 @@ if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(window.
 
 // タイトル画面
 openTitleScreen();
+
+// ページタブは初回描画時に用意しておく
+renderPageNav('group');
 </script>
 
 </body>
