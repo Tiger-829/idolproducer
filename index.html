@@ -2937,6 +2937,8 @@ function validatePlanLiveSlots(month, slots) {
   }
   return true;
 }
+
+function saveDecisionPlan() {
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
     const songName = document.getElementById(`song-name-${m}`).value.trim();
