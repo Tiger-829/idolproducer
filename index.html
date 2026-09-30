@@ -1325,6 +1325,22 @@ const MUSIC_PROGRAMS = [
   { id: 'm-con', name: 'Mコン' }
 ];
 const SONG_TITLES = ['ひかりの約束', 'キミ色サイン', '青空レター', '恋するステップ', '未来へのメロディ', '星屑のリボン', 'まっすぐな夢', '花咲く頃に'];
+// 新世代グループの名前素材（前半語 × 後半語の組み合わせで既存と重複しない名前を引く）
+const RIVAL_NAME_HEADS = [
+  'ヴァイオレット', 'プリズム', 'ステラ', 'ネオン', 'ダイアモンド',
+  'ルナ', 'ソラ', 'ヒカリ', 'カゼ', 'ユメ', 'ミライ', 'ココロ',
+  'アオゾラ', 'ハル', 'ナオ', 'エンゼル', 'クローバー', 'ペタル',
+  'スイフト', 'アオ', 'アカ', 'ギンカ', 'ヨル', 'ボイス',
+  'ジュエル', 'パレット', 'モノクロ', 'サンセット', 'ムーンライト',
+  'フェニックス', 'レインボー', 'グルーヴ'
+];
+const RIVAL_NAME_TAILS = [
+  'クイーン', 'プロジェクト', 'シンフォニー', 'ガールズ', 'シスターズ',
+  'クラブ', 'ユニオン', 'オアシス', 'チャーム', 'ポエジー',
+  'メロディ', 'ドリーム', 'ビート', 'ストーリーズ', 'セクション',
+  'アイドル', 'グループ', 'ショー', 'ステージ', 'コレクション'
+];
+
 
 // ランク判定定義
 function getRankData(val) {
@@ -1402,6 +1418,51 @@ function createInitialLeagueTeams() {
     { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
     { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
   ];
+}
+
+// 既存と重複しない新世代グループの名前を引く（前半語×後半語。枯渇時は期数を添える）
+function generateRivalGroupName(usedNames = []) {
+  const used = new Set(usedNames);
+  const candidates = [];
+  for (const head of RIVAL_NAME_HEADS) {
+    for (const tail of RIVAL_NAME_TAILS) {
+      const name = `${head}・${tail}`;
+      if (!used.has(name)) candidates.push(name);
+    }
+  }
+  if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
+  // 語彙を使い切った場合は、既存名に現れる最大の期数より大きい期数を添える
+  let maxSeq = 0;
+  for (const name of used) {
+    const match = /^新世代プロジェクト(\d+)期$/.exec(name);
+    if (match) maxSeq = Math.max(maxSeq, Number(match[1]));
+  }
+  return `新世代プロジェクト${maxSeq + 1}期`;
+}
+
+// 既存チームと衝突しない競合チームの ID を採番する
+function createRivalTeamId() {
+  let index = leagueTeams.length;
+  let id = `rival_${index}`;
+  while (leagueTeams.some(team => team.id === id)) id = `rival_${++index}`;
+  return id;
+}
+
+// 旧セーブで重複していた ID を整理する（公演予約はグループ名で照合して付け替える）
+function normalizeLeagueTeams() {
+  const usedIds = new Set();
+  leagueTeams.forEach(team => {
+    const originalId = team.id || 'rival';
+    let id = originalId;
+    let suffix = 2;
+    while (usedIds.has(id)) id = `${originalId}_${suffix++}`;
+    team.id = id;
+    usedIds.add(id);
+    if (id === originalId) return;
+    rivalLiveBookings.forEach(booking => {
+      if (booking.groupId === originalId && booking.groupName === team.name) booking.groupId = id;
+    });
+  });
 }
 
 function createInitialOfficeUpgrades() {
@@ -1718,22 +1779,62 @@ function generateRandomStats(biasPolicy = null) {
   return stats;
 }
 
-function generateBirthday(preferredMonth = null, preferredWeek = null) {
-  const usedBirthdays = new Set(idolRoster
-    .filter(member => Number.isInteger(member.birthdayDay))
-    .map(member => `${member.birthdayMonth}-${member.birthdayDay}`));
+// うるう年判定
+function isLeapYear(year) {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+// その月の日数（生年が無い場合は平年の日数で計算する）
+function getDaysInMonth(year, month) {
+  const lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12) return 28;
+  return month === 2 && isLeapYear(year) ? 29 : lengths[month - 1];
+}
+
+// 2月29日生まれは、平年では3月1日を誕生日として扱う
+function getBirthdayDate(year, month, day) {
+  if (month === 2 && day === 29 && !isLeapYear(year)) return new Date(year, 2, 1, 12);
+  return new Date(year, month - 1, day, 12);
+}
+
+// 生年に存在しない日付（平年の2/29）は2/28に寄せる
+function normalizeBirthDate(birthYear, month, day) {
+  if (month === 2 && day === 29 && Number.isInteger(birthYear) && !isLeapYear(birthYear)) {
+    return { month: 2, day: 28 };
+  }
+  return { month, day };
+}
+
+// 誕生日を引く（生年を渡すとその年の日数で拘束する。誕生日は重複してよい）
+function generateBirthday(birthYear = null, preferredMonth = null, preferredWeek = null) {
+  const referenceYear = Number.isInteger(birthYear) ? birthYear : 2001; // 生年不明は平年として扱う
   const available = [];
   for (let month = 1; month <= 12; month++) {
-    for (let day = 1; day <= 28; day++) {
+    for (let day = 1; day <= getDaysInMonth(referenceYear, month); day++) {
       const week = Math.ceil(day / 7);
-      const matchesPreference = preferredMonth === null || (month === preferredMonth && week === preferredWeek);
-      if (matchesPreference && !usedBirthdays.has(`${month}-${day}`)) available.push({ month, day, week });
+      const matchesPreference = preferredMonth === null
+        || (month === preferredMonth && (preferredWeek === null || week === preferredWeek));
+      if (matchesPreference) available.push({ month, day, week });
     }
   }
-  if (!available.length && preferredMonth !== null) return generateBirthday();
-  return available.length
-    ? available[Math.floor(Math.random() * available.length)]
-    : { month: Math.floor(Math.random() * 12) + 1, day: Math.floor(Math.random() * 28) + 1, week: 1 };
+  // 条件に合う組み合わせが空なら条件なしで引き直す
+  if (!available.length) return generateBirthday(birthYear);
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+// 身長（cm）の範囲
+const MEMBER_HEIGHT_MIN = 148.0;
+const MEMBER_HEIGHT_MAX = 172.0;
+
+// 身長を小数第一位で生成する
+function generateMemberHeight() {
+  const range = MEMBER_HEIGHT_MAX - MEMBER_HEIGHT_MIN;
+  return Math.round((MEMBER_HEIGHT_MIN + Math.random() * range) * 10) / 10;
+}
+
+// 身長の表示（データが無い場合は "--"）
+function formatHeight(value) {
+  return `${Number.isFinite(value) ? value.toFixed(1) : '--'}cm`;
 }
 
 function ensureMemberBirthdays() {
@@ -1741,37 +1842,71 @@ function ensureMemberBirthdays() {
     if (!member.stats) member.stats = {};
     if (!Number.isFinite(member.stats.sns)) member.stats.sns = 45;
     if (!Array.isArray(member.eventSalesHistory)) member.eventSalesHistory = [];
+    // 生年が無い古いデータは、現在の年齢から逆算して補う
+    if (!Number.isInteger(member.birthYear) && Number.isFinite(member.age)) {
+      member.birthYear = getGameDateObject().getFullYear() - member.age;
+    }
     if (!Number.isInteger(member.birthdayMonth) || !Number.isInteger(member.birthdayDay)) {
       const hasWeekBirthday = Number.isInteger(member.birthdayMonth) && Number.isInteger(member.birthdayWeek);
       const birthday = generateBirthday(
+        member.birthYear,
         hasWeekBirthday ? member.birthdayMonth : null,
         hasWeekBirthday ? member.birthdayWeek : null
       );
       member.birthdayMonth = birthday.month;
       member.birthdayDay = birthday.day;
       member.birthdayWeek = birthday.week;
+    } else {
+      // 生年に存在しない日付（平年の2/29など）は実在する日付に寄せる
+      const normalized = normalizeBirthDate(member.birthYear, member.birthdayMonth, member.birthdayDay);
+      member.birthdayMonth = normalized.month;
+      member.birthdayDay = normalized.day;
     }
     member.birthdayWeek = Math.ceil(member.birthdayDay / 7);
+  });
+}
+
+// 旧セーブで身長を持たないメンバーに身長を補完する
+function ensureMemberHeights() {
+  idolRoster.forEach(member => {
+    if (!Number.isFinite(member.height)) member.height = generateMemberHeight();
+  });
+}
+
+// 年齢は生年月日から再計算する（加算カウンタは持たない）
+function syncMemberAges(onDate = getGameDateObject()) {
+  idolRoster.forEach(member => {
+    if (!Number.isInteger(member.birthYear)) return;
+    member.age = calculateAgeFromBirth(member.birthYear, onDate, member.birthdayMonth, member.birthdayDay);
   });
 }
 
 function createMember(age = null, policy = null, birthYear = null) {
   const nameData = generateIdolName();
   const idolAge = age || (Math.floor(Math.random() * 8) + 13); // 13〜20
-  const birthday = generateBirthday();
-  const birthYearValue = Number.isInteger(birthYear)
+  const today = getGameDateObject();
+  const givenBirthYear = Number.isInteger(birthYear);
+  // 生年が確定している場合はその年の日数（うるう年の2/29も含む）で誕生日を引く
+  const birthdayDraft = generateBirthday(givenBirthYear ? birthYear : today.getFullYear() - idolAge);
+  const birthdayPassed = (today.getMonth() + 1) > birthdayDraft.month
+    || ((today.getMonth() + 1) === birthdayDraft.month && today.getDate() >= birthdayDraft.day);
+  // 誕生日がまだ来ていなければ生年を1つ前にずらし、記録する年齢と生年を一致させる
+  const birthYearValue = givenBirthYear
     ? birthYear
-    : getGameDateObject().getFullYear() - idolAge;
+    : today.getFullYear() - idolAge - (birthdayPassed ? 0 : 1);
+  const birthday = normalizeBirthDate(birthYearValue, birthdayDraft.month, birthdayDraft.day);
+  const ageValue = calculateAgeFromBirth(birthYearValue, today, birthday.month, birthday.day);
   return {
     id: Date.now() + Math.floor(Math.random() * 10000),
     name: nameData.fullName,
     reading: nameData.reading,
-    age: idolAge,
+    age: ageValue,
     birthYear: birthYearValue,
     birthdayMonth: birthday.month,
     birthdayDay: birthday.day,
-    birthdayWeek: birthday.week,
-    joinAge: idolAge,
+    birthdayWeek: Math.ceil(birthday.day / 7),
+    height: generateMemberHeight(),
+    joinAge: ageValue,
     yearsActive: 0,
     stats: generateRandomStats(policy),
     eventSalesHistory: [],
@@ -1838,6 +1973,8 @@ function initializeNewGameState() {
     idolRoster.push(m);
   }
   ensureMemberBirthdays();
+  ensureMemberHeights();
+  syncMemberAges();
 }
 
 function applySavedGame(data) {
@@ -1873,6 +2010,8 @@ function applySavedGame(data) {
   yearlyStats = data.yearlyStats || { sales: 0, audience: 0 };
   idolRoster = data.idolRoster || [];
   ensureMemberBirthdays();
+  ensureMemberHeights();
+  syncMemberAges();
   productionSchedule = data.productionSchedule || {};
   leagueTeams = data.leagueTeams || createInitialLeagueTeams();
   songs = data.songs || [];
@@ -1880,6 +2019,7 @@ function applySavedGame(data) {
   scheduledPerformances = data.scheduledPerformances || [];
   specialOffersSent = data.specialOffersSent || [];
   rivalLiveBookings = data.rivalLiveBookings || [];
+  normalizeLeagueTeams();
 }
 
 function saveSlotKey(slot) {
@@ -2150,9 +2290,14 @@ function getBirthdayMembersBetween(startDate, endDate) {
   const startTime = startDate.getTime();
   const endTime = endDate.getTime();
   idolRoster.forEach(member => {
+    const month = member.birthdayMonth || 1;
+    const day = member.birthdayDay || ((member.birthdayWeek - 1) * 7 + 1) || 1;
     for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
-      const birthday = new Date(year, member.birthdayMonth - 1, member.birthdayDay || ((member.birthdayWeek - 1) * 7 + 1), 12);
-      if (birthday.getTime() > startTime && birthday.getTime() <= endTime) birthdays.push(member);
+      const birthday = getBirthdayDate(year, month, day);
+      if (birthday.getTime() <= startTime) continue;
+      if (birthday.getTime() > endTime) break;
+      birthdays.push(member);
+      break;
     }
   });
   return birthdays;
@@ -2160,7 +2305,7 @@ function getBirthdayMembersBetween(startDate, endDate) {
 
 function processMemberBirthdays(startDate, endDate) {
   const birthdayMembers = getBirthdayMembersBetween(startDate, endDate);
-  birthdayMembers.forEach(member => { member.age++; });
+  // 年齢の更新は syncMemberAges が生年月日から行うため、ここではログのみ
   if (birthdayMembers.length) {
     setLog(`【誕生日】${birthdayMembers.map(member => member.name).join('、')}が誕生日を迎えました。`);
   }
@@ -2525,6 +2670,7 @@ function advanceOneWeek() {
   const previousYear = currentYear;
 
   processMemberBirthdays(currentDate, nextDate);
+  syncMemberAges(nextDate);
   if (wasWednesday) {
     totalWeeksElapsed++;
     rollWeeklyCrisisEvent();
@@ -3405,15 +3551,12 @@ function pickDraftBirthYear() {
   return birthYear;
 }
 
-// 生年から年齢を計算する
+// 生年から年齢を計算する（2月29日生まれは平年では3月1日を満年齢の基準日とする）
 function calculateAgeFromBirth(birthYear, onDate, birthdayMonth, birthdayDay) {
-  let age = onDate.getFullYear() - birthYear;
-  const month = birthdayMonth || 1;
-  const day = birthdayDay || 1;
-  const passed = (onDate.getMonth() + 1) > month
-    || ((onDate.getMonth() + 1) === month && onDate.getDate() >= day);
-  if (!passed) age -= 1;
-  return age;
+  const year = onDate.getFullYear();
+  const birthday = getBirthdayDate(year, birthdayMonth || 1, birthdayDay || 1);
+  const age = year - birthYear;
+  return onDate.getTime() >= birthday.getTime() ? age : age - 1;
 }
 
 
@@ -3447,10 +3590,9 @@ function buildDraftCandidatePool() {
 function startDraftMeeting() {
   draftCount++;
   if (draftCount % 2 === 0) {
-    const newTeamName = `新世代プロジェクト${draftCount / 2}期`;
     leagueTeams.push({
-      id: `rival_${draftCount}`,
-      name: newTeamName,
+      id: createRivalTeamId(),
+      name: generateRivalGroupName(leagueTeams.map(team => team.name)),
       sales: 0,
       audience: 0,
       basePower: 75 + Math.floor(Math.random() * 12)
@@ -3564,7 +3706,7 @@ function renderDraftPickStep() {
         const overall = calculateSingleOverall(member.stats);
         return `
           <button class="draft-candidate" type="button" onclick="resolveDraftPick(${index})">
-            <div class="draft-candidate-name">${escapeHtml(member.name)} <small>${member.age}歳（${member.birthYear}年${member.birthdayMonth}月${member.birthdayDay}日生）</small></div>
+            <div class="draft-candidate-name">${escapeHtml(member.name)} <small>${member.age}歳 / ${formatHeight(member.height)}（${member.birthYear}年${member.birthdayMonth}月${member.birthdayDay}日生）</small></div>
             <div class="draft-candidate-score">総評 ${overall}</div>
             <div class="draft-candidate-stats">
               ${STATUS_KEYS.slice(0, 4).map(key =>
@@ -3655,7 +3797,7 @@ function renderDraftDoneStep() {
   document.getElementById('draft-standings').innerHTML = renderDraftStandings();
   document.getElementById('draft-body').innerHTML = `
     <div class="draft-acquired">
-      ${state.acquired.map(member => `<span>${escapeHtml(member.name)}（${member.age}歳）</span>`).join('')}
+      ${state.acquired.map(member => `<span>${escapeHtml(member.name)}（${member.age}歳 / ${formatHeight(member.height)}）</span>`).join('')}
     </div>`;
   document.getElementById('draft-actions').innerHTML =
     '<button class="main-btn" type="button" onclick="closeDraftModal()">ドラフトを終了する</button>';
@@ -4086,7 +4228,7 @@ function renderRosterList() {
         <summary class="member-row member-summary">
           <div>
             <span style="font-size:9px; color:#e91e63;">${m.reading}</span>
-            <span style="font-size:10px; color:#777;">(${m.age}歳/在籍${m.yearsActive}年・誕生日 ${m.birthdayMonth}月${m.birthdayDay}日)</span>
+            <span style="font-size:10px; color:#777;">(${m.age}歳/${formatHeight(m.height)}/在籍${m.yearsActive}年・誕生日 ${m.birthdayMonth}月${m.birthdayDay}日)</span>
               <div style="font-weight:bold;">
                 ${escapeHtml(m.name)} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''}
             </div>
