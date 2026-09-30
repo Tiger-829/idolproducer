@@ -794,27 +794,216 @@
 // 1. 定数・マスターデータ
 // ==========================================
 
-// 苗字上位100件
-const SURNAMES_TOP100 = [
-  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
-  "吉田", "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水",
-  "山崎", "森", "池田", "橋本", "阿部", "石川", "山下", "中島", "石井", "小川",
-  "前田", "岡田", "長谷川", "藤田", "後藤", "近藤", "村上", "遠藤", "青木", "坂本",
-  "斉藤", "福田", "藤井", "西村", "三浦", "岡本", "松田", "中川", "中野", "原田",
-  "小野", "田村", "竹内", "金子", "和田", "中山", "石田", "上田", "森田", "原",
-  "柴田", "酒井", "工藤", "横山", "宮崎", "宮本", "内田", "高木", "安藤", "谷口",
-  "大野", "丸山", "今井", "高田", "河野", "藤原", "武田", "村田", "上野", "杉山",
-  "増田", "平野", "大塚", "千葉", "久保", "松井", "小島", "岩崎", "桜井", "野口",
-  "松尾", "菊地", "野村", "新井", "渡部", "本田", "吉川", "菅原", "矢野", "市川"
+// 苗字上位189件
+const SURNAMES_TOP200 = [
+  "佐藤",
+  "鈴木",
+  "高橋",
+  "田中",
+  "伊藤",
+  "渡辺",
+  "山本",
+  "中村",
+  "小林",
+  "加藤",
+  "吉田",
+  "山田",
+  "佐々木",
+  "山口",
+  "松本",
+  "井上",
+  "木村",
+  "林",
+  "斎藤",
+  "清水",
+  "山崎",
+  "森",
+  "池田",
+  "橋本",
+  "阿部",
+  "石川",
+  "山下",
+  "中島",
+  "石井",
+  "小川",
+  "前田",
+  "岡田",
+  "長谷川",
+  "藤田",
+  "後藤",
+  "近藤",
+  "村上",
+  "遠藤",
+  "青木",
+  "坂本",
+  "斉藤",
+  "福田",
+  "藤井",
+  "西村",
+  "三浦",
+  "岡本",
+  "松田",
+  "中川",
+  "中野",
+  "原田",
+  "小野",
+  "田村",
+  "竹内",
+  "金子",
+  "和田",
+  "中山",
+  "石田",
+  "上田",
+  "森田",
+  "原",
+  "柴田",
+  "酒井",
+  "工藤",
+  "横山",
+  "宮崎",
+  "宮本",
+  "内田",
+  "高木",
+  "安藤",
+  "谷口",
+  "大野",
+  "丸山",
+  "今井",
+  "高田",
+  "河野",
+  "藤原",
+  "武田",
+  "村田",
+  "上野",
+  "杉山",
+  "増田",
+  "平野",
+  "大塚",
+  "千葉",
+  "久保",
+  "松井",
+  "小島",
+  "岩崎",
+  "桜井",
+  "野口",
+  "松尾",
+  "菊地",
+  "野村",
+  "新井",
+  "渡部",
+  "本田",
+  "吉川",
+  "菅原",
+  "矢野",
+  "市川",
+  "大久保",
+  "黒田",
+  "杉田",
+  "白井",
+  "黒川",
+  "青山",
+  "菊池",
+  "西尾",
+  "長田",
+  "森下",
+  "小野寺",
+  "岩本",
+  "桜田",
+  "大橋",
+  "平松",
+  "中谷",
+  "中井",
+  "浜田",
+  "市原",
+  "坂東",
+  "諸星",
+  "萩原",
+  "土屋",
+  "桐生",
+  "星野",
+  "桑原",
+  "坂口",
+  "大坪",
+  "堀内",
+  "荒木",
+  "黒木",
+  "白石",
+  "畑中",
+  "堀江",
+  "松永",
+  "西岡",
+  "井口",
+  "栗原",
+  "園田",
+  "柏木",
+  "迫",
+  "田代",
+  "秋山",
+  "河村",
+  "岸本",
+  "大島",
+  "榎本",
+  "神田",
+  "須田",
+  "倉田",
+  "金城",
+  "滝沢",
+  "大川",
+  "吉村",
+  "安田",
+  "小笠原",
+  "菅野",
+  "片桐",
+  "大竹",
+  "川島",
+  "古川",
+  "栗田",
+  "中田",
+  "永田",
+  "小池",
+  "沖田",
+  "大原",
+  "宮田",
+  "川端",
+  "谷本",
+  "石原",
+  "小田",
+  "平田",
+  "栗林",
+  "松浦",
+  "山内",
+  "吉岡",
+  "高松",
+  "山中",
+  "大村",
+  "小西",
+  "福島",
+  "堀",
+  "荒井",
+  "大森",
+  "阿久津",
+  "内藤",
+  "高瀬",
+  "浦山",
+  "落合",
+  "宮島",
+  "浅野",
+  "浜口",
+  "矢島",
+  "瀬川",
+  "坂田",
+  "黒沢",
+  "根岸",
+  "栗栖",
+  "川畑",
 ];
-
-// 女性の読み上位100個 ＆ 漢字候補
+// 女性の読み上位199個 ＆ 漢字候補
 const FEMALE_READINGS_MAP = {
   "えま": ["咲茉", "依舞", "愛真", "絵麻", "えま"],
   "つむぎ": ["紬", "紬希", "紡", "つむぎ"],
   "さくら": ["桜", "咲良", "櫻", "さくら"],
   "めい": ["芽依", "芽生", "明衣", "萌衣", "めい"],
-  "みお": ["澪", "美緒", "美桜", "心央", "みお"],
+  "みお": ["美緒", "美桜", "心央", "みお"],
   "こはる": ["心春", "小春", "心晴", "こはる"],
   "ひまり": ["陽葵", "日茉莉", "陽莉", "ひまり"],
   "あおい": ["葵", "碧", "蒼", "あおい"],
@@ -827,16 +1016,16 @@ const FEMALE_READINGS_MAP = {
   "いちご": ["一期", "苺", "一瑚", "いちご"],
   "さな": ["紗奈", "咲那", "彩菜", "さな"],
   "かのん": ["花音", "果音", "佳音", "かのん"],
-  "りこ": ["莉子", "理子", "里瑚", "りこ"],
+  "りこ": ["莉子", "理子", "りこ"],
   "すず": ["鈴", "涼", "すず"],
   "ふうか": ["楓香", "風花", "ふうか"],
   "ゆづき": ["結月", "優月", "悠月", "ゆづき"],
-  "ことね": ["琴音", "琴乃", "ことね"],
+  "ことね": ["琴音", "言音", "ことね"],
   "さら": ["紗良", "咲良", "沙良", "彩良", "さら"],
   "ひな": ["陽菜", "日菜", "雛", "ひな"],
   "みつき": ["美月", "光希", "充希", "みつき"],
   "あすか": ["明日香", "飛鳥", "あすか"],
-  "ななみ": ["七海", "菜々美", "那奈美", "ななみ"],
+  "ななみ": ["七海", "菜々美", "奈々未", "ななみ"],
   "ゆいな": ["結菜", "唯奈", "由衣奈", "ゆいな"],
   "こころ": ["心", "心結", "こころ"],
   "るか": ["琉花", "瑠香", "留果", "るか"],
@@ -844,7 +1033,7 @@ const FEMALE_READINGS_MAP = {
   "ゆず": ["柚", "柚子", "優寿", "ゆず"],
   "みれい": ["美玲", "美麗", "未麗", "みれい"],
   "みゆ": ["美優", "未悠", "実優", "心結", "みゆ"],
-  "しおり": ["詩織", "栞", "汐里", "しおり"],
+  "しおり": ["詩織", "栞", "汐里", "史緒里","しおり"],
   "まい": ["麻衣", "舞", "真衣", "まい"],
   "みさき": ["美咲", "実咲", "海咲", "みさき"],
   "まな": ["愛菜", "真菜", "愛", "まな"],
@@ -853,16 +1042,15 @@ const FEMALE_READINGS_MAP = {
   "ちひろ": ["千尋", "千裕", "千紘", "ちひろ"],
   "みおり": ["澪莉", "美織", "心織", "みおり"],
   "かんな": ["環奈", "栞奈", "柑奈", "かんな"],
-  "ゆめ": ["夢", "優芽", "結愛", "ゆめ"],
+  "ゆめ": [ "優芽", "結愛", "ゆめ"],
   "あやね": ["綾音", "彩音", "絢音", "あやね"],
   "るな": ["瑠奈", "月", "流奈", "るな"],
-  "はるか": ["春香", "遥", "晴香", "悠華", "はるか"],
+  "はるか": ["春香", "遥香", "晴香", "悠華", "はるか"],
   "ちさと": ["千里", "知里", "千聖", "ちさと"],
   "みく": ["美玖", "未来", "未久", "みく"],
   "なのか": ["菜乃花", "七香", "七和", "なのか"],
   "あいり": ["愛莉", "愛理", "藍梨", "あいり"],
   "ゆり": ["百合", "由梨", "優里", "ゆり"],
-  "きこ": ["希子", "稀子", "季子", "きこ"],
   "みなみ": ["美波", "南", "未奈美", "みなみ"],
   "わかな": ["若菜", "和花奈", "和奏", "わかな"],
   "みずき": ["瑞希", "美月", "水希", "みずき"],
@@ -872,23 +1060,22 @@ const FEMALE_READINGS_MAP = {
   "このか": ["好花", "心香", "このか"],
   "ほなみ": ["穂波", "保奈美", "ほなみ"],
   "ねね": ["寧々", "音々", "ねね"],
-  "うた": ["詩", "唄", "羽多", "うた"],
+  "うた": ["詩",  "羽多", "うた"],
   "おとは": ["乙葉", "音羽", "おとは"],
   "ももか": ["百花", "萌々香", "桃香", "ももか"],
-  "なな": ["奈々", "七", "菜々", "なな"],
+  "なな": ["奈々", "菜々", "なな"],
   "しほ": ["志保", "詩歩", "志帆", "しほ"],
   "ひより": ["日和", "陽依", "ひより"],
-  "そら": ["空", "昊", "そら"],
   "まゆ": ["真優", "麻友", "茉由", "まゆ"],
   "りんな": ["凛奈", "倫菜", "梨乃", "りんな"],
   "みほ": ["美穂", "未歩", "実保", "みほ"],
   "ひろか": ["広香", "裕香", "紘花", "ひろか"],
   "あかね": ["茜", "明音", "あかね"],
   "かすみ": ["霞", "香澄", "かすみ"],
-  "ことのは": ["言の葉", "琴葉", "ことのは"],
+  "ことのは": ["言葉", "琴葉", "ことのは"],
   "みか": ["美香", "美夏", "実果", "みか"],
-  "さや": ["紗矢", "彩花", "沙耶", "さや"],
-  "ののか": ["野乃花", "乃々華", "ののか"],
+  "さや": ["紗矢", "彩", "沙耶", "さや"],
+  "ののか": ["乃々花", "乃々華", "ののか"],
   "まほ": ["真帆", "万歩", "真歩", "まほ"],
   "すずか": ["涼花", "鈴香", "すずか"],
   "あやか": ["彩花", "絢香", "綾香", "あやか"],
@@ -903,15 +1090,56 @@ const FEMALE_READINGS_MAP = {
   "みやび": ["雅", "都", "美夜", "みやび"],
   "かほ": ["果穂", "佳歩", "夏帆", "かほ"],
   "ゆき": ["雪", "由紀", "優希", "ゆき"],
-  "えれな": ["恵令奈", "絵玲奈", "絵麗奈", "えれな"],
   "りか": ["梨花", "里香", "理香", "りか"],
   "みさ": ["美佐", "海砂", "実沙", "みさ"],
-  "はるの": ["春乃", "晴乃", "はるの"],
-  "たまき": ["環", "珠貴", "玉紀", "たまき"],
+  "はるの": ["春乃","はるの"],
+  "たまき": ["環", "珠貴", "たまき"],
   "あや": ["彩", "綾", "絢", "あや"],
-  "れな": ["玲奈", "麗奈", "怜菜", "れな"]
-};
-
+  "れな": ["玲奈", "麗奈", "怜菜", "れな"],
+  "あいな": ["愛菜",  "あいな"],
+  "あき": ["亜希", "あき"],
+  "あずみ": ["あず美","あずみ"],
+  "あん": ["杏", "あん"],
+  "いおり": ["織", "衣織", "いおり"],
+  "いづみ": ["泉", "和泉", "いづみ"],
+  "うつぎ": ["空芽", "うつぎ"],
+  "うらら": ["浦良", "うらら"],
+  "えり": ["恵里",  "えり"],
+  "えみ": ["恵美",  "えみ"],
+  "かえで": ["楓",  "かえで"],
+  "かおり": ["香","香織",  "かおり"],
+  "かおる": ["薫",  "かおる"],
+  "かげ": ["陽炎", "かげ"],
+  "かな": ["叶",  "かな"],
+  "きよ": ["清代", "きよ"],
+  "くみ": ["久美", "くみ"],
+  "くれは": ["呉葉", "くれは"],
+  "さき": ["咲希", "さき"],
+  "とき": ["季", "時", "とき"],
+  "なほ": ["奈穂", "なほ"],
+  "にこ": ["仁子",  "にこ"],
+  "ふゆ": ["冬", "ふゆ"],
+  "みき": ["美紀",  "みき"],
+  "みな": ["美奈",  "みな"],
+  "もか": ["桃花", "もか"],
+  "もも": ["桃", "もも"],
+  "ゆあ": ["優亜",  "ゆあ"],
+  "ゆかり": ["ゆかり",  "由香里"],
+  "よい": ["良依",  "よい"],
+  "らら": ["良々",  "らら"],
+  "りさ": ["里沙",  "りさ"],
+  "わか": ["若","和歌",  "わか"],
+  "あい": ["愛",  "あい"],
+  "ひなの": ["ひなの"],
+  "まや": ["真矢",  "まや"],
+  "みう": ["美羽", "みう"],
+  "もこ": ["桃子",  "もこ"],
+  "わこ": ["和子", "わこ"],
+  "うめ": ["梅", "うめ"],
+  "あきな": ["秋奈", "あきな"],
+  "いさき": ["壮希", "いさき"],
+  "うめこ": ["梅子", "うめこ"],
+  };
 // 11ステータス定義
 const STATUS_KEYS = [
   { id: 'popularity', name: '人気' },
@@ -1357,7 +1585,7 @@ function migrateLegacyGameDate(year, month, week) {
 // ==========================================
 
 function generateIdolName() {
-  const surname = SURNAMES_TOP100[Math.floor(Math.random() * SURNAMES_TOP100.length)];
+  const surname = SURNAMES_TOP200[Math.floor(Math.random() * SURNAMES_TOP200.length)];
   const readKeys = Object.keys(FEMALE_READINGS_MAP);
   const reading = readKeys[Math.floor(Math.random() * readKeys.length)];
   const kanjiList = FEMALE_READINGS_MAP[reading];
@@ -1413,15 +1641,19 @@ function ensureMemberBirthdays() {
   });
 }
 
-function createMember(age = null, policy = null) {
+function createMember(age = null, policy = null, birthYear = null) {
   const nameData = generateIdolName();
   const idolAge = age || (Math.floor(Math.random() * 8) + 13); // 13〜20
   const birthday = generateBirthday();
+  const birthYearValue = Number.isInteger(birthYear)
+    ? birthYear
+    : getGameDateObject().getFullYear() - idolAge;
   return {
     id: Date.now() + Math.floor(Math.random() * 10000),
     name: nameData.fullName,
     reading: nameData.reading,
     age: idolAge,
+    birthYear: birthYearValue,
     birthdayMonth: birthday.month,
     birthdayDay: birthday.day,
     birthdayWeek: birthday.week,
@@ -3030,12 +3262,61 @@ function getDraftRivalNames(excludeCount) {
     .map(team => team.name);
 }
 
-function createDraftCandidate(index) {
-  const policies = ['vocal', 'dance', 'talk', 'variety', null];
-  const member = createMember(null, policies[index % policies.length]);
-  member.isDraftCandidate = true;
-  return member;
+// 参加グループ1つあたり20名の候補者を生成するプール
+const DRAFT_CANDIDATES_PER_TEAM = 20;
+const DRAFT_MIN_AGE = 14;
+const DRAFT_MAX_AGE = 20;
+
+function getDraftTeamCount() {
+  return Math.max(1, leagueTeams.length);
 }
+
+// ドラフト開始時点の年齢が14〜20歳になる生年を引く
+function pickDraftBirthYear() {
+  const today = getGameDateObject();
+  const age = DRAFT_MIN_AGE + Math.floor(Math.random() * (DRAFT_MAX_AGE - DRAFT_MIN_AGE + 1));
+  const birthYear = today.getFullYear() - age;
+  return birthYear;
+}
+
+// 生年から年齢を計算する
+function calculateAgeFromBirth(birthYear, onDate, birthdayMonth, birthdayDay) {
+  let age = onDate.getFullYear() - birthYear;
+  const month = birthdayMonth || 1;
+  const day = birthdayDay || 1;
+  const passed = (onDate.getMonth() + 1) > month
+    || ((onDate.getMonth() + 1) === month && onDate.getDate() >= day);
+  if (!passed) age -= 1;
+  return age;
+}
+
+
+// 参加グループ1つあたり20名分の候補者を一度に生成する
+function buildDraftCandidatePool() {
+  const total = getDraftTeamCount() * DRAFT_CANDIDATES_PER_TEAM;
+  const policies = ['vocal', 'dance', 'talk', 'variety', null];
+  const usedNames = new Set(idolRoster.map(member => member.name));
+  const pool = [];
+  const today = getGameDateObject();
+  let guard = 0;
+  while (pool.length < total && guard < total * 30) {
+    guard++;
+    const birthYear = pickDraftBirthYear();
+    const member = createMember(0, policies[pool.length % policies.length], birthYear);
+    // 開始日時点で14〜20歳になる生年だけを採用する
+    // 誕生日ごとに年齢を計算し、開始日時点で14〜20歳になる組だけを採用する
+    const ageNow = calculateAgeFromBirth(birthYear, today, member.birthdayMonth, member.birthdayDay);
+    if (ageNow < DRAFT_MIN_AGE || ageNow > DRAFT_MAX_AGE) continue;
+    member.age = ageNow;
+    member.joinAge = ageNow;
+    if (usedNames.has(member.name)) continue;
+    usedNames.add(member.name);
+    member.isDraftCandidate = true;
+    pool.push(member);
+  }
+  return pool;
+}
+
 
 function startDraftMeeting() {
   draftCount++;
@@ -3121,8 +3402,18 @@ function beginDraftPicking() {
   openDraftModal();
 }
 
+// プールから未指名の候補者を抽選して提示する
 function getDraftCandidates() {
-  return Array.from({ length: DRAFT_CANDIDATE_COUNT }, (_, index) => createDraftCandidate(index));
+  if (!draftState) return [];
+  if (!draftState.pool) draftState.pool = buildDraftCandidatePool();
+  const picked = [];
+  const pool = draftState.pool;
+  const take = Math.min(DRAFT_CANDIDATE_COUNT, pool.length);
+  for (let i = 0; i < take; i++) {
+    const index = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(index, 1)[0]);
+  }
+  return picked;
 }
 
 // 1巡目は他チームと重複する可能性がある
@@ -3147,7 +3438,7 @@ function renderDraftPickStep() {
         const overall = calculateSingleOverall(member.stats);
         return `
           <button class="draft-candidate" type="button" onclick="resolveDraftPick(${index})">
-            <div class="draft-candidate-name">${escapeHtml(member.name)} <small>${member.age}歳</small></div>
+            <div class="draft-candidate-name">${escapeHtml(member.name)} <small>${member.age}歳（${member.birthYear}年${member.birthdayMonth}月${member.birthdayDay}日生）</small></div>
             <div class="draft-candidate-score">総評 ${overall}</div>
             <div class="draft-candidate-stats">
               ${STATUS_KEYS.slice(0, 4).map(key =>
@@ -3207,10 +3498,13 @@ function resolveDraftLottery() {
   if (state.lottery.won) {
     draftSignMember(state.lottery.member);
   } else {
-    // 外れ1位：無指名で有望株を1名獲得
-    const consolation = createMember();
-    idolRoster.push(consolation);
-    state.acquired.push(consolation);
+    // 外れ1位：無指名でプールから有望株を1名獲得
+    const consolation = getDraftCandidates()[0];
+    if (consolation) {
+      consolation.isDraftCandidate = false;
+      idolRoster.push(consolation);
+      state.acquired.push(consolation);
+    }
   }
   state.lottery = null;
   advanceDraftRound();
