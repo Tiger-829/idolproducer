@@ -195,7 +195,7 @@
     }
     .page-nav {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       border-bottom: 1px solid #f0d5de;
     }
     .page-tab {
@@ -586,6 +586,33 @@
       padding: 16px;
       border-radius: 12px;
     }
+    /* 業界順位 */
+    .ranking-note { font-size: 11px; color: #777; line-height: 1.6; margin-bottom: 6px; }
+    .ranking-list { display: flex; flex-direction: column; gap: 5px; }
+    .ranking-row {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .ranking-row.player {
+      background: #fdf2f4;
+      border-color: var(--primary);
+      font-weight: bold;
+    }
+    .ranking-rank { text-align: center; font-weight: 900; font-family: monospace; }
+    .ranking-rank.top { color: #d4af37; }
+    .ranking-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ranking-name-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ranking-name-sub { font-size: 9px; color: #777; font-weight: normal; }
+    .ranking-power { text-align: right; font-family: monospace; font-weight: 900; }
+    .ranking-trend { font-size: 9px; color: #888; }
+
     /* ドラフト会議 */
     .draft-standings { display: flex; flex-direction: column; gap: 3px; margin: 8px 0; }
     .draft-standing-row {
@@ -733,6 +760,12 @@
       <div class="fund-stat"><span class="fund-stat-label">今年のライブ動員</span><span class="fund-stat-value" id="txt-year-audience">0 人</span></div>
       <div class="fund-stat" id="fanclub-stat"><span class="fund-stat-label">ファンクラブ</span><span class="fund-stat-value" id="txt-fanclub">未設立</span></div>
     </div>
+  </section>
+
+  <section class="page-panel" id="page-ranking" role="tabpanel" aria-labelledby="page-tab-ranking" hidden>
+    <h2 class="page-title">業界順位</h2>
+    <div class="ranking-note" id="ranking-note"></div>
+    <div class="ranking-list" id="ranking-list"></div>
   </section>
 
   <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
@@ -1224,6 +1257,8 @@ const ICONS = {
   office: '<path d="M4 21V6l7-3 7 3v15"/><path d="M9 21v-4h4v4"/><path d="M8 9h1M8 13h1M13 9h1M13 13h1"/>',
   // 資金：財布
   funds: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="17" cy="14.5" r="1.4"/>',
+  // 順位：トロフィー
+  ranking: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5a2.5 2.5 0 0 0 2.5 2.5M17 6h2.5a2.5 2.5 0 0 1-2.5 2.5"/><path d="M12 14v3"/><path d="M9 20h6"/><path d="M10 17h4l.5 3h-5z"/>',
   // 記録：帳面
   records: '<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 3v18"/><path d="M10 8h6M10 12h6"/>',
   // 強化：上矢印
@@ -2497,10 +2532,18 @@ function advanceOneWeek() {
     rollEquipmentUpgradeEvent();
     rollEquipmentDowngradeEvent();
     checkFanClubYearlyEvent();
+    syncPlayerTeamStats();
     leagueTeams.forEach(team => {
       if (team.id === 'player') return;
-      team.sales += Math.floor((team.basePower * 550) + (Math.random() * 7000));
-      team.audience += Math.floor((team.basePower * 220) + (Math.random() * 3000));
+      // 公演規模は開催頻度によって変動する
+      const monthPrefix = `${calendarYear}-${String(currentMonth).padStart(2, '0')}-`;
+      const showCount = rivalLiveBookings.filter(booking =>
+        booking.groupId === team.id && (booking.venueDates || [booking.liveDate]).some(key => key.startsWith(monthPrefix))
+      ).length;
+      const power = getRivalTeamPower(team);
+      team.sales += Math.floor(power * 550 + Math.random() * 7000 + showCount * 6000);
+      team.audience += Math.floor(power * 220 + Math.random() * 3000 + showCount * 2500);
+      team.showCount = (team.showCount || 0) + showCount;
     });
 
     // 危機対応は選択肢を提示し、プレイヤーの判断で処理する
@@ -2528,7 +2571,7 @@ function advanceOneWeek() {
   if (wasWednesday) maintainOfficeFacilities();
   if (wasWednesday && isLastWednesdayOfMonth(currentDate) && currentMonth === 12) {
     executeYearEndAwards();
-    processYearEndAgingAndGraduation();
+    leagueTeams.forEach(team => { team.sales = 0; team.audience = 0; team.showCount = 0; });
   }
   if (wasWednesday && totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) startDraftMeeting();
 
@@ -3635,6 +3678,7 @@ const PAGE_TABS = [
   { id: 'formation', label: '編成', icon: 'formation' },
   { id: 'office', label: '事務所', icon: 'office' },
   { id: 'funds', label: '資金', icon: 'funds' },
+  { id: 'ranking', label: '順位', icon: 'ranking' },
   { id: 'records', label: '記録', icon: 'records' }
 ];
 
@@ -3661,6 +3705,89 @@ function switchPage(page) {
     const active = name === page;
     document.getElementById(`page-${name}`).hidden = !active;
   });
+}
+
+// 競合チームの現在の影響力（売上に応じて増減する）
+function getRivalTeamPower(team) {
+  const base = team.basePower || 0;
+  const growth = (team.sales || 0) / 200000;
+  return Math.max(10, Math.round(base + growth));
+}
+
+// 自チームの成績を leagueTeams に反映する
+function syncPlayerTeamStats() {
+  const pTeam = leagueTeams.find(team => team.id === 'player');
+  if (!pTeam) return;
+  pTeam.sales = yearlyStats.sales;
+  pTeam.audience = yearlyStats.audience;
+  pTeam.showCount = countPlayerLiveShows();
+  pTeam.basePower = getPlayerTeamOverall();
+}
+
+// 今年以来に自チームが開催した公演数
+function countPlayerLiveShows() {
+  let count = 0;
+  getScheduledLiveEntries().forEach(entry => {
+    if (entry.year !== currentYear) return;
+    count += getLiveEntryShowDates(entry).length;
+  });
+  return count;
+}
+
+// 業界順位の表を作る
+function getLeagueRanking() {
+  syncPlayerTeamStats();
+  return leagueTeams
+    .map(team => {
+      const power = team.id === 'player' ? getPlayerTeamOverall() : getRivalTeamPower(team);
+      return {
+        id: team.id,
+        name: team.name,
+        isPlayer: team.id === 'player',
+        power,
+        sales: team.sales || 0,
+        audience: team.audience || 0,
+        showCount: team.showCount || 0
+      };
+    })
+    .sort((a, b) => b.power - a.power)
+    .map((team, index) => ({ ...team, rank: index + 1 }));
+}
+
+// 自分の順位
+function getPlayerRank() {
+  const ranking = getLeagueRanking();
+  const me = ranking.find(team => team.isPlayer);
+  return me ? { rank: me.rank, total: ranking.length, power: me.power, top: ranking[0] } : null;
+}
+
+// 業界順位の描画
+function renderRankingPanel() {
+  const list = document.getElementById('ranking-list');
+  const note = document.getElementById('ranking-note');
+  if (!list || !note) return;
+  const ranking = getLeagueRanking();
+  const playerInfo = getPlayerRank();
+  if (!playerInfo) {
+    list.innerHTML = '';
+    note.textContent = '';
+    return;
+  }
+  note.innerHTML = `自グループは <strong>${playerInfo.rank}位 / ${playerInfo.total}グループ</strong>（総合力 ${playerInfo.power}）`
+    + `<br>総合力は選抜チームの平均評価です。他グループは売上に応じて影響力が増減します。`;
+
+  list.innerHTML = ranking.map(team => {
+    const rankClass = team.rank <= 3 ? ' top' : '';
+    return `
+      <div class="ranking-row${team.isPlayer ? ' player' : ''}">
+        <span class="ranking-rank${rankClass}">${team.rank}</span>
+        <span class="ranking-name">
+          <span class="ranking-name-main">${escapeHtml(team.name)}${team.isPlayer ? '（自グループ）' : ''}</span>
+          <span class="ranking-name-sub">売上 ${team.sales.toLocaleString()}枚 / 動員 ${team.audience.toLocaleString()}人 / 公演 ${team.showCount}回</span>
+        </span>
+        <span class="ranking-power">${team.power}</span>
+      </div>`;
+  }).join('');
 }
 
 function renderWeeklyActionPanel() {
@@ -3894,6 +4021,7 @@ function updateUI() {
 
   renderSongLibrary();
   renderRosterList();
+  renderRankingPanel();
   renderOfficeUpgrades();
   renderGameCalendar();
   renderWeeklyActionPanel();
