@@ -1,0 +1,12 @@
+{
+  "name": "managementgame",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "browser-sync start --server . --watch --files \"**/*\" --port 8080 --no-open --reload-delay 200",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "browser-sync": "^3.0.3"
+  }
+}
