@@ -665,6 +665,7 @@
     <div class="fund-stat-grid">
       <div class="fund-stat"><span class="fund-stat-label">今年の売上</span><span class="fund-stat-value" id="txt-year-sales">0 枚</span></div>
       <div class="fund-stat"><span class="fund-stat-label">今年のライブ動員</span><span class="fund-stat-value" id="txt-year-audience">0 人</span></div>
+      <div class="fund-stat" id="fanclub-stat"><span class="fund-stat-label">ファンクラブ</span><span class="fund-stat-value" id="txt-fanclub">未設立</span></div>
     </div>
   </section>
 
@@ -680,6 +681,30 @@
     <p style="font-size:12px; color:#666;">出演する番組と披露する楽曲を選んでください。</p>
     <div class="offer-list" id="music-offer-rows"></div>
     <button class="main-btn" style="width:100%; margin-top:12px;" onclick="resolveMusicOffers()">出演内容を決定</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="crisis-response-modal">
+  <div class="modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">危機対応</h3>
+    <p id="crisis-response-text" style="font-size:12px; color:#555; line-height:1.7;"></p>
+    <div id="crisis-response-options" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="random-event-modal">
+  <div class="modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">ランダム事件</h3>
+    <p id="random-event-text" style="font-size:12px; color:#555; line-height:1.7;"></p>
+    <div id="random-event-options" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fanclub-modal">
+  <div class="modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">ファンクラブ</h3>
+    <p id="fanclub-text" style="font-size:12px; color:#555; line-height:1.7;"></p>
+    <div id="fanclub-options" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
   </div>
 </div>
 
@@ -989,6 +1014,12 @@ let nextLivePromotionPoints = 0;
 let crisisCheckWeekKey = '';
 let crisisEventWeekKey = '';
 let crisisEventType = '';
+let pendingCrisisResponse = null;
+let pendingRandomEvent = null;
+let randomEventCheckWeekKey = '';
+let pendingFanClubEvent = null;
+let fanClub = null;
+let fanClubFoundedYear = 0;
 let industryOfferCheckWeekKey = '';
 let pendingIndustryOffer = null;
 let specialLiveEvents = [];
@@ -1367,6 +1398,12 @@ function initializeNewGameState() {
   pendingEquipmentEvent = null;
   equipmentEventCheckWeekKey = '';
   equipmentDowngradeCheckWeekKey = '';
+  pendingCrisisResponse = null;
+  randomEventCheckWeekKey = '';
+  pendingRandomEvent = null;
+  fanClub = null;
+  fanClubFoundedYear = 0;
+  pendingFanClubEvent = null;
   groupCrisis = 55;
   officeUpgrades = createInitialOfficeUpgrades();
   productionSchedule = {
@@ -1412,6 +1449,12 @@ function applySavedGame(data) {
   crisisCheckWeekKey = data.crisisCheckWeekKey || '';
   crisisEventWeekKey = data.crisisEventWeekKey || '';
   crisisEventType = data.crisisEventType || '';
+  pendingCrisisResponse = data.pendingCrisisResponse || null;
+  randomEventCheckWeekKey = data.randomEventCheckWeekKey || '';
+  pendingRandomEvent = data.pendingRandomEvent || null;
+  fanClub = data.fanClub || null;
+  fanClubFoundedYear = data.fanClubFoundedYear || 0;
+  pendingFanClubEvent = data.pendingFanClubEvent || null;
   industryOfferCheckWeekKey = data.industryOfferCheckWeekKey || '';
   pendingIndustryOffer = data.pendingIndustryOffer || null;
   specialLiveEvents = data.specialLiveEvents || [];
@@ -1531,8 +1574,9 @@ function initGame(slot, startFresh) {
   updateUI();
   renderPageNav('group');
   document.getElementById('active-slot-label').textContent = `セーブ枠 ${slot}`;
-  if (pendingEquipmentEvent) openEquipmentUpgradeEventModal();
-  else if (pendingPerformanceOffers.length) openMusicOfferModal();
+  // ゲーム開始直後に当年7月〜12月の計画決定を行う
+  if (startFresh) openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
+  else openPendingModal();
 }
 
 // ==========================================
@@ -1602,9 +1646,99 @@ function calculateGroupFans() {
 }
 
 // ==========================================
-// 5. 進行 ＆ イベントシステム
+// 危機対応（謝罪・謹慎・罰金・懲戒処分）
 // ==========================================
+const CRISIS_FINE_BASE = 2000000;
 
+function getCrisisSeverity() {
+  // 危機回避力が低いほど深刻度が高い（1.0〜2.0倍）
+  return 1 + (100 - calculateGroupCrisisResilience()) / 100;
+}
+
+function adjustSelectedPopularity(delta) {
+  idolRoster.forEach(member => {
+    if (!member.isSelected) return;
+    member.stats.popularity = Math.max(0, Math.min(100, (member.stats.popularity || 0) + delta));
+  });
+}
+
+function getCrisisResponseOptions() {
+  const fine = Math.round(CRISIS_FINE_BASE * getCrisisSeverity());
+  return [
+    {
+      id: 'apology',
+      label: '謝罪してお詫びを出す',
+      detail: `資金 -${formatMoney(Math.round(fine * 0.3))} / 危機回避力 +2 / 人気 -1`,
+      effect: () => {
+        funds -= Math.round(fine * 0.3);
+        groupCrisis = Math.min(100, groupCrisis + 2);
+        adjustSelectedPopularity(-1);
+      }
+    },
+    {
+      id: 'suspension',
+      label: '謹慎（短期活動休止）を発表',
+      detail: '資金 据え置き / 危機回避力 -6 / 人気 -3',
+      effect: () => {
+        groupCrisis = Math.max(0, groupCrisis - 6);
+        adjustSelectedPopularity(-3);
+      }
+    },
+    {
+      id: 'fine',
+      label: '罰金（賠償金）を支払う',
+      detail: `資金 -${formatMoney(fine)} / 危機回避力 +4 / 人気 据え置き`,
+      effect: () => {
+        funds -= fine;
+        groupCrisis = Math.min(100, groupCrisis + 4);
+      }
+    },
+    {
+      id: 'discipline',
+      label: '懲戒処分（該当メンバーを活動停止）',
+      detail: '危機回避力 -10 / 選抜メンバーの人気 -6',
+      effect: () => {
+        groupCrisis = Math.max(0, groupCrisis - 10);
+        adjustSelectedPopularity(-6);
+      }
+    }
+  ];
+}
+
+function openCrisisResponseModal() {
+  if (!pendingCrisisResponse) return;
+  const type = pendingCrisisResponse.type;
+  document.getElementById('crisis-response-text').textContent = type === 'information-leak'
+    ? '内部情報の流出が報道されました。事務所としての対応方針を選んでください。'
+    : 'メンバーのSNS発言が世論の批判を招きました。対応方針を選んでください。';
+  document.getElementById('crisis-response-options').innerHTML = getCrisisResponseOptions().map(option => `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveCrisisResponse('${option.id}')">
+      <div style="font-size:13px;">${option.label}</div>
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">${option.detail}</div>
+    </button>`).join('');
+  document.getElementById('crisis-response-modal').style.display = 'flex';
+}
+
+function resolveCrisisResponse(optionId) {
+  if (!pendingCrisisResponse) return;
+  const type = pendingCrisisResponse.type;
+  pendingCrisisResponse = null;
+  document.getElementById('crisis-response-modal').style.display = 'none';
+  const option = getCrisisResponseOptions().find(item => item.id === optionId);
+  if (!option) return;
+  option.effect();
+  const labelMap = { apology: '謝罪', suspension: '謹慎', fine: '罰金', discipline: '懲戒処分' };
+  const subject = type === 'information-leak' ? '情報漏洩' : 'SNSスキャンダル';
+  setLog(`【危機対応】${labelMap[optionId]}で対応しました（${subject}）。`);
+  // 対応が終われば危機状態は解消する
+  crisisEventWeekKey = '';
+  crisisEventType = '';
+  updateUI();
+}
+
+// ==========================================
+// 6. 進行 ＆ イベントシステム
+// ==========================================
 function getBirthdayMembersBetween(startDate, endDate) {
   const birthdays = [];
   const startTime = startDate.getTime();
@@ -1919,6 +2053,8 @@ function getCurrentWeekEvents() {
   }
   if (pendingIndustryOffer) events.push(pendingIndustryOffer.name);
   if (pendingEquipmentEvent) events.push(`設備強化提案: ${pendingEquipmentEvent.name}`);
+  if (pendingRandomEvent) events.push(`ランダムイベント: ${pendingRandomEvent.name}`);
+  if (pendingFanClubEvent) events.push(pendingFanClubEvent.type === 'founding' ? 'ファンクラブ設立の打診' : 'ファンクラブ会費の見直し');
   return events;
 }
 
@@ -1986,25 +2122,22 @@ function advanceOneWeek() {
   if (wasWednesday) {
     totalWeeksElapsed++;
     rollWeeklyCrisisEvent();
+    rollRandomEvent();
     rollEquipmentUpgradeEvent();
+    rollEquipmentDowngradeEvent();
+    checkFanClubYearlyEvent();
     leagueTeams.forEach(team => {
       if (team.id === 'player') return;
       team.sales += Math.floor((team.basePower * 550) + (Math.random() * 7000));
       team.audience += Math.floor((team.basePower * 220) + (Math.random() * 3000));
     });
 
+    // 危機対応は選択肢を提示し、プレイヤーの判断で処理する
     if (crisisEventWeekKey === getCurrentWeekKey()) {
-      if (crisisEventType === 'information-leak') {
-        groupCrisis = Math.max(0, groupCrisis - 5);
-        funds -= 250000;
-        setLog('【情報漏洩】内部情報が外部に流出しました。危機回避力が低下し、対応費が発生しました。');
-      } else {
-        groupCrisis = Math.max(0, groupCrisis - 7);
-        idolRoster.forEach(member => {
-          if (member.isSelected) member.stats.popularity = Math.max(0, member.stats.popularity - 3);
-        });
-        setLog('【SNSスキャンダル】SNS上の騒動が広がり、選抜メンバーの人気が低下しました。');
-      }
+      pendingCrisisResponse = { type: crisisEventType, weekKey: crisisEventWeekKey };
+      setLog(crisisEventType === 'information-leak'
+        ? '【情報漏洩】内部情報が外部に流出しました。対応方針を決めましょう。'
+        : '【SNSスキャンダル】SNS上の騒動が広がっています。対応方針を決めましょう。');
     }
 
     const summary = calculateTeamAverages();
@@ -2040,8 +2173,234 @@ function advanceOneWeek() {
   }
 
   updateUI();
-  if (pendingEquipmentEvent) openEquipmentUpgradeEventModal();
-  else if (pendingPerformanceOffers.length) openMusicOfferModal();
+  openPendingModal();
+}
+
+// ==========================================
+// ランダムイベント（現実のアイドル業界によくある事象）
+// ==========================================
+const RANDOM_EVENTS = [
+  {
+    id: 'viral-post',
+    name: '日常投稿がバズる',
+    text: '選抜メンバーの日常投稿が突然バズり、トレンド入りしました。',
+    choices: [
+      { label: 'バズに便乗して宣传する', detail: '資金 +${gain} / 全員の人気 +2', apply: ctx => { funds += ctx.gain; adjustAllPopularity(2); } },
+      { label: '静かに受け流す', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'magazine-cover',
+    name: '雑誌の表紙掲載',
+    text: '有名雑誌からの取材・表紙掲載の打診が届きました。',
+    choices: [
+      { label: '有名雑誌の特集ページに出稿する', detail: '資金 -${cost} / 人気 +4', apply: ctx => { funds -= ctx.cost; adjustAllPopularity(4); } },
+      { label: 'webメディアに回す', detail: '費用は安く効果は薄', apply: ctx => { funds -= Math.round(ctx.cost * 0.2); adjustAllPopularity(1); } }
+    ]
+  },
+  {
+    id: 'handshake-event',
+    name: '握手会の長蛇行列',
+    text: '定期公演の会場で握手会の行列が想定以上に長くなりました。',
+    choices: [
+      { label: '時間を追加して握手会を延長する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +3', apply: ctx => { funds -= ctx.cost; adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 3); } },
+      { label: '予定通り終了する', detail: '人気 -1', apply: () => adjustAllPopularity(-1) }
+    ]
+  },
+  {
+    id: 'streamer-collab',
+    name: '配信者とのコラボ',
+    text: '人気配信者とのコラボ配信の誘いが届きました。',
+    choices: [
+      { label: '受ける', detail: '資金 +${gain} / SNS運用 +3', apply: ctx => { funds += ctx.gain; adjustSelectedSns(3); } },
+      { label: '断る', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'radio-request',
+    name: 'ラジオの深夜放送枠',
+    text: '深夜ラジオへの出演打診が届きました。',
+    choices: [
+      { label: '出演する', detail: '資金 +${smallGain} / 人気 +2', apply: ctx => { funds += ctx.smallGain; adjustAllPopularity(2); } },
+      { label: '見送る', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'rumor',
+    name: '噂の拡散',
+    text: 'メンバーの体調不良に関する未確認の噂がインターネットで広まっています。',
+    choices: [
+      { label: '公式に否定する', detail: '危機回避力 +5 / 資金 -${cost}', apply: ctx => { groupCrisis = Math.min(100, groupCrisis + 5); funds -= Math.round(ctx.cost * 0.5); } },
+      { label: '沈黙する', detail: '危機回避力 -4', apply: () => { groupCrisis = Math.max(0, groupCrisis - 4); } }
+    ]
+  },
+  {
+    id: 'charity-event',
+    name: '慈善イベントへの出席',
+    text: '慈善行事への参加打診が届きました。',
+    choices: [
+      { label: '主旨参加する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +4', apply: ctx => { funds -= Math.round(ctx.cost * 0.6); adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 4); } },
+      { label: '不参加', detail: '効果なし', apply: () => {} }
+    ]
+  }
+];
+
+function adjustAllPopularity(delta) {
+  idolRoster.forEach(member => {
+    member.stats.popularity = Math.max(0, Math.min(100, (member.stats.popularity || 0) + delta));
+  });
+}
+
+function adjustSelectedSns(delta) {
+  idolRoster.forEach(member => {
+    if (member.isSelected) member.stats.sns = Math.max(0, Math.min(100, (member.stats.sns || 0) + delta));
+  });
+}
+
+function fillEventTemplate(text, context) {
+  return String(text)
+    .replace(/\$\{gain\}/g, formatMoney(context.gain))
+    .replace(/\$\{smallGain\}/g, formatMoney(context.smallGain))
+    .replace(/\$\{cost\}/g, formatMoney(context.cost));
+}
+
+function rollRandomEvent() {
+  if (getGameDateObject().getDay() !== 3) return;
+  if (pendingRandomEvent || pendingCrisisResponse) return;
+  const weekKey = getCurrentWeekKey();
+  if (randomEventCheckWeekKey === weekKey) return;
+  randomEventCheckWeekKey = weekKey;
+  if (Math.random() >= 0.16) return;
+
+  const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+  const fans = calculateGroupFans();
+  pendingRandomEvent = {
+    id: event.id,
+    name: event.name,
+    text: event.text,
+    choices: event.choices,
+    context: {
+      gain: Math.round(Math.max(500000, fans * 0.12)),
+      smallGain: Math.round(Math.max(200000, fans * 0.05)),
+      cost: Math.round(500000 + fans * 0.02)
+    }
+  };
+}
+
+function openRandomEventModal() {
+  if (!pendingRandomEvent) return;
+  const event = pendingRandomEvent;
+  document.getElementById('random-event-text').textContent =
+    `【${event.name}】${fillEventTemplate(event.text, event.context)}`;
+  document.getElementById('random-event-options').innerHTML = event.choices.map((choice, index) => `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveRandomEvent(${index})">
+      <div style="font-size:13px;">${fillEventTemplate(choice.label, event.context)}</div>
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">${fillEventTemplate(choice.detail, event.context)}</div>
+    </button>`).join('');
+  document.getElementById('random-event-modal').style.display = 'flex';
+}
+
+function resolveRandomEvent(choiceIndex) {
+  if (!pendingRandomEvent) return;
+  const event = pendingRandomEvent;
+  const choice = event.choices[choiceIndex];
+  pendingRandomEvent = null;
+  document.getElementById('random-event-modal').style.display = 'none';
+  if (choice) choice.apply(event.context);
+  setLog(`【ランダムイベント】${event.name} / ${fillEventTemplate(choice ? choice.label : '経過', event.context)}`);
+  updateUI();
+}
+
+// ==========================================
+// ファンクラブ（2年目に開設、1年ごとに会費を見直し）
+// ==========================================
+const FANCLUB_TIERS = [
+  { id: 'light', name: 'ライト', fee: 500, benefit: 'デジタル会報の配信' },
+  { id: 'standard', name: 'スタンダード', fee: 1500, benefit: '会報と先行配信' },
+  { id: 'premium', name: 'プレミアム', fee: 3000, benefit: '会報・先行配信・握手会参加権' }
+];
+
+function getFanClubMemberTarget(tier) {
+  // 会費が高いほど会員数は減る
+  return Math.max(0, Math.round(calculateGroupFans() * (0.25 - tier.fee / 20000)));
+}
+
+function openFanClubModal() {
+  if (!pendingFanClubEvent) return;
+  const event = pendingFanClubEvent;
+  const isFounding = event.type === 'founding';
+  const intro = isFounding
+    ? '2年目の幕開けです。応援団体（ファンクラブ）を設立するか決めてください。'
+    : 'ファンクラブの1年が経過しました。会費と特典を見直しましょう。';
+  document.getElementById('fanclub-text').innerHTML =
+    `<div style="margin-bottom:8px;">${intro}</div>${getFanClubStatusText()}`;
+  document.getElementById('fanclub-options').innerHTML = FANCLUB_TIERS.map((tier, index) => `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveFanClub(${index})">
+      <div style="font-size:13px;">${tier.name}（会費 ${formatMoney(tier.fee)}/月）</div>
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">特典: ${tier.benefit}${fanClub && fanClub.tierId === tier.id ? '（継続）' : ''}</div>
+    </button>`).join('')
+    + (isFounding ? '<button class="danger-btn" type="button" onclick="resolveFanClub(-1)">ファンクラブを設けない</button>' : '');
+  document.getElementById('fanclub-modal').style.display = 'flex';
+}
+
+function getFanClubStatusText() {
+  if (!fanClub) return '<div style="color:#777;">ファンクラブは未設立です</div>';
+  return `<div>現在の会費: <strong>${formatMoney(fanClub.fee)}/月</strong> / 会員数: <strong>${Number(fanClub.members || 0).toLocaleString()}人</strong> / 毎月の収入: <strong>${formatMoney(fanClub.members * fanClub.fee)}</strong></div>`;
+}
+
+function resolveFanClub(tierIndex) {
+  if (!pendingFanClubEvent) return;
+  const event = pendingFanClubEvent;
+  pendingFanClubEvent = null;
+  document.getElementById('fanclub-modal').style.display = 'none';
+
+  if (tierIndex < 0) {
+    fanClub = null;
+    setLog('【ファンクラブ】设立を見送りました。');
+  } else {
+    const tier = FANCLUB_TIERS[tierIndex];
+    const isNew = !fanClub;
+    const previousFee = fanClub ? fanClub.fee : 0;
+    const previousMembers = fanClub ? fanClub.members : 0;
+    const target = getFanClubMemberTarget(tier);
+    // 変更時は新プランの目標値へ近づける（会員の離脱と獲得を緩やかにする）
+    const members = isNew ? target : Math.round(previousMembers * 0.5 + target * 0.5);
+    fanClub = { tierId: tier.id, fee: tier.fee, members };
+    fanClubFoundedYear = currentYear;
+    setLog(isNew
+      ? `【ファンクラブ】${tier.name}プランで設立しました（会費 ${formatMoney(tier.fee)}/月 / 会員 ${members.toLocaleString()}人）。`
+      : `【ファンクラブ】会費を見直しました（${formatMoney(previousFee)} → ${formatMoney(tier.fee)}/月 / 会員 ${previousMembers.toLocaleString()} → ${members.toLocaleString()}人）。`);
+  }
+  updateUI();
+}
+
+// 保留中のモーダルを優先度順に1つだけ開く
+// ファンクラブの年次処理：2年目に開設、以降は1年ごとに会費を見直す
+function checkFanClubYearlyEvent() {
+  if (pendingFanClubEvent) return;
+  if (currentYear < 2) return;
+  const isFounding = !fanClub && fanClubFoundedYear === 0;
+  if (!isFounding && fanClubFoundedYear === currentYear) return;
+  pendingFanClubEvent = {
+    type: isFounding ? 'founding' : 'renewal',
+    tierId: fanClub ? fanClub.tierId : null
+  };
+}
+
+function applyFanClubMonthlyIncome() {
+  if (!fanClub || !fanClub.members) return 0;
+  const income = fanClub.members * fanClub.fee;
+  funds += income;
+  yearlyStats.fanClubIncome = (yearlyStats.fanClubIncome || 0) + income;
+  return income;
+}
+
+function openPendingModal() {
+  if (pendingCrisisResponse) return openCrisisResponseModal();
+  if (pendingFanClubEvent) return openFanClubModal();
+  if (pendingRandomEvent) return openRandomEventModal();
+  if (pendingEquipmentEvent) return openEquipmentUpgradeEventModal();
+  if (pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
 function recordIndividualEventSale(member, eventType, available) {
@@ -2183,7 +2542,11 @@ function processMonthlyReleaseAndLive() {
   if (todayLiveEntries.length) nextLivePromotionPoints = 0;
   if (liveLogs.length) setLog(liveLogs.join(' '));
 
-  if (isLastWednesdayOfMonth()) processScheduledPerformances();
+  if (isLastWednesdayOfMonth()) {
+    processScheduledPerformances();
+    const fanClubIncome = applyFanClubMonthlyIncome();
+    if (fanClubIncome > 0) setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}を入金しました。`);
+  }
   processSpecialLiveEvents();
 }
 
@@ -2849,6 +3212,9 @@ function updateUI() {
   document.getElementById('txt-group-fans').textContent = calculateGroupFans().toLocaleString();
   document.getElementById('txt-group-crisis').textContent = groupCrisis;
   document.getElementById('txt-effective-crisis').textContent = calculateGroupCrisisResilience();
+  document.getElementById('txt-fanclub').textContent = fanClub
+    ? `${FANCLUB_TIERS.find(t => t.id === fanClub.tierId)?.name || ''} ${formatMoney(fanClub.fee)}/月・${Number(fanClub.members).toLocaleString()}人`
+    : '未設立';
   document.getElementById('goods-sales-stats').textContent =
     `グッズ在庫 ${merchandiseStock.toLocaleString()}個 / 累計販売 ${merchandiseUnitsSold.toLocaleString()}個 / 直近完売率 ${Number.isFinite(merchandiseSellThrough) ? `${Math.round(merchandiseSellThrough * 100)}%` : '実績なし'}`;
 
@@ -2886,6 +3252,8 @@ function updateUI() {
     currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
     merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
     nextLivePromotionPoints, crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
+    pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent,
+    fanClub, fanClubFoundedYear, pendingFanClubEvent,
     industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
     pendingEquipmentEvent, equipmentEventCheckWeekKey, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
     yearlyStats, idolRoster, productionSchedule, leagueTeams,
