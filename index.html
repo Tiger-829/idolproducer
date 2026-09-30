@@ -1467,10 +1467,24 @@ function getVenueFeePerShow(venue) {
 }
 
 // 会場使用料 = ランクの1日料金 + (日数-1)×0.2×ランクの1日料金
-function getVenueRentalFee(venue, days) {
-  const base = getVenueFeePerShow(venue);
-  const count = Math.max(1, normalizeLiveDays(days));
-  return base + (count - 1) * VENUE_EXTRA_DAY_RATE * base;
+// 公演日程から会場使用料の曜日割引率を決める
+// 日曜を含む=元値 / 日曜なし・土曜を含む=0.95倍 / 金曜が最終日=0.8倍 / それ以外=0.75倍
+function getVenueWeekdayDiscount(dates) {
+  const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
+  if (!list.length) return 1;
+  const weekdays = list.map(dateKey => getGameDateObject(dateKey).getDay());
+  if (weekdays.includes(0)) return 1;
+  if (weekdays.includes(6)) return 0.95;
+  if (weekdays[weekdays.length - 1] === 5) return 0.8;
+  return 0.75;
+}
+
+// 会場使用料 = 曜日割引後の1日料金 + (日数-1)×0.2×曜日割引後の1日料金
+function getVenueRentalFee(venue, days, dates = null) {
+  const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
+  const count = list.length ? list.length : Math.max(1, normalizeLiveDays(days));
+  const discounted = getVenueFeePerShow(venue) * getVenueWeekdayDiscount(list);
+  return Math.round(discounted + (count - 1) * VENUE_EXTRA_DAY_RATE * discounted);
 }
 
 // 1つの会場枠が持つ公演日一覧（1公演=1日）
@@ -1569,44 +1583,64 @@ function getLastWednesday(year, monthIndex) {
 }
 
 // Rival tour bookings. Requirement 5: a rival may hold several shows in one month.
+// 競合チームの公演予約を生成する。venueDates で公演日を並べることで連日公演も表現する。
 function ensureRivalLiveBookings(gameYear, month) {
   const actualYear = calendarYear + (gameYear - currentYear);
   leagueTeams.filter(team => team.id !== 'player').forEach(team => {
-    const existingCount = rivalLiveBookings.filter(booking =>
-      booking.groupId === team.id && booking.monthKey === `${actualYear}-${month}`
-    ).length;
-    if (existingCount > 0) return;
-    if (Math.random() >= 0.45) return;
+    const monthKey = `${actualYear}-${month}`;
+    if (rivalLiveBookings.some(booking => booking.groupId === team.id && booking.monthKey === monthKey)) return;
+    // 開催頻度：影響力が高いほど高い
+    const frequency = team.basePower >= 90 ? 0.75
+      : team.basePower >= 80 ? 0.6
+      : team.basePower >= 70 ? 0.45
+      : 0.3;
+    if (Math.random() >= frequency) return;
 
-    // Stronger teams are more likely to run a double-header
     const isBigTeam = team.basePower >= 80;
-    const showCount = Math.random() < (isBigTeam ? 0.45 : 0.2) ? 2 : 1;
+    // 公演回数：強者为多（1〜4公演）
+    const maxShows = isBigTeam ? 4 : 2;
+    const showCount = 1 + Math.floor(Math.random() * maxShows);
+    // 連日公演の確率
+    const isConsecutive = Math.random() < 0.35;
+    const consecutiveDays = isConsecutive ? Math.min(showCount, 2 + Math.floor(Math.random() * 3)) : 1;
 
-    for (let index = 0; index < showCount; index++) {
-      const venuePool = Math.random() < 0.35
-        ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
-        : VENUE_DATA;
-      const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
-      const lastDay = new Date(actualYear, month, 0).getDate();
-      const liveDay = Math.floor(Math.random() * Math.min(28, lastDay)) + 1;
-      const liveDate = toDateKey(new Date(actualYear, month - 1, liveDay, 12));
-      // 同じ会場・同じ日の重複を避ける
+    const venuePool = Math.random() < 0.35
+      ? VENUE_DATA.filter(venue => ['A', 'S', 'SS'].includes(venue.cap))
+      : VENUE_DATA;
+    const venue = venuePool[Math.floor(Math.random() * venuePool.length)];
+    const lastDay = new Date(actualYear, month, 0).getDate();
+    const startDay = Math.floor(Math.random() * Math.max(1, Math.min(28, lastDay) - consecutiveDays + 1)) + 1;
+
+    // 公演日を並べる（同じ会場で連日開催）
+    const venueDates = [];
+    for (let i = 0; i < showCount; i++) {
+      const day = isConsecutive ? startDay + (i % consecutiveDays) : startDay + i;
+      if (day > lastDay) break;
+      const liveDate = toDateKey(new Date(actualYear, month - 1, day, 12));
       if (rivalLiveBookings.some(booking => booking.venue === venue.name && booking.liveDate === liveDate)) continue;
       if (rivalLiveBookings.some(booking => booking.groupId === team.id && booking.liveDate === liveDate)) continue;
-      rivalLiveBookings.push({
-        id: `${team.id}-${actualYear}-${month}-${index}`,
-        groupId: team.id,
-        monthKey: `${actualYear}-${month}`,
-        groupName: team.name,
-        venue: venue.name,
-        liveDate
-      });
+      venueDates.push(liveDate);
     }
+    if (!venueDates.length) return;
+
+    rivalLiveBookings.push({
+      id: `${team.id}-${actualYear}-${month}-0`,
+      groupId: team.id,
+      monthKey,
+      groupName: team.name,
+      venue: venue.name,
+      liveDate: venueDates[0],
+      venueDates,
+      consecutive: isConsecutive
+    });
   });
 }
 
 function findRivalVenueConflict(venueName, dateKey) {
-  return rivalLiveBookings.find(booking => booking.venue === venueName && booking.liveDate === dateKey) || null;
+  // 連日公演を含むすべての公演日が対象
+  return rivalLiveBookings.find(booking =>
+    booking.venue === venueName && (booking.venueDates || [booking.liveDate]).includes(dateKey)
+  ) || null;
 }
 
 function syncGameCalendar() {
@@ -2862,7 +2896,7 @@ function processMonthlyReleaseAndLive() {
     const totalMerchandise = sellMerchandiseAtLive().revenue;
 
     // 会場使用料：ランク基準 + (日数-1)×0.2×ランク基準
-    const venueCost = getVenueRentalFee(v, totalShowCount);
+    const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
     const totalRevenueWithGoods = totalRevenue + totalMerchandise;
     const profit = totalRevenueWithGoods - venueCost;
 
@@ -3679,7 +3713,11 @@ function renderGameCalendar() {
   specialLiveEvents.forEach(event => {
     if (!event.completed) liveDates.add(event.liveDate);
   });
-  const rivalLiveDates = new Set(rivalLiveBookings.map(booking => booking.liveDate));
+  // 競合公演は連日を含むすべての公演日をマークする
+  const rivalLiveDates = new Set();
+  rivalLiveBookings.forEach(booking => {
+    (booking.venueDates || [booking.liveDate]).forEach(dateKey => rivalLiveDates.add(dateKey));
+  });
 
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   let cells = weekdays.map(day => `<span class="calendar-weekday">${day}</span>`).join('');
@@ -4019,7 +4057,7 @@ function updateShowDateNote(month, index) {
     const weekday = weekdayNames[getGameDateObject(dateKey).getDay()];
     return `${Number(dateKey.slice(-2))}日(${weekday})`;
   }).join(' / ');
-  const fee = getVenueRentalFee(venue, dates.length);
+  const fee = getVenueRentalFee(venue, dates.length, dates);
   note.innerHTML = `この会場は${dates.length}公演（${detail || '日程未設定'}）<br>会場使用料の目安: ${formatMoney(fee)}<br>今月の合計 ${total}/${MAX_LIVE_SHOWS_PER_MONTH}公演`;
 }
 
@@ -4151,9 +4189,17 @@ function openDecisionModal(title, y, sM, eM) {
   for (let m = sM; m <= eM; m++) {
     const existing = productionSchedule[`${y}-${m}`] || { release: 'none', liveVenue: '' };
     const actualYear = calendarYear + (y - currentYear);
+    const monthPrefix = `${actualYear}-${String(m).padStart(2, '0')}-`;
     const rivalMonthSchedule = rivalLiveBookings
-      .filter(booking => booking.liveDate.startsWith(`${actualYear}-${String(m).padStart(2, '0')}-`))
-      .map(booking => `${Number(booking.liveDate.slice(-2))}日 ${booking.groupName}（${booking.venue}）`);
+      .filter(booking => (booking.venueDates || [booking.liveDate]).some(dateKey => dateKey.startsWith(monthPrefix)))
+      .map(booking => {
+        const days = (booking.venueDates || [booking.liveDate])
+          .filter(dateKey => dateKey.startsWith(monthPrefix))
+          .map(dateKey => Number(dateKey.slice(-2)));
+        const dayText = days.length > 1 ? `${days[0]}〜${days[days.length - 1]}日` : `${days[0]}日`;
+        const note = booking.consecutive && days.length > 1 ? '・連日' : (days.length > 1 ? `・${days.length}公演` : '');
+        return `${dayText} ${booking.groupName}（${booking.venue}）${note}`;
+      });
     // 保存済みのライブ（メイン＋追加）を入力枠へ展開する
     const savedLives = getMonthLiveEntries(existing).slice(0, MAX_LIVE_VENUES_PER_MONTH);
     const liveSlots = savedLives.length
