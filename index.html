@@ -89,9 +89,6 @@
     .weekly-event-note ul { margin: 6px 0 0; padding-left: 20px; }
     .weekly-member-target { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
     .weekly-member-target select { padding: 8px; font-size: 12px; }
-    .weekly-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-    .weekly-action-grid .main-btn { min-height: 48px; padding: 8px 6px; font-size: 12px; }
-    .weekly-action-grid .main-btn:disabled { background: #aaa; cursor: not-allowed; }
 
     /* 週間スケジュール */
     .schedule-block {
@@ -135,6 +132,7 @@
       cursor: pointer;
     }
     .week-vacation-btn.active { color: #fff; background: #2e7d32; border-color: #2e7d32; border-style: solid; }
+    .week-vacation-btn:disabled { color: #aaa; background: #f4f1f2; border-color: #ddd; cursor: not-allowed; }
     .week-grid { display: flex; flex-direction: column; gap: 3px; }
     .week-row {
       display: grid;
@@ -154,8 +152,21 @@
     .week-cell-label { font-size: 8px; color: #999; text-align: center; }
     .week-cell select { margin-bottom: 0; padding: 5px 4px; font-size: 11px; }
     .week-cell select:disabled { background: #f0ecee; color: #aaa; }
+    /* テレビ出演で固定された枠（リハーサル／出演） */
+    .week-cell.is-fixed select {
+      background: #e8eef7;
+      color: #1a4b8c;
+      font-weight: bold;
+      border: 1px solid #9db8dd;
+      opacity: 1;
+    }
+    .week-cell.is-fixed .week-cell-label { color: #1a4b8c; }
     .rest-toggle.focus { border-color: #4527a0; }
     .rest-toggle.focus.active { background: #4527a0; border-color: #4527a0; }
+    /* 今週の事務作業（選択中だけ色を付ける） */
+    .rest-toggle.office { border-color: #ef6c00; color: #b35c00; }
+    .rest-toggle.office.active { background: #ef6c00; border-color: #ef6c00; color: #fff; }
+    .rest-toggle.office.active small { color: #ffe9d6; }
     .schedule-note { font-size: 10px; color: #777; line-height: 1.5; margin-top: 4px; }
     .schedule-note.warn { color: #c0392b; }
     .rest-toggle-grid { display: flex; flex-wrap: wrap; gap: 4px; max-height: 130px; overflow-y: auto; }
@@ -1023,6 +1034,7 @@
       touch-action: manipulation;
     }
     button.main-btn:active { transform: scale(0.98); }
+    button.main-btn:disabled { background-color: #aaa; cursor: not-allowed; opacity: 0.75; }
     .danger-btn {
       background-color: #757575;
       color: white;
@@ -1299,7 +1311,7 @@
 
 <div class="modal-overlay" id="random-event-modal">
   <div class="modal-content">
-    <h3 class="page-title" style="margin:0 0 8px;">!!</h3>
+    <h3 class="page-title" id="random-event-title" style="margin:0 0 8px;">!!</h3>
     <p id="random-event-text" style="font-size:12px; color:#555; line-height:1.7;"></p>
     <div id="random-event-options" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
   </div>
@@ -1315,11 +1327,11 @@
 
 <div class="modal-overlay" id="equipment-event-modal">
   <div class="modal-content">
-    <h3 class="page-title" style="margin:0 0 8px;">設備強化イベント</h3>
+    <h3 class="page-title" id="equipment-event-title" style="margin:0 0 8px;">設備整理の提案</h3>
     <p id="equipment-event-description" style="font-size:12px; color:#555; line-height:1.6;"></p>
     <div class="actions">
-      <button class="main-btn" id="equipment-event-upgrade" onclick="resolveEquipmentUpgradeEvent(true)">設備を強化</button>
-      <button class="danger-btn" onclick="resolveEquipmentUpgradeEvent(false)">今回は見送る</button>
+      <button class="main-btn" id="equipment-event-upgrade" onclick="resolveEquipmentEvent(true)">ダウングレード</button>
+      <button class="danger-btn" onclick="resolveEquipmentEvent(false)">今回は見送る</button>
     </div>
   </div>
 </div>
@@ -1727,7 +1739,7 @@ const FEMALE_READINGS_MAP = {
   "いさき": ["壮希", "いさき"],
   "うめこ": ["梅子", "うめこ"],
   };
-// 13ステータス定義（体力の次に回復力を追加）
+// 14ステータス定義（体力の次に回復力・連携力を追加）
 const STATUS_KEYS = [
   { id: 'popularity', name: '人気' },
   { id: 'style',      name: 'スタイル' },
@@ -1741,12 +1753,13 @@ const STATUS_KEYS = [
   { id: 'variety',    name: 'バラエティ耐性' },
   { id: 'academics',  name: '学力' },
   { id: 'athletics',  name: '運動能力' },
-  { id: 'crisis',     name: '危機回避力' }
+  { id: 'crisis',     name: '危機回避力' },
+  { id: 'coordination', name: '連携力' }
 ];
 
-// レッスンで育成する11個の固定能力（人気と体力値は別枠で扱うため除く）
+// レッスンで育成する12個の固定能力（人気と体力値は別枠で扱うため除く）
 const MEMBER_STAT_GROUPS = [
-  { label: '表現',   ids: ['style', 'fashion', 'vocal', 'dance'] },
+  { label: '表現',   ids: ['style', 'fashion', 'vocal', 'dance', 'coordination'] },
   { label: '体調',   ids: ['recovery', 'athletics'] },
   { label: '応対力', ids: ['talk', 'sns', 'variety', 'academics', 'crisis'] }
 ];
@@ -1952,19 +1965,38 @@ function getWeekSlotLabel(slotIndex) {
   return `${WEEK_DAY_LABELS[getWeekSlotDay(slotIndex)]}曜${WEEK_PERIOD_LABELS[getWeekSlotPeriod(slotIndex)]}`;
 }
 
+// 通し練習は疲労が大きいため、1週間で2枠までに制限する
+const FULL_RUN_THROUGH_WEEKLY_LIMIT = 2;
+
 const WEEKLY_SCHEDULE_ITEMS = [
   { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaCost: 1.0 },
   { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaCost: 0.8 },
   { id: 'literacy', name: 'リテラシー講義', expStat: 'academics', secondaryExp: { talk: 0.3 }, staminaCost: 0.7 },
   { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7 },
+  { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: {}, staminaCost: 1.1, effect: '運動能力' },
+  { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: {}, staminaCost: 1.0, effect: '体力' },
+  { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaCost: 1.2, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
+  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaCost: 0.9, groupOnly: true, effect: '連携力' },
   { id: 'meal-party', name: '食事会', social: true, cost: 1000000, staminaCost: 0 },
-  { id: 'rest-day', name: '休養', rest: true, staminaCost: 0 }
+  { id: 'rest-day', name: '休養', rest: true, staminaCost: 0 },
+  // テレビ出演（歌番組など）の放送日午前に固定される枠。プルダウンからは選べない
+  { id: 'rehearsal', name: 'リハーサル', fixed: true, staminaCost: 0 }
 ];
 // 食事会（社会性イベント。1回あたり100万円）
 const MEAL_PARTY_COST = 1000000;
 const MEAL_PARTY_POPULARITY_GAIN = 2;
 const MEAL_PARTY_CRISIS_GAIN = 3;
 const MEAL_PARTY_RECOVERY = 10;
+// グッズ開発の上限・単価
+const MAX_MERCHANDISE_PRODUCTS = 5;
+const GOODS_DEVELOPMENT_COST = 500000;
+const GOODS_DEVELOPMENT_STOCK = 1000;
+// 今週の事務作業（メンバーのレッスンと同じ週にまとめて実行する）
+const OFFICE_ACTIONS = [
+  { id: 'single-promotion', name: 'シングル販促', short: '次作を販促', detail: '発売予定のシングルを販促します（売上が上昇）。該当が無ければ選抜メンバーの人気がUp。' },
+  { id: 'live-promotion', name: '次のライブの広報', short: '集客効果Up', detail: '次回ライブの集客効果を上げます。' },
+  { id: 'goods-development', name: 'グッズの開発', short: '1種/在庫+', detail: `グッズを1種開発します（在庫+${GOODS_DEVELOPMENT_STOCK.toLocaleString()}個 / 開発費 ${GOODS_DEVELOPMENT_COST.toLocaleString()}円 / 上限${MAX_MERCHANDISE_PRODUCTS}種）。` }
+];
 // 1週間の休暇（14枠すべてを休養にして、大きな回復を得る）
 const FULL_VACATION_RECOVERY = 45;
 // 初期状態の枠の並び（休養を1日フル＋2枠に確保し、残りをレッスンで埋める）
@@ -1992,6 +2024,9 @@ const SPECIAL_TRAINING_EXTRA_COST = 10;
 // 14枠化に伴う体力消費の再調整（1枠あたりの基準消費）
 const GROUP_LESSON_STAMINA_COST = 6;
 const INDIVIDUAL_LESSON_STAMINA_COST = 8;
+// テレビ出演で固定される枠の体力消費（リハーサル1回／出演1回あたり）
+const REHEARSAL_STAMINA_COST = 4;
+const BROADCAST_STAMINA_COST = 3;
 // 休養1枠あたりの追加回復
 const REST_SLOT_RECOVERY = 8;
 // ライブによる体力消費（会場規模によって変動）
@@ -2079,7 +2114,6 @@ let industryOfferCheckWeekKey = '';
 let pendingIndustryOffer = null;
 let specialLiveEvents = [];
 let pendingEquipmentEvent = null;
-let equipmentEventCheckWeekKey = '';
 let equipmentDowngradeCheckWeekKey = '';
 let groupCrisis = 55;
 let officeUpgrades = createInitialOfficeUpgrades();
@@ -2914,7 +2948,6 @@ function initializeNewGameState() {
   pendingIndustryOffer = null;
   specialLiveEvents = [];
   pendingEquipmentEvent = null;
-  equipmentEventCheckWeekKey = '';
   equipmentDowngradeCheckWeekKey = '';
   pendingCrisisResponse = null;
   randomEventCheckWeekKey = '';
@@ -2988,7 +3021,7 @@ function applySavedGame(data) {
   crisisEventType = data.crisisEventType || '';
   pendingCrisisResponse = data.pendingCrisisResponse || null;
   randomEventCheckWeekKey = data.randomEventCheckWeekKey || '';
-  pendingRandomEvent = data.pendingRandomEvent || null;
+  pendingRandomEvent = restorePendingRandomEvent(data.pendingRandomEvent);
   armedRandomEvents = Array.isArray(data.armedRandomEvents) ? data.armedRandomEvents : [];
   pendingSelectionEvent = data.pendingSelectionEvent || null;
   selectionLock = data.selectionLock || null;
@@ -2999,7 +3032,6 @@ function applySavedGame(data) {
   pendingIndustryOffer = data.pendingIndustryOffer || null;
   specialLiveEvents = data.specialLiveEvents || [];
   pendingEquipmentEvent = data.pendingEquipmentEvent || null;
-  equipmentEventCheckWeekKey = data.equipmentEventCheckWeekKey || '';
   equipmentDowngradeCheckWeekKey = data.equipmentDowngradeCheckWeekKey || '';
   groupCrisis = data.groupCrisis ?? 55;
   officeUpgrades = { ...createInitialOfficeUpgrades(), ...(data.officeUpgrades || {}) };
@@ -3248,11 +3280,13 @@ function getStatExpProgress(member, statId) {
   return Math.min(1, current / getStatExpRequired(level));
 }
 
-// 旧セーブに不足している回復力・経験値・体力値を補完する
+// 旧セーブに不足している回復力・連携力・経験値・体力値を補完する
 function ensureMemberVitalState() {
   idolRoster.forEach(member => {
     if (!member.stats) member.stats = {};
     if (!Number.isFinite(member.stats.recovery)) member.stats.recovery = 40;
+    // 連携力は後から追加した能力なので、旧セーブには新人が入会した時の初期値（30）を入れる
+    if (!Number.isFinite(member.stats.coordination)) member.stats.coordination = 30;
     if (!member.statExp || typeof member.statExp !== 'object') member.statExp = {};
     if (!Number.isFinite(member.staminaValue)) member.staminaValue = MAX_STAMINA_VALUE;
     member.staminaValue = Math.max(0, Math.min(MAX_STAMINA_VALUE, Math.round(member.staminaValue)));
@@ -3549,13 +3583,17 @@ function hasUpcomingSpecialBroadcastOffer() {
   return pendingPerformanceOffers.some(offer => offer.isSpecial);
 }
 
-// 今週のうちにライブやテレビ出演があるか（週間スケジュールを組めない週の判定用）
-function hasEventWithinWeek(date) {
-  const nextWednesday = getNextWednesday(date);
-  return Boolean(findNextScheduledLiveDate(date, nextWednesday));
+// 今週のうちにライブがあるか（週間スケジュールを組めない週の判定用）
+function hasLiveWithinWeek(date = getGameDateObject()) {
+  return Boolean(findWeekLiveStop(date));
 }
 
-// 指定期間の次に開催される自分のライブ日・テレビ出演日を探す
+// 今週のライブ日（なければ null）。ライブがある週だけ時間が止まる
+function findWeekLiveStop(date = getGameDateObject()) {
+  return findNextScheduledLiveDate(date, getNextWednesday(date));
+}
+
+// 指定期間の次に開催されるライブ日を探す（自分のライブ・出演決定済みイベント・競合公演）
 function findNextScheduledLiveDate(startDate, endDate) {
   let nextLiveDate = null;
   const consider = candidate => {
@@ -3572,14 +3610,8 @@ function findNextScheduledLiveDate(startDate, endDate) {
     if (event.completed) return;
     consider(getGameDateObject(event.liveDate));
   });
-  // テレビ出演（定例番組・大型特番）の放送日でも時間を止める
-  scheduledPerformances.forEach(performance => {
-    if (!performance.airDate) return;
-    consider(getGameDateObject(performance.airDate));
-  });
-  // 年末の大型イベント（赤白12/31・大賞12/30）
-  consider(getGameDateObject(getFixedDateOfMonth(calendarYear, KOHAKU_DATE.month, KOHAKU_DATE.day)));
-  consider(getGameDateObject(getFixedDateOfMonth(calendarYear, AWARD_DATE.month, AWARD_DATE.day)));
+  // テレビ出演（定例番組・大型特番）や年末の大型イベント（赤白・大賞）は
+  // 週間スケジュールの固定枠として処理するため、週を止めない
   rivalLiveBookings.forEach(booking => {
     (booking.venueDates || [booking.liveDate]).forEach(dateKey => {
       consider(getGameDateObject(dateKey));
@@ -3637,12 +3669,10 @@ function rollWeeklyIndustryOffer() {
   };
 }
 
-function rollEquipmentUpgradeEvent() {
-  if (getGameDateObject().getDay() !== 3) return;
+// 設備強化の打診で候補になる設備（ランダムイベント「設備強化の打診」で使う）
+// 要件10: 他グループと比較し、明显落后于同业界平均水准的设备会被提名为改善对象
+function getEquipmentUpgradeCandidates() {
   const weekKey = getCurrentWeekKey();
-  if (equipmentEventCheckWeekKey === weekKey || pendingEquipmentEvent) return;
-  equipmentEventCheckWeekKey = weekKey;
-
   const candidates = [];
   const currentScore = calculateTeamAverages().overall;
   const rivalTeams = leagueTeams.filter(team => team.id !== 'player');
@@ -3664,7 +3694,6 @@ function rollEquipmentUpgradeEvent() {
     candidates.push({ facilityId: 'analytics', reason: '他グループの影響力が強く、市場データの分析が必要です。' });
   }
 
-  // 要件10: 他グループと比較し、明显落后于同业界平均水准的设备会被提名为改善对象
   const myAverageLevel = OFFICE_FACILITIES.reduce((sum, f) => sum + (officeUpgrades[f.id] || 0), 0) / OFFICE_FACILITIES.length;
   const behindRivals = OFFICE_FACILITIES.find(f =>
     (officeUpgrades[f.id] || 0) < MAX_OFFICE_LEVEL && (officeUpgrades[f.id] || 0) + 1 < myAverageLevel
@@ -3673,16 +3702,19 @@ function rollEquipmentUpgradeEvent() {
     candidates.push({ facilityId: behindRivals.id, reason: `${behindRivals.name}のレベルが明显落后于同业界平均水准，需要改善。` });
   }
 
-  const activeCandidates = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < MAX_OFFICE_LEVEL);
-  const eventChance = activeCandidates.length ? 0.22 : 0.018;
-  if (Math.random() >= eventChance) return;
+  const active = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < MAX_OFFICE_LEVEL);
+  if (active.length) return active;
+  // 特に劣る設備がないときは、経営会議での一般的な強化打診が届く
+  return OFFICE_FACILITIES
+    .filter(facility => (officeUpgrades[facility.id] || 0) < MAX_OFFICE_LEVEL)
+    .map(facility => ({ facilityId: facility.id, reason: '経営会議で事務所設備の強化が提案されました。' }));
+}
 
-  const candidate = activeCandidates.length
-    ? activeCandidates[Math.floor(Math.random() * activeCandidates.length)]
-    : { facilityId: OFFICE_FACILITIES[Math.floor(Math.random() * OFFICE_FACILITIES.length)].id, reason: '経営会議で事務所設備の強化が提案されました。' };
-  const facility = OFFICE_FACILITIES.find(item => item.id === candidate.facilityId);
-  if (!facility || (officeUpgrades[facility.id] || 0) >= MAX_OFFICE_LEVEL) return;
-  pendingEquipmentEvent = { ...candidate, name: facility.name, eventDate: gameDate };
+// 強化対象の設備を1件選ぶ（候補があればその中から、無ければ未強化の設備から）
+function pickEquipmentUpgradeCandidate() {
+  const candidates = getEquipmentUpgradeCandidates();
+  if (!candidates.length) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 // 資金難によるダウングレード提案（Lv.2以上の設備を対象にする）
@@ -3712,64 +3744,42 @@ function rollEquipmentDowngradeEvent() {
   setLog(`【設備整理提案】${target.facility.name}をLv.${target.level - 1}に縮小すると ${formatMoney(refund)} 回収できます。`);
 }
 
-function openEquipmentUpgradeEventModal() {
+// 設備整理（ダウングレード）提案のモーダル。強化打診はランダムイベントで処理する
+function openEquipmentEventModal() {
   if (!pendingEquipmentEvent) return;
   const facility = OFFICE_FACILITIES.find(item => item.id === pendingEquipmentEvent.facilityId);
   if (!facility) return;
   const level = officeUpgrades[facility.id] || 0;
   const button = document.getElementById('equipment-event-upgrade');
   const description = document.getElementById('equipment-event-description');
+  const title = document.getElementById('equipment-event-title');
 
-  if (pendingEquipmentEvent.eventType === 'downgrade') {
-    // ダウングレード提案：Lv.2以上の設備を1段階下げる（売却額は資金に戻る）
-    const refund = getOfficeDowngradeRefund(facility, level);
-    const saving = getOfficeMaintenanceCost(facility, level) - getOfficeMaintenanceCost(facility, level - 1);
-    button.disabled = level <= 1;
-    button.textContent = 'ダウングレード';
-    description.textContent =
-      `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level - 1}に下げますか？\n売却額: ${formatMoney(refund)} / 週間維持費の削減: ${formatMoney(saving)}${level <= 1 ? '（Lv.1未満にはできません）' : ''}`;
-    document.getElementById('equipment-event-modal').style.display = 'flex';
-    return;
-  }
-
-  const cost = getOfficeUpgradeCost(facility);
-  button.disabled = funds < cost;
-  button.textContent = '設備を強化';
+  // ダウングレード提案：Lv.2以上の設備を1段階下げる（売却額は資金に戻る）
+  const refund = getOfficeDowngradeRefund(facility, level);
+  const saving = getOfficeMaintenanceCost(facility, level) - getOfficeMaintenanceCost(facility, level - 1);
+  button.disabled = level <= 1;
+  button.textContent = 'ダウングレード';
+  if (title) title.textContent = '設備整理の提案';
   description.textContent =
-    `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level + 1}へ強化しますか？ 開発費 ${formatMoney(cost)} / 強化後の週維持費 ${formatMoney(getOfficeMaintenanceCost(facility, level + 1))}。${funds < cost ? '資金が不足しています。' : ''}`;
+    `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level - 1}に下げますか？\n売却額: ${formatMoney(refund)} / 週間維持費の削減: ${formatMoney(saving)}${level <= 1 ? '（Lv.1未満にはできません）' : ''}`;
   document.getElementById('equipment-event-modal').style.display = 'flex';
 }
 
-function resolveEquipmentUpgradeEvent(accept) {
+function resolveEquipmentEvent(accept) {
   if (!pendingEquipmentEvent) return;
   const event = pendingEquipmentEvent;
   pendingEquipmentEvent = null;
   document.getElementById('equipment-event-modal').style.display = 'none';
 
-  if (event.eventType === 'downgrade') {
-    const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
-    const level = officeUpgrades[event.facilityId] || 0;
-    if (accept && facility && level > 1) {
-      const refund = getOfficeDowngradeRefund(facility, level);
-      officeUpgrades[event.facilityId] = level - 1;
-      funds += refund;
-      setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
-    } else {
-      setLog(`【設備整理】${event.name}の縮小提案を見送りました。`);
-    }
-  } else if (accept) {
-    const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
-    const level = officeUpgrades[event.facilityId] || 0;
-    const cost = getOfficeUpgradeCost(facility);
-    if (funds >= cost && level < MAX_OFFICE_LEVEL) {
-      funds -= cost;
-      officeUpgrades[event.facilityId] = level + 1;
-      setLog(`【設備強化イベント】${facility.name}をLv.${level + 1}に強化しました。`);
-    } else {
-      setLog(`【設備強化イベント】${facility.name}の提案を資金不足で見送りました。`);
-    }
+  const facility = OFFICE_FACILITIES.find(item => item.id === event.facilityId);
+  const level = facility ? (officeUpgrades[event.facilityId] || 0) : 0;
+  if (accept && facility && level > 1) {
+    const refund = getOfficeDowngradeRefund(facility, level);
+    officeUpgrades[event.facilityId] = level - 1;
+    funds += refund;
+    setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
   } else {
-    setLog(`【設備強化イベント】${event.name}の強化提案を見送りました。`);
+    setLog(`【設備整理】${event.name}の縮小提案を見送りました。`);
   }
   updateUI();
   if (pendingPerformanceOffers.length) openMusicOfferModal();
@@ -3792,7 +3802,6 @@ function getCurrentWeekEvents() {
   if (currentDate.getDay() === 3) {
     rollWeeklyCrisisEvent();
     rollWeeklyIndustryOffer();
-    rollEquipmentUpgradeEvent();
     rollEquipmentDowngradeEvent();
   }
   const events = [];
@@ -3853,7 +3862,7 @@ function getCurrentWeekEvents() {
     events.push(crisisEventType === 'information-leak' ? '情報漏洩への対応' : 'SNSスキャンダル対応');
   }
   if (pendingIndustryOffer) events.push(pendingIndustryOffer.name);
-  if (pendingEquipmentEvent) events.push(`設備強化提案: ${pendingEquipmentEvent.name}`);
+  if (pendingEquipmentEvent) events.push(`設備整理提案: ${pendingEquipmentEvent.name}`);
   // ランダムイベントは発生するまで伏せているため、ここには出さない
   if (pendingFanClubEvent) events.push(pendingFanClubEvent.type === 'founding' ? 'ファンクラブ設立の打診' : 'ファンクラブ会費の見直し');
   return events;
@@ -3884,7 +3893,7 @@ function createEmptyWeeklySchedule() {
   const restDayMembers = idolRoster
     .filter(member => (member.staminaValue ?? MAX_STAMINA_VALUE) < STAMINA_WARNING_THRESHOLD)
     .map(member => member.id);
-  return { slots, vacation: false, individualMemberId: defaultMember, individualStat: 'vocal', focusMemberIds: [defaultMember].filter(Boolean), restDayMembers };
+  return { slots, vacation: false, individualMemberId: defaultMember, individualStat: 'vocal', focusMemberIds: [defaultMember].filter(Boolean), restDayMembers, officeAction: '' };
 }
 
 function ensureWeeklySchedule() {
@@ -3904,23 +3913,107 @@ function ensureWeeklySchedule() {
   }
   delete weeklySchedule.focusMemberId;
   if (!INDIVIDUAL_LESSON_STATS.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
+  // 事務作業は「未選択 or 定義済みの1件」のみ認める
+  if (!OFFICE_ACTIONS.some(action => action.id === weeklySchedule.officeAction)) weeklySchedule.officeAction = '';
   // 強化人数の上限はマネージャー側で管理するため、ここではトリムしない
 }
 
-// 1週間の休暇を切り替える（オンなら14枠すべてが休養になる）
+// 1週間の休暇を切り替える（オンなら14枠すべてが休養になる。テレビ出演枠がある週は不可）
 function toggleWeekVacation() {
   ensureWeeklySchedule();
+  if (getWeekFixedSlots().size) {
+    setLog('【週間スケジュール】テレビ出演がある週は1週間の休暇をとれません。');
+    return;
+  }
   weeklySchedule.vacation = !weeklySchedule.vacation;
   renderWeeklyActionPanel();
 }
 
-// 枠に内容（itemId）を割り当てる（休暇中は変更できない）
+// 枠に内容（itemId）を割り当てる（休暇中・テレビ出演で固定された枠は変更できない）
 function setWeeklyScheduleSlot(index, itemId) {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return;
   if (index < 0 || index >= weeklySchedule.slots.length) return;
+  if (getWeekFixedSlots().has(index)) return;
+  // 週の上限がある項目は、超過分をここで弾く（明示して黙って無視しない）
+  const blocked = getWeeklyLimitBlocker(itemId, index);
+  if (blocked) {
+    setLog(`【週間スケジュール】${blocked.message}`);
+    renderWeeklyActionPanel();
+    return;
+  }
   weeklySchedule.slots[index] = itemId;
   renderWeeklyActionPanel();
+}
+
+// 週の上限を超える項目を弾く理由（なければnull）
+function getWeeklyLimitBlocker(itemId, excludeIndex = -1) {
+  const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId);
+  if (!item || !item.weeklyLimit) return null;
+  const used = countWeekSlots(itemId, excludeIndex);
+  if (used < item.weeklyLimit) return null;
+  return {
+    message: `「${item.name}」は1週間で${item.weeklyLimit}枠までです（現在${used}枠）。`,
+    item,
+    used
+  };
+}
+
+// 特定の項目の今週の枠数（excludeIndex の枠は数えない）
+function countWeekSlots(itemId, excludeIndex = -1) {
+  if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) return 0;
+  return weeklySchedule.slots.filter((slotId, index) => slotId === itemId && index !== excludeIndex).length;
+}
+
+// 週の起点（水曜）から◯日後が、週グリッドの何曜目に当たるかを求める
+// 0=月曜 … 2=水曜（ゲーム内の起点） … 6=日曜
+function getWeekDayIndexForOffset(offsetDays) {
+  return (offsetDays + 2) % WEEK_DAY_LABELS.length;
+}
+
+// 今週のテレビ出演（歌番組・大型特番）を週枠に固定する
+// 放送日の「午後」＝出演、その直前の「午前」＝リハーサル として埋め込む
+function getWeekFixedSlots() {
+  const startDate = getGameDateObject();
+  const fixedSlots = new Map();
+  const addFixed = (slot, date) => {
+    const existing = fixedSlots.get(slot.index);
+    if (!existing) {
+      fixedSlots.set(slot.index, { ...slot, date });
+      return;
+    }
+    fixedSlots.set(slot.index, {
+      ...existing,
+      label: `${existing.label}＋${slot.label}`,
+      names: existing.names.concat(slot.names)
+    });
+  };
+  scheduledPerformances.forEach(performance => {
+    if (!performance.airDate) return;
+    const airDate = getGameDateObject(performance.airDate);
+    const offsetDays = Math.round((airDate - startDate) / 86400000);
+    // 起点の翌日から週の最終日（次の水曜の1日前）までを枠に埋め込む
+    if (offsetDays < 1 || offsetDays > WEEK_DAY_LABELS.length - 1) return;
+    const dayBase = getWeekDayIndexForOffset(offsetDays) * WEEK_PERIOD_LABELS.length;
+    addFixed({ index: dayBase + 1, kind: 'broadcast', label: `テレビ出演: ${performance.name}`, names: [performance.name] }, performance.airDate);
+    addFixed({ index: dayBase, kind: 'rehearsal', label: 'リハーサル', names: [] }, performance.airDate);
+  });
+  return fixedSlots;
+}
+
+// 今週のテレビ出演一覧（画面への説明用）
+function getWeekBroadcastSummaries() {
+  return [...getWeekFixedSlots().values()]
+    .filter(slot => slot.kind === 'broadcast')
+    .map(slot => ({ date: slot.date, names: slot.names }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+// テレビ出演の枠数（リハーサル／出演の内訳）
+function getWeekBroadcastCounts() {
+  const counts = { rehearsal: 0, broadcast: 0 };
+  getWeekFixedSlots().forEach(slot => { counts[slot.kind] += 1; });
+  return counts;
 }
 
 // 週が変わったら下書きをリセットする
@@ -4039,6 +4132,26 @@ function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null
 // 週間スケジュールの実行前チェック（食事会の経費など）
 function validateWeeklySchedule() {
   ensureWeeklySchedule();
+  // テレビ出演があるのに休暇が選択されていたら解除する（出演は取り消せない）
+  if (weeklySchedule.vacation && getWeekFixedSlots().size) {
+    weeklySchedule.vacation = false;
+    setLog('【週間スケジュール】テレビ出演があるため、1週間の休暇を解除しました。');
+  }
+  // 週の上限を超えた項目がないか（セーブ読み込み直後の最終防衛線）
+  const overLimit = WEEKLY_SCHEDULE_ITEMS
+    .filter(item => item.weeklyLimit)
+    .map(item => ({ item, used: countWeekSlots(item.id) }))
+    .find(entry => entry.used > entry.item.weeklyLimit);
+  if (overLimit) {
+    alert(`「${overLimit.item.name}」は1週間で${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。枠を減らすか、別の内容に変更してください。`);
+    return false;
+  }
+  // グッズ開発は開発費が資金を超えないよう、足りなくなる前に確認する
+  if (weeklySchedule.officeAction === 'goods-development' && merchandiseProducts < MAX_MERCHANDISE_PRODUCTS
+    && GOODS_DEVELOPMENT_COST > funds) {
+    alert(`グッズの開発費 ${formatMoney(GOODS_DEVELOPMENT_COST)} が資金（${formatMoney(funds)}）を超えています。事務作業を変更するか、資金を増やしてください。`);
+    return false;
+  }
   if (weeklySchedule.vacation) return true;
   const mealCost = getWeekMealPartyCount() * MEAL_PARTY_COST;
   if (mealCost > funds) {
@@ -4061,11 +4174,13 @@ function applyWeeklySchedule() {
   const specialMultiplier = getSpecialTrainingMultiplier();
   const staminaReduction = getSpecialTrainingStaminaReduction();
   const riskReduction = getSpecialTrainingRiskReduction();
+  // 事務作業はメンバーのレッスンと同じ週に実行する（選択されていなければ何もしない）
+  const officeMessage = applyOfficeAction(weeklySchedule.officeAction);
 
-  // 1週間の休暇：14枠すべて休養になる。レッスンも出費もケガも発生しない
+  // 1週間の休暇：14枠すべて休養になる。レッスンも出費もケガも発生しない（事務作業は残る）
   if (weeklySchedule.vacation) {
     idolRoster.forEach(member => recoverMemberStamina(member, FULL_VACATION_RECOVERY));
-    setLog(`【1週間の休暇】全員がしっかり休養しました（体力値 +${FULL_VACATION_RECOVERY}）。`);
+    setLog(`【1週間の休暇】全員がしっかり休養しました（体力値 +${FULL_VACATION_RECOVERY}）${officeMessage ? ` / ${officeMessage}` : ''}。`);
     return { levelUps: 0, injuries: [] };
   }
 
@@ -4073,6 +4188,20 @@ function applyWeeklySchedule() {
     .filter(slotId => slotId && slotId !== 'rest-day' && slotId !== 'meal-party');
   const restSlotCount = weeklySchedule.slots.filter(slotId => slotId === 'rest-day').length;
   const hasLessons = lessonSlotIds.length > 0;
+  // グループ練習のみ項目（連携）の今週の枠数
+  const groupOnlySlots = lessonSlotIds.filter(slotId =>
+    WEEKLY_SCHEDULE_ITEMS.some(item => item.id === slotId && item.groupOnly)
+  );
+  // テレビ出演で固定された枠（リハーサル／出演）はレッスン経験値ではなく体力消費だけ
+  const broadcastCounts = getWeekBroadcastCounts();
+  const fixedStaminaCost = (broadcastCounts.rehearsal * REHEARSAL_STAMINA_COST)
+    + (broadcastCounts.broadcast * BROADCAST_STAMINA_COST);
+  // 連携はグループ練習のみ：実際に参加できるメンバーが2名未満なら成立しない
+  const availableMembers = participants.filter(member =>
+    !restDayMemberIds.has(member.id) && !member.injury
+  );
+  const groupOnlyEnabled = availableMembers.length >= 2;
+  const skippedGroupOnly = groupOnlySlots.length > 0 && !groupOnlyEnabled;
 
   // 食事会：100万円/回。人気とグループ危機回避力をわずかに伸ばし、体力も回復する
   const mealCount = getWeekMealPartyCount();
@@ -4104,11 +4233,15 @@ function applyWeeklySchedule() {
           staminaCost += INDIVIDUAL_LESSON_STAMINA_COST * item.staminaCost;
           return;
         }
+        // グループ練習のみの項目は、参加者2名未満では成立しない（経験値も体力消費も発生しない）
+        if (item.groupOnly && !groupOnlyEnabled) return;
         // グループレッスンは選抜全員が受講。特別強化の対象は強化倍率
         const multiplier = isFocus ? specialMultiplier : 1;
         memberLevels += applyMemberLesson(member, slotId, multiplier).levels;
         staminaCost += GROUP_LESSON_STAMINA_COST * item.staminaCost;
       });
+      // テレビ出演枠（リハーサル＋出演）でも体力を消費する
+      staminaCost += fixedStaminaCost;
       // 特別強化の追加消費は「1週間あたり1回」だけ加算する（14枠化で高額になりすぎないように）
       if (isFocus) {
         // メンタルケアで特別強化時の追加消費を抑える
@@ -4139,8 +4272,15 @@ function applyWeeklySchedule() {
   const countByLabel = new Map();
   weeklySchedule.slots.forEach(slotId => {
     if (!slotId) return;
+    const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId);
+    // 参加者が揃わず未実施になったグループ練習（連携）は内訳に含めない
+    if (item && item.groupOnly && skippedGroupOnly) return;
     const label = itemIdLabel(slotId);
     countByLabel.set(label, (countByLabel.get(label) || 0) + 1);
+  });
+  // テレビ出演で固定された枠も内訳に含める
+  getWeekFixedSlots().forEach(slot => {
+    countByLabel.set(slot.label, (countByLabel.get(slot.label) || 0) + 1);
   });
 
   const parts = [];
@@ -4152,9 +4292,11 @@ function applyWeeklySchedule() {
     const rounded = Math.round(specialMultiplier * 10) / 10;
     parts.push(`特別強化: ${focusMembers.map(member => member.name).join('、')}（${rounded}倍）`);
   }
+  if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
+  if (skippedGroupOnly) parts.push('連携: 参加者が2名未満のため未実施');
   if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
   if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
-  if (!breakdown.length && !restNames.length) parts.push('何もない1週間でした');
+  if (!breakdown.length && !restNames.length && !officeMessage) parts.push('何もない1週間でした');
 
   setLog(`【週間スケジュール】${parts.join(' / ')}`);
   // この週の自然回復はスケジュール側で適用済み（ライブ側で重複させない）
@@ -4170,41 +4312,48 @@ function itemIdLabel(itemId) {
   return WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId)?.name || itemId;
 }
 
-function performWeeklyAction(action) {
-  if (getCurrentWeekEvents().length) return;
+// 今週の事務作業を選ぶ（同じ項目を再押すと解除する）
+function selectOfficeAction(actionId) {
+  ensureWeeklySchedule();
+  if (actionId && !OFFICE_ACTIONS.some(action => action.id === actionId)) return;
+  weeklySchedule.officeAction = weeklySchedule.officeAction === actionId ? '' : actionId;
+  renderWeeklyActionPanel();
+}
 
-  if (action === 'single-promotion') {
+// 事務作業を実際に実行し、記録用の文言を返す（未選択なら空文字）
+function applyOfficeAction(actionId) {
+  if (actionId === 'single-promotion') {
     const upcoming = findUpcomingSinglePlan();
     if (upcoming) {
       const song = ensureScheduledSong(upcoming.year, upcoming.month, upcoming.plan);
       song.promotionPoints = (song.promotionPoints || 0) + 1;
       addSongExperience(song, 3);
-      setLog(`【シングル販促】「${song.title}」の販促を行いました。発売時の売上が上がります。`);
-    } else {
-      idolRoster.filter(idol => idol.isSelected).forEach(idol => {
-        idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
-      });
-      setLog('【シングル販促】選抜メンバーの人気を高めました。');
+      return `シングル販促「${song.title}」（発売時の売上が上がります）`;
     }
-  } else if (action === 'live-promotion') {
-    nextLivePromotionPoints++;
-    setLog('【ライブ広報】次回ライブの集客効果が上がります。');
-  } else if (action === 'goods-development') {
-    if (merchandiseProducts >= 5) return;
-    merchandiseProducts++;
-    merchandiseStock += 1000;
-    funds -= 500000;
-    setLog(`【グッズ開発】商品を開発しました（全${merchandiseProducts}種 / 在庫 ${merchandiseStock.toLocaleString()}個 / 開発費 500,000円）。`);
-  } else {
-    return;
+    idolRoster.filter(idol => idol.isSelected).forEach(idol => {
+      idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
+    });
+    return 'シングル販促（選抜メンバーの人気をUp）';
   }
-
-  advanceOneWeek();
+  if (actionId === 'live-promotion') {
+    nextLivePromotionPoints++;
+    return `ライブ広報（次回ライブの集客効果 累計+${nextLivePromotionPoints}）`;
+  }
+  if (actionId === 'goods-development') {
+    if (merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS) {
+      return `グッズ開発（上限${MAX_MERCHANDISE_PRODUCTS}種のため未実施）`;
+    }
+    merchandiseProducts++;
+    merchandiseStock += GOODS_DEVELOPMENT_STOCK;
+    funds -= GOODS_DEVELOPMENT_COST;
+    return `グッズ開発（全${merchandiseProducts}種 / 在庫${merchandiseStock.toLocaleString()}個 / -${formatMoney(GOODS_DEVELOPMENT_COST)}）`;
+  }
+  return '';
 }
 
 // 週間スケジュールを確定して1週間進める
 function confirmWeeklySchedule() {
-  if (getCurrentWeekEvents().length) return;
+  if (hasLiveWithinWeek()) return;
   if (!validateWeeklySchedule()) return;
   applyWeeklySchedule();
   advanceOneWeek();
@@ -4225,7 +4374,6 @@ function advanceOneWeek() {
     totalWeeksElapsed++;
     rollWeeklyCrisisEvent();
     rollRandomEvent();
-    rollEquipmentUpgradeEvent();
     rollEquipmentDowngradeEvent();
     checkFanClubYearlyEvent();
     checkSpecialBroadcastOffers();
@@ -4362,8 +4510,33 @@ const RANDOM_EVENTS = [
       { label: '主旨参加する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +4', apply: ctx => { funds -= Math.round(ctx.cost * 0.6); adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 4); } },
       { label: '不参加', detail: '効果なし', apply: () => {} }
     ]
+  },
+  {
+    id: 'equipment-upgrade',
+    name: '設備強化の打診',
+    kind: 'equipment',
+    text: '${reason}${facilityName}をLv.${facilityLevel}からLv.${nextLevel}へ強化する打診が届きました。',
+    choices: [
+      { label: '強化を引き受ける', detail: '開発費 -${cost} / 週間維持費 +${maintenance}', requiresFunds: true, apply: ctx => applyEquipmentUpgrade(ctx) },
+      { label: '今回は見送る', detail: '効果なし', apply: () => {} }
+    ]
   }
 ];
+
+// ランダムイベントの「強化を引き受ける」を実行する
+function applyEquipmentUpgrade(context) {
+  const facility = OFFICE_FACILITIES.find(item => item.id === context.facilityId);
+  if (!facility) return;
+  const level = officeUpgrades[facility.id] || 0;
+  const cost = getOfficeUpgradeCost(facility, level);
+  if (level >= MAX_OFFICE_LEVEL || funds < cost) {
+    setLog(`【設備強化】${facility.name}の提案を資金不足で見送りました。`);
+    return;
+  }
+  funds -= cost;
+  officeUpgrades[facility.id] = level + 1;
+  setLog(`【設備強化】${facility.name}をLv.${level + 1}に強化しました（開発費 ${formatMoney(cost)}）。`);
+}
 
 function adjustAllPopularity(delta) {
   idolRoster.forEach(member => {
@@ -4390,7 +4563,12 @@ function fillEventTemplate(text, context) {
   return String(text)
     .replace(/\$\{gain\}/g, formatMoney(context.gain))
     .replace(/\$\{smallGain\}/g, formatMoney(context.smallGain))
-    .replace(/\$\{cost\}/g, formatMoney(context.cost));
+    .replace(/\$\{cost\}/g, formatMoney(context.cost))
+    .replace(/\$\{maintenance\}/g, formatMoney(context.maintenance))
+    .replace(/\$\{reason\}/g, context.reason || '')
+    .replace(/\$\{facilityName\}/g, context.facilityName || '')
+    .replace(/\$\{facilityLevel\}/g, context.facilityLevel ?? '')
+    .replace(/\$\{nextLevel\}/g, context.nextLevel ?? '');
 }
 
 // ランダムイベントを1件組み立てる（経費などの金額は発生時のfan数で確定させる）
@@ -4398,17 +4576,42 @@ function buildRandomEvent(eventId) {
   const event = RANDOM_EVENTS.find(entry => entry.id === eventId);
   if (!event) return null;
   const fans = calculateGroupFans();
+  const context = {
+    gain: Math.round(Math.max(500000, fans * 0.12)),
+    smallGain: Math.round(Math.max(200000, fans * 0.05)),
+    cost: Math.round(500000 + fans * 0.02)
+  };
+  // 設備強化の打診は強化対象の設備を決めてから組み立てる
+  if (event.kind === 'equipment') {
+    const candidate = pickEquipmentUpgradeCandidate();
+    const facility = candidate ? OFFICE_FACILITIES.find(item => item.id === candidate.facilityId) : null;
+    if (!facility) return null;
+    const level = officeUpgrades[facility.id] || 0;
+    Object.assign(context, {
+      facilityId: facility.id,
+      facilityName: facility.name,
+      facilityLevel: level,
+      nextLevel: level + 1,
+      reason: candidate.reason,
+      cost: getOfficeUpgradeCost(facility, level),
+      maintenance: getOfficeMaintenanceCost(facility, level + 1) - getOfficeMaintenanceCost(facility, level)
+    });
+  }
   return {
     id: event.id,
     name: event.name,
     text: event.text,
     choices: event.choices,
-    context: {
-      gain: Math.round(Math.max(500000, fans * 0.12)),
-      smallGain: Math.round(Math.max(200000, fans * 0.05)),
-      cost: Math.round(500000 + fans * 0.02)
-    }
+    context
   };
+}
+
+// セーブから復元したランダムイベントを現在の定義に紐づける（apply関数は保存されない）
+function restorePendingRandomEvent(data) {
+  if (!data || !data.id) return null;
+  const event = RANDOM_EVENTS.find(entry => entry.id === data.id);
+  if (!event) return null;
+  return { ...data, name: event.name, text: event.text, choices: event.choices, context: data.context || {} };
 }
 
 // 該当する週に達した予約を1件だけ発動させる（1週につき最大1件）
@@ -4433,8 +4636,12 @@ function rollRandomEvent() {
   if (Math.random() >= 0.16) return;
   if (armedRandomEvents.length >= 5) return;
 
+  // 強化できる設備がないときは「設備強化の打診」を出現させせない
+  const pool = RANDOM_EVENTS.filter(entry => entry.kind !== 'equipment' || getEquipmentUpgradeCandidates().length);
+  if (!pool.length) return;
+
   // 何週後に起きるかは表に出さず、1〜3週間後のいずれかで発生させる
-  const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+  const event = pool[Math.floor(Math.random() * pool.length)];
   const leadWeeks = 1 + Math.floor(Math.random() * 3);
   const target = new Date(`${todayKey}T12:00:00`);
   target.setDate(target.getDate() + leadWeeks * 7);
@@ -4444,13 +4651,19 @@ function rollRandomEvent() {
 function openRandomEventModal() {
   if (!pendingRandomEvent) return;
   const event = pendingRandomEvent;
-  document.getElementById('random-event-text').textContent =
-    `【${event.name}】${fillEventTemplate(event.text, event.context)}`;
-  document.getElementById('random-event-options').innerHTML = event.choices.map((choice, index) => `
-    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveRandomEvent(${index})">
+  const title = document.getElementById('random-event-title');
+  if (title) title.textContent = event.name;
+  document.getElementById('random-event-text').textContent = fillEventTemplate(event.text, event.context);
+  document.getElementById('random-event-options').innerHTML = event.choices.map((choice, index) => {
+    // 資金が必要な選択肢は、資金不足のときは選ばせない
+    const disabled = Boolean(choice.requiresFunds) && funds < (event.context.cost || 0);
+    const detail = `${fillEventTemplate(choice.detail, event.context)}${disabled ? ' / 資金不足' : ''}`;
+    return `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" ${disabled ? 'disabled' : ''} onclick="resolveRandomEvent(${index})">
       <div style="font-size:13px;">${fillEventTemplate(choice.label, event.context)}</div>
-      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">${fillEventTemplate(choice.detail, event.context)}</div>
-    </button>`).join('');
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">${detail}</div>
+    </button>`;
+  }).join('');
   document.getElementById('random-event-modal').style.display = 'flex';
 }
 
@@ -4565,7 +4778,7 @@ function openPendingModal() {
   if (pendingCrisisResponse) return openCrisisResponseModal();
   if (pendingFanClubEvent) return openFanClubModal();
   if (pendingRandomEvent) return openRandomEventModal();
-  if (pendingEquipmentEvent) return openEquipmentUpgradeEventModal();
+  if (pendingEquipmentEvent) return openEquipmentEventModal();
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
@@ -4791,25 +5004,32 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
       setLog(`【給与】メンバー ${formatMoney(salary.memberSalary)} / マネージャー ${formatMoney(salary.managerSalary)} を支払いました（合計 ${formatMoney(salary.total)}）。`);
     }
   }
-  // テレビ出演は放送日にその場で処理する
-  processScheduledPerformances();
-  processYearEndEvents();
+  // テレビ出演・年末の大型イベントは、週をまたいで通過した日も含めて処理する
+  processScheduledPerformances(reachDate);
+  processYearEndEvents(reachDate);
   processSpecialLiveEvents();
 }
 
 // 年末の大型イベント（赤白 12/31 ／ 日本CD大賞 12/30）
-function processYearEndEvents() {
-  const date = getGameDateObject();
-  if (date.getMonth() + 1 !== 12) return;
+// 週をまとめて進めるときに通過した日も含めて判定する
+function processYearEndEvents(reachDate = gameDate) {
+  const startDate = getGameDateObject();
+  const limitDate = getGameDateObject(reachDate);
+  const spanDays = Math.max(0, Math.round((limitDate - startDate) / 86400000));
+  for (let offset = 0; offset <= spanDays; offset++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + offset);
+    if (date.getMonth() + 1 !== 12) continue;
 
-  if (date.getDate() === AWARD_DATE.day && !yearEndAwardProcessed) {
-    yearEndAwardProcessed = true;
-    executeYearEndAwards();
-  }
+    if (date.getDate() === AWARD_DATE.day && !yearEndAwardProcessed) {
+      yearEndAwardProcessed = true;
+      executeYearEndAwards();
+    }
 
-  if (date.getDate() === KOHAKU_DATE.day && !yearEndKohakuProcessed) {
-    yearEndKohakuProcessed = true;
-    executeKohaku();
+    if (date.getDate() === KOHAKU_DATE.day && !yearEndKohakuProcessed) {
+      yearEndKohakuProcessed = true;
+      executeKohaku();
+    }
   }
 }
 
@@ -5043,13 +5263,15 @@ function checkSpecialBroadcastOffers() {
 }
 
 // 出演予定（放送日ベース）を処理する
-function processScheduledPerformances() {
-  const todayKey = gameDate;
+// reachDate を渡すと、その週をまとめて進める際に通過した放送日ぶんもまとめて処理する
+function processScheduledPerformances(reachDate = null) {
+  const startKey = gameDate;
+  const limitKey = reachDate || startKey;
   const remaining = [];
   const logs = [];
 
   scheduledPerformances.forEach(performance => {
-    if (performance.airDate !== todayKey) {
+    if (!performance.airDate || performance.airDate > limitKey || (reachDate && performance.airDate < startKey)) {
       remaining.push(performance);
       return;
     }
@@ -5950,34 +6172,44 @@ function renderRankingPanel() {
 
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
-  const events = getCurrentWeekEvents();
-  if (events.length) {
-    panel.innerHTML = `
-      <h2 class="page-title">今週の行動</h2>
-      <div class="weekly-event-note"><strong>イベント週</strong><ul>${events.map(event => `<li>${escapeHtml(event)}</li>`).join('')}</ul></div>
-      <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">イベントを進行</button>
-    `;
-    return;
-  }
-
+  if (!panel) return;
   ensureWeeklySchedule();
-
-  // ライブやテレビ出演がある週は週間スケジュールを組めない
+  const events = getCurrentWeekEvents();
   const currentDate = getGameDateObject();
-  if (hasEventWithinWeek(currentDate)) {
-    const nextStop = findNextScheduledLiveDate(currentDate, getNextWednesday(currentDate));
+
+  // ライブがある週だけ週間スケジュールは組めない
+  const nextLiveDate = findWeekLiveStop(currentDate);
+  if (nextLiveDate) {
+    const liveLabel = getGameDateObject(nextLiveDate).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
     panel.innerHTML = `
       <h2 class="page-title">今週の行動</h2>
-      <div class="weekly-event-note"><strong>予定消化週</strong><ul><li>${escapeHtml(`${getGameDateObject(nextStop).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}にイベントが開催されるため、週間スケジュールは組めません。`)}</li></ul></div>
+      <div class="weekly-event-note"><strong>ライブ週</strong><ul>
+        <li>${escapeHtml(`${liveLabel}にライブがあるため、週間スケジュールは組めません。`)}</li>
+        ${renderWeeklyEventItems(events)}
+      </ul></div>
       <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">イベントまで進行</button>
     `;
     return;
   }
 
+  // ライブ以外は週間スケジュールを組める（今週のイベントは注記として表示する）
+  const notes = getWeeklyEventNoteEvents(events);
   panel.innerHTML = `
     <h2 class="page-title">今週のスケジュール</h2>
+    ${notes.length
+      ? `<div class="weekly-event-note"><strong>今週起きること</strong><ul>${renderWeeklyEventItems(notes)}</ul></div>`
+      : ''}
     ${renderWeeklyScheduleControls()}
   `;
+}
+
+// ライブ週の表示から重複する競合公演の行を除く
+function getWeeklyEventNoteEvents(events) {
+  return events.filter(event => !event.startsWith('他グループのライブ'));
+}
+
+function renderWeeklyEventItems(events) {
+  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(event)}</li>`).join('');
 }
 
 // 週間スケジュールのUI（レッスン枠・特別強化・休養日）
@@ -6009,17 +6241,31 @@ function renderWeeklyScheduleControls() {
     .join('');
 
   // 1週間＝7日×午前/午後＝14枠のグリッド
+  // テレビ出演（歌番組など）は放送日の午後とリハーサルの午前が固定枠になる
+  const fixedSlots = getWeekFixedSlots();
   const itemOptions = slotId => ['<option value="">— 空き —</option>']
-    .concat(WEEKLY_SCHEDULE_ITEMS.map(item =>
-      `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`
-    ))
+    .concat(WEEKLY_SCHEDULE_ITEMS.filter(item => !item.fixed).map(item => {
+      // 週の上限に達している項目は選択肢から除外する
+      const limit = item.weeklyLimit && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
+      if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
+      return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
+    }))
     .join('');
 
   const weekRows = WEEK_DAY_LABELS.map((dayLabel, dayIndex) => {
     const morningIndex = dayIndex * WEEK_PERIOD_LABELS.length;
     const cells = WEEK_PERIOD_LABELS.map((periodLabel, periodIndex) => {
       const index = morningIndex + periodIndex;
+      const fixed = fixedSlots.get(index);
       const slotId = weeklySchedule.slots[index];
+      if (fixed) {
+        return `
+        <div class="week-cell is-fixed">
+          <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
+          <select aria-label="${escapeHtml(dayLabel)}曜${escapeHtml(periodLabel)}の予定" disabled
+            title="テレビ出演で固定された枠です">${`<option value="" selected>${escapeHtml(fixed.label)}</option>`}</select>
+        </div>`;
+      }
       return `
         <div class="week-cell">
           <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
@@ -6071,18 +6317,51 @@ function renderWeeklyScheduleControls() {
   const mealCost = mealCount * MEAL_PARTY_COST;
 
   const vacationNote = weeklySchedule.vacation
-    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません。'
+    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
+
+  // 今週の事務作業は1つだけ選択する（未選択なら行わない）
+  const selectedOfficeAction = OFFICE_ACTIONS.find(action => action.id === weeklySchedule.officeAction) || null;
+  const officeToggles = OFFICE_ACTIONS.map(action => {
+    const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
+    const atLimit = action.id === 'goods-development' && merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS;
+    return `
+      <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
+        onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}
+        title="${escapeHtml(action.detail)}">${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ` <small>${escapeHtml(action.short)}</small>`}</button>`;
+  }).join('');
+
+  // テレビ出演の週は、固定枠の内容と休暇が使えないことを明示する
+  const broadcastSummaries = getWeekBroadcastSummaries();
+  const broadcastNote = broadcastSummaries.length
+    ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
+        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })} ${WEEK_PERIOD_LABELS[1]}「${item.names.join('・')}」`)
+      ).join('、')} — 放送日の午前はリハーサルで固定されます。</div>`
+    : '';
+
+  // 追加トレーニング（効果・週の上限・グループ練習のみ）を1行ずつ明示する
+  const trainingNotes = WEEKLY_SCHEDULE_ITEMS
+    .filter(item => item.effect)
+    .map(item => {
+      const used = countWeekSlots(item.id);
+      const atLimit = item.weeklyLimit && used >= item.weeklyLimit;
+      const limitText = item.weeklyLimit ? ` / 1週間${item.weeklyLimit}枠まで（現在${used}枠）` : '';
+      const groupText = item.groupOnly ? '（グループ練習のみ。参加者2名未満なら未実施）' : '';
+      return `<div class="schedule-note${atLimit ? ' warn' : ''}">${escapeHtml(`${item.name}: ${item.effect}${groupText}${limitText}`)}</div>`;
+    })
+    .join('');
 
   return `
     <div class="schedule-block">
       <div class="schedule-block-title">1週間のスケジュール <small>7日×午前/午後で14枠</small></div>
-      <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()">
+      <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()" ${fixedSlots.size ? 'disabled' : ''}>
         ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : '□ 1週間の休暇をとる（体力値+' + FULL_VACATION_RECOVERY + '）'}
       </button>
+      ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
       <div class="schedule-note">${escapeHtml(vacationNote)}</div>
       <div class="schedule-note">レッスン1回の経験値: 約${lessonExp}（事務所 レッスン設備で変動）</div>
+      ${trainingNotes}
     </div>
 
     <div class="schedule-block">
@@ -6109,12 +6388,13 @@ function renderWeeklyScheduleControls() {
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">今週の事務作業 <small>いずれか1つ</small></div>
-      <div class="weekly-action-grid">
-        <button class="main-btn" onclick="performWeeklyAction('single-promotion')">シングル販促</button>
-        <button class="main-btn" onclick="performWeeklyAction('live-promotion')">次のライブの広報</button>
-        <button class="main-btn" onclick="performWeeklyAction('goods-development')" ${merchandiseProducts >= 5 ? 'disabled' : ''}>グッズの開発${merchandiseProducts >= 5 ? '（上限）' : ''}</button>
+      <div class="schedule-block-title">今週の事務作業 <small>レッスンと同じ週に実行（未選択なら行わない）</small></div>
+      <div class="rest-toggle-grid">
+        <button type="button" class="rest-toggle office${selectedOfficeAction ? '' : ' active'}"
+          onclick="selectOfficeAction('')" title="事務作業を行いません">何もしない</button>
+        ${officeToggles}
       </div>
+      <div class="schedule-note">${escapeHtml(selectedOfficeAction ? selectedOfficeAction.detail : '事務作業は行いません。週のレッスンと一緒に実行したいものを選んでください。')}</div>
     </div>
 
     <button class="main-btn" style="width:100%;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
@@ -6524,7 +6804,7 @@ function updateUI() {
     pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent, armedRandomEvents, pendingSelectionEvent, selectionLock,
     fanClub, fanClubFoundedYear, pendingFanClubEvent,
     industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
-    pendingEquipmentEvent, equipmentEventCheckWeekKey, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
+    pendingEquipmentEvent, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
     yearlyStats, idolRoster, productionSchedule, leagueTeams,
     songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
     rivalLiveBookings, managers, managerMarketCandidates, groupFansAtYearStart, previousYearGroupFansAtYearStart,

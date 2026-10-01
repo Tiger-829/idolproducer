@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "browser-sync start --server . --watch --files \"**/*\" --port 8080 --no-open --reload-delay 200",
-    "start": "npm run dev"
+    "start": "npm run dev",
+    "test": "node test-schedule.js",
+    "test:soak": "node test-soak.js"
   },
   "devDependencies": {
     "browser-sync": "^3.0.3"
