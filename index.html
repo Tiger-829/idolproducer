@@ -5886,11 +5886,13 @@ function updateUI() {
   avgGrid.innerHTML = '';
   STATUS_KEYS.forEach(k => {
     const val = summary.averages[k.id] || 0;
-    const rInfo = getRankData(Math.round(val));
+    // 内部計算は小数のまま（averages）、表示だけ整数に丸める
+    const displayVal = Math.round(val);
+    const rInfo = getRankData(displayVal);
     avgGrid.innerHTML += `
       <div class="avg-item">
         <span class="avg-label">${k.name}</span>
-        <span class="avg-val" style="color:${rInfo.color};">${val.toFixed(1)}</span>
+        <span class="avg-val" style="color:${rInfo.color};">${displayVal}</span>
       </div>
     `;
   });
