@@ -519,6 +519,32 @@
     }
     .team-fans-count { font-size: 18px; font-family: monospace; }
     .member-fan-count { display: block; color: #777; font-size: 9px; }
+
+    /* 常時表示のメンバー名一覧 */
+    .roster-namebar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 30vh;
+      overflow-y: auto;
+    }
+    .roster-namebar-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 7px;
+      font-size: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 11px;
+      color: #555;
+      white-space: nowrap;
+    }
+    .roster-namebar-item.selected { background: #fce4ec; border-color: #f8bbd0; color: #ad1457; font-weight: bold; }
+    .roster-namebar-item.center { border-color: #ff1493; }
+    .roster-namebar-crown { color: #ff1493; font-size: 9px; font-weight: bold; }
+    .roster-namebar-meta { color: #999; font-size: 9px; }
+    .roster-namebar-item.low .roster-namebar-meta { color: #c0392b; }
     .fund-stat-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -990,12 +1016,17 @@
   </section>
 
   <section class="page-panel" id="page-formation" role="tabpanel" aria-labelledby="page-tab-formation" hidden>
-    <!-- 所属メンバー名簿 -->
+    <!-- 常時表示：メンバー名一覧（操作なしで参照できる） -->
     <div class="roster-card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <span style="font-weight:bold; font-size:12px;">所属メンバー (<span id="txt-roster-count">0</span>名)</span>
-        <span style="font-size:10px; color:#888;">選抜 <span id="txt-selected-count">0</span>名</span>
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+        <span style="font-weight:bold; font-size:12px;">メンバー名一覧</span>
+        <span style="font-size:10px; color:#888;">所属 <span id="txt-roster-count">0</span>名 / 選抜 <span id="txt-selected-count">0</span>名</span>
       </div>
+      <div class="roster-namebar" id="roster-namebar-ui"></div>
+    </div>
+
+    <!-- 所属メンバー名簿（詳細） -->
+    <div class="roster-card">
       <div class="roster-tabs">
         <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
         <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
@@ -5898,6 +5929,7 @@ function updateUI() {
   });
 
   renderSongLibrary();
+  renderRosterNameBar();
   renderRosterList();
   renderRankingPanel();
   renderOfficeUpgrades();
@@ -5966,6 +5998,40 @@ function formatMemberDisplayName(member) {
   const givenName = spaceIndex >= 0 ? name.slice(spaceIndex + 1) : name;
   const hasKanaInName = /[\u3041-\u3096\u309D-\u309F]/.test(givenName);
   return hasKanaInName ? name : `${name}（${reading}）`;
+}
+
+// 常時表示のメンバー名一覧（タブの開閉なしで参照できる）
+function renderRosterNameBar() {
+  const bar = document.getElementById('roster-namebar-ui');
+  if (!bar) return;
+  if (!idolRoster.length) {
+    bar.innerHTML = '<div class="office-maintenance-note">メンバーが在籍していません。</div>';
+    return;
+  }
+  // 選抜 → センター → 名前順の順に並べる
+  const ordered = [...idolRoster].sort((a, b) => {
+    if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+    if (a.isCenter !== b.isCenter) return a.isCenter ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ja');
+  });
+  bar.innerHTML = ordered.map(member => {
+    const staminaValue = member.staminaValue ?? MAX_STAMINA_VALUE;
+    const lowStamina = staminaValue < STAMINA_WARNING_THRESHOLD;
+    const injuryMark = member.injury ? ` ${member.injury.type}` : '';
+    const classes = [
+      'roster-namebar-item',
+      member.isSelected ? 'selected' : '',
+      member.isCenter ? 'center' : '',
+      lowStamina ? 'low' : ''
+    ].filter(Boolean).join(' ');
+    return `
+      <span class="${classes}">
+        ${member.isCenter ? '<span class="roster-namebar-crown">C</span>' : ''}
+        ${escapeHtml(member.name)}
+        <span class="roster-namebar-meta">${member.age}歳・体力${staminaValue}${escapeHtml(injuryMark)}</span>
+      </span>
+    `;
+  }).join('');
 }
 
 function renderRosterList() {
