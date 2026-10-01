@@ -426,6 +426,9 @@
     .calendar-day.rival-live-day::before { position: absolute; top: 2px; width: 4px; height: 4px; border-radius: 50%; background: #c88738; content: ''; }
     .calendar-day.broadcast-day { background: #ede7f6; color: #4527a0; font-weight: bold; }
     .calendar-day.broadcast-day.live-day { background: #d1c4e9; }
+    .calendar-day.release-day { background: #e2eefc; color: #12447e; font-weight: bold; }
+    .calendar-day.release-day.live-day { background: #cfe0f5; }
+    .calendar-day.plan-event-day { box-shadow: inset 0 0 0 1px #b8742a; }
     .calendar-day.today { background: var(--primary); color: #fff; font-weight: bold; }
     .calendar-day.today::after { background: #fff; }
     @keyframes calendar-turn {
@@ -677,6 +680,95 @@
       color: #aaa;
       cursor: not-allowed;
     }
+    .plan-booth-btn {
+      margin-left: 6px;
+      padding: 3px 8px;
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 10px;
+      color: var(--primary);
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .plan-event-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .plan-event-row { display: flex; gap: 4px; align-items: center; }
+    .plan-event-row .plan-event-date { flex: 0 0 128px; min-width: 0; padding: 6px; font-size: 12px; }
+    .plan-event-row .plan-event-kind { flex: 1; min-width: 0; padding: 6px; font-size: 11px; }
+    .plan-event-row .danger-btn { padding: 6px 8px; }
+
+    /* 半年計画カレンダー（6か月分） */
+    .plan-calendar-lead { margin: 0 0 8px; font-size: 11px; color: #666; line-height: 1.6; }
+    .plan-calendar-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 6px;
+    }
+    .plan-calendar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .plan-calendar-actions button {
+      padding: 8px 4px;
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .plan-calendar-actions button.ghost { border-color: #ccc; color: #888; }
+    .plan-calendar-selection { margin-top: 6px; font-size: 10px; color: #555; line-height: 1.5; }
+    .plan-calendar-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0; font-size: 10px; color: #666; }
+    .plan-calendar-legend span { display: flex; align-items: center; gap: 4px; }
+    .plan-calendar-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    .plan-calendar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .plan-calendar-month { padding: 6px; background: #fff; border: 1px solid #f0d5de; border-radius: 6px; }
+    .plan-calendar-month-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .plan-calendar-month-head strong { color: var(--primary); font-size: 12px; }
+    .plan-calendar-month-head button {
+      padding: 2px 6px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      color: #666;
+      font-size: 9px;
+      cursor: pointer;
+    }
+    .plan-calendar-weekday-row, .plan-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+    .plan-calendar-weekday { display: grid; place-items: center; min-height: 14px; color: #999; font-size: 9px; font-weight: bold; }
+    .plan-calendar-weekday:first-child { color: #c94f68; }
+    .plan-calendar-day {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 26px;
+      background: #fafafa;
+      border-radius: 3px;
+      color: #444;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .plan-calendar-day.plan-calendar-blank { background: transparent; cursor: default; }
+    .plan-calendar-day.is-past { background: #f2f2f2; color: #bbb; cursor: not-allowed; }
+    .plan-calendar-day.is-today { box-shadow: inset 0 0 0 2px var(--primary); }
+    .plan-calendar-day.has-release { background: #e2eefc; color: #12447e; font-weight: bold; }
+    .plan-calendar-day.has-live { background: #e0f1ea; color: #1f5c49; }
+    .plan-calendar-day.has-event { background: #fdf0da; color: #8a5a12; }
+    .plan-calendar-day.has-rival { box-shadow: inset 0 0 0 1px #c88738; }
+    .plan-calendar-day.is-selected { background: var(--primary); color: #fff; font-weight: bold; }
+    .plan-calendar-marks { position: absolute; bottom: 2px; left: 0; right: 0; display: flex; justify-content: center; gap: 1px; }
+    .plan-calendar-marks i { width: 3px; height: 3px; border-radius: 50%; }
+    .plan-calendar-marks .mark-release { background: #2f6fb5; }
+    .plan-calendar-marks .mark-live { background: #2f7d63; }
+    .plan-calendar-marks .mark-event { background: #b8742a; }
+    .plan-calendar-marks .mark-rival { background: #c88738; }
+    .plan-calendar-marks .mark-broadcast { background: #6b4fc7; }
+    .plan-calendar-day.is-selected .plan-calendar-marks i { background: #fff; }
+    .plan-calendar-month-note { margin-top: 4px; color: #777; font-size: 9px; line-height: 1.5; }
     
     /* チーム総合力カード */
     .team-summary-card {
@@ -746,6 +838,8 @@
     }
     .roster-tab-btn.active {
       background: var(--primary);
+
+
       color: white;
       font-weight: bold;
     }
@@ -1060,6 +1154,7 @@
     </section>
     <!-- アクションボタン -->
     <div class="actions">
+      <button class="danger-btn" style="width:100%; margin-bottom:6px;" onclick="openPlanningCalendar()">📅 半年計画カレンダーを開く（6か月分）</button>
       <div style="display:flex; gap:6px;">
         <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
         <button class="danger-btn" style="flex:1;" onclick="returnToTitle()">タイトルへ戻る</button>
@@ -1163,8 +1258,40 @@
   <div class="modal-content">
     <h3 id="modal-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画の策定</h3>
     <p style="font-size:11px; color:#666;">各月のシングル/アルバム発売とライブ会場を決定してください。</p>
+    <button class="plan-booth-btn" style="margin:0 0 8px;" onclick="openPlanCalendar()">📅 6か月分のカレンダーを開く</button>
     <div id="plan-rows"></div>
     <button class="main-btn" style="width:100%; margin-top:12px;" onclick="saveDecisionPlan()">この計画で決定する</button>
+  </div>
+</div>
+
+<!-- 半年計画カレンダー（6か月分） -->
+<div class="modal-overlay" id="plan-calendar-modal" style="z-index: 1000;">
+  <div class="modal-content" style="max-width: 560px;">
+    <h3 id="plan-calendar-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画カレンダー</h3>
+    <p class="plan-calendar-lead">
+      日付をタップして選び、上のボタンで<b>CD発売</b>／<b>ライブ</b>／<b>イベント（CD関連）</b>の日程を一括で設定します。<br>
+      選び終えたら「月ごとのブースで詳細設定へ」で、会場・ライブ名・楽曲名などを詰めます。
+    </p>
+    <div class="plan-calendar-toolbar">
+      <div class="plan-calendar-actions">
+        <button type="button" onclick="applyPlanCalendarMark('release')">CD発売に設定</button>
+        <button type="button" onclick="applyPlanCalendarMark('live')">ライブに設定</button>
+        <button type="button" onclick="applyPlanCalendarMark('event')">イベントに設定</button>
+        <button class="ghost" type="button" onclick="applyPlanCalendarMark('clear')">ライブ・イベントを解除</button>
+        <button class="ghost" id="plan-calendar-range-toggle" type="button" onclick="togglePlanCalendarRangeMode()">範囲選択: OFF</button>
+        <button class="ghost" type="button" onclick="clearPlanCalendarSelection()">選択を解除</button>
+      </div>
+      <div class="plan-calendar-selection" id="plan-calendar-selection"></div>
+    </div>
+    <div class="plan-calendar-legend">
+      <span><i style="background:#2f6fb5;"></i>CD発売</span>
+      <span><i style="background:#2f7d63;"></i>ライブ</span>
+      <span><i style="background:#b8742a;"></i>イベント</span>
+      <span><i style="background:#c88738;"></i>他グループ公演</span>
+      <span><i style="background:#6b4fc7;"></i>放送</span>
+    </div>
+    <div class="plan-calendar-grid" id="plan-calendar-grid"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="closePlanCalendar()">月ごとのブースで詳細設定へ</button>
   </div>
 </div>
 
@@ -1626,6 +1753,16 @@ const CD_BENEFITS = [
   { id: 'web-sign', name: 'ウェブサイン', cost: 4000000 },
   { id: 'real-sign', name: 'リアルサインイベント', cost: 10000000 }
 ];
+// 半年計画で日程を指定できるCD関連イベント（特典イベントとグッズ販売）
+const PLAN_EVENT_TYPES = [
+  ...CD_BENEFITS.map(benefit => ({ id: benefit.id, name: benefit.name, cost: benefit.cost, kind: 'benefit' })),
+  { id: 'goods', name: 'グッズ販売イベント', cost: 0, kind: 'goods' }
+];
+const MAX_PLAN_EVENTS_PER_MONTH = 3;
+const DEFAULT_PLAN_EVENT_ID = 'web-greeting';
+// カレンダーからライブ日程を振ったときの既定会場（球場・ドームは予約が180日必要なため避ける）
+const DEFAULT_PLAN_VENUE_CAPS = ['B', 'C'];
+const PLAN_CALENDAR_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const SEAT_TYPES = [
   { id: 'arena', name: 'アリーナ', defaultPrice: 12000 },
   { id: 'stand1', name: '1Fスタンド', defaultPrice: 9000 },
@@ -3491,11 +3628,15 @@ function getCurrentWeekEvents() {
     if (!yearEndKohakuProcessed && currentDate.getDate() >= KOHAKU_DATE.day - 3) events.push(`赤白歌合戦（${KOHAKU_DATE.month}/${KOHAKU_DATE.day}）`);
   }
 
-  if (isLastWednesdayOfMonth(currentDate)) {
-    const plan = productionSchedule[`${currentYear}-${currentMonth}`];
-    if (plan?.release && plan.release !== 'none') events.push('CD発売');
-    events.push('給与支払い');
-  }
+  // 計画したCD関連イベント
+  getPlanEventEntries().forEach(entry => {
+    if (isPlanEventDue(entry, gameDate)) {
+      events.push(`${getPlanEventType(entry.event.benefitId)?.name || 'イベント'}: ${formatPlanDayLabel(entry.event.date)}`);
+    }
+  });
+
+  if (isLastWednesdayOfMonth(currentDate)) events.push('給与支払い');
+  if (isPlanReleaseDue(productionSchedule[`${currentYear}-${currentMonth}`], gameDate)) events.push('CD発売');
 
   if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) events.push('ドラフト会議');
   if (crisisEventWeekKey === weekKey) {
@@ -3829,7 +3970,9 @@ function advanceOneWeek() {
     }
   }
 
-  processMonthlyReleaseAndLive();
+  // 発売・CD関連イベントは「移動先の日付将达到した時点」で処理する
+  processMonthlyReleaseAndLive(toDateKey(nextDate));
+  processPlanEvents(toDateKey(nextDate));
   if (wasWednesday) maintainOfficeFacilities();
   if (wasWednesday && totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) startDraftMeeting();
 
@@ -4158,14 +4301,66 @@ function sellMerchandiseAtLive() {
   return { unitsSold, revenue: unitsSold * 2500 };
 }
 
+// 発売日の基準日（計画で指定がなければ当月の最終水曜）
+function getPlanReleaseTriggerKey(plan, year, monthIndex) {
+  if (plan && plan.releaseDate) return plan.releaseDate;
+  return toDateKey(getLastWednesday(year, monthIndex));
+}
+
+// 計画した発売日に到達したか（未到達なら次の到達先まで看作する）
+function isPlanReleaseDue(plan, reachDate = gameDate) {
+  if (!plan || !plan.release || plan.release === 'none' || plan.releaseCompleted) return false;
+  const target = getPlanReleaseTriggerKey(plan, calendarYear, currentMonth - 1);
+  return reachDate >= target;
+}
+
+// 計画したCD関連イベントの開催判定
+function isPlanEventDue(entry, reachDate = gameDate) {
+  return !entry.event.completed && reachDate >= entry.event.date;
+}
+
+// 計画したCD関連イベントを日程ごとに列挙する
+function getPlanEventEntries() {
+  const entries = [];
+  Object.entries(productionSchedule).forEach(([planKey, plan]) => {
+    if (!Array.isArray(plan.planEvents)) return;
+    plan.planEvents.forEach((event, index) => {
+      if (!event || !event.date) return;
+      entries.push({ plan, planKey, event, index });
+    });
+  });
+  return entries;
+}
+
+// CD関連イベントの開催（特典イベント／グッズ販売）
+function processPlanEvents(reachDate = gameDate) {
+  getPlanEventEntries().forEach(entry => {
+    if (!isPlanEventDue(entry, reachDate)) return;
+    const type = getPlanEventType(entry.event.benefitId);
+    if (!type) {
+      entry.plan.planEvents.splice(entry.index, 1);
+      return;
+    }
+    entry.event.completed = true;
+    if (type.cost) funds -= type.cost;
+    if (type.kind === 'goods') {
+      const goods = sellMerchandiseAtLive();
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
+    } else {
+      const result = recordReleaseBenefitSales(type.id);
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（経費: ${formatMoney(type.cost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
+    }
+  });
+}
+
 // 月ごとのリリース＆ライブ実行
-function processMonthlyReleaseAndLive() {
+function processMonthlyReleaseAndLive(reachDate = gameDate) {
   const planKey = `${currentYear}-${currentMonth}`;
   const plan = productionSchedule[planKey];
   const summary = calculateTeamAverages();
 
-  // CDリリース
-  if (plan && isLastWednesdayOfMonth() && plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
+  // CDリリース（計画で指定した日に発売する。未定なら従来どおり最終水曜）
+  if (plan && isPlanReleaseDue(plan, reachDate)) {
     const isSingle = (plan.release === 'single');
     const song = ensureScheduledSong(currentYear, currentMonth, plan);
     const quality = (summary.averages.popularity * 0.6) + (summary.averages.vocal * 0.2) + (summary.averages.dance * 0.2);
@@ -5587,6 +5782,17 @@ function renderGameCalendar() {
   scheduledPerformances.forEach(performance => {
     if (performance.airDate) broadcastDates.set(performance.airDate, performance.name);
   });
+  // 計画した発売日とCD関連イベントの日をマークする
+  const releaseDates = new Set();
+  const planEventDates = new Set();
+  Object.entries(productionSchedule).forEach(([key, plan]) => {
+    if (plan.releaseDate && plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
+      releaseDates.add(plan.releaseDate);
+    }
+    (Array.isArray(plan.planEvents) ? plan.planEvents : []).forEach(event => {
+      if (event && event.date && !event.completed) planEventDates.add(event.date);
+    });
+  });
 
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   let cells = weekdays.map(day => `<span class="calendar-weekday">${day}</span>`).join('');
@@ -5606,11 +5812,16 @@ function renderGameCalendar() {
       day === today ? 'today' : '',
       liveDates.has(dateKey) ? 'live-day' : '',
       rivalLiveDates.has(dateKey) ? 'rival-live-day' : '',
+      releaseDates.has(dateKey) ? 'release-day' : '',
+      planEventDates.has(dateKey) ? 'plan-event-day' : '',
       broadcastName ? 'broadcast-day' : ''
     ].filter(Boolean).join(' ');
-    const title = liveDates.has(dateKey)
-      ? 'ライブ予定'
-      : (broadcastName ? `テレビ出演: ${broadcastName}` : '');
+    const title = [
+      liveDates.has(dateKey) ? 'ライブ予定' : '',
+      releaseDates.has(dateKey) ? 'CD発売' : '',
+      planEventDates.has(dateKey) ? 'CD関連イベント' : '',
+      broadcastName ? `テレビ出演: ${broadcastName}` : ''
+    ].filter(Boolean).join(' / ');
     cells += `<span class="${classes}"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
   }
 
@@ -6096,6 +6307,157 @@ function setLog(msg) {
 
 // 半年計画モーダル
 let planYearTarget = 1, planStartM = 7, planEndM = 12;
+// 計画画面を開いている間だけ使う編集用ドラフト（月ごとのブースと同じ値を参照する）
+let planReleaseDates = {};      // 月 → 発売日
+let planEventDrafts = {};       // 月 → [{ id, date, benefitId, completed }]
+let planBoothDraft = {};        // 月 → { release, songName, releaseBenefit, slots }
+let planDraftSignature = '';    // 読み込み済みの計画期間（"1-7-12" 形式）
+let planCalendarSelection = []; // 6か月カレンダーで選択中の日付
+let planCalendarAnchorKey = '';
+let planCalendarRangeMode = false;
+let planEventIdSeq = 0;
+
+// 6か月カレンダーで使う共通ヘルパ ----------------------------------------------
+
+// 計画対象の月が暦の上ではどの年になるか
+function getPlanMonthCalendarYear(month) {
+  return calendarYear + (planYearTarget - currentYear);
+}
+
+function getPlanMonthList() {
+  const months = [];
+  for (let month = planStartM; month <= planEndM; month++) months.push(month);
+  return months;
+}
+
+function getPlanEventType(benefitId) {
+  return PLAN_EVENT_TYPES.find(type => type.id === benefitId) || null;
+}
+
+function getPlanMonthCalendarDate(month, day) {
+  return toDateKey(new Date(getPlanMonthCalendarYear(month), month - 1, day, 12));
+}
+
+// 「9月12日」のような短い表記
+function formatPlanDayLabel(dateKey) {
+  if (!dateKey) return '未設定';
+  const date = getGameDateObject(dateKey);
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+// 発売日の既定値（未指定なら従来どおり当月の最終水曜）
+function getDefaultPlanReleaseDate(month) {
+  return toDateKey(getLastWednesday(getPlanMonthCalendarYear(month), month - 1));
+}
+
+function getPlanReleaseDate(month) {
+  return planReleaseDates[month] || '';
+}
+
+function getPlanMonthEventDrafts(month) {
+  const list = planEventDrafts[month];
+  return Array.isArray(list) ? list.filter(item => item && item.date) : [];
+}
+
+function createPlanEventId(month) {
+  planEventIdSeq += 1;
+  return `plan-event-${planYearTarget}-${month}-${planEventIdSeq}`;
+}
+
+// 計画画面を開いた時点で保存済みの計画を読み込む
+function initPlanCalendarDrafts() {
+  planReleaseDates = {};
+  planEventDrafts = {};
+  planBoothDraft = {};
+  planCalendarSelection = [];
+  planCalendarAnchorKey = '';
+  getPlanMonthList().forEach(month => {
+    const saved = productionSchedule[`${planYearTarget}-${month}`] || {};
+    planReleaseDates[month] = saved.releaseDate || '';
+    planEventDrafts[month] = (Array.isArray(saved.planEvents) ? saved.planEvents : [])
+      .filter(item => item && item.date)
+      .map(item => ({
+        id: item.id || createPlanEventId(month),
+        date: item.date,
+        benefitId: getPlanEventType(item.benefitId) ? item.benefitId : DEFAULT_PLAN_EVENT_ID,
+        completed: Boolean(item.completed)
+      }));
+    const savedLives = getMonthLiveEntries(saved).slice(0, MAX_LIVE_VENUES_PER_MONTH);
+    planBoothDraft[month] = {
+      release: saved.release || 'none',
+      songName: saved.songName || '',
+      releaseBenefit: saved.releaseBenefit || 'none',
+      slots: savedLives.length
+        ? savedLives.map(entry => ({
+            liveVenue: entry.liveVenue,
+            liveName: entry.liveName || entry.liveVenue || '',
+            liveDate: entry.liveDate || '',
+            liveDates: Array.isArray(entry.liveDates) ? [...entry.liveDates] : [],
+            seatPrices: entry.seatPrices || {},
+            seatOptions: entry.seatOptions || {}
+          }))
+        : [createEmptyLiveSlot()]
+    };
+  });
+}
+
+// ブースの入力内容をドラフトへ取り込む（カレンダーを開閉しても編集内容を保つ）
+function syncPlanBoothsIntoDrafts() {
+  getPlanMonthList().forEach(month => {
+    const releaseSelect = document.getElementById(`sel-rel-${month}`);
+    if (!releaseSelect) return;
+    const benefitSelect = document.getElementById(`sel-benefit-${month}`);
+    const songInput = document.getElementById(`song-name-${month}`);
+    planBoothDraft[month] = {
+      release: releaseSelect.value,
+      songName: songInput ? songInput.value : '',
+      releaseBenefit: benefitSelect ? benefitSelect.value : 'none',
+      slots: readLiveSlotInputs(month)
+    };
+  });
+}
+
+// 選んだ日程を月ごとにまとめる
+function groupPlanDatesByMonth(dateKeys) {
+  const grouped = new Map();
+  dateKeys.forEach(dateKey => {
+    const month = Number(dateKey.slice(5, 7));
+    if (!grouped.has(month)) grouped.set(month, []);
+    grouped.get(month).push(dateKey);
+  });
+  return new Map([...grouped.entries()].sort((a, b) => a[0] - b[0]));
+}
+
+function buildPlanDateRange(fromKey, toKey) {
+  const from = getGameDateObject(fromKey);
+  const to = getGameDateObject(toKey);
+  const start = from.getTime() <= to.getTime() ? from : to;
+  const end = from.getTime() <= to.getTime() ? to : from;
+  const keys = [];
+  const cursor = new Date(start);
+  while (cursor.getTime() <= end.getTime()) {
+    keys.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
+}
+
+// 会場の予約期間（球場・ドームは180日前、小会場は45日前）を満たしているか
+function isPlanBookableDate(dateKey, leadDays) {
+  const earliest = new Date(`${gameDate}T12:00:00`);
+  earliest.setDate(earliest.getDate() + leadDays);
+  return dateKey >= toDateKey(earliest);
+}
+
+// ライブ日程を振るときの既定会場。同日に他のグループが予約している会場は避ける
+function pickDefaultPlanVenue(dateKey) {
+  const weekday = getGameDateObject(dateKey).getDay();
+  const isWeekend = weekday === 0 || weekday === 6;
+  const pool = VENUE_DATA.filter(item => !isStadiumVenue(item) && DEFAULT_PLAN_VENUE_CAPS.includes(item.cap));
+  const preferred = pool.filter(item => (isWeekend ? item.name.includes('アリーナ') : true));
+  const ranked = preferred.length ? preferred : pool;
+  return ranked.find(item => !findRivalVenueConflict(item.name, dateKey)) || ranked[0] || null;
+}
 
 // 公演日の追加・削除・集計
 function getSlotShowDateInputs(month, index) {
@@ -6285,15 +6647,375 @@ function removeLiveSlot(month, index) {
   renderLiveSlots(month, slots);
 }
 
+// ==========================================
+// 6か月計画カレンダー（日程の一括設定）
+// ==========================================
+const EMPTY_PLAN_CALENDAR_ENTRY = { release: false, live: [], event: [], rival: false, broadcast: null };
+
+// 計画画面（ブース）から6か月カレンダーを開く（編集内容は保持する）
+function openPlanCalendar() {
+  if (!document.getElementById('plan-calendar-modal')) return;
+  syncPlanBoothsIntoDrafts();
+  const title = document.getElementById('modal-title').textContent.replace(/^【\d+年】/, '');
+  openDecisionModal(title, planYearTarget, planStartM, planEndM);
+  document.getElementById('plan-calendar-modal').style.display = 'flex';
+}
+
+// 事務所画面から指定期間の6か月カレンダーを開く
+function openPlanCalendarForRange(title, y, sM, eM) {
+  planDraftSignature = '';  // 明示的に期間を選ぶので保存済みの計画を読み直す
+  openDecisionModal(title, y, sM, eM);
+  document.getElementById('plan-calendar-modal').style.display = 'flex';
+}
+
+// カレンダーを閉じる（ブースの計画画面は開いたままにする）
+function closePlanCalendar() {
+  const modal = document.getElementById('plan-calendar-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// 各月のライブ公演日（ブースの入力欄から読む）
+function getPlanMonthShowDates(month) {
+  const dates = [];
+  readLiveSlotInputs(month).forEach(slot => {
+    if (!slot.liveVenue) return;
+    if (slot.liveDate) dates.push(slot.liveDate);
+    (slot.liveDates || []).forEach(key => { if (key) dates.push(key); });
+  });
+  return dates;
+}
+
+// カレンダーに載る予定（発売・ライブ・イベント・競合・放送）を日付ごとに集める
+function collectPlanCalendarEntries() {
+  const map = new Map();
+  const add = (dateKey, type, label) => {
+    if (!dateKey) return;
+    if (!map.has(dateKey)) map.set(dateKey, { ...EMPTY_PLAN_CALENDAR_ENTRY, live: [], event: [] });
+    const entry = map.get(dateKey);
+    if (type === 'release') { entry.release = true; return; }
+    if (type === 'live') { if (!entry.live.includes(label)) entry.live.push(label); return; }
+    if (type === 'event') { if (!entry.event.includes(label)) entry.event.push(label); return; }
+    if (type === 'rival') { entry.rival = true; return; }
+    if (type === 'broadcast') { entry.broadcast = label; }
+  };
+  getPlanMonthList().forEach(month => {
+    const releaseKey = getPlanReleaseDate(month);
+    if (releaseKey) add(releaseKey, 'release', 'CD発売');
+    getPlanMonthShowDates(month).forEach(key => add(key, 'live', 'ライブ'));
+    getPlanMonthEventDrafts(month).forEach(item => {
+      add(item.date, 'event', getPlanEventType(item.benefitId)?.name || 'イベント');
+    });
+  });
+  rivalLiveBookings.forEach(booking => {
+    (booking.venueDates || [booking.liveDate]).filter(Boolean).forEach(key => add(key, 'rival', booking.groupName));
+  });
+  scheduledPerformances.forEach(performance => {
+    if (performance.airDate) add(performance.airDate, 'broadcast', performance.name);
+  });
+  return map;
+}
+
+// 1ヶ月ぶんのカレンダーシート
+function renderPlanCalendarMonth(month, entries) {
+  const calendarY = getPlanMonthCalendarYear(month);
+  const firstWeekday = new Date(calendarY, month - 1, 1, 12).getDay();
+  const daysInMonth = new Date(calendarY, month, 0, 12).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push('<span class="plan-calendar-day plan-calendar-blank"></span>');
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = getPlanMonthCalendarDate(month, day);
+    const entry = entries.get(dateKey) || EMPTY_PLAN_CALENDAR_ENTRY;
+    const isPast = dateKey < gameDate;
+    const classes = ['plan-calendar-day'];
+    if (isPast) classes.push('is-past');
+    if (dateKey === gameDate) classes.push('is-today');
+    if (entry.release) classes.push('has-release');
+    if (entry.live.length) classes.push('has-live');
+    if (entry.event.length) classes.push('has-event');
+    if (entry.rival) classes.push('has-rival');
+    if (planCalendarSelection.includes(dateKey)) classes.push('is-selected');
+    const marks = [
+      entry.release ? '<i class="mark-release"></i>' : '',
+      entry.live.length ? '<i class="mark-live"></i>' : '',
+      entry.event.length ? '<i class="mark-event"></i>' : '',
+      entry.rival ? '<i class="mark-rival"></i>' : '',
+      entry.broadcast ? '<i class="mark-broadcast"></i>' : ''
+    ].join('');
+    const title = [
+      entry.release ? 'CD発売' : '',
+      entry.live.length ? entry.live.join('、') : '',
+      entry.event.length ? entry.event.join('、') : '',
+      entry.rival ? '他グループの公演' : '',
+      entry.broadcast ? `放送: ${entry.broadcast}` : ''
+    ].filter(Boolean).join(' / ') || '予定なし';
+    const click = isPast ? '' : ` onclick="togglePlanCalendarDate('${dateKey}')"`;
+    cells.push(`<span class="${classes.join(' ')}"${click} title="${escapeHtml(title)}">${day}<span class="plan-calendar-marks">${marks}</span></span>`);
+  }
+  const weekdayRow = PLAN_CALENDAR_WEEKDAYS.map(label => `<span class="plan-calendar-weekday">${label}</span>`).join('');
+  const releaseKey = getPlanReleaseDate(month);
+  return `
+    <div class="plan-calendar-month">
+      <div class="plan-calendar-month-head">
+        <strong>${month}月</strong>
+        <button type="button" onclick="focusPlanMonthBooth(${month})">詳細</button>
+      </div>
+      <div class="plan-calendar-weekday-row">${weekdayRow}</div>
+      <div class="plan-calendar-days">${cells.join('')}</div>
+      <div class="plan-calendar-month-note">発売 ${releaseKey ? escapeHtml(formatPlanDayLabel(releaseKey)) : '未定'} / ライブ ${getPlanMonthShowDates(month).length}公演 / イベント ${getPlanMonthEventDrafts(month).length}件</div>
+    </div>`;
+}
+
+function renderPlanCalendar() {
+  const grid = document.getElementById('plan-calendar-grid');
+  if (!grid) return;
+  const title = document.getElementById('plan-calendar-title');
+  if (title) title.textContent = `【${planYearTarget}年】${planStartM}月〜${planEndM}月 計画カレンダー`;
+  const entries = collectPlanCalendarEntries();
+  grid.innerHTML = getPlanMonthList().map(month => renderPlanCalendarMonth(month, entries)).join('');
+  renderPlanCalendarSelectionSummary();
+}
+
+function renderPlanCalendarSelectionSummary() {
+  const summary = document.getElementById('plan-calendar-selection');
+  if (!summary) return;
+  if (!planCalendarSelection.length) {
+    summary.textContent = '日程が未選択です。日付をタップすると選択できます（同じ日をもう一度タップすると解除）。';
+    return;
+  }
+  const sorted = [...planCalendarSelection].sort();
+  summary.innerHTML = `<strong>${sorted.length}日を選択中</strong><br>${escapeHtml(sorted.map(formatPlanDayLabel).join('、'))}`;
+}
+
+// 日付の選択・解除。「範囲選択」モードでは直前にタップした日を基準にまとめて選ぶ
+function togglePlanCalendarDate(dateKey) {
+  if (dateKey < gameDate) return;
+  const index = planCalendarSelection.indexOf(dateKey);
+  if (index >= 0) {
+    planCalendarSelection.splice(index, 1);
+    planCalendarAnchorKey = '';
+  } else if (planCalendarRangeMode && planCalendarAnchorKey) {
+    const already = new Set(planCalendarSelection);
+    buildPlanDateRange(planCalendarAnchorKey, dateKey)
+      .filter(key => key >= gameDate)
+      .forEach(key => { if (!already.has(key)) planCalendarSelection.push(key); });
+    planCalendarAnchorKey = dateKey;
+  } else {
+    planCalendarSelection.push(dateKey);
+    planCalendarAnchorKey = dateKey;
+  }
+  renderPlanCalendar();
+}
+
+function togglePlanCalendarRangeMode() {
+  planCalendarRangeMode = !planCalendarRangeMode;
+  planCalendarAnchorKey = '';
+  const button = document.getElementById('plan-calendar-range-toggle');
+  if (button) {
+    button.classList.toggle('ghost', !planCalendarRangeMode);
+    button.textContent = planCalendarRangeMode ? '範囲選択: ON' : '範囲選択: OFF';
+  }
+  renderPlanCalendar();
+}
+
+// カレンダーの「詳細」から該当月のブースへ移動
+function focusPlanMonthBooth(month) {
+  closePlanCalendar();
+  const panel = document.getElementById(`plan-month-panel-${month}`);
+  if (panel && typeof panel.scrollIntoView === 'function') {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function clearPlanCalendarSelection() {
+  planCalendarSelection = [];
+  planCalendarAnchorKey = '';
+  renderPlanCalendar();
+}
+
+// 選択した日程に一括で設定を適用する
+function applyPlanCalendarMark(mark) {
+  if (!planCalendarSelection.length) {
+    alert('先に日程を選んでください。');
+    return;
+  }
+  const dateKeys = [...planCalendarSelection].sort();
+  if (mark === 'release') applyPlanCalendarRelease(dateKeys);
+  if (mark === 'live') applyPlanCalendarLive(dateKeys);
+  if (mark === 'event') applyPlanCalendarEvent(dateKeys);
+  if (mark === 'clear') clearPlanCalendarMarks(dateKeys);
+  planCalendarSelection = [];
+  planCalendarAnchorKey = '';
+  renderPlanCalendar();
+}
+
+// CD発売は1か月に1つだけ。複数日を選んだ場合は各月の最初の日付を採用する
+function applyPlanCalendarRelease(dateKeys) {
+  const messages = [];
+  groupPlanDatesByMonth(dateKeys).forEach((monthDates, month) => {
+    const releaseKey = monthDates[0];
+    const select = document.getElementById(`sel-rel-${month}`);
+    if (select) {
+      if (!select.value || select.value === 'none') select.value = 'single';
+      updateReleaseBenefitOptions(month);
+    }
+    planReleaseDates[month] = releaseKey;
+    renderPlanMonthReleaseDate(month);
+    messages.push(`${month}月の発売日を${formatPlanDayLabel(releaseKey)}に設定しました。`);
+    if (monthDates.length > 1) {
+      messages.push(`※${month}月の発売日は1つだけなので、${monthDates.slice(1).map(formatPlanDayLabel).join('、')}は無視しました。`);
+    }
+  });
+  if (messages.length) alert(messages.join('\n'));
+}
+
+function applyPlanCalendarLive(dateKeys) {
+  const messages = [];
+  groupPlanDatesByMonth(dateKeys).forEach((monthDates, month) => {
+    const planKey = `${planYearTarget}-${month}`;
+    const slots = readLiveSlotInputs(month);
+    const added = [];
+    const skipped = [];
+    let venueCount = slots.filter(slot => slot.liveVenue).length;
+    let showCount = slots.reduce((sum, slot) =>
+      sum + (slot.liveVenue ? Math.max(1, (slot.liveDates || []).filter(Boolean).length) : 0), 0);
+
+    monthDates.forEach(dateKey => {
+      if (slots.some(slot => slot.liveVenue && (slot.liveDate === dateKey || (slot.liveDates || []).includes(dateKey)))) return;
+      if (showCount >= MAX_LIVE_SHOWS_PER_MONTH) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（公演数が上限${MAX_LIVE_SHOWS_PER_MONTH}公演）`);
+        return;
+      }
+      const venue = pickDefaultPlanVenue(dateKey);
+      if (!venue) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（会場が見つかりません）`);
+        return;
+      }
+      const leadDays = getLiveBookingLeadDays(venue);
+      if (!isPlanBookableDate(dateKey, leadDays)) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（${venue.name}は開催日の${leadDays}日前からのみ予約可）`);
+        return;
+      }
+      const rival = findRivalVenueConflict(venue.name, dateKey);
+      if (rival) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（${venue.name}は${rival.groupName}が予約済み）`);
+        return;
+      }
+      // 既存会場で空いているところがあればそこへ追加する
+      const host = slots.find(slot =>
+        slot.liveVenue
+        && !findOwnLiveConflict(slot.liveVenue, dateKey, planKey)
+        && !findRivalVenueConflict(slot.liveVenue, dateKey)
+      );
+      if (host) {
+        if (host.liveDate) host.liveDates = [...(host.liveDates || []), dateKey];
+        else host.liveDate = dateKey;
+        showCount += 1;
+        added.push(dateKey);
+        return;
+      }
+      if (venueCount >= MAX_LIVE_VENUES_PER_MONTH) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（会場が上限${MAX_LIVE_VENUES_PER_MONTH}か所）`);
+        return;
+      }
+      // 会場が空いている枠があればそこを使い、ライブ1（定期公演）を保つ
+      const newSlot = { liveVenue: venue.name, liveName: '', liveDate: dateKey, liveDates: [], seatPrices: {}, seatOptions: {} };
+      const emptyIndex = slots.findIndex(slot => !slot.liveVenue);
+      if (emptyIndex >= 0) slots[emptyIndex] = newSlot;
+      else slots.push(newSlot);
+      venueCount += 1;
+      showCount += 1;
+      added.push(dateKey);
+    });
+
+    if (added.length) {
+      renderLiveSlots(month, slots);
+      messages.push(`${month}月: ${added.map(formatPlanDayLabel).join('、')} をライブに設定しました（会場は詳細で変更できます）。`);
+    }
+    if (skipped.length) messages.push(`${month}月: ${skipped.join('、')} は設定できませんでした。`);
+  });
+  if (messages.length) alert(messages.join('\n'));
+}
+
+function applyPlanCalendarEvent(dateKeys) {
+  const messages = [];
+  groupPlanDatesByMonth(dateKeys).forEach((monthDates, month) => {
+    const drafts = getPlanMonthEventDrafts(month).map(item => ({ ...item }));
+    const added = [];
+    const skipped = [];
+    monthDates.forEach(dateKey => {
+      if (drafts.some(item => item.date === dateKey)) return;
+      if (drafts.length >= MAX_PLAN_EVENTS_PER_MONTH) {
+        skipped.push(`${formatPlanDayLabel(dateKey)}（${month}月の上限${MAX_PLAN_EVENTS_PER_MONTH}件）`);
+        return;
+      }
+      drafts.push({ id: createPlanEventId(month), date: dateKey, benefitId: DEFAULT_PLAN_EVENT_ID, completed: false });
+      added.push(dateKey);
+    });
+    planEventDrafts[month] = drafts;
+    renderPlanMonthEvents(month);
+    if (added.length) {
+      messages.push(`${month}月: ${added.map(formatPlanDayLabel).join('、')} にイベントを設定しました（${getPlanEventType(DEFAULT_PLAN_EVENT_ID).name}）。`);
+    }
+    if (skipped.length) messages.push(`${month}月: ${skipped.join('、')} は設定できませんでした。`);
+  });
+  if (messages.length) alert(messages.join('\n'));
+}
+
+// ライブ日程とイベント日程を取り消す（CD発売は月単位の設定なので残す）
+function clearPlanCalendarMarks(dateKeys) {
+  const target = new Set(dateKeys);
+  const messages = [];
+  groupPlanDatesByMonth(dateKeys).forEach((monthDates, month) => {
+    let removed = 0;
+    const slots = readLiveSlotInputs(month);
+    slots.forEach(slot => {
+      if (!slot.liveVenue) return;
+      if (target.has(slot.liveDate)) {
+        slot.liveDate = '';
+        removed += 1;
+      }
+      const before = (slot.liveDates || []).filter(key => target.has(key)).length;
+      slot.liveDates = (slot.liveDates || []).filter(key => !target.has(key));
+      removed += before;
+      // メイン日程が空になったら追加日程を繰り上げる
+      if (!slot.liveDate) slot.liveDate = slot.liveDates.shift() || '';
+      // 日程が1日も残らない会場は「ライブなし」に戻す
+      if (!slot.liveDate && !slot.liveDates.length) {
+        slot.liveVenue = '';
+        slot.liveName = '';
+        slot.liveDates = [];
+      }
+    });
+    if (removed) renderLiveSlots(month, slots);
+
+    const events = getPlanMonthEventDrafts(month);
+    const kept = events.filter(item => !target.has(item.date));
+    const eventRemoved = events.length - kept.length;
+    if (eventRemoved) {
+      planEventDrafts[month] = kept;
+      renderPlanMonthEvents(month);
+    }
+    if (removed || eventRemoved) {
+      messages.push(`${month}月: ライブ${removed}公演・イベント${eventRemoved}件を解除しました。`);
+    }
+  });
+  if (messages.length) alert(messages.join('\n'));
+}
+
 function openDecisionModal(title, y, sM, eM) {
   planYearTarget = y; planStartM = sM; planEndM = eM;
+  // 別の計画期間を開いたときだけ保存済みの計画を読み直す
+  const signature = `${y}-${sM}-${eM}`;
+  if (signature !== planDraftSignature) {
+    planDraftSignature = signature;
+    initPlanCalendarDrafts();
+  }
   for (let month = sM; month <= eM; month++) ensureRivalLiveBookings(y, month);
   document.getElementById('modal-title').textContent = `【${y}年】${title}`;
   const rows = document.getElementById('plan-rows');
   rows.innerHTML = '';
 
   for (let m = sM; m <= eM; m++) {
-    const existing = productionSchedule[`${y}-${m}`] || { release: 'none', liveVenue: '' };
     const actualYear = calendarYear + (y - currentYear);
     const monthPrefix = `${actualYear}-${String(m).padStart(2, '0')}-`;
     const rivalMonthSchedule = rivalLiveBookings
@@ -6306,47 +7028,175 @@ function openDecisionModal(title, y, sM, eM) {
         const note = booking.consecutive && days.length > 1 ? '・連日' : (days.length > 1 ? `・${days.length}公演` : '');
         return `${dayText} ${booking.groupName}（${booking.venue}）${note}`;
       });
-    // 保存済みのライブ（メイン＋追加）を入力枠へ展開する
-    const savedLives = getMonthLiveEntries(existing).slice(0, MAX_LIVE_VENUES_PER_MONTH);
-    const liveSlots = savedLives.length
-      ? savedLives.map(entry => ({
-          liveVenue: entry.liveVenue,
-          liveName: entry.liveName || entry.liveVenue || '',
-          liveDate: entry.liveDate || '',
-          seatPrices: entry.seatPrices,
-          seatOptions: entry.seatOptions
-        }))
-      : [createEmptyLiveSlot()];
+    const draft = planBoothDraft[m] || {};
+    const liveSlots = (draft.slots && draft.slots.length) ? draft.slots : [createEmptyLiveSlot()];
     rows.innerHTML += `
-      <div class="plan-month" style="margin-bottom:8px; padding:6px; background:#f9f9f9; border-radius:4px; font-size:11px;">
+      <div class="plan-month" id="plan-month-panel-${m}" style="margin-bottom:8px; padding:6px; background:#f9f9f9; border-radius:4px; font-size:11px;">
         <span style="font-weight:bold;">${m}月</span>
-        ${rivalMonthSchedule.length ? `<div style="margin-top:4px; color:#777;">他グループ予定: ${rivalMonthSchedule.join(' / ')}</div>` : ''}
+        <button class="plan-booth-btn" type="button" onclick="openPlanCalendar()">📅 カレンダーで日程を選ぶ</button>
+        ${rivalMonthSchedule.length ? `<div style="margin-top:4px; color:#777;">他グループ予定: ${escapeHtml(rivalMonthSchedule.join(' / '))}</div>` : ''}
         <label class="weekly-member-target" for="sel-rel-${m}" style="margin-top:6px;">リリース
           <select id="sel-rel-${m}" onchange="updateReleaseBenefitOptions(${m})">
-            <option value="none" ${!existing.release || existing.release === 'none' ? 'selected' : ''}>リリースなし</option>
-            <option value="single" ${existing.release === 'single' ? 'selected' : ''}>シングル発売</option>
-            <option value="album" ${existing.release === 'album' ? 'selected' : ''}>アルバム発売</option>
+            <option value="none" ${draft.release !== 'single' && draft.release !== 'album' ? 'selected' : ''}>リリースなし</option>
+            <option value="single" ${draft.release === 'single' ? 'selected' : ''}>シングル発売</option>
+            <option value="album" ${draft.release === 'album' ? 'selected' : ''}>アルバム発売</option>
           </select>
         </label>
+        <label class="weekly-member-target" for="release-date-${m}" style="margin-top:6px;">発売日
+          <input type="date" id="release-date-${m}" onchange="updatePlanReleaseDate(${m}, this.value)">
+          <span id="release-date-note-${m}" class="show-date-note"></span>
+        </label>
         <label class="weekly-member-target" for="song-name-${m}" style="margin-top:6px;">楽曲名（空欄は自動設定）
-          <input type="text" id="song-name-${m}" maxlength="40" value="${escapeHtml(existing.songName || '')}" placeholder="好きな楽曲名を入力">
+          <input type="text" id="song-name-${m}" maxlength="40" value="${escapeHtml(draft.songName || '')}" placeholder="好きな楽曲名を入力">
         </label>
         <select id="sel-benefit-${m}" style="width:100%; margin-top:6px; font-size:11px;">
-          <option value="none" ${!existing.releaseBenefit || existing.releaseBenefit === 'none' ? 'selected' : ''}>CD特典なし</option>
-          ${CD_BENEFITS.map(benefit => `<option value="${benefit.id}" ${existing.releaseBenefit === benefit.id ? 'selected' : ''}>${benefit.name}（経費 ${formatMoney(benefit.cost)}）</option>`).join('')}
+          <option value="none" ${!draft.releaseBenefit || draft.releaseBenefit === 'none' ? 'selected' : ''}>CD特典なし</option>
+          ${CD_BENEFITS.map(benefit => `<option value="${benefit.id}" ${draft.releaseBenefit === benefit.id ? 'selected' : ''}>${benefit.name}（経費 ${formatMoney(benefit.cost)}）</option>`).join('')}
         </select>
         <div class="plan-live-heading" style="margin-top:8px; font-weight:bold;">ライブ（1月あたり最大${MAX_LIVE_VENUES_PER_MONTH}会場・計${MAX_LIVE_SHOWS_PER_MONTH}公演）</div>
         <div id="live-slots-${m}"></div>
+        <div class="plan-live-heading" style="margin-top:8px; font-weight:bold;">CD関連イベント（1月あたり最大${MAX_PLAN_EVENTS_PER_MONTH}件）</div>
+        <div id="plan-events-${m}"></div>
       </div>
     `;
     renderLiveSlots(m, liveSlots);
+    renderPlanMonthEvents(m);
   }
   for (let m = sM; m <= eM; m++) updateReleaseBenefitOptions(m);
   document.getElementById('decision-modal').style.display = 'flex';
+  renderPlanCalendar();
 }
 
+// 発売日欄の描画（未指定なら当月の最終水曜を既定にする）
+function renderPlanMonthReleaseDate(month) {
+  const input = document.getElementById(`release-date-${month}`);
+  const note = document.getElementById(`release-date-note-${month}`);
+  if (!input) return;
+  const releaseSelect = document.getElementById(`sel-rel-${month}`);
+  const isNone = !releaseSelect || releaseSelect.value === 'none';
+  if (isNone) {
+    delete planReleaseDates[month];
+    input.value = '';
+    input.disabled = true;
+    if (note) note.textContent = 'リリースなし';
+    return;
+  }
+  const defaultKey = getDefaultPlanReleaseDate(month);
+  const current = getPlanReleaseDate(month);
+  input.disabled = false;
+  input.value = current || defaultKey;
+  planReleaseDates[month] = input.value;
+  if (note) {
+    note.textContent = current
+      ? `${formatPlanDayLabel(current)}に発売します。`
+      : `未指定（既定は最終水曜 ${formatPlanDayLabel(defaultKey)}）`;
+  }
+}
+
+function updatePlanReleaseDate(month, value) {
+  if (!value) {
+    delete planReleaseDates[month];
+  } else {
+    const date = getGameDateObject(value);
+    if (date.getFullYear() !== getPlanMonthCalendarYear(month) || date.getMonth() + 1 !== month) {
+      alert(`発売日は${getPlanMonthCalendarYear(month)}年${month}月内で選択してください。`);
+      renderPlanMonthReleaseDate(month);
+      return;
+    }
+    if (value < gameDate) {
+      alert('発売日は今日以降の日付で設定してください。');
+      renderPlanMonthReleaseDate(month);
+      return;
+    }
+    planReleaseDates[month] = value;
+  }
+  renderPlanMonthReleaseDate(month);
+  renderPlanCalendar();
+}
+
+// CD関連イベント欄（ブース側の詳細設定）
+function renderPlanMonthEvents(month) {
+  const container = document.getElementById(`plan-events-${month}`);
+  if (!container) return;
+  const drafts = getPlanMonthEventDrafts(month);
+  const rows = drafts.map((item, index) => `
+    <div class="plan-event-row" data-event-index="${index}">
+      <input type="date" class="plan-event-date" value="${item.date}" min="${gameDate}"
+        onchange="updatePlanEvent(${month}, ${index}, 'date', this.value)">
+      <select class="plan-event-kind" onchange="updatePlanEvent(${month}, ${index}, 'benefitId', this.value)">
+        ${PLAN_EVENT_TYPES.map(type => `<option value="${type.id}" ${item.benefitId === type.id ? 'selected' : ''}>${type.name}${type.cost ? `（${formatMoney(type.cost)}）` : ''}</option>`).join('')}
+      </select>
+      <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
+    </div>`).join('');
+  const addButton = drafts.length < MAX_PLAN_EVENTS_PER_MONTH
+    ? `<button class="plan-add-show-btn" type="button" onclick="addPlanEvent(${month})">＋イベントを追加（${drafts.length}/${MAX_PLAN_EVENTS_PER_MONTH}件）</button>`
+    : `<div class="show-date-note">1月あたりの上限（${MAX_PLAN_EVENTS_PER_MONTH}件）に達しています。</div>`;
+  container.className = 'plan-event-list';
+  container.innerHTML = rows + addButton;
+}
+
+function addPlanEvent(month) {
+  const drafts = getPlanMonthEventDrafts(month).map(item => ({ ...item }));
+  if (drafts.length >= MAX_PLAN_EVENTS_PER_MONTH) return;
+  const used = new Set(drafts.map(item => item.date));
+  const daysInMonth = new Date(getPlanMonthCalendarYear(month), month, 0, 12).getDate();
+  let dateKey = '';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const candidate = getPlanMonthCalendarDate(month, day);
+    if (!used.has(candidate)) {
+      dateKey = candidate;
+      break;
+    }
+  }
+  drafts.push({ id: createPlanEventId(month), date: dateKey, benefitId: DEFAULT_PLAN_EVENT_ID, completed: false });
+  planEventDrafts[month] = drafts;
+  renderPlanMonthEvents(month);
+}
+
+function updatePlanEvent(month, index, field, value) {
+  const drafts = getPlanMonthEventDrafts(month).map(item => ({ ...item }));
+  const target = drafts[index];
+  if (!target) return;
+  if (field === 'date') {
+    if (!value) {
+      target.date = '';
+    } else {
+      const date = getGameDateObject(value);
+      if (date.getFullYear() !== getPlanMonthCalendarYear(month) || date.getMonth() + 1 !== month) {
+        alert(`イベント日は${getPlanMonthCalendarYear(month)}年${month}月内で選択してください。`);
+        renderPlanMonthEvents(month);
+        return;
+      }
+      if (value < gameDate) {
+        alert('イベント日は今日以降の日付で設定してください。');
+        renderPlanMonthEvents(month);
+        return;
+      }
+      target.date = value;
+    }
+  } else if (field === 'benefitId') {
+    target.benefitId = getPlanEventType(value) ? value : DEFAULT_PLAN_EVENT_ID;
+  }
+  planEventDrafts[month] = drafts;
+  renderPlanMonthEvents(month);
+  renderPlanCalendar();
+}
+
+function removePlanEvent(month, index) {
+  planEventDrafts[month] = getPlanMonthEventDrafts(month).filter((item, itemIndex) => itemIndex !== index);
+  renderPlanMonthEvents(month);
+  renderPlanCalendar();
+}
+
+// リリース無しにしたときは発売日も消す
 function updateReleaseBenefitOptions(month) {
-  document.getElementById(`sel-benefit-${month}`).disabled = document.getElementById(`sel-rel-${month}`).value === 'none';
+  const releaseSelect = document.getElementById(`sel-rel-${month}`);
+  const benefitSelect = document.getElementById(`sel-benefit-${month}`);
+  if (!releaseSelect || !benefitSelect) return;
+  const isNone = releaseSelect.value === 'none';
+  benefitSelect.disabled = isNone;
+  if (isNone) delete planReleaseDates[month];
+  renderPlanMonthReleaseDate(month);
 }
 
 function updateSeatPlanOptions(month, index = 0) {
@@ -6534,6 +7384,13 @@ function saveDecisionPlan() {
     const plan = {
       release,
       songName: songName || null,
+      releaseDate: release === 'none' ? null : (getPlanReleaseDate(m) || null),
+      planEvents: getPlanMonthEventDrafts(m).map(item => ({
+        id: item.id,
+        date: item.date,
+        benefitId: item.benefitId,
+        completed: Boolean(item.completed)
+      })),
       liveVenue: primary ? primary.liveVenue : null,
       liveName: primary ? (primary.liveName || primary.liveVenue) : null,
       liveDate: primary ? (primary.liveDate || null) : null,
@@ -6561,6 +7418,7 @@ function saveDecisionPlan() {
     if (plan.release !== 'none') ensureScheduledSong(planYearTarget, m, plan);
     productionSchedule[planKey] = plan;
   }
+  closePlanCalendar();
   document.getElementById('decision-modal').style.display = 'none';
   setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   updateUI();
@@ -6569,6 +7427,12 @@ function saveDecisionPlan() {
 function openPlanningManual() {
   if (currentMonth <= 6) openDecisionModal("当年7月〜12月の計画", currentYear, 7, 12);
   else openDecisionModal("翌年1月〜6月の計画", currentYear + 1, 1, 6);
+}
+
+// 事務所画面から6か月カレンダーを開く
+function openPlanningCalendar() {
+  if (currentMonth <= 6) openPlanCalendarForRange("当年7月〜12月の計画カレンダー", currentYear, 7, 12);
+  else openPlanCalendarForRange("翌年1月〜6月の計画カレンダー", currentYear + 1, 1, 6);
 }
 
 // サービスワーカー登録（開発時はローカルホストで無効化して自動更新を優先）
