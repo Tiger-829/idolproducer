@@ -122,8 +122,34 @@
     }
     .schedule-block select:disabled { background: #f0ecee; color: #aaa; }
     .schedule-slot-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-    .schedule-slot-label { font-size: 10px; color: #777; min-width: 30px; }
-    .schedule-slot-row select { margin-bottom: 0; }
+    .schedule-slot-row select { margin-bottom: 0; flex: 1; }
+    .slot-remove-btn {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      font-size: 15px;
+      line-height: 1;
+      color: #fff;
+      background: #bdbdbd;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .slot-remove-btn:disabled { background: #e0e0e0; cursor: not-allowed; }
+    .slot-add-btn {
+      width: 100%;
+      padding: 7px;
+      margin-top: 2px;
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--primary);
+      background: #fff;
+      border: 1px dashed var(--primary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .rest-toggle.focus { border-color: #4527a0; }
+    .rest-toggle.focus.active { background: #4527a0; border-color: #4527a0; }
     .schedule-note { font-size: 10px; color: #777; line-height: 1.5; margin-top: 4px; }
     .schedule-note.warn { color: #c0392b; }
     .rest-toggle-grid { display: flex; flex-wrap: wrap; gap: 4px; max-height: 130px; overflow-y: auto; }
@@ -142,6 +168,90 @@
     .rest-toggle.active small { color: #ffe4ec; }
     .rest-toggle.warn:not(.active) { border-color: #e57373; color: #c0392b; }
     .rest-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 選抜・センター選定 */
+    .selection-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: #fdf2f4;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #555;
+    }
+    .selection-summary strong { color: var(--primary); font-size: 14px; }
+    .selection-summary-center { font-size: 11px; color: #777; }
+    .selection-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      max-height: 34vh;
+      overflow-y: auto;
+      padding: 2px;
+    }
+    .selection-member {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      grid-template-areas: "check name score" "check meta score";
+      gap: 1px 5px;
+      align-items: center;
+      padding: 5px 6px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 5px;
+      text-align: left;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .selection-member.selected { background: #fce4ec; border-color: var(--primary); }
+    .selection-check { grid-area: check; font-size: 12px; font-weight: bold; color: var(--primary); }
+    .selection-name { grid-area: name; font-size: 11px; font-weight: bold; color: #333; }
+    .selection-meta { grid-area: meta; font-size: 9px; color: #888; }
+    .selection-score { grid-area: score; font-size: 12px; font-weight: bold; font-family: monospace; }
+    .selection-crown {
+      display: inline-block;
+      margin-left: 3px;
+      padding: 0 3px;
+      font-size: 8px;
+      font-style: normal;
+      color: #fff;
+      background: #ff1493;
+      border-radius: 3px;
+    }
+    .selection-center { margin-top: 10px; }
+    .selection-subtitle {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .selection-subtitle small { font-size: 9px; font-weight: normal; color: #999; }
+    .selection-center-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 22vh;
+      overflow-y: auto;
+    }
+    .selection-center-btn {
+      padding: 4px 8px;
+      font-size: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+      text-align: left;
+    }
+    .selection-center-btn small { display: block; font-size: 8px; color: #999; }
+    .selection-center-btn.active { background: #ff1493; border-color: #ff1493; color: #fff; }
+    .selection-center-btn.active small { color: #ffd9e8; }
 
     /* マネージャー */
     .manager-card {
@@ -884,12 +994,14 @@
     <div class="roster-card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-weight:bold; font-size:12px;">所属メンバー (<span id="txt-roster-count">0</span>名)</span>
-        <span style="font-size:10px; color:#888;">選抜枠: 16名</span>
+        <span style="font-size:10px; color:#888;">選抜 <span id="txt-selected-count">0</span>名</span>
       </div>
       <div class="roster-tabs">
         <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
         <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
       </div>
+      <button class="main-btn" style="width:100%; padding:8px; margin-bottom:6px; font-size:12px;"
+        id="btn-selection-setup" onclick="openSelectionSetup()">選抜・センターを変更する</button>
       <div class="roster-list" id="roster-list-ui"></div>
     </div>
   </section>
@@ -958,6 +1070,8 @@
     <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
   </section>
 </div>
+
+<div class="modal-overlay" id="selection-modal"></div>
 
 <div class="modal-overlay" id="music-offer-modal">
   <div class="modal-content">
@@ -1649,6 +1763,12 @@ let crisisEventType = '';
 let pendingCrisisResponse = null;
 let pendingRandomEvent = null;
 let randomEventCheckWeekKey = '';
+// 選抜・センターの選定待ち（新曲発売10週前に発生。編成ページからも手動で開ける）
+let pendingSelectionEvent = null;
+// 選抜のロック（発表時に確定。スキャンダル等が発生するまで変更不可）
+let selectionLock = null;
+const MIN_SELECTION_SIZE = 3;
+const SENBATSU_LEAD_DAYS = 70;
 let pendingFanClubEvent = null;
 let fanClub = null;
 let fanClubFoundedYear = 0;
@@ -1991,29 +2111,32 @@ function getManagerSkillTier(skillId) {
   };
 }
 
-// マネージャーの統率力効果：レッスン経験値の倍率（合計レベル段階）
-function getLessonExperienceMultiplier() {
-  return getManagerSkillTier('leadership').multiplier;
+// ==========================================
+// マネージャーの効果（すべて「特別強化」に効く）
+// 週間スケジュール自体は点名制限なしで自由に組める
+// ==========================================
+
+// 統率力：特別強化の倍率（基礎10倍 × 段階倍率）
+function getSpecialTrainingMultiplier() {
+  return SPECIAL_TRAINING_MULTIPLIER * getManagerSkillTier('leadership').multiplier;
 }
 
-// スケジュールの効果：1週間に組めるレッスン枠（合計レベル段階）
-function getWeeklyScheduleSlotCount() {
-  return Math.max(2, Math.min(5, 2 + getManagerSkillTier('scheduling').tier));
+// スケジュール管理力：特別強化できる人数（E/D/C=1人、B以上=2人、極=3人）
+function getSpecialTrainingTargetLimit() {
+  const tier = getManagerSkillTier('scheduling');
+  if (tier.tier >= MANAGER_LEVEL_TIERS.length - 1) return 3; // 極
+  if (tier.tier >= 3) return 2;                              // B以上
+  return 1;                                                   // E/D/C
 }
 
-// メンタルケアの効果：体力値の回復量倍率（合計レベル段階）
-function getRecoveryMultiplier() {
-  return getManagerSkillTier('mentalCare').multiplier;
+// メンタルケア：特別強化時の体力消費軽減率（0〜0.75）
+function getSpecialTrainingStaminaReduction() {
+  return (getManagerSkillTier('mentalCare').multiplier - 1) * 0.75;
 }
 
-// メンタルケアの効果：ケガ・体調不良のリスク軽減率（0〜1）
-function getInjuryRiskReduction() {
-  return Math.min(0.85, (getRecoveryMultiplier() - 1) * 0.6);
-}
-
-// リスクマネジメントの効果：危機回避力ボーナス（合計レベル段階）
-function getRiskControlBonus() {
-  return (getManagerSkillTier('riskControl').multiplier - 1) * 12;
+// リスクマネジメント：特別強化中のケガ・体調不良リスク軽減率（0〜0.75）
+function getSpecialTrainingRiskReduction() {
+  return (getManagerSkillTier('riskControl').multiplier - 1) * 0.75;
 }
 
 let leagueTeams = createInitialLeagueTeams();
@@ -2492,6 +2615,8 @@ function initializeNewGameState() {
   pendingCrisisResponse = null;
   randomEventCheckWeekKey = '';
   pendingRandomEvent = null;
+  pendingSelectionEvent = null;
+  selectionLock = null;
   fanClub = null;
   fanClubFoundedYear = 0;
   pendingFanClubEvent = null;
@@ -2558,6 +2683,8 @@ function applySavedGame(data) {
   pendingCrisisResponse = data.pendingCrisisResponse || null;
   randomEventCheckWeekKey = data.randomEventCheckWeekKey || '';
   pendingRandomEvent = data.pendingRandomEvent || null;
+  pendingSelectionEvent = data.pendingSelectionEvent || null;
+  selectionLock = data.selectionLock || null;
   fanClub = data.fanClub || null;
   fanClubFoundedYear = data.fanClubFoundedYear || 0;
   pendingFanClubEvent = data.pendingFanClubEvent || null;
@@ -2842,17 +2969,18 @@ function recoverMemberStamina(member, amount) {
 function getMemberWeeklyRecovery(member, isRestDay) {
   const recoveryStat = member.stats?.recovery || 0;
   const dormitoryBonus = (officeUpgrades.dormitory || 0) * 4;
+  // 自然回復はメンバーの回復力と寮のみで決まる（マネージャーはかからない）
   let recovery = STAMINA_BASE_RECOVERY + recoveryStat * STAMINA_RECOVERY_PER_STAT + dormitoryBonus;
-  recovery *= getRecoveryMultiplier();
   if (isRestDay) recovery *= STAMINA_REST_RECOVERY_MULTIPLIER;
   return Math.round(recovery);
 }
 
 // ケガ・体調不良の発生判定（体力値が低い状態で練習すると起きやすい）
-function rollMemberInjury(member) {
+// extraReduction は特別強化中のみ指定する（リスクマネジメントの効果）
+function rollMemberInjury(member, extraReduction = 0) {
   if ((member.staminaValue ?? 0) >= STAMINA_WARNING_THRESHOLD) return false;
   const severity = (STAMINA_WARNING_THRESHOLD - member.staminaValue) / STAMINA_WARNING_THRESHOLD;
-  const risk = severity * 0.45 * (1 - getInjuryRiskReduction());
+  const risk = severity * 0.45 * Math.max(0, 1 - extraReduction);
   if (Math.random() >= risk) return false;
   const isAccident = Math.random() < 0.5;
   const weeks = isAccident ? 2 + Math.floor(Math.random() * 2) : 1;
@@ -2992,6 +3120,8 @@ function resolveCrisisResponse(optionId) {
   // 対応が終われば危機状態は解消する
   crisisEventWeekKey = '';
   crisisEventType = '';
+  // スキャンダル対応の結果として選抜の編成を見直す必要がある
+  unlockSelection(`${subject}への対応`);
   updateUI();
 }
 
@@ -3102,9 +3232,8 @@ function calculateGroupCrisisResilience() {
     : 0;
   const dataBonus = ((officeUpgrades.analytics || 1) - 1) * 5;
   const snsBonus = ((officeUpgrades.snsTraining || 1) - 1) * 7;
-  // マネージャーのリスクマネジメントが危機回避力を底上げする
-  const managerBonus = getRiskControlBonus();
-  return Math.min(100, Math.round(groupCrisis * 0.6 + averageSns * 0.4 + dataBonus + snsBonus + managerBonus));
+  // 危機回避力はグループ危機・SNS運用・設備のみで決まる（マネージャーは特別強化専用）
+  return Math.min(100, Math.round(groupCrisis * 0.6 + averageSns * 0.4 + dataBonus + snsBonus));
 }
 
 function rollWeeklyIndustryOffer() {
@@ -3305,7 +3434,7 @@ function getCurrentWeekEvents() {
     if (hasUpcomingSpecialBroadcastOffer(currentDate)) events.push('大型特番の出演打診');
 
     const targetReleaseDate = new Date(currentDate);
-    targetReleaseDate.setDate(targetReleaseDate.getDate() + 84);
+    targetReleaseDate.setDate(targetReleaseDate.getDate() + SENBATSU_LEAD_DAYS);
     const targetReleaseYear = currentYear + targetReleaseDate.getFullYear() - calendarYear;
     const targetReleaseMonth = targetReleaseDate.getMonth() + 1;
     const selectionPlan = productionSchedule[`${targetReleaseYear}-${targetReleaseMonth}`];
@@ -3363,28 +3492,45 @@ function findUpcomingSinglePlan() {
 // ==========================================
 
 function createEmptyWeeklySchedule() {
-  const slotCount = getWeeklyScheduleSlotCount();
-  const slots = Array.from({ length: slotCount }, () => '');
+  // 週間スケジュールは点数制限なし。空き枠4つから自由に追加・削除できる
+  const slots = ['', '', '', ''];
   const availableMembers = idolRoster.filter(member => member.isSelected && !member.injury);
   const defaultMember = availableMembers[0]?.id ?? idolRoster.find(member => !member.injury)?.id ?? '';
   // 休養を指示されるメンバー（体力値が閾値を下回る人不参加）
   const restDayMembers = idolRoster
     .filter(member => (member.staminaValue ?? MAX_STAMINA_VALUE) < STAMINA_WARNING_THRESHOLD)
     .map(member => member.id);
-  return { slots, individualMemberId: defaultMember, individualStat: 'vocal', focusMemberId: defaultMember, restDayMembers };
+  return { slots, individualMemberId: defaultMember, individualStat: 'vocal', focusMemberIds: [defaultMember].filter(Boolean), restDayMembers };
 }
 
 function ensureWeeklySchedule() {
-  const slotCount = getWeeklyScheduleSlotCount();
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = createEmptyWeeklySchedule();
     return;
   }
-  // マネージャー強化で枠数が増えた場合は枠を補う
-  while (weeklySchedule.slots.length < slotCount) weeklySchedule.slots.push('');
-  if (weeklySchedule.slots.length > slotCount) weeklySchedule.slots.length = slotCount;
   if (!Array.isArray(weeklySchedule.restDayMembers)) weeklySchedule.restDayMembers = [];
+  if (!Array.isArray(weeklySchedule.focusMemberIds)) {
+    // 旧セーブ（focusMemberId 単一）を複数人対応へ移行する
+    weeklySchedule.focusMemberIds = weeklySchedule.focusMemberId ? [weeklySchedule.focusMemberId] : [];
+  }
+  delete weeklySchedule.focusMemberId;
   if (!INDIVIDUAL_LESSON_STATS.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
+  // 強化人数の上限はマネージャー側で管理するため、ここではトリムしない
+}
+
+// 枠を自由に追加する
+function addWeeklyScheduleSlot() {
+  ensureWeeklySchedule();
+  weeklySchedule.slots.push('');
+  renderWeeklyActionPanel();
+}
+
+// 枠を削除する
+function removeWeeklyScheduleSlot(index) {
+  ensureWeeklySchedule();
+  if (weeklySchedule.slots.length <= 1) return;
+  weeklySchedule.slots.splice(index, 1);
+  renderWeeklyActionPanel();
 }
 
 // 週が変わったら下書きをリセットする
@@ -3397,18 +3543,29 @@ function setWeeklyScheduleSlot(index, itemId) {
   ensureWeeklySchedule();
   if (index < 0 || index >= weeklySchedule.slots.length) return;
   weeklySchedule.slots[index] = itemId;
-  // 個別レッスンは同時に1枠だけ
-  if (itemId === 'individual-lesson') {
-    weeklySchedule.slots = weeklySchedule.slots.map((slot, slotIndex) =>
-      slotIndex === index ? slot : (slot === 'individual-lesson' ? '' : slot)
-    );
-  }
   renderWeeklyActionPanel();
 }
 
 function setWeeklyScheduleField(field, value) {
   ensureWeeklySchedule();
   weeklySchedule[field] = value;
+  renderWeeklyActionPanel();
+}
+
+// 特別強化の対象メンバーをトグルする（人数はスケジュール管理力で制限）
+function toggleFocusMember(memberId) {
+  ensureWeeklySchedule();
+  const list = weeklySchedule.focusMemberIds;
+  const index = list.indexOf(memberId);
+  if (index >= 0) {
+    list.splice(index, 1);
+  } else {
+    if (list.length >= getSpecialTrainingTargetLimit()) {
+      setLog(`【特別強化】同時に強化できるのは${getSpecialTrainingTargetLimit()}名までです。`);
+      return;
+    }
+    list.push(memberId);
+  }
   renderWeeklyActionPanel();
 }
 
@@ -3428,11 +3585,11 @@ function hasScheduledLessons() {
   return weeklySchedule.slots.some(slotId => slotId && slotId !== 'rest-day');
 }
 
-// グループレッスン1回あたりの基礎経験値（事務所設備・統率力で変動）
+// グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
 function getWeeklyLessonExperience() {
   const lessonLevel = officeUpgrades.lessons || 0;
   const lessonMultiplier = 1 + lessonLevel * 0.12;
-  return Math.round(LESSON_BASE_EXP * lessonMultiplier * getLessonExperienceMultiplier());
+  return Math.round(LESSON_BASE_EXP * lessonMultiplier);
 }
 
 // 1人のメンバーに週次レッスン効果をかける
@@ -3459,7 +3616,6 @@ function applyWeeklySchedule() {
   const selectedMembers = idolRoster.filter(member => member.isSelected);
   const participants = selectedMembers.length ? selectedMembers : idolRoster;
   const restDayMemberIds = new Set(weeklySchedule.restDayMembers || []);
-  const focusMember = idolRoster.find(member => member.id === weeklySchedule.focusMemberId);
   const individualMember = idolRoster.find(member => member.id === weeklySchedule.individualMemberId);
 
   let levelUps = 0;
@@ -3472,9 +3628,16 @@ function applyWeeklySchedule() {
   const restNames = (weeklySchedule.restDayMembers || [])
     .map(id => idolRoster.find(member => member.id === id)?.name)
     .filter(Boolean);
+  const focusIds = new Set(weeklySchedule.focusMemberIds || []);
+  const focusMembers = participants.filter(member => focusIds.has(member.id));
+  // マネージャーの能力は特別強化にだけ効く
+  const specialMultiplier = getSpecialTrainingMultiplier();
+  const staminaReduction = getSpecialTrainingStaminaReduction();
+  const riskReduction = getSpecialTrainingRiskReduction();
 
   participants.forEach(member => {
     const isResting = restDayMemberIds.has(member.id);
+    const isFocus = focusIds.has(member.id) && hasScheduledLessons();
     let staminaCost = 0;
     let memberLevels = 0;
 
@@ -3489,11 +3652,14 @@ function applyWeeklySchedule() {
           staminaCost += 20 * item.staminaCost;
           return;
         }
-        // グループレッスンは選抜全員が受講。特別強化の対象は10倍
-        const multiplier = member.id === focusMember?.id ? SPECIAL_TRAINING_MULTIPLIER : 1;
+        // グループレッスンは選抜全員が受講。特別強化の対象は強化倍率
+        const multiplier = isFocus ? specialMultiplier : 1;
         memberLevels += applyMemberLesson(member, slotId, multiplier).levels;
         staminaCost += 15 * item.staminaCost;
-        if (multiplier > 1) staminaCost += SPECIAL_TRAINING_EXTRA_COST;
+        if (isFocus) {
+          // メンタルケアで特別強化時の追加消費を抑える
+          staminaCost += SPECIAL_TRAINING_EXTRA_COST * (1 - staminaReduction);
+        }
       });
     }
 
@@ -3501,7 +3667,8 @@ function applyWeeklySchedule() {
 
     if (staminaCost > 0) {
       consumeMemberStamina(member, staminaCost);
-      if (rollMemberInjury(member)) {
+      // リスクマネジメントで特別強化中のケガ・体調不良を抑える
+      if (rollMemberInjury(member, isFocus ? riskReduction : 0)) {
         injuries.push(`${member.name}（${member.injury.type}・${member.injury.weeksLeft}週）`);
       }
     }
@@ -3515,7 +3682,10 @@ function applyWeeklySchedule() {
   const parts = [];
   if (scheduleSummary.length) parts.push(`実施: ${scheduleSummary.join(' / ')}`);
   if (restNames.length) parts.push(`休養: ${restNames.join('、')}`);
-  if (focusMember && hasScheduledLessons()) parts.push(`特別強化: ${focusMember.name}（${SPECIAL_TRAINING_MULTIPLIER}倍）`);
+  if (focusMembers.length && hasScheduledLessons()) {
+    const rounded = Math.round(specialMultiplier * 10) / 10;
+    parts.push(`特別強化: ${focusMembers.map(member => member.name).join('、')}（${rounded}倍）`);
+  }
   if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
   if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
   if (!scheduleSummary.length && !restNames.length) parts.push('何もない1週間でした');
@@ -3893,6 +4063,7 @@ function applyMonthlySalary() {
 }
 
 function openPendingModal() {
+  if (pendingSelectionEvent) return openSelectionModal();
   if (pendingCrisisResponse) return openCrisisResponseModal();
   if (pendingFanClubEvent) return openFanClubModal();
   if (pendingRandomEvent) return openRandomEventModal();
@@ -4340,35 +4511,221 @@ function processScheduledPerformances() {
   if (logs.length) setLog(logs.join(' '));
 }
 
-// 12週前選抜発表
+// 新曲発売10週前の選抜発表（ユーザー自身が選抜とセンターを選ぶ）
 function checkSenbatsuTrigger() {
   if (!isFirstWednesdayOfMonth()) return;
+  if (pendingSelectionEvent) return;
   const targetDate = getGameDateObject();
-  targetDate.setDate(targetDate.getDate() + 84);
+  targetDate.setDate(targetDate.getDate() + SENBATSU_LEAD_DAYS);
   const targetYear = currentYear + targetDate.getFullYear() - calendarYear;
   const targetMonth = targetDate.getMonth() + 1;
   const targetKey = `${targetYear}-${targetMonth}`;
 
   const plan = productionSchedule[targetKey];
-  if (plan && plan.release && plan.release !== 'none') {
-    const relName = plan.release === 'single' ? 'シングル' : 'アルバム';
-    const num = prompt(`【選抜発表】${targetYear}年${targetMonth}月発売の${relName}選抜を決定します。\n選抜人数を入力してください (5〜20名):`, "16");
-    const count = Math.max(5, Math.min(20, parseInt(num) || 16));
+  if (!plan || !plan.release || plan.release === 'none') return;
+  // 同じリリースの選抜発表は一度だけ
+  if (plan.senbatsuAnnounced) return;
+  plan.senbatsuAnnounced = true;
 
-    let memberListTxt = "センターにするメンバーの番号を入力してください:\n";
-    idolRoster.slice(0, 15).forEach((m, idx) => {
-      memberListTxt += `${idx + 1}: ${m.name} (総合:${calculateSingleOverall(m.stats)} / ${getMemberEventSalesSummary(m)})\n`;
-    });
-    const cIdx = prompt(memberListTxt, "1");
-    const centerIndex = Math.max(0, Math.min(idolRoster.length - 1, (parseInt(cIdx) || 1) - 1));
+  // 次作の発表時なので、前回のロックはここで外れる
+  selectionLock = null;
 
-    idolRoster.forEach((m, idx) => {
-      m.isSelected = (idx < count);
-      m.isCenter = (idx === centerIndex);
-    });
+  pendingSelectionEvent = createSelectionEvent({
+    trigger: 'release',
+    year: targetYear,
+    month: targetMonth,
+    releaseType: plan.release
+  });
+}
 
-    setLog(`【選抜決定】${targetMonth}月作のセンターは【${idolRoster[centerIndex].name}】！ 選抜${count}名体制を敷きました。`);
+// 選抜・センター選定イベントを生成する（既存の選抜を引き継ぐ）
+function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, releaseType = null } = {}) {
+  const currentSelected = idolRoster.filter(member => member.isSelected);
+  const currentCenter = idolRoster.find(member => member.isCenter);
+  const base = currentSelected.length >= MIN_SELECTION_SIZE
+    ? currentSelected
+    : [...idolRoster].sort((a, b) => calculateSingleOverall(b.stats) - calculateSingleOverall(a.stats))
+        .slice(0, Math.max(MIN_SELECTION_SIZE, 16));
+  // センターは選抜内に収める
+  const centerId = base.some(member => member.id === currentCenter?.id) ? currentCenter.id : base[0]?.id ?? null;
+  return {
+    trigger,
+    year,
+    month,
+    releaseType,
+    selectedIds: base.map(member => member.id),
+    centerId
+  };
+}
+
+// ==========================================
+// 選抜・センターの選定（ユーザー自身が選ぶ）
+// ==========================================
+
+// 選抜が確定してロック中か
+function isSelectionLocked() {
+  return Boolean(selectionLock);
+}
+
+// 発表確定時にロックする
+function lockSelection(year, month, releaseType) {
+  selectionLock = { year, month, releaseType };
+}
+
+// 事件などでロックを解除する
+function unlockSelection(reason) {
+  if (!selectionLock) return false;
+  selectionLock = null;
+  setLog(`【選抜】${reason}のため、選抜とセンターを変更できるようになりました。`);
+  return true;
+}
+
+// 編成ページから手動で開く
+function openSelectionSetup() {
+  if (isSelectionLocked()) {
+    setLog(`【選抜】${selectionLock.year}年${selectionLock.month}月発表分は確定済みです。次作の選抜発表まで変更できません。`);
+    return;
   }
+  if (!pendingSelectionEvent) pendingSelectionEvent = createSelectionEvent({ trigger: 'manual' });
+  openSelectionModal();
+}
+
+function getSelectionSelectedIds() {
+  if (!pendingSelectionEvent) return new Set();
+  return new Set(pendingSelectionEvent.selectedIds || []);
+}
+
+// 選抜のチェックを切り替える
+function toggleSelectionMember(memberId) {
+  if (!pendingSelectionEvent) return;
+  const ids = new Set(pendingSelectionEvent.selectedIds || []);
+  if (ids.has(memberId)) {
+    if (ids.size <= MIN_SELECTION_SIZE) {
+      setLog(`【選抜】最少${MIN_SELECTION_SIZE}名は必要です。`);
+      return;
+    }
+    ids.delete(memberId);
+    if (pendingSelectionEvent.centerId === memberId) {
+      pendingSelectionEvent.centerId = ids.values().next().value ?? null;
+    }
+  } else {
+    ids.add(memberId);
+  }
+  pendingSelectionEvent.selectedIds = [...ids];
+  renderSelectionModal();
+}
+
+// センターを変更する（選抜内に限定）
+function setSelectionCenter(memberId) {
+  if (!pendingSelectionEvent) return;
+  const ids = getSelectionSelectedIds();
+  if (!ids.has(memberId)) return;
+  pendingSelectionEvent.centerId = memberId;
+  renderSelectionModal();
+}
+
+// 選抜とセンターを確定する
+function confirmSelection() {
+  if (!pendingSelectionEvent) return;
+  const ids = getSelectionSelectedIds();
+  if (ids.size < MIN_SELECTION_SIZE) {
+    setLog(`【選抜】少なくとも${MIN_SELECTION_SIZE}名を選んでください。`);
+    return;
+  }
+  const centerId = ids.has(pendingSelectionEvent.centerId)
+    ? pendingSelectionEvent.centerId
+    : [...ids][0];
+  idolRoster.forEach(member => {
+    member.isSelected = ids.has(member.id);
+    member.isCenter = member.id === centerId;
+  });
+  const center = idolRoster.find(member => member.id === centerId);
+  const isRelease = pendingSelectionEvent.trigger === 'release';
+  // 発表で確定した場合は、次作の発表まで変更不可になる
+  if (isRelease) {
+    lockSelection(pendingSelectionEvent.year, pendingSelectionEvent.month, pendingSelectionEvent.releaseType);
+  }
+  pendingSelectionEvent = null;
+  document.getElementById('selection-modal').style.display = 'none';
+  setLog(isRelease
+    ? `【選抜決定】センターは【${center ? center.name : '未定'}】！ ${ids.size}名の選抜体制を敷きました。`
+    : `【編成変更】センターは【${center ? center.name : '未定'}】！ ${ids.size}名の選抜に変更しました。`);
+  updateUI();
+}
+
+function cancelSelection() {
+  pendingSelectionEvent = null;
+  document.getElementById('selection-modal').style.display = 'none';
+  setLog('【編成】選抜の変更を中止しました。');
+  updateUI();
+}
+
+function renderSelectionModal() {
+  const event = pendingSelectionEvent;
+  if (!event) return;
+  const ids = getSelectionSelectedIds();
+  const isRelease = event.trigger === 'release';
+  const title = isRelease && event.month
+    ? `選抜発表（${event.year}年${event.month}月発売）`
+    : '選抜・センターを変更';
+
+  const centerOptions = [...ids].map(id => idolRoster.find(member => member.id === id)).filter(Boolean);
+  const centerMember = centerOptions.find(member => member.id === event.centerId);
+  const centerRow = centerOptions.length
+    ? `<div class="selection-center">
+        <div class="selection-subtitle">センターを選ぶ<small>選抜の中から1名</small></div>
+        <div class="selection-center-list">
+          ${centerOptions.map(member => `
+            <button type="button" class="selection-center-btn${member.id === event.centerId ? ' active' : ''}"
+              onclick="setSelectionCenter(${member.id})">
+              ${escapeHtml(formatMemberDisplayName(member))}
+              <small>総評${calculateSingleOverall(member.stats)} / 人気${member.stats.popularity || 0}</small>
+            </button>
+          `).join('')}
+        </div>
+      </div>`
+    : '';
+
+  const memberRows = idolRoster.map(member => {
+    const overall = calculateSingleOverall(member.stats);
+    const rInfo = getRankData(overall);
+    const selected = ids.has(member.id);
+    return `
+      <button type="button" class="selection-member${selected ? ' selected' : ''}"
+        onclick="toggleSelectionMember(${member.id})">
+        <span class="selection-check">${selected ? '✓' : ''}</span>
+        <span class="selection-name">${escapeHtml(formatMemberDisplayName(member))}${member.isCenter ? '<i class="selection-crown">C</i>' : ''}</span>
+        <span class="selection-meta">${member.age}歳 / 体力${member.staminaValue}${member.injury ? ` / ${escapeHtml(member.injury.type)}` : ''}</span>
+        <span class="selection-score" style="color:${rInfo.color};">${overall}</span>
+      </button>
+    `;
+  }).join('');
+
+  const confirmDisabled = ids.size < MIN_SELECTION_SIZE ? 'disabled' : '';
+  document.getElementById('selection-modal').innerHTML = `
+    <div class="modal-content">
+      <h3 class="page-title" style="margin-top:0;">${escapeHtml(title)}</h3>
+      <p style="font-size:11px; color:#666; line-height:1.6;">
+        グループ成績・売上・ファン数・レッスン経験値のすべてに反映されます。チェックしたメンバーが選抜になり、選抜の中からセンターを1名選んでください。
+      </p>
+      <div class="selection-summary">
+        選抜 <strong>${ids.size}</strong> / ${idolRoster.length}名
+        <span class="selection-summary-center">センター: <strong>${escapeHtml(centerMember ? formatMemberDisplayName(centerMember) : '未選択')}</strong></span>
+      </div>
+      <div class="selection-grid">${memberRows}</div>
+      ${centerRow}
+      <div class="actions" style="flex-direction:row; gap:6px; margin-top:12px;">
+        <button class="danger-btn" style="flex:1; padding:10px;" onclick="cancelSelection()">やめる</button>
+        <button class="main-btn" style="flex:2;" onclick="confirmSelection()" ${confirmDisabled}>この内容で決定</button>
+      </div>
+    </div>
+  `;
+}
+
+function openSelectionModal() {
+  if (!pendingSelectionEvent) return;
+  renderSelectionModal();
+  document.getElementById('selection-modal').style.display = 'flex';
 }
 
 function openMusicOfferModal() {
@@ -4470,6 +4827,7 @@ function executeYearEndAwards() {
 function processYearEndAgingAndGraduation() {
   idolRoster.forEach(m => { m.yearsActive++; });
   const remaining = [];
+  let graduatedCount = 0;
 
   for (let m of idolRoster) {
     let graduate = false;
@@ -4521,6 +4879,8 @@ function processYearEndAgingAndGraduation() {
 
     if (!graduate) {
       remaining.push(m);
+    } else {
+      graduatedCount += 1;
     }
   }
 
@@ -4528,6 +4888,8 @@ function processYearEndAgingAndGraduation() {
   if (!idolRoster.some(m => m.isCenter) && idolRoster.length > 0) {
     idolRoster[0].isCenter = true;
   }
+  // 卒業で選抜が欠けた場合は編成を見直す
+  if (graduatedCount > 0) unlockSelection('メンバーの卒業');
 }
 
 function promptGraduationPlan(member) {
@@ -5055,14 +5417,12 @@ function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
   const members = idolRoster.filter(member => member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
+  const focusIds = new Set(weeklySchedule.focusMemberIds || []);
+  const focusLimit = getSpecialTrainingTargetLimit();
+  const specialMultiplier = getSpecialTrainingMultiplier();
   const memberOptions = idolRoster
     .filter(member => !member.injury)
-    .map(member => `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${member.name}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`)
-    .join('');
-
-  const focusOptions = idolRoster
-    .filter(member => !member.injury)
-    .map(member => `<option value="${member.id}" ${member.id === weeklySchedule.focusMemberId ? 'selected' : ''}>${escapeHtml(`${member.name}（体力値${member.staminaValue}）`)}</option>`)
+    .map(member => `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`)
     .join('');
 
   // 残体力が低いメンバーにはマネージャーが休養日を打診する
@@ -5070,7 +5430,7 @@ function renderWeeklyScheduleControls() {
     !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
   );
   const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">マネージャーから休養打診: ${fatiguedMembers.map(member => escapeHtml(`${member.name}（体力値${member.staminaValue}）`)).join('、')}</div>`
+    ? `<div class="schedule-note warn">マネージャーから休養打診: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
     : '';
 
   const lessonStatOptions = INDIVIDUAL_LESSON_STATS
@@ -5081,15 +5441,16 @@ function renderWeeklyScheduleControls() {
     .join('');
 
   const slotRows = weeklySchedule.slots.map((slotId, index) => {
-    const options = ['<option value="">— 空き枠 —</option>']
+    const options = ['<option value="">— 空き —</option>']
       .concat(WEEKLY_SCHEDULE_ITEMS.map(item =>
         `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`
       ))
       .join('');
+    const canRemove = weeklySchedule.slots.length > 1;
     return `
       <div class="schedule-slot-row">
-        <span class="schedule-slot-label">枠${index + 1}</span>
         <select aria-label="スケジュール枠${index + 1}" onchange="setWeeklyScheduleSlot(${index}, this.value)">${options}</select>
+        <button type="button" class="slot-remove-btn" onclick="removeWeeklyScheduleSlot(${index})" ${canRemove ? '' : 'disabled'} aria-label="枠${index + 1}を削除">×</button>
       </div>
     `;
   }).join('');
@@ -5101,30 +5462,46 @@ function renderWeeklyScheduleControls() {
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
         onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
-        ${escapeHtml(member.name)}${member.injury ? `（${member.injury.type}）` : ` <small>${member.staminaValue}</small>`}
+        ${escapeHtml(formatMemberDisplayName(member))}${member.injury ? `（${member.injury.type}）` : ` <small>${member.staminaValue}</small>`}
       </button>
     `;
   }).join('');
 
-  const focusDisabled = hasScheduledLessons() ? '' : 'disabled';
+  const focusToggles = members.filter(member => !member.injury).map(member => {
+    const isFocus = focusIds.has(member.id);
+    const atLimit = !isFocus && focusIds.size >= focusLimit;
+    return `
+      <button type="button" class="rest-toggle focus${isFocus ? ' active' : ''}"
+        onclick="toggleFocusMember(${member.id})" ${atLimit ? 'disabled' : ''}
+        title="特別強化（${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍）">
+        ${escapeHtml(formatMemberDisplayName(member))} <small>${member.staminaValue}</small>
+      </button>
+    `;
+  }).join('');
+
   const lessonExp = getWeeklyLessonExperience();
+  const schedTier = getManagerSkillTier('scheduling');
+  const mentalTier = getManagerSkillTier('mentalCare');
+  const riskTier = getManagerSkillTier('riskControl');
+  const leadTier = getManagerSkillTier('leadership');
 
   return `
     <div class="schedule-block">
-      <div class="schedule-block-title">グループスケジュール <small>枠: ${weeklySchedule.slots.length}（スケジュール管理力 合計${getManagerSkillTier('scheduling').total} / ${escapeHtml(getManagerSkillTier('scheduling').label)}）</small></div>
+      <div class="schedule-block-title">グループスケジュール <small>自由に追加・削除できます</small></div>
       ${slotRows}
-      <div class="schedule-note">レッスン1回の経験値: 約${lessonExp}（事務所 レッスン設備・統率力で変動）</div>
+      <button type="button" class="slot-add-btn" onclick="addWeeklyScheduleSlot()">＋ 枠を追加</button>
+      <div class="schedule-note">レッスン1回の経験値: 約${lessonExp}（事務所 レッスン設備で変動）</div>
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">特別強化 <small>グループレッスンの${SPECIAL_TRAINING_MULTIPLIER}倍</small></div>
-      <select aria-label="特別強化の対象メンバー" onchange="setWeeklyScheduleField('focusMemberId', this.value)" ${focusDisabled}>
-        ${focusOptions || '<option value="">対象なし</option>'}
-      </select>
+      <div class="schedule-block-title">特別強化 <small>対象にチェック（上限${focusLimit}名）</small></div>
+      <div class="schedule-note">対象にはグループレッスンの <strong>${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍</strong> の経験値を得られます。</div>
+      <div class="schedule-note">統率力 ${escapeHtml(leadTier.label)}: 倍率 / スケジュール管理力 ${escapeHtml(schedTier.label)}: 強化人数 / メンタルケア ${escapeHtml(mentalTier.label)}: 体力消費軽減 / リスクマネジメント ${escapeHtml(riskTier.label)}: ケガ率低減</div>
+      <div class="rest-toggle-grid">${focusToggles || '<div class="schedule-note">強化できるメンバーがいません。</div>'}</div>
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン <small>1枠を消費 / 対象1名</small></div>
+      <div class="schedule-block-title">個別レッスン <small>枠を1つ使って対象1名を集中育成</small></div>
       <select aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', this.value)">
         ${memberOptions || '<option value="">メンバーなし</option>'}
       </select>
@@ -5134,7 +5511,7 @@ function renderWeeklyScheduleControls() {
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">休養日の設定 <small>体力値の回復が大幅アップ</small></div>
+      <div class="schedule-block-title">休養日の設定 <small>枠を消費せず体力値を回復</small></div>
       ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
@@ -5474,6 +5851,18 @@ function updateUI() {
   document.getElementById('txt-year-sales').textContent = `${yearlyStats.sales.toLocaleString()} 枚`;
   document.getElementById('txt-year-audience').textContent = `${yearlyStats.audience.toLocaleString()} 人`;
   document.getElementById('txt-roster-count').textContent = idolRoster.length;
+  const selectedCountEl = document.getElementById('txt-selected-count');
+  if (selectedCountEl) selectedCountEl.textContent = idolRoster.filter(member => member.isSelected).length;
+  // 選抜が確定している間は変更ボタンを無効化する
+  const selectionButton = document.getElementById('btn-selection-setup');
+  if (selectionButton) {
+    const locked = isSelectionLocked();
+    selectionButton.disabled = locked;
+    selectionButton.textContent = locked
+      ? `選抜確定済み（${selectionLock.year}年${selectionLock.month}月）`
+      : '選抜・センターを変更する';
+    selectionButton.style.opacity = locked ? '0.6' : '1';
+  }
   document.getElementById('txt-group-fans').textContent = calculateGroupFans().toLocaleString();
   document.getElementById('txt-group-crisis').textContent = groupCrisis;
   document.getElementById('txt-effective-crisis').textContent = calculateGroupCrisisResilience();
@@ -5521,7 +5910,7 @@ function updateUI() {
     currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
     merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
     nextLivePromotionPoints, crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
-    pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent,
+    pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent, pendingSelectionEvent, selectionLock,
     fanClub, fanClubFoundedYear, pendingFanClubEvent,
     industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
     pendingEquipmentEvent, equipmentEventCheckWeekKey, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
@@ -5564,6 +5953,19 @@ function renderSongLibrary() {
     }).join('');
 }
 
+// 名前の表示：フルネーム（苗字＋名）に読みを括弧で添える
+// 名前にひらがなが既に含まれている場合はそのまま表示する（読みが重複するため付けない）
+function formatMemberDisplayName(member) {
+  const name = String(member?.name || '');
+  const reading = String(member?.reading || '');
+  if (!reading) return name;
+  // 苗字を除いた「名」部分にひらがなが含まれるか
+  const spaceIndex = name.indexOf(' ');
+  const givenName = spaceIndex >= 0 ? name.slice(spaceIndex + 1) : name;
+  const hasKanaInName = /[\u3041-\u3096\u309D-\u309F]/.test(givenName);
+  return hasKanaInName ? name : `${name}（${reading}）`;
+}
+
 function renderRosterList() {
   const listUI = document.getElementById('roster-list-ui');
   listUI.innerHTML = '';
@@ -5584,10 +5986,9 @@ function renderRosterList() {
       <details class="member-details">
         <summary class="member-row member-summary">
           <div>
-            <span style="font-size:9px; color:#e91e63;">${m.reading}</span>
             <span style="font-size:10px; color:#777;">(${m.age}歳/${formatHeight(m.height)}/在籍${m.yearsActive}年・誕生日 ${m.birthdayMonth}月${m.birthdayDay}日)</span>
               <div style="font-weight:bold;">
-                ${escapeHtml(m.name)} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''} ${injuryTag}
+                ${escapeHtml(formatMemberDisplayName(m))} ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''} ${injuryTag}
             </div>
             <span class="member-fan-count">個人推定ファン ${calculateMemberFans(m).toLocaleString()}人 / 年収 ${formatMoney(getMemberAnnualSalary(m))}</span>
           </div>
