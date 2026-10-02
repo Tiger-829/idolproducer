@@ -8,13 +8,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>日本一のアイドル事務所を作ろう</title>
   
-  <link rel="manifest" href="./manifest.json?v=1">
+  <link rel="manifest" href="./manifest.json?v=3">
   <meta name="theme-color" content="#e91e63">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="アイドル育成">
 
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=3">
 </head>
 <body>
 
@@ -155,6 +155,10 @@
 
   <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
     <h2 class="page-title">最新の記録</h2>
+    <div class="records-log-head">
+      <span class="records-log-label">出来事ログ</span>
+      <button class="ghost-btn small" type="button" onclick="openDraftPractice()">ドラフト疑似体験</button>
+    </div>
     <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
     <div id="tv-fx-layer" class="tv-fx-layer" aria-hidden="true"></div>
 
@@ -260,6 +264,7 @@
 <div class="modal-overlay" id="draft-modal">
   <div class="modal-content">
     <h3 class="page-title" style="margin:0 0 8px;" id="draft-title">ドラフト会議</h3>
+    <p id="draft-notice" style="margin:0 0 6px; font-size:11px; color:#b5651d;"></p>
     <p id="draft-intro" style="font-size:12px; color:#555; line-height:1.7;"></p>
     <div id="draft-standings"></div>
     <div id="draft-body"></div>
@@ -309,20 +314,20 @@
   </div>
 </div>
 
-<script src="./js/01-constants.js"></script>
-<script src="./js/02-state.js"></script>
-<script src="./js/03-venue.js"></script>
-<script src="./js/04-members.js"></script>
-<script src="./js/05-calc.js"></script>
-<script src="./js/06-progress.js"></script>
-<script src="./js/07-schedule.js"></script>
-<script src="./js/08-events.js"></script>
-<script src="./js/09-selection-draft.js"></script>
-<script src="./js/10-ui-panels.js"></script>
-<script src="./js/11-ui-roster.js"></script>
-<script src="./js/12-ui-plan-save.js"></script>
-<script src="./js/13-help.js"></script>
-<script src="./js/14-ui-records.js"></script>
+<script src="./js/01-constants.js?v=3"></script>
+<script src="./js/02-state.js?v=3"></script>
+<script src="./js/03-venue.js?v=3"></script>
+<script src="./js/04-members.js?v=3"></script>
+<script src="./js/05-calc.js?v=3"></script>
+<script src="./js/06-progress.js?v=3"></script>
+<script src="./js/07-schedule.js?v=3"></script>
+<script src="./js/08-events.js?v=3"></script>
+<script src="./js/09-selection-draft.js?v=3"></script>
+<script src="./js/10-ui-panels.js?v=3"></script>
+<script src="./js/11-ui-roster.js?v=3"></script>
+<script src="./js/12-ui-plan-save.js?v=3"></script>
+<script src="./js/13-help.js?v=3"></script>
+<script src="./js/14-ui-records.js?v=3"></script>
 
 </body>
 </html>

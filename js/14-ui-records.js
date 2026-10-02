@@ -19,6 +19,20 @@ function formatChartWeekLabel(weekKey) {
 // ==========================================
 // 記録タブ（売上推移・楽曲一覧・初週売上ランキング）
 // ==========================================
+// 保持するログの件数（古いものから捨てる）
+const LOG_HISTORY_LIMIT = 60;
+
+// ログ履歴を「新しい順」のリストとして描画する
+function renderLogList() {
+  const box = document.getElementById('log-box');
+  if (!box) return;
+  if (!Array.isArray(logHistory) || !logHistory.length) return;
+  box.innerHTML = logHistory.map((entry, index) => `
+    <div class="log-entry${index === 0 ? ' is-latest' : ''}">
+      <span class="log-date">${escapeHtml(String(entry.date || ''))}</span>
+      <span class="log-text">${escapeHtml(String(entry.text || ''))}</span>
+    </div>`).join('');
+}
 // 外部ライブラリなしで折れ線グラフのSVGを描く
 // points は [{ label, value }] の配列
 function buildLineChartSvg(points, options = {}) {

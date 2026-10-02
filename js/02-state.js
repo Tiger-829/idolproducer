@@ -82,6 +82,8 @@ let yearlyStats = { sales: 0, audience: 0 };
 let lifetimeSales = 0;
 // CD累積売上の週次推移（記録タブのグラフ用。直近1年分だけ保持する）
 let salesHistory = [];
+// 出来事ログの履歴（記録タブで newest を上に並べる）
+let logHistory = [];
 let funds = INITIAL_FUNDS;
 
 // 競合チーム（初期6チーム）

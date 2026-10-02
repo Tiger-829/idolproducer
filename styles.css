@@ -1214,7 +1214,23 @@
     @media (prefers-reduced-motion: reduce) {
       .tv-fx-card, .tv-fx-bar { animation: none; }
     }
-    .help-modal-content { max-width: 560px; }
+    /* 記録タブ：ログ欄とドラフト疑似体験 */
+.records-log-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.records-log-label { font-size: 12px; font-weight: 700; color: #555; }
+.ghost-btn.small { padding: 5px 10px; font-size: 11px; }
+#log-box .log-entry {
+  display: flex; gap: 6px; align-items: baseline;
+  padding: 4px 0; border-bottom: 1px dashed #eee;
+}
+#log-box .log-entry:last-child { border-bottom: none; }
+#log-box .log-date { flex: none; color: #aaa; font-size: 9px; white-space: nowrap; }
+#log-box .log-text { flex: 1; word-break: break-word; }
+#log-box .log-entry.is-latest { font-weight: 700; }
+
+.help-modal-content { max-width: 560px; }
     .help-body { max-height: 66vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .help-section { padding: 10px 0; border-bottom: 1px solid #f0e4e8; }
     .help-section:last-child { border-bottom: none; }
@@ -1332,5 +1348,105 @@
     .draft-lottery.win { background: #e8f5e9; border: 1px solid #66bb6a; }
     .draft-lottery.lose { background: #ffebee; border: 1px solid #e57373; }
     .draft-lottery.none { background: #f5f1f2; border: 1px solid #ddd; }
+    /* 名予記位パンル（リスト関覧） */
+    /* 指名パンル：現状コーグー */
+    .draft-status {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-top: 8px; padding: 6px 8px;
+      background: #fdf2f4; border: 1px solid #f3d3dc; border-radius: 6px;
+    }
+    .draft-status span {
+      padding: 2px 8px; background: #fff; border: 1px solid #f3d3dc;
+      border-radius: 10px; font-size: 10px; color: #666;
+    }
+    .draft-note {
+      margin-top: 6px; padding: 7px 10px;
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
+      font-size: 10px; color: #7a5c00; line-height: 1.6;
+    }
+
+    /* 他チームの指名履歴 */
+    .draft-picklog {
+      margin-top: 8px; padding: 8px 10px;
+      background: #fafafa; border: 1px solid #eee; border-radius: 6px;
+    }
+    .draft-picklog.is-empty { color: #999; font-size: 10px; }
+    .draft-picklog-head { margin-bottom: 4px; font-size: 10px; font-weight: 700; color: #666; }
+    .draft-picklog-row {
+      display: flex; align-items: baseline; gap: 6px;
+      padding: 2px 0; font-size: 10px; color: #555;
+    }
+    .draft-picklog-row.is-player { color: var(--primary); font-weight: 700; }
+    .draft-picklog-round { flex: none; color: #aaa; min-width: 26px; }
+    .draft-picklog-team { flex: none; color: #888; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .draft-picklog-member { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .draft-picklog-tag {
+      flex: none; padding: 1px 5px;
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px;
+      color: #7a5c00; font-size: 9px;
+    }
+
+    /* 指名済みリスト */
+    .draft-acquired-list {
+      margin-top: 8px; padding: 8px 10px;
+      background: #fdf2f4; border: 1px solid #f3d3dc; border-radius: 6px;
+    }
+    .draft-acquired-list.is-empty { background: #fafafa; border-color: #eee; color: #999; font-size: 11px; }
+    .draft-acquired-head { margin-bottom: 4px; font-size: 11px; font-weight: 700; color: var(--primary); }
+    .draft-acquired-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .draft-acquired-tags span {
+      padding: 2px 7px; background: #fff; border: 1px solid #eee;
+      border-radius: 10px; font-size: 10px; color: #555;
+    }
+
+    /* 名指しパネルの並び替え */
+    .draft-sort-bar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+      margin-top: 8px; padding: 6px 8px;
+      background: #fafafa; border: 1px solid #eee; border-radius: 6px;
+    }
+    .draft-sort-label { margin-right: 2px; font-size: 10px; color: #888; }
+    .draft-sort-btn {
+      padding: 4px 9px; border: 1px solid #e2e2e2; border-radius: 12px;
+      background: #fff; color: #555; font-family: inherit; font-size: 10px; cursor: pointer;
+    }
+    .draft-sort-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
+
+    .draft-list-head {
+      display: flex; justify-content: space-between;
+      margin-top: 8px; font-size: 10px; color: #777;
+    }
+    .draft-pager { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
+    .draft-pager button[disabled] { opacity: 0.4; }
+    .draft-progress { font-size: 11px; color: #777; text-align: center; margin-bottom: 6px; }
+
+    /* きじ引き（回っていたチームが順に引き） */
+    .draft-lottery-target {
+      margin: 8px 0 4px; padding: 8px 10px;
+      background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
+      font-size: 12px;
+    }
+    .draft-lottery-list { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; }
+    .draft-lottery-row {
+      display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
+      gap: 8px; align-items: center;
+      padding: 7px 10px; font-size: 12px;
+      background: #fafafa; border: 1px solid #eee; border-radius: 6px;
+    }
+    .draft-lottery-row.is-turn {
+      background: #fdf2f4; border-color: var(--primary);
+      animation: draft-turn-pulse 1.2s ease-in-out infinite;
+    }
+    .draft-lottery-row.is-winner { background: #e8f5e9; border-color: #66bb6a; font-weight: 700; }
+    .draft-lottery-no { color: #999; text-align: center; }
+    .draft-lottery-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .draft-lottery-state { color: #777; font-size: 10px; white-space: nowrap; }
+    @keyframes draft-turn-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(216, 27, 96, 0); }
+      50% { box-shadow: 0 0 0 3px rgba(216, 27, 96, 0.18); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .draft-lottery-row.is-turn { animation: none; }
+    }
     .draft-acquired { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 10px; color: #555; }
     .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }

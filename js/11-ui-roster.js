@@ -297,7 +297,12 @@ function renderRosterList() {
 }
 
 function setLog(msg) {
+  // 記録タブで過去の出来事を追溯できるよう、履歴にも残す（新しい順）
+  if (!Array.isArray(logHistory)) logHistory = [];
+  logHistory.unshift({ date: gameDate, text: String(msg) });
+  if (logHistory.length > LOG_HISTORY_LIMIT) logHistory.length = LOG_HISTORY_LIMIT;
   document.getElementById('log-box').textContent = msg;
+  renderLogList();
   // テレビ関連の放送であれば画面演出を出す
   playTvEffectFromLog(msg);
 }

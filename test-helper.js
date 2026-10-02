@@ -11,7 +11,9 @@ const path = require('path');
 function loadGameHtml(root = __dirname) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   let inlined = html.replace(/<script\s+src="([^"]+)"\s*><\/script>/g, (_, src) => {
-    const target = path.join(root, src.replace(/^\.\//, '').replace(/^\//, ''));
+    // クエリ引数（?v=1 など）を除いてパスを求める
+    const cleanSrc = src.split('?')[0];
+    const target = path.join(root, cleanSrc.replace(/^\.\//, '').replace(/^\//, ''));
     if (!fs.existsSync(target)) {
       throw new Error(`index.html が参照しているファイルが見つかりません: ${src}`);
     }

@@ -394,11 +394,20 @@ function runGraduationPlan(member, choice, regularVenueName) {
 // ==========================================
 // ドラフト会議（逆ウェーバー方式）
 // ==========================================
-const DRAFT_MIN_PICKS = 10;
-const DRAFT_MAX_PICKS = 15;
-const DRAFT_CANDIDATE_COUNT = 5;
+// 指名パネルの並び替え項目（5項目）
+const DRAFT_SORT_KEYS = [
+  { id: 'overall', name: '総評', get: member => calculateSingleOverall(member.stats) },
+  { id: 'popularity', name: '人気', get: member => member.stats.popularity || 0 },
+  { id: 'style', name: 'スタイル', get: member => member.stats.style || 0 },
+  { id: 'fashion', name: 'ファッション', get: member => member.stats.fashion || 0 },
+  { id: 'vocal', name: '歌唱力', get: member => member.stats.vocal || 0 }
+];
+const DRAFT_LIST_PAGE_SIZE = 8;
 // 1位指名で他チームと重複する確率
 const DRAFT_TOP_OVERLAP_RATE = 0.45;
+// くじ引きで各チームが獲得できる確率（順位が下がるほど低下）
+const DRAFT_LOTTERY_FIRST_CHANCE = 0.6;
+const DRAFT_LOTTERY_CHANCE_STEP = 0.4;
 
 let draftState = null;
 
@@ -497,13 +506,15 @@ function startDraftMeeting() {
   const playerRank = pickOrder.findIndex(team => team.isPlayer) + 1;
   draftState = {
     round: 1,
-    pickTotal: DRAFT_MIN_PICKS,
     acquired: [],
     ranked,
     pickOrder,
     playerRank,
     playerTeam,
-    phase: 'select-count'
+    page: 0,
+    pickLog: [],
+    lostCount: 0,
+    phase: 'picking'
   };
   openDraftModal();
 }
@@ -511,14 +522,50 @@ function startDraftMeeting() {
 function openDraftModal() {
   if (!draftState) return;
   const state = draftState;
+  // 練習モードはタイトルで明示する（本番ドラフトと混同しないため）
+  const roundLabel = state.isPractice ? '練習' : `第${draftCount}回`;
   document.getElementById('draft-title').textContent =
-    state.phase === 'done' ? 'ドラフト会議 结果' : `ドラフト会議（第${draftCount}回）`;
+    state.phase === 'done' ? `ドラフト会議 结果（${roundLabel}）` : `ドラフト会議（${roundLabel}）`;
+  const notice = document.getElementById('draft-notice');
+  if (notice) notice.textContent = state.isPractice ? '疑似体験：獲得した候補者は実際の名簿に入りません。' : '';
 
-  if (state.phase === 'select-count') renderDraftCountStep();
-  else if (state.phase === 'picking') renderDraftPickStep();
+  if (state.phase === 'picking') renderDraftPickStep();
+  else if (state.phase === 'lottery') renderDraftLotteryStep();
   else renderDraftDoneStep();
 
   document.getElementById('draft-modal').style.display = 'flex';
+}
+
+// 疑似体験（練習モード）のドラフト会議を起動する
+// 実際の名簿・リーグ構成・開催回数には一切影響しない
+function startPracticeDraft() {
+  if (draftState) return;
+  const { ranked, pickOrder } = buildDraftStandings();
+  const playerTeam = ranked.find(team => team.isPlayer);
+  const playerRank = pickOrder.findIndex(team => team.isPlayer) + 1;
+  draftState = {
+    round: 1,
+    acquired: [],
+    ranked,
+    pickOrder,
+    playerRank,
+    playerTeam,
+    isPractice: true,
+    page: 0,
+    pickLog: [],
+    lostCount: 0,
+    phase: 'picking'
+  };
+  openDraftModal();
+}
+
+// ドラフト経験の入口（記録タブのボタンから呼ぶ）
+function openDraftPractice() {
+  if (draftState) {
+    openDraftModal();
+    return;
+  }
+  startPracticeDraft();
 }
 
 function renderDraftStandings() {
@@ -533,161 +580,364 @@ function renderDraftStandings() {
   return `<div class="draft-standings">${rows}</div>`;
 }
 
-// 獲得人数（10〜15名）を選ぶ
-function renderDraftCountStep() {
+// 名簿プールの参照（指名候補はここで生成し、以後は並び替えのみ行う）
+function getDraftPool() {
   const state = draftState;
-  document.getElementById('draft-intro').textContent =
-    `全国から13〜20歳の候補生が集結しました。前回ドラフト時点の総合値による順位は下表のとおりで、逆ウェーバー方式のため下位のグループから順に指名できます。あなたは${state.playerRank}位指名です。獲得する人数を選んでください。`;
-  document.getElementById('draft-standings').innerHTML = renderDraftStandings();
-  document.getElementById('draft-body').innerHTML = `
-    <div style="font-size:11px; color:#555; margin-top:6px;">獲得人数</div>
-    <div class="draft-pick-count" id="draft-count-picker">
-      ${Array.from({ length: DRAFT_MAX_PICKS - DRAFT_MIN_PICKS + 1 }, (_, i) => {
-        const count = DRAFT_MIN_PICKS + i;
-        return `<button type="button" class="${count === state.pickTotal ? 'active' : ''}" onclick="setDraftPickTotal(${count})">${count}</button>`;
+  if (!state) return [];
+  if (!state.pool) state.pool = buildDraftCandidatePool();
+  return state.pool;
+}
+
+// 候補者を指定の項目で並べ替える（元の追加を保持したまま、見た目だけ並べる）
+function sortDraftCandidates(pool, sortKey, sortDesc) {
+  const key = DRAFT_SORT_KEYS.find(entry => entry.id === sortKey) || DRAFT_SORT_KEYS[0];
+  const dir = sortDesc ? -1 : 1;
+  return pool
+    .map((member, index) => ({ member, index }))
+    .sort((a, b) => {
+      const diff = (key.get(a.member) - key.get(b.member)) * dir;
+      // 同じ値なら名前順にして、並びが毎回入れ替わらないようにする
+      return diff !== 0 ? diff : a.member.name.localeCompare(b.member.name, 'ja');
+    });
+}
+
+// 並び替え項目を選ぶ（同じ項目を再押すと昇順／降順が反転する）
+function setDraftSort(sortKey) {
+  const state = draftState;
+  if (!state || state.phase !== 'picking') return;
+  if (!DRAFT_SORT_KEYS.some(entry => entry.id === sortKey)) return;
+  if (state.sortKey === sortKey) state.sortDesc = !state.sortDesc;
+  else {
+    state.sortKey = sortKey;
+    state.sortDesc = true;
+  }
+  state.page = 0;
+  renderDraftPickStep();
+}
+
+// 並び替えボタン（5項目）
+function renderDraftSortBar() {
+  const state = draftState;
+  const active = state.sortKey || DRAFT_SORT_KEYS[0].id;
+  return `
+    <div class="draft-sort-bar">
+      <span class="draft-sort-label">並び替え</span>
+      ${DRAFT_SORT_KEYS.map(key => {
+        const isActive = active === key.id;
+        const arrow = isActive ? (state.sortDesc === false ? '（昇順）' : '（降順）') : '';
+        return `<button type="button" class="draft-sort-btn${isActive ? ' active' : ''}" onclick="setDraftSort('${key.id}')">${escapeHtml(key.name)}${arrow}</button>`;
       }).join('')}
     </div>`;
-  document.getElementById('draft-actions').innerHTML =
-    '<button class="main-btn" type="button" onclick="beginDraftPicking()">ドラフトを開始する</button>';
 }
 
-function setDraftPickTotal(count) {
-  if (!draftState) return;
-  draftState.pickTotal = Math.max(DRAFT_MIN_PICKS, Math.min(DRAFT_MAX_PICKS, count));
-  renderDraftCountStep();
-}
-
-function beginDraftPicking() {
-  if (!draftState) return;
-  draftState.phase = 'picking';
-  draftState.round = 1;
-  openDraftModal();
-}
-
-// プールから未指名の候補者を抽選して提示する
-function getDraftCandidates() {
-  if (!draftState) return [];
-  if (!draftState.pool) draftState.pool = buildDraftCandidatePool();
-  const picked = [];
-  const pool = draftState.pool;
-  const take = Math.min(DRAFT_CANDIDATE_COUNT, pool.length);
-  for (let i = 0; i < take; i++) {
-    const index = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(index, 1)[0]);
+// 指名済みリスト（このドラフトで既に獲得した候補者）
+function renderDraftAcquiredList() {
+  const state = draftState;
+  const acquired = state.acquired || [];
+  if (!acquired.length) {
+    return '<div class="draft-acquired-list is-empty">指名済みの人はまだいません</div>';
   }
-  return picked;
+  return `
+    <div class="draft-acquired-list">
+      <div class="draft-acquired-head">指名済み（${acquired.length}名）</div>
+      <div class="draft-acquired-tags">
+        ${acquired.map(member => `<span>${escapeHtml(member.name)}（${member.age}歳 / 総評${calculateSingleOverall(member.stats)}）</span>`).join('')}
+      </div>
+    </div>`;
 }
 
-// 1巡目は他チームと重複する可能性がある
-function rollDraftTopConflict() {
-  return draftState.round === 1 && Math.random() < DRAFT_TOP_OVERLAP_RATE;
-}
-
+// 指名パネル：指名状況と他チームの指名履歴を揃えて、候補者リストを並べ替え・ページ送りで閲覧する
 function renderDraftPickStep() {
   const state = draftState;
-  const candidates = state.candidates || (state.candidates = getDraftCandidates());
-  const isTopRound = state.round === 1;
+  const pool = getDraftPool();
+  if (!pool.length) {
+    finishDraft();
+    return;
+  }
+  const size = DRAFT_LIST_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(pool.length / size));
+  const page = Math.min(Math.max(0, state.page || 0), totalPages - 1);
+  state.page = page;
+  const sortKey = state.sortKey || DRAFT_SORT_KEYS[0].id;
+  const sortDesc = state.sortDesc !== false;
+  const ordered = sortDraftCandidates(pool, sortKey, sortDesc);
+  const rows = ordered.slice(page * size, page * size + size);
+  const isTopRound = state.round === 1 && !state.lostCount;
+  const lost = state.lostCount || 0;
+  const rivalTotal = (state.pickLog || []).filter(entry => !entry.isPlayer).length;
   const conflictRivals = isTopRound ? getDraftRivalNames(3) : [];
 
+  // 現在の状況を一言で示す（レイアウトの案内）
+  const statusLines = [];
+  statusLines.push(`${state.round}巡目・あなたの指名枠`);
+  statusLines.push(`獲得 ${state.acquired.length} 名`);
+  statusLines.push(`他チームの指名 ${rivalTotal} 件`);
+  if (lost) statusLines.push(`くじ落選 ${lost} 回（同じ指名枠で再指名できます）`);
+
+  const conflictNote = isTopRound
+    ? `<div class="draft-note">1巡目の指名は他のグループも注目しています。指名した候補者が重複するとくじ引きになります。</div>`
+    : '';
+
   document.getElementById('draft-intro').textContent = isTopRound
-    ? `1位指名です。他グループもSetelah注目している可能性があり、候補者が重複する可能性があります。${conflictRivals.length ? `（${conflictRivals.join('、')}が注目）` : ''}`
-    : `${state.round}位指名。候補生から1名を選んでください。`;
+    ? `1位指名です。他グループも注目している可能性があり、名指しした候補者は重複する可能性があります。${conflictRivals.length ? `（${conflictRivals.join('、')}が注目）` : ''}`
+    : `${state.round}位指名。候補者リストから 1 名を選んでください。${lost ? `（くじを引き落とした回数：${lost}回。同じ指名枠で続けて指名できます）` : ''}`;
 
   document.getElementById('draft-standings').innerHTML = renderDraftStandings();
   document.getElementById('draft-body').innerHTML = `
+    <div class="draft-status">
+      ${statusLines.map(text => `<span>${escapeHtml(text)}</span>`).join('')}
+    </div>
+    ${conflictNote}
+    ${renderDraftAcquiredList()}
+    ${renderDraftPickLog()}
+    ${renderDraftSortBar()}
+    <div class="draft-list-head">
+      <span>候補者 ${pool.length}名</span>
+      <span>${page + 1} / ${totalPages} ページ</span>
+    </div>
     <div class="draft-candidates">
-      ${candidates.map((member, index) => {
-        const overall = calculateSingleOverall(member.stats);
+      ${rows.map(row => {
+        const member = row.member;
         return `
-          <button class="draft-candidate" type="button" onclick="resolveDraftPick(${index})">
+          <button class="draft-candidate" type="button" onclick="resolveDraftPick(${row.index})">
             <div class="draft-candidate-name">${escapeHtml(member.name)} <small>${member.age}歳 / ${formatHeight(member.height)}（${member.birthYear}年${member.birthdayMonth}月${member.birthdayDay}日生）</small></div>
-            <div class="draft-candidate-score">総評 ${overall}</div>
+            <div class="draft-candidate-score">総評 ${calculateSingleOverall(member.stats)}</div>
             <div class="draft-candidate-stats">
               ${STATUS_KEYS.slice(0, 4).map(key =>
                 `<span>${key.name} ${member.stats[key.id] || 0}</span>`).join('')}
             </div>
           </button>`;
       }).join('')}
+    </div>
+    <div class="draft-pager">
+      <button type="button" class="ghost-btn small" onclick="changeDraftPage(-1)" ${page === 0 ? 'disabled' : ''}>前へ</button>
+      <button type="button" class="ghost-btn small" onclick="changeDraftPage(1)" ${page >= totalPages - 1 ? 'disabled' : ''}>次へ</button>
     </div>`;
-  document.getElementById('draft-actions').innerHTML =
-    `<div style="font-size:11px; color:#777; text-align:center;">${state.acquired.length} / ${state.pickTotal} 名獲得</div>`;
+  document.getElementById('draft-actions').innerHTML = `
+    <div class="draft-progress">指名済み ${state.acquired.length} 名</div>
+    <button class="main-btn" type="button" onclick="finishDraft()">ここまででドラフトを終了する</button>`;
+}
+
+
+// 他チームの指名履歴（巡ごとに下位のグループから指名している）
+function renderDraftPickLog() {
+  const state = draftState;
+  const log = state.pickLog || [];
+  if (!log.length) {
+    return '<div class="draft-picklog is-empty">まだ他チームの指名はありません</div>';
+  }
+  const recent = log.slice(-12).reverse();
+  return `
+    <div class="draft-picklog">
+      <div class="draft-picklog-head">指名履歴（直近12件）</div>
+      ${recent.map(entry => `
+        <div class="draft-picklog-row${entry.isPlayer ? ' is-player' : ''}">
+          <span class="draft-picklog-round">${entry.round}巡</span>
+          <span class="draft-picklog-team">${escapeHtml(entry.teamName)}</span>
+          <span class="draft-picklog-member">${escapeHtml(entry.memberName)}（${entry.age}歳 / 総評${entry.overall}）</span>
+          ${entry.viaLottery ? '<span class="draft-picklog-tag">くじ引き</span>' : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
+
+// 候補者リストのページを送る
+function changeDraftPage(delta) {
+  const state = draftState;
+  if (!state || state.phase !== 'picking') return;
+  state.page = Math.max(0, (state.page || 0) + delta);
+  renderDraftPickStep();
+}
+
+// 任意の人数で終了する（開始時に人数を絞り込ばない）
+function finishDraft() {
+  const state = draftState;
+  if (!state) return;
+  state.phase = 'done';
+  openDraftModal();
+}
+
+// 1位指名のみ、他チームと重複する可能性がある
+function rollDraftTopConflict() {
+  return draftState.round === 1 && Math.random() < DRAFT_TOP_OVERLAP_RATE;
+}
+
+// くじを引く権利が回ってきたチームから順に回ります
+function buildDraftLotteryOrder() {
+  const state = draftState;
+  const order = state.pickOrder || [];
+  const startIndex = order.findIndex(team => team.isPlayer);
+  if (startIndex < 0 || !order.length) return order.slice();
+  const rotated = [];
+  for (let i = 0; i < order.length; i++) rotated.push(order[(startIndex + i) % order.length]);
+  return rotated;
 }
 
 function resolveDraftPick(candidateIndex) {
   const state = draftState;
   if (!state || state.phase !== 'picking') return;
-  const candidate = state.candidates[candidateIndex];
+  const pool = getDraftPool();
+  const candidate = pool[candidateIndex];
   if (!candidate) return;
-  state.candidates = null;
 
-  const isTopRound = state.round === 1;
-  if (isTopRound && rollDraftTopConflict()) {
-    // 1位指名のみ、他チームと重複して抽選になる
-    const won = Math.random() < 0.6;
+  if (rollDraftTopConflict()) {
+    // 重複した場合はくじ引き画面に移り、回ってきたチームから順に引きます
+    pool.splice(candidateIndex, 1);
     state.phase = 'lottery';
-    state.lottery = { member: candidate, won, rivals: getDraftRivalNames(3) };
+    state.lottery = {
+      member: candidate,
+      order: buildDraftLotteryOrder(),
+      index: 0,
+      done: false,
+      winner: null,
+      keepRound: true
+    };
     openDraftModal();
     return;
   }
+  pool.splice(candidateIndex, 1);
   draftSignMember(candidate);
+  recordDraftPickLog(state, state.playerTeam, candidate, false);
   advanceDraftRound();
 }
 
 function draftSignMember(member) {
   member.isDraftCandidate = false;
-  idolRoster.push(member);
+  // 疑似体験では実際の名簿に加えない
+  if (!draftState || !draftState.isPractice) idolRoster.push(member);
   if (draftState) draftState.acquired.push(member);
 }
 
+// 指名履歴に 1 件追記する
+function recordDraftPickLog(state, team, member, viaLottery) {
+  if (!state || !team || !member) return;
+  if (!Array.isArray(state.pickLog)) state.pickLog = [];
+  state.pickLog.push({
+    round: state.round,
+    teamId: team.id,
+    teamName: team.name,
+    isPlayer: Boolean(team.isPlayer),
+    memberName: member.name,
+    age: member.age,
+    overall: calculateSingleOverall(member.stats),
+    viaLottery: Boolean(viaLottery)
+  });
+}
+
+// 同じ巡のうちに他チームも指名し、その履歴を残す
+function recordRivalPicks(state) {
+  const pool = getDraftPool();
+  const order = state.pickOrder || [];
+  order.forEach(team => {
+    if (team.isPlayer || !pool.length) return;
+    const index = Math.floor(Math.random() * pool.length);
+    const member = pool.splice(index, 1)[0];
+    recordDraftPickLog(state, team, member, false);
+  });
+}
+
+
+// くじ引き画面：回ってきたチームが順に引く。結果を確定する
 function renderDraftLotteryStep() {
   const state = draftState;
   const lottery = state.lottery;
-  document.getElementById('draft-intro').textContent = '1位指名の重複抽選が発生しました。';
+  const member = lottery.member;
+  document.getElementById('draft-intro').textContent =
+    `同じ候補者をもっと指名しようとしました。${escapeHtml(member.name)}の争いで、回ってきたチームからくじ引きの権利が回ります。`;
   document.getElementById('draft-standings').innerHTML = renderDraftStandings();
+
+  const rows = lottery.order.map((team, index) => {
+    let label;
+    if (index < lottery.index) label = '引き済み';
+    else if (index === lottery.index && !lottery.done) label = '引き中';
+    else if (lottery.done && lottery.winner === team) label = '獲得';
+    else label = '待ち';
+    return `
+      <div class="draft-lottery-row${index === lottery.index && !lottery.done ? ' is-turn' : ''}${lottery.done && lottery.winner === team ? ' is-winner' : ''}">
+        <span class="draft-lottery-no">${index + 1}</span>
+        <span class="draft-lottery-name">${escapeHtml(team.name)}${team.isPlayer ? '（自グループ）' : ''}</span>
+        <span class="draft-lottery-state">${label}</span>
+      </div>`;
+  }).join('');
+
   document.getElementById('draft-body').innerHTML = `
-    <div class="draft-lottery ${lottery.won ? 'win' : 'lose'}">
-      ${lottery.won
-        ? `【獲得】${escapeHtml(lottery.member.name)}を独占指名しました！`
-        : `【落選】${lottery.rivals.join('、')}が先に獲得しました。外れ1位で別の有望株を獲得しました。`}
-    </div>`;
-  document.getElementById('draft-actions').innerHTML =
-    '<button class="main-btn" type="button" onclick="resolveDraftLottery()">結果を確認する</button>';
+    <div class="draft-lottery-target">争いの候補：${escapeHtml(member.name)}（総評 ${calculateSingleOverall(member.stats)}）</div>
+    <div class="draft-lottery-list">${rows}</div>
+    ${lottery.done ? `
+      <div class="draft-lottery ${lottery.winner && lottery.winner.isPlayer ? 'win' : 'lose'}">
+        ${lottery.winner && lottery.winner.isPlayer
+          ? `【獲得】${escapeHtml(lottery.winner.name)}が${escapeHtml(member.name)}を獲得しました。`
+          : `【落選】${escapeHtml(lottery.winner ? lottery.winner.name : '他チーム')}が先に獲得しました。`}
+      </div>` : ''}`;
+  document.getElementById('draft-actions').innerHTML = lottery.done
+    ? '<button class="main-btn" type="button" onclick="resolveDraftLottery()">結果を確認する</button>'
+    : '<button class="main-btn" type="button" onclick="advanceDraftLottery()">下のチームを引く</button>';
+}
+
+// くじ引きを1チームだけ進める（順位が下がるほど確率が下がる）
+function advanceDraftLottery() {
+  const state = draftState;
+  if (!state || state.phase !== 'lottery' || state.lottery.done) return;
+  const lottery = state.lottery;
+  lottery.index++;
+  if (lottery.index >= lottery.order.length) {
+    lottery.done = true;
+    lottery.winner = lottery.order[lottery.order.length - 1];
+  } else {
+    const chance = Math.max(0.1, DRAFT_LOTTERY_FIRST_CHANCE - lottery.index * DRAFT_LOTTERY_CHANCE_STEP * 0.35);
+    if (Math.random() < chance) {
+      lottery.done = true;
+      lottery.winner = lottery.order[lottery.index];
+    }
+  }
+  renderDraftLotteryStep();
 }
 
 function resolveDraftLottery() {
   const state = draftState;
   if (!state || state.phase !== 'lottery') return;
-  if (state.lottery.won) {
-    draftSignMember(state.lottery.member);
-  } else {
-    // 外れ1位：無指名でプールから有望株を1名獲得
-    const consolation = getDraftCandidates()[0];
-    if (consolation) {
-      consolation.isDraftCandidate = false;
-      idolRoster.push(consolation);
-      state.acquired.push(consolation);
-    }
+  const lottery = state.lottery;
+  const member = lottery.member;
+  const winner = lottery.winner;
+  const won = Boolean(winner && winner.isPlayer);
+
+  if (won) {
+    draftSignMember(member);
+    recordDraftPickLog(state, state.playerTeam, member, true);
+    advanceDraftRound();
+    return;
   }
+
+  // 落選：現実のドラフトと同じく、この指名枠はそのまま次の指名に使える
+  recordDraftPickLog(state, winner, member, true);
   state.lottery = null;
-  advanceDraftRound();
+  state.page = 0;
+  if (getDraftPool().length) {
+    state.phase = 'picking';
+    state.lostCount = (state.lostCount || 0) + 1;
+    openDraftModal();
+  } else {
+    state.phase = 'done';
+    openDraftModal();
+  }
 }
 
 function advanceDraftRound() {
   const state = draftState;
+  // 同じ巡のうちに他チームも指名する（指名順は下位から上位）
+  recordRivalPicks(state);
   state.round++;
-  if (state.acquired.length >= state.pickTotal) {
-    state.phase = 'done';
-  } else {
-    state.phase = 'picking';
-  }
+  state.page = 0;
+  state.phase = getDraftPool().length ? 'picking' : 'done';
   openDraftModal();
 }
 
+
 function renderDraftDoneStep() {
   const state = draftState;
-  const total = state.pickTotal;
+  const total = state.acquired.length;
   document.getElementById('draft-intro').textContent =
-    `ドラフトが終了しました。目標だった${total}名に対し${state.acquired.length}名を獲得しました。`;
+    `ドラフトが終了しました。合計${total}名を獲得しました。`;
   document.getElementById('draft-standings').innerHTML = renderDraftStandings();
   document.getElementById('draft-body').innerHTML = `
     <div class="draft-acquired">
@@ -700,7 +950,12 @@ function renderDraftDoneStep() {
 function closeDraftModal() {
   document.getElementById('draft-modal').style.display = 'none';
   const acquired = draftState ? draftState.acquired.length : 0;
+  const wasPractice = Boolean(draftState && draftState.isPractice);
   draftState = null;
-  if (acquired > 0) setLog(`【ドラフト】新たに${acquired}名のメンバーが加入しました。`);
+  if (wasPractice) {
+    setLog(`【ドラフト・練習】${acquired}名の指名で疑似体験が終了しました（実際の名簿は変化していません）。`);
+  } else if (acquired > 0) {
+    setLog(`【ドラフト】新たに${acquired}名のメンバーが加入しました。`);
+  }
   updateUI();
 }

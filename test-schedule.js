@@ -478,7 +478,7 @@ const runFocusWeek = (slotId) => withRecorder(`
       academics: sum(window.__exp.filter(e => e.statId === 'academics')),
       talk: sum(window.__exp.filter(e => e.statId === 'talk')),
       spent: sum(window.__stamina.filter(e => e.id === focus.id)),
-      log: document.getElementById('log-box').textContent
+      log: (logHistory[0] && logHistory[0].text) || document.getElementById('log-box').textContent
     };
   };
   return JSON.stringify({ withF: pass(true), withoutF: pass(false) });
@@ -575,6 +575,299 @@ check('ordinary logs play no effect', run(`
     document.getElementById('tv-fx-layer').innerHTML = '';
     setLog('【週間スケジュール】レッスン実施 / 能力UP 3件');
     return document.querySelectorAll('.tv-fx-card').length === 0;
+  })()
+`) === true);
+
+// ---- ドラフト：他チームの指名履歴・落選時の再指名 ----
+check('rival picks are recorded in the pick history', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    const empty = document.querySelector('.draft-picklog').classList.contains('is-empty');
+    draftState.round = 2;
+    resolveDraftPick(0);
+    const log = draftState.pickLog;
+    const rivals = log.filter(entry => !entry.isPlayer);
+    const rivalTeams = draftState.pickOrder.filter(t => !t.isPlayer).length;
+    const rows = document.querySelectorAll('.draft-picklog-row').length;
+    const ok = empty
+      && rivals.length === rivalTeams
+      && rows === log.length
+      && rivals.every(e => e.memberName && e.round === 2);
+    closeDraftModal();
+    return ok;
+  })()
+`) === true);
+check('the history records the player and the lottery result too', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    draftState.round = 1;
+    const original = Math.random;
+    Math.random = () => 0;                 // 1 巡目の重複を確定
+    resolveDraftPick(0);
+    Math.random = original;
+    draftState.lottery.index = 0;
+    let guard = 0;
+    while (!draftState.lottery.done && guard++ < 30) advanceDraftLottery();
+    const winner = draftState.lottery.winner;
+    resolveDraftLottery();
+    const viaLottery = draftState.pickLog.filter(e => e.viaLottery);
+    const winnerName = winner.name;
+    const mine = draftState.pickLog.filter(e => e.isPlayer);
+    // 落選時は自グループが指名できないので、抽擬したチームの指名だけを確認する
+    const ok = viaLottery.length === 1
+      && viaLottery[0].teamName === winnerName
+      && mine.length === (winner.isPlayer ? 1 : 0);
+    closeDraftModal();
+    return ok;
+  })()
+`) === true);
+check('losing the lottery keeps the same pick slot', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    draftState.round = 1;
+    const roundBefore = draftState.round;
+    const original = Math.random;
+    Math.random = () => 0;
+    resolveDraftPick(0);
+    Math.random = original;
+    draftState.lottery.index = 0;
+    let guard = 0;
+    while (!draftState.lottery.done && guard++ < 30) advanceDraftLottery();
+    const winnerIsPlayer = draftState.lottery.winner.isPlayer;
+    resolveDraftLottery();
+    const sameRound = draftState.round === roundBefore;
+    const canPickAgain = draftState.phase === 'picking'
+      && document.querySelectorAll('.draft-candidate').length > 0;
+    const explained = document.querySelector('.draft-status').textContent.includes('\u304f\u3058\u843d\u9078');
+    closeDraftModal();
+    return !winnerIsPlayer && sameRound && canPickAgain && explained
+      && draftState === null || (!winnerIsPlayer && sameRound && canPickAgain && explained);
+  })()
+`) === true);
+check('winning the lottery still advances to the next round', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    draftState.round = 1;
+    const original = Math.random;
+    Math.random = () => 0;
+    resolveDraftPick(0);
+    draftState.lottery.index = 0;
+    draftState.lottery.done = true;
+    draftState.lottery.winner = draftState.lottery.order[0];   // \u56de\u3063\u305f\u30c1\u30fc\u30e0 = \u81ea\u30b0\u30eb\u30fc\u30d7
+    resolveDraftLottery();
+    Math.random = original;
+    const advanced = draftState.round === 2;
+    const signed = draftState.acquired.length === 1;
+    closeDraftModal();
+    return advanced && signed;
+  })()
+`) === true);
+
+// ---- ドラフト：指名済みリスト・名指しパネルの並び替え ----
+check('the pick panel offers exactly five sort criteria', run(`
+  (() => {
+    openDraftPractice();
+    const labels = [...document.querySelectorAll('.draft-sort-btn')].map(b => b.textContent);
+    return DRAFT_SORT_KEYS.length === 5
+      && labels.length === 5
+      && ['\u7dcf\u8a55', '\u4eba\u6c17', '\u30b9\u30bf\u30a4\u30eb', '\u30d5\u30a1\u30c3\u30b7\u30e7\u30f3', '\u6b4c\u5531\u529b'].every(n => labels.some(l => l.startsWith(n)));
+  })()
+`) === true);
+check('sorting by each criterion orders the list correctly', run(`
+  (() => {
+    const pool = draftState.pool;
+    const valuesOf = (key, desc) => sortDraftCandidates(pool, key, desc).map(r => key === 'overall'
+      ? calculateSingleOverall(r.member.stats)
+      : r.member.stats[key] || 0);
+    const isOrdered = (arr, desc) => arr.every((v, i) => i === 0 || (desc ? arr[i - 1] >= v : arr[i - 1] <= v));
+    return ['overall', 'popularity', 'style', 'fashion', 'vocal'].every(key =>
+      isOrdered(valuesOf(key, true), true) && isOrdered(valuesOf(key, false), false));
+  })()
+`) === true);
+check('pressing the same criterion flips the direction', run(`
+  (() => {
+    setDraftSort('style');
+    const first = document.querySelector('.draft-sort-btn.active').textContent;
+    setDraftSort('style');
+    const second = document.querySelector('.draft-sort-btn.active').textContent;
+    const activeKey = draftState.sortKey;
+    return activeKey === 'style' && first !== second
+      && first.includes('\u964d\u9806') && second.includes('\u6607\u9806');
+  })()
+`) === true);
+check('changing the criterion returns to the first page', run(`
+  (() => {
+    changeDraftPage(2);
+    const before = draftState.page;
+    setDraftSort('fashion');
+    return before === 2 && draftState.page === 0 && draftState.sortKey === 'fashion';
+  })()
+`) === true);
+check('sorting keeps the pool order so picks still target the right member', run(`
+  (() => {
+    setDraftSort('vocal');
+    // 表示されている 1 行目の onclick に含まれるプール追加を取り出す
+    const onclick = document.querySelector('.draft-candidate').getAttribute('onclick');
+    const poolIndex = Number((onclick.match(/\\d+/) || [])[0]);
+    const member = draftState.pool[poolIndex];
+    draftState.round = 2;
+    resolveDraftPick(poolIndex);
+    return Number.isInteger(poolIndex) && draftState.acquired.length === 1
+      && draftState.acquired[0] === member;
+  })()
+`) === true);
+check('the acquired list starts empty and fills after each pick', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    const empty = document.querySelector('.draft-acquired-list').classList.contains('is-empty');
+    draftState.round = 2;
+    resolveDraftPick(0);
+    const tags = document.querySelectorAll('.draft-acquired-tags span').length;
+    const head = document.querySelector('.draft-acquired-head').textContent;
+    closeDraftModal();
+    return empty && tags === 1 && head.includes('1');
+  })()
+`) === true);
+
+// ---- ドラフト：任意人数の指名パンル・きじ引き ----
+check('the draft opens straight into the pick panel', run(`
+  (() => {
+    openDraftPractice();
+    return draftState.phase === 'picking'
+      && !document.getElementById('draft-count-picker')
+      && document.querySelectorAll('.draft-candidate').length > 0
+      && !!document.querySelector('.draft-pager');
+  })()
+`) === true);
+check('the candidate list shows a whole pool page', run(`
+  (() => {
+    const poolSize = draftState.pool.length;
+    const rows = document.querySelectorAll('.draft-candidate').length;
+    const head = document.querySelector('.draft-list-head').textContent;
+    return poolSize > DRAFT_LIST_PAGE_SIZE
+      && rows === Math.min(DRAFT_LIST_PAGE_SIZE, poolSize)
+      && head.includes(String(poolSize))
+      && head.includes('1 /');
+  })()
+`) === true);
+check('the candidate list can be paged', run(`
+  (() => {
+    const before = document.querySelector('.draft-candidate-name').textContent;
+    changeDraftPage(1);
+    const head = document.querySelector('.draft-list-head').textContent;
+    const after = document.querySelector('.draft-candidate-name').textContent;
+    const changed = before !== after && head.includes('2 /');
+    changeDraftPage(-1);
+    return changed && document.querySelector('.draft-candidate-name').textContent === before;
+  })()
+`) === true);
+check('the draft ends after any number of picks', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    draftState.round = 2;
+    resolveDraftPick(0);
+    const afterOne = draftState.acquired.length;
+    const stillPicking = draftState.phase === 'picking';
+    finishDraft();
+    const doneText = document.getElementById('draft-intro').textContent;
+    closeDraftModal();
+    return afterOne === 1 && stillPicking && doneText.includes('1名');
+  })()
+`) === true);
+check('the lottery order starts from this round team', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    const order = buildDraftLotteryOrder();
+    const covered = order.length === draftState.pickOrder.length
+      && order.every(team => draftState.pickOrder.includes(team));
+    return order[0].isPlayer === true && covered;
+  })()
+`) === true);
+check('a conflict opens the lottery and rotates the draws', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    resolveDraftPick(0);
+    Math.random = originalRandom;
+    const enteredLottery = draftState.phase === 'lottery';
+    const rows = document.querySelectorAll('.draft-lottery-row').length;
+    const turnShown = !!document.querySelector('.draft-lottery-row.is-turn');
+    let guard = 0;
+    while (!draftState.lottery.done && guard++ < 30) advanceDraftLottery();
+    const decided = draftState.lottery.done && !!draftState.lottery.winner;
+    const winnerRow = !!document.querySelector('.draft-lottery-row.is-winner');
+    resolveDraftLottery();
+    closeDraftModal();
+    return enteredLottery && rows > 0 && turnShown && decided && winnerRow;
+  })()
+`) === true);
+
+// ---- 記録タブ：ログ履歴とドラフト疑似体験 ----
+check('the log keeps a history with the newest first', run(`
+  (() => {
+    setLog('【履歴テスト】1件目');
+    setLog('【履歴テスト】2件目');
+    setLog('【履歴テスト】3件目');
+    const rows = document.querySelectorAll('#log-box .log-entry');
+    return rows.length >= 3
+      && rows[0].querySelector('.log-text').textContent.includes('3件目')
+      && rows[0].querySelector('.log-date').textContent.length > 0;
+  })()
+`) === true);
+check('the draft practice opens with a clear practice label', run(`
+  (() => {
+    openDraftPractice();
+    const title = document.getElementById('draft-title').textContent;
+    const notice = document.getElementById('draft-notice').textContent;
+    const shown = document.getElementById('draft-modal').style.display;
+    return title.includes('練習') && notice.includes('疑似体験') && shown === 'flex';
+  })()
+`) === true);
+check('the draft practice never touches the real roster or league', run(`
+  (() => {
+    const rosterBefore = idolRoster.length;
+    const leagueBefore = leagueTeams.length;
+    const countBefore = draftCount;
+    // 1巡目は他チームとの重複抽選があるので、抽選が出たら先に解決する
+    for (let i = 0; i < 5 && draftState && draftState.phase !== 'done'; i++) {
+      if (draftState.phase === 'lottery') resolveDraftLottery();
+      else if (draftState.phase === 'picking') resolveDraftPick(0);
+      else break;
+    }
+    const acquired = draftState ? draftState.acquired.length : 0;
+    closeDraftModal();
+    return acquired > 0
+      && idolRoster.length === rosterBefore
+      && leagueTeams.length === leagueBefore
+      && draftCount === countBefore;
+  })()
+`) === true);
+check('closing the practice writes a practice log entry', run(`
+  logHistory[0].text.includes('疑似体験') && logHistory[0].text.includes('実際の名簿は変化していません')
+`) === true);
+check('a real draft still signs members to the roster', run(`
+  (() => {
+    const rosterBefore = idolRoster.length;
+    draftState = {
+      round: 2, acquired: [], page: 0,
+      ranked: [], pickOrder: [], playerRank: 1, playerTeam: null,
+      phase: 'picking'
+    };
+    const member = createMember(18);
+    draftSignMember(member);
+    const added = idolRoster.length === rosterBefore + 1;
+    idolRoster.pop();
+    draftState = null;
+    return added;
   })()
 `) === true);
 
