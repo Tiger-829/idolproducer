@@ -10,7 +10,9 @@ try {
   process.exit(0);
 }
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const { loadGameHtml } = require('./test-helper');
+
+const html = loadGameHtml(__dirname);
 const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/' });
 const { window } = dom;
 window.alert = () => {};

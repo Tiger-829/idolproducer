@@ -1,0 +1,1082 @@
+// ==========================================
+// イベント・収入・リリース・ライブ
+// ==========================================
+// ==========================================
+// ランダムイベント（現実のアイドル業界によくある事象）
+// ==========================================
+const RANDOM_EVENTS = [
+  {
+    id: 'viral-post',
+    name: '日常投稿がバズる',
+    text: '選抜メンバーの日常投稿が突然バズり、トレンド入りしました。',
+    choices: [
+      { label: 'バズに便乗して宣伝する', detail: '資金 +${gain} / 全員の人気 +2', apply: ctx => { funds += ctx.gain; adjustAllPopularity(2); } },
+      { label: '静かに受け流す', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'magazine-cover',
+    name: '雑誌の表紙掲載',
+    text: '有名雑誌からの取材・表紙掲載の打診が届きました。',
+    choices: [
+      { label: '有名雑誌の特集ページに出稿する', detail: '資金 -${cost} / 人気 +4', apply: ctx => { funds -= ctx.cost; adjustAllPopularity(4); } },
+      { label: 'webメディアに回す', detail: '費用は安く効果は薄', apply: ctx => { funds -= Math.round(ctx.cost * 0.2); adjustAllPopularity(1); } }
+    ]
+  },
+  {
+    id: 'handshake-event',
+    name: '握手会に長い行列ができる',
+    text: '定期公演の会場で握手会の行列が想定以上に長くなりました。',
+    choices: [
+      { label: '時間を追加して握手会を延長する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +3', apply: ctx => { funds -= ctx.cost; adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 3); } },
+      { label: '予定通り終了する', detail: '人気 -1', apply: () => adjustAllPopularity(-1) }
+    ]
+  },
+  {
+    id: 'streamer-collab',
+    name: '配信者とのコラボ',
+    text: '人気配信者とのコラボ配信の誘いが届きました。',
+    choices: [
+      { label: '受ける', detail: '資金 +${gain} / SNS運用 +3', apply: ctx => { funds += ctx.gain; adjustSelectedSns(3); } },
+      { label: '断る', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'radio-request',
+    name: 'ラジオの深夜放送枠',
+    text: '深夜ラジオへの出演打診が届きました。',
+    choices: [
+      { label: '出演する', detail: '資金 +${smallGain} / 人気 +2', apply: ctx => { funds += ctx.smallGain; adjustAllPopularity(2); } },
+      { label: '見送る', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'rumor',
+    name: '噂の拡散',
+    text: 'メンバーの体調不良に関する未確認の噂がインターネットで広まっています。',
+    choices: [
+      { label: '公式に否定する', detail: '危機回避力 +5 / 資金 -${cost}', apply: ctx => { groupCrisis = Math.min(100, groupCrisis + 5); funds -= Math.round(ctx.cost * 0.5); } },
+      { label: '沈黙する', detail: '危機回避力 -4', apply: () => { groupCrisis = Math.max(0, groupCrisis - 4); } }
+    ]
+  },
+  {
+    id: 'charity-event',
+    name: '慈善イベントへの出席',
+    text: '慈善行事への参加打診が届きました。',
+    choices: [
+      { label: '主旨参加する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +4', apply: ctx => { funds -= Math.round(ctx.cost * 0.6); adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 4); } },
+      { label: '不参加', detail: '効果なし', apply: () => {} }
+    ]
+  },
+  {
+    id: 'equipment-upgrade',
+    name: '設備強化の打診',
+    kind: 'equipment',
+    text: '${reason}${facilityName}をLv.${facilityLevel}からLv.${nextLevel}へ強化する打診が届きました。',
+    choices: [
+      { label: '強化を引き受ける', detail: '開発費 -${cost} / 週間維持費 +${maintenance}', requiresFunds: true, apply: ctx => applyEquipmentUpgrade(ctx) },
+      { label: '今回は見送る', detail: '効果なし', apply: () => {} }
+    ]
+  }
+];
+
+// ランダムイベントの「強化を引き受ける」を実行する
+function applyEquipmentUpgrade(context) {
+  const facility = OFFICE_FACILITIES.find(item => item.id === context.facilityId);
+  if (!facility) return;
+  const level = officeUpgrades[facility.id] || 0;
+  const cost = getOfficeUpgradeCost(facility, level);
+  if (level >= MAX_OFFICE_LEVEL || funds < cost) {
+    setLog(`【設備強化】${facility.name}の提案を資金不足で見送りました。`);
+    return;
+  }
+  funds -= cost;
+  officeUpgrades[facility.id] = level + 1;
+  setLog(`【設備強化】${facility.name}をLv.${level + 1}に強化しました（開発費 ${formatMoney(cost)}）。`);
+}
+
+function adjustAllPopularity(delta) {
+  idolRoster.forEach(member => {
+    member.stats.popularity = Math.max(0, Math.min(100, (member.stats.popularity || 0) + delta));
+  });
+}
+
+// 選抜メンバー（＝出演対象）の人気だけを動かす
+function adjustTargetPopularity(delta) {
+  const selected = idolRoster.filter(member => member.isSelected);
+  const targets = selected.length ? selected : idolRoster;
+  targets.forEach(member => {
+    member.stats.popularity = Math.max(0, Math.min(100, (member.stats.popularity || 0) + delta));
+  });
+}
+
+function adjustSelectedSns(delta) {
+  idolRoster.forEach(member => {
+    if (member.isSelected) member.stats.sns = Math.max(0, Math.min(100, (member.stats.sns || 0) + delta));
+  });
+}
+
+function fillEventTemplate(text, context) {
+  return String(text)
+    .replace(/\$\{gain\}/g, formatMoney(context.gain))
+    .replace(/\$\{smallGain\}/g, formatMoney(context.smallGain))
+    .replace(/\$\{cost\}/g, formatMoney(context.cost))
+    .replace(/\$\{maintenance\}/g, formatMoney(context.maintenance))
+    .replace(/\$\{reason\}/g, context.reason || '')
+    .replace(/\$\{facilityName\}/g, context.facilityName || '')
+    .replace(/\$\{facilityLevel\}/g, context.facilityLevel ?? '')
+    .replace(/\$\{nextLevel\}/g, context.nextLevel ?? '');
+}
+
+// ランダムイベントを1件組み立てる（経費などの金額は発生時のfan数で確定させる）
+function buildRandomEvent(eventId) {
+  const event = RANDOM_EVENTS.find(entry => entry.id === eventId);
+  if (!event) return null;
+  const fans = calculateGroupFans();
+  const context = {
+    gain: Math.round(Math.max(500000, fans * 0.12)),
+    smallGain: Math.round(Math.max(200000, fans * 0.05)),
+    cost: Math.round(500000 + fans * 0.02)
+  };
+  // 設備強化の打診は強化対象の設備を決めてから組み立てる
+  if (event.kind === 'equipment') {
+    const candidate = pickEquipmentUpgradeCandidate();
+    const facility = candidate ? OFFICE_FACILITIES.find(item => item.id === candidate.facilityId) : null;
+    if (!facility) return null;
+    const level = officeUpgrades[facility.id] || 0;
+    Object.assign(context, {
+      facilityId: facility.id,
+      facilityName: facility.name,
+      facilityLevel: level,
+      nextLevel: level + 1,
+      reason: candidate.reason,
+      cost: getOfficeUpgradeCost(facility, level),
+      maintenance: getOfficeMaintenanceCost(facility, level + 1) - getOfficeMaintenanceCost(facility, level)
+    });
+  }
+  return {
+    id: event.id,
+    name: event.name,
+    text: event.text,
+    choices: event.choices,
+    context
+  };
+}
+
+// セーブから復元したランダムイベントを現在の定義に紐づける（apply関数は保存されない）
+function restorePendingRandomEvent(data) {
+  if (!data || !data.id) return null;
+  const event = RANDOM_EVENTS.find(entry => entry.id === data.id);
+  if (!event) return null;
+  return { ...data, name: event.name, text: event.text, choices: event.choices, context: data.context || {} };
+}
+
+// 該当する週に達した予約を1件だけ発動させる（1週につき最大1件）
+function triggerArmedRandomEvent(todayKey) {
+  const idx = armedRandomEvents.findIndex(entry => todayKey >= entry.targetDate);
+  if (idx < 0) return;
+  const [entry] = armedRandomEvents.splice(idx, 1);
+  const built = buildRandomEvent(entry.eventId);
+  if (built) pendingRandomEvent = built;
+}
+
+function rollRandomEvent() {
+  if (getGameDateObject().getDay() !== 3) return;
+  if (pendingRandomEvent || pendingCrisisResponse) return;
+  const todayKey = toDateKey(getGameDateObject());
+  // 予約が満期したらこの週で発生させる
+  triggerArmedRandomEvent(todayKey);
+  if (pendingRandomEvent) return;
+  const weekKey = getCurrentWeekKey();
+  if (randomEventCheckWeekKey === weekKey) return;
+  randomEventCheckWeekKey = weekKey;
+  if (Math.random() >= 0.16) return;
+  if (armedRandomEvents.length >= 5) return;
+
+  // 強化できる設備がないときは「設備強化の打診」を出現させせない
+  const pool = RANDOM_EVENTS.filter(entry => entry.kind !== 'equipment' || getEquipmentUpgradeCandidates().length);
+  if (!pool.length) return;
+
+  // 何週後に起きるかは表に出さず、1〜3週間後のいずれかで発生させる
+  const event = pool[Math.floor(Math.random() * pool.length)];
+  const leadWeeks = 1 + Math.floor(Math.random() * 3);
+  const target = new Date(`${todayKey}T12:00:00`);
+  target.setDate(target.getDate() + leadWeeks * 7);
+  armedRandomEvents.push({ eventId: event.id, targetDate: toDateKey(target) });
+}
+
+function openRandomEventModal() {
+  if (!pendingRandomEvent) return;
+  const event = pendingRandomEvent;
+  const title = document.getElementById('random-event-title');
+  if (title) title.textContent = event.name;
+  document.getElementById('random-event-text').textContent = fillEventTemplate(event.text, event.context);
+  document.getElementById('random-event-options').innerHTML = event.choices.map((choice, index) => {
+    // 資金が必要な選択肢は、資金不足のときは選ばせない
+    const disabled = Boolean(choice.requiresFunds) && funds < (event.context.cost || 0);
+    const detail = `${fillEventTemplate(choice.detail, event.context)}${disabled ? ' / 資金不足' : ''}`;
+    return `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" ${disabled ? 'disabled' : ''} onclick="resolveRandomEvent(${index})">
+      <div style="font-size:13px;">${fillEventTemplate(choice.label, event.context)}</div>
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">${detail}</div>
+    </button>`;
+  }).join('');
+  document.getElementById('random-event-modal').style.display = 'flex';
+}
+
+function resolveRandomEvent(choiceIndex) {
+  if (!pendingRandomEvent) return;
+  const event = pendingRandomEvent;
+  const choice = event.choices[choiceIndex];
+  pendingRandomEvent = null;
+  document.getElementById('random-event-modal').style.display = 'none';
+  if (choice) choice.apply(event.context);
+  setLog(`【ランダムイベント】${event.name} / ${fillEventTemplate(choice ? choice.label : '経過', event.context)}`);
+  updateUI();
+}
+
+// ==========================================
+// ファンクラブ（2年目に開設、1年ごとに会費を見直し）
+// ==========================================
+const FANCLUB_TIERS = [
+  { id: 'light', name: 'ライト', fee: 500, benefit: 'デジタル会報の配信' },
+  { id: 'standard', name: 'スタンダード', fee: 1500, benefit: '会報と先行配信' },
+  { id: 'premium', name: 'プレミアム', fee: 3000, benefit: '会報・先行配信・握手会参加権' }
+];
+
+function getFanClubMemberTarget(tier) {
+  // 会費が高いほど会員数は減る
+  return Math.max(0, Math.round(calculateGroupFans() * (0.25 - tier.fee / 20000)));
+}
+
+function openFanClubModal() {
+  if (!pendingFanClubEvent) return;
+  const event = pendingFanClubEvent;
+  const isFounding = event.type === 'founding';
+  const intro = isFounding
+    ? '2年目の幕開けです。応援団体（ファンクラブ）を設立するか決めてください。'
+    : 'ファンクラブの1年が経過しました。会費と特典を見直しましょう。';
+  document.getElementById('fanclub-text').innerHTML =
+    `<div style="margin-bottom:8px;">${intro}</div>${getFanClubStatusText()}`;
+  document.getElementById('fanclub-options').innerHTML = FANCLUB_TIERS.map((tier, index) => `
+    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveFanClub(${index})">
+      <div style="font-size:13px;">${tier.name}（会費 ${formatMoney(tier.fee)}/月）</div>
+      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">特典: ${tier.benefit}${fanClub && fanClub.tierId === tier.id ? '（継続）' : ''}</div>
+    </button>`).join('')
+    + (isFounding ? '<button class="danger-btn" type="button" onclick="resolveFanClub(-1)">ファンクラブを設けない</button>' : '');
+  document.getElementById('fanclub-modal').style.display = 'flex';
+}
+
+function getFanClubStatusText() {
+  if (!fanClub) return '<div style="color:#777;">ファンクラブは未設立です</div>';
+  return `<div>現在の会費: <strong>${formatMoney(fanClub.fee)}/月</strong> / 会員数: <strong>${Number(fanClub.members || 0).toLocaleString()}人</strong> / 毎月の収入: <strong>${formatMoney(fanClub.members * fanClub.fee)}</strong></div>`;
+}
+
+function resolveFanClub(tierIndex) {
+  if (!pendingFanClubEvent) return;
+  const event = pendingFanClubEvent;
+  pendingFanClubEvent = null;
+  document.getElementById('fanclub-modal').style.display = 'none';
+
+  if (tierIndex < 0) {
+    fanClub = null;
+    setLog('【ファンクラブ】設立を見送りました。');
+  } else {
+    const tier = FANCLUB_TIERS[tierIndex];
+    const isNew = !fanClub;
+    const previousFee = fanClub ? fanClub.fee : 0;
+    const previousMembers = fanClub ? fanClub.members : 0;
+    const target = getFanClubMemberTarget(tier);
+    // 変更時は新プランの目標値へ近づける（会員の離脱と獲得を緩やかにする）
+    const members = isNew ? target : Math.round(previousMembers * 0.5 + target * 0.5);
+    fanClub = { tierId: tier.id, fee: tier.fee, members };
+    fanClubFoundedYear = currentYear;
+    setLog(isNew
+      ? `【ファンクラブ】${tier.name}プランで設立しました（会費 ${formatMoney(tier.fee)}/月 / 会員 ${members.toLocaleString()}人）。`
+      : `【ファンクラブ】会費を見直しました（${formatMoney(previousFee)} → ${formatMoney(tier.fee)}/月 / 会員 ${previousMembers.toLocaleString()} → ${members.toLocaleString()}人）。`);
+  }
+  updateUI();
+}
+
+// 保留中のモーダルを優先度順に1つだけ開く
+// ファンクラブの年次処理：2年目に開設、以降は1年ごとに会費を見直す
+function checkFanClubYearlyEvent() {
+  if (pendingFanClubEvent) return;
+  if (currentYear < 2) return;
+  const isFounding = !fanClub && fanClubFoundedYear === 0;
+  if (!isFounding && fanClubFoundedYear === currentYear) return;
+  pendingFanClubEvent = {
+    type: isFounding ? 'founding' : 'renewal',
+    tierId: fanClub ? fanClub.tierId : null
+  };
+}
+
+function applyFanClubMonthlyIncome() {
+  if (!fanClub || !fanClub.members) return 0;
+  const income = fanClub.members * fanClub.fee;
+  funds += income;
+  yearlyStats.fanClubIncome = (yearlyStats.fanClubIncome || 0) + income;
+  return income;
+}
+
+// CD売上の収入を月末計上プールに積む（売上の8割だけが収入として計上される）
+function addMonthlyCdRevenue(grossRevenue) {
+  const revenue = Math.round(grossRevenue * CD_REVENUE_MONTHLY_SHARE);
+  monthlyCdRevenue += revenue;
+  return revenue;
+}
+
+// 雑誌・TVタイアップを引く（月末の臨時収入として計上する）
+function rollMonthlyTieUps() {
+  const fans = calculateGroupFans();
+  const summary = calculateTeamAverages();
+  const results = [];
+  TIE_UPS.forEach(tieUp => {
+    // 人気が高いほど引き引っかりやすい
+    const chance = tieUp.chance * (0.5 + (summary.averages.popularity || 0) / 100);
+    if (Math.random() >= chance) return;
+    const revenue = Math.round(fans * tieUp.revenuePerFan);
+    monthlyTieUpRevenue += revenue;
+    adjustTargetPopularity(tieUp.popularityGain);
+    const song = findLatestReleasedSong();
+    if (song) addSongExperience(song, tieUp.songExperience);
+    results.push({ tieUp, revenue });
+  });
+  return results;
+}
+
+// 月末の精算（CD売上8割＋タイアップの臨時収入を入金し、会費と給与を引く）
+function settleMonthlyIncome() {
+  // CD売上収入は前月までに積んだ分を入金してクリアする
+  const cdRevenue = monthlyCdRevenue;
+  monthlyCdRevenue = 0;
+  monthlyTieUpRevenue = 0;
+  if (cdRevenue > 0) {
+    funds += cdRevenue;
+    yearlyStats.cdRevenue = (yearlyStats.cdRevenue || 0) + cdRevenue;
+    setLog(`【月末精算】CD売上収入（売上の${Math.round(CD_REVENUE_MONTHLY_SHARE * 100)}%相当） ${formatMoney(cdRevenue)} を入金しました。`);
+  }
+  // タイアップは当月の臨時収入として引く
+  const tieUps = rollMonthlyTieUps();
+  const tieUpRevenue = monthlyTieUpRevenue;
+  monthlyTieUpRevenue = 0;
+  if (tieUps.length) {
+    funds += tieUpRevenue;
+    yearlyStats.tieUpRevenue = (yearlyStats.tieUpRevenue || 0) + tieUpRevenue;
+    const detail = tieUps.map(item => `${item.tieUp.name} ${formatMoney(item.revenue)}`).join(' / ');
+    setLog(`【タイアップ】${detail} （臨時収入 ${formatMoney(tieUpRevenue)}）`);
+  }
+  const fanClubIncome = applyFanClubMonthlyIncome();
+  if (fanClubIncome > 0) setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}を入金しました。`);
+  // 月末にメンバーとマネージャーの給与を月割りで引き落とす
+  const salary = applyMonthlySalary();
+  if (salary.total > 0) {
+    setLog(`【給与】メンバー ${formatMoney(salary.memberSalary)} / マネージャー ${formatMoney(salary.managerSalary)} を支払いました（合計 ${formatMoney(salary.total)}）。`);
+  }
+  return { cdRevenue, tieUpRevenue, fanClubIncome, salary: salary.total };
+}
+
+// メンバーとマネージャーの月次給与を支払って引く
+function applyMonthlySalary() {
+  const memberSalary = getTotalMemberMonthlySalary();
+  const managerSalary = getTotalManagerMonthlySalary();
+  const total = memberSalary + managerSalary;
+  if (total <= 0) return { memberSalary: 0, managerSalary: 0, total: 0 };
+  funds -= total;
+  yearlyStats.salary = (yearlyStats.salary || 0) + total;
+  return { memberSalary, managerSalary, total };
+}
+
+function openPendingModal() {
+  if (pendingSelectionEvent) return openSelectionModal();
+  if (pendingCrisisResponse) return openCrisisResponseModal();
+  if (pendingFanClubEvent) return openFanClubModal();
+  if (pendingRandomEvent) return openRandomEventModal();
+  if (pendingEquipmentEvent) return openEquipmentEventModal();
+  if (pendingPerformanceOffers.length) return openMusicOfferModal();
+}
+
+// 階層ごとの参加率を加重した率（0〜1）
+// ライブ参加率は1.67倍に引き上げている（会場が埋まるペースに合わせた調整）
+const LIVE_PARTICIPATION_MULTIPLIER = 1.67;
+
+function getTierParticipationRate(kind) {
+  const rates = FAN_TIER_PARTICIPATION[kind] || FAN_TIER_PARTICIPATION.live;
+  const shares = getFanTierShares();
+  const rate = shares.core * rates.core + shares.fan * rates.fan + shares.light * rates.light;
+  return kind === 'live' ? rate * LIVE_PARTICIPATION_MULTIPLIER : rate;
+}
+
+// 中立（熱心度0.5）のときの参加率。イベント需要の基準値に使う
+const FAN_TIER_NEUTRAL_PARTICIPATION = 0.40;
+// イベントの参加率による需要倍率（階層の配分次第で完売率が変わる）
+function getEventParticipationFactor() {
+  return getTierParticipationRate('event') / FAN_TIER_NEUTRAL_PARTICIPATION;
+}
+
+function recordIndividualEventSale(member, eventType, available) {
+  const profile = INDIVIDUAL_EVENT_PROFILES[eventType];
+  if (!profile || available <= 0) return { available: 0, unitsSold: 0, sellThrough: null };
+  const popularity = member.stats.popularity || 0;
+  const sns = member.stats.sns || 0;
+  // 参加率が高いほど需要が伸びる（コア層が増えるとイベントの動員も伸びる）
+  const base = (popularity * profile.popularityMultiplier + sns * profile.snsMultiplier) * getEventParticipationFactor();
+  const demand = Math.floor(base);
+  const unitsSold = Math.min(available, demand);
+  const sellThrough = unitsSold / available;
+  if (!Array.isArray(member.eventSalesHistory)) member.eventSalesHistory = [];
+  member.eventSalesHistory.push({
+    eventType,
+    date: gameDate,
+    available,
+    unitsSold,
+    sellThrough
+  });
+  if (member.eventSalesHistory.length > 24) member.eventSalesHistory.shift();
+  return { available, unitsSold, sellThrough };
+}
+
+function recordReleaseBenefitSales(benefitId) {
+  const participants = idolRoster.filter(member => member.isSelected);
+  const results = participants.map(member =>
+    recordIndividualEventSale(member, benefitId, INDIVIDUAL_EVENT_PROFILES[benefitId].capacity)
+  );
+  const available = results.reduce((sum, result) => sum + result.available, 0);
+  const unitsSold = results.reduce((sum, result) => sum + result.unitsSold, 0);
+  return { available, unitsSold, sellThrough: available ? unitsSold / available : 0 };
+}
+
+function sellMerchandiseAtLive() {
+  if (merchandiseProducts <= 0 || merchandiseStock <= 0) {
+    merchandiseSellThrough = merchandiseProducts > 0 ? 0 : null;
+    return { unitsSold: 0, revenue: 0 };
+  }
+  const participants = idolRoster.length ? idolRoster : [];
+  if (!participants.length) return { unitsSold: 0, revenue: 0 };
+  const startingStock = merchandiseStock;
+  const baseStockPerMember = Math.floor(startingStock / participants.length);
+  let remainder = startingStock % participants.length;
+  let availableTotal = 0;
+  let unitsSold = 0;
+  participants.forEach(member => {
+    const share = baseStockPerMember + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    const available = Math.min(share, INDIVIDUAL_EVENT_PROFILES.merchandise.capacity + merchandiseProducts * 20);
+    const sale = recordIndividualEventSale(member, 'merchandise', available);
+    availableTotal += sale.available;
+    unitsSold += sale.unitsSold;
+  });
+  merchandiseStock -= unitsSold;
+  merchandiseUnitsSold += unitsSold;
+  merchandiseSellThrough = availableTotal ? unitsSold / availableTotal : 0;
+  return { unitsSold, revenue: unitsSold * 2500 };
+}
+
+// 発売日の基準日（計画で指定がなければ当月の最終水曜）
+function getPlanReleaseTriggerKey(plan, year, monthIndex) {
+  if (plan && plan.releaseDate) return plan.releaseDate;
+  return toDateKey(getLastWednesday(year, monthIndex));
+}
+
+// 計画した発売日に到達したか（未到達なら次の到達先まで看作する）
+function isPlanReleaseDue(plan, reachDate = gameDate) {
+  if (!plan || !plan.release || plan.release === 'none' || plan.releaseCompleted) return false;
+  const target = getPlanReleaseTriggerKey(plan, calendarYear, currentMonth - 1);
+  return reachDate >= target;
+}
+
+// 計画したCD関連イベントの開催判定
+function isPlanEventDue(entry, reachDate = gameDate) {
+  return !entry.event.completed && reachDate >= entry.event.date;
+}
+
+// 計画したCD関連イベントを日程ごとに列挙する
+function getPlanEventEntries() {
+  const entries = [];
+  Object.entries(productionSchedule).forEach(([planKey, plan]) => {
+    if (!Array.isArray(plan.planEvents)) return;
+    plan.planEvents.forEach((event, index) => {
+      if (!event || !event.date) return;
+      entries.push({ plan, planKey, event, index });
+    });
+  });
+  return entries;
+}
+
+// CD関連イベントの開催（特典イベント／グッズ販売）
+function processPlanEvents(reachDate = gameDate) {
+  getPlanEventEntries().forEach(entry => {
+    if (!isPlanEventDue(entry, reachDate)) return;
+    const type = getPlanEventType(entry.event.benefitId);
+    if (!type) {
+      entry.plan.planEvents.splice(entry.index, 1);
+      return;
+    }
+    entry.event.completed = true;
+    if (type.cost) funds -= type.cost;
+    if (type.kind === 'goods') {
+      const goods = sellMerchandiseAtLive();
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
+    } else {
+      const result = recordReleaseBenefitSales(type.id);
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（経費: ${formatMoney(type.cost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
+    }
+  });
+}
+
+// 月ごとのリリース＆ライブ実行
+function processMonthlyReleaseAndLive(reachDate = gameDate) {
+  const planKey = `${currentYear}-${currentMonth}`;
+  const plan = productionSchedule[planKey];
+  const summary = calculateTeamAverages();
+
+  // CDリリース（計画で指定した日に発売する。未定なら従来どおり最終水曜）
+  if (plan && isPlanReleaseDue(plan, reachDate)) {
+    const isSingle = (plan.release === 'single');
+    const song = ensureScheduledSong(currentYear, currentMonth, plan);
+    const quality = (summary.averages.popularity * 0.6) + (summary.averages.vocal * 0.2) + (summary.averages.dance * 0.2);
+    const multiplier = 1.0 + (summary.overall / 100);
+    const base = isSingle ? 5000 : 7500;
+    const songMultiplier = 1 + ((song.level - 1) * 0.02);
+    // 発売前の販促回数nによる倍率（1+α、α=n×0.005）
+    const promoAlpha = (song.promoCount || 0) * RELEASE_PROMO_ALPHA_STEP;
+    const promoMultiplier = 1 + promoAlpha;
+    const qualitySales = quality * base * multiplier * songMultiplier * promoMultiplier;
+    const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
+    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
+
+    addGroupSales(sales);
+    // CD売上の8割が月ごとに収入として計上される
+    addMonthlyCdRevenue(sales * getSongUnitPrice(song));
+    song.totalSales = (song.totalSales || 0) + sales;
+    song.released = true;
+    song.releaseDateKey = gameDate;
+    song.releasePromoAlpha = promoAlpha;
+    const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
+    if (benefit) funds -= benefit.cost;
+    const benefitSales = benefit ? recordReleaseBenefitSales(benefit.id) : null;
+    plan.releaseCompleted = true;
+    const benefitText = benefit
+      ? ` ${benefit.name}経費: ${formatMoney(benefit.cost)} / 参加メンバー平均完売率 ${Math.round(benefitSales.sellThrough * 100)}%。`
+      : '';
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
+  }
+
+  // ライブ（1か月 最大3会場・計8公演まで）
+  const allLiveEntries = getScheduledLiveEntries();
+  const todayLiveEntries = allLiveEntries.filter(entry =>
+    !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === gameDate
+  );
+  const liveLogs = [];
+  todayLiveEntries.forEach(entry => {
+    const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
+    if (!v) return;
+    const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);
+    const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
+
+    // 当日の1公演のみ精算する（会場使用料は契約上の全公演分で計上）
+    const showDates = getLiveEntryShowDates(entry);
+    const totalShowCount = showDates.length;
+    // 複数日にまたがるライブでは疲労が積み上がる
+    const isMultiDay = totalShowCount > 1;
+    const yesterday = new Date(getGameDateObject());
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isConsecutive = lastLiveDate === toDateKey(yesterday);
+    // 連日公演の最終日は千秋楽として曜日重みの代わりに補正を使う
+    const remainingDates = showDates.filter(dateKey => dateKey !== gameDate);
+    const isFinale = isMultiDay && remainingDates.length === 0;
+    // 動員はファン階層ごとの参加率 × 会場ティアの集客率 × 曜日重み（千秋楽は0.9）× 価格調整
+    const priceFactor = getPriceDemandFactor(v, entry);
+    let remainingDemand = Math.floor(
+      getLiveAudienceDemand(v, getGameDateObject(), isFinale ? LIVE_FINALE_RATE : null, priceFactor) * livePromotionMultiplier
+    );
+    let totalAudience = 0;
+    let totalRevenue = 0;
+    seatCapacities.forEach(seat => {
+      const sold = Math.min(seat.capacity, remainingDemand);
+      totalAudience += sold;
+      remainingDemand -= sold;
+      totalRevenue += sold * getEffectiveSeatPrice(v, entry, seat);
+    });
+    const totalMerchandise = sellMerchandiseAtLive().revenue;
+    // 配信チケット：来場しないファンの一部が配信を購入（曜日の購入割合つき）
+    const streamBuyers = getStreamTicketBuyers(getGameDateObject());
+    const streamRevenue = streamBuyers * STREAM_TICKET_PRICE;
+
+    // 会場使用料：ランク基準 + (日数-1)×0.2×ランク基準
+    const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
+    const totalRevenueWithGoods = totalRevenue + totalMerchandise + streamRevenue;
+    // 配信的制作費は1公演日程あたり1億円
+    const profit = totalRevenueWithGoods - venueCost - STREAM_PRODUCTION_COST;
+
+    yearlyStats.audience += totalAudience;
+    yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
+    yearlyStats.streamCost = (yearlyStats.streamCost || 0) + STREAM_PRODUCTION_COST;
+    funds += profit;
+
+    // ライブの体力消費と疲労の蓄積
+    const stamina = applyLiveStaminaCost(v, isMultiDay, isConsecutive);
+    lastLiveDate = gameDate;
+    // ライブ週は週間スケジュールを組めないので自然回復を代わりに1回だけ適用する
+    if (!weeklyRecoveryDone) {
+      applyLiveWeekRecovery();
+      weeklyRecoveryDone = true;
+    }
+
+    // 当日の公演を処理し、残りの公演があれば次回へ回す
+    // entry は毎回生成される一時オブジェクトのため、実際の保存先へ直接書き戻す
+    const target = entry.isPrimary ? entry.plan : entry.plan.additionalLives[entry.extraIndex];
+    if (remainingDates.length) {
+      target.liveDate = remainingDates[0];
+      target.liveDates = remainingDates.slice(1);
+    } else {
+      markLiveEntryCompleted(entry);
+    }
+    const fatigueNote = stamina.fatigueGain >= LIVE_FATIGUE_GAIN + LIVE_FATIGUE_MULTI_DAY_BONUS
+      ? '・疲労が大きく累積'
+      : (stamina.fatigueGain > LIVE_FATIGUE_GAIN ? '・疲労が累積' : '');
+    liveLogs.push(`【ライブ成功】${entry.liveName || v.name}（${v.name} / ${totalShowCount}公演中・残り${remainingDates.length}${isFinale ? '・千秋楽' : ''} / 動員: ${totalAudience.toLocaleString()}人 / 配信: ${streamBuyers.toLocaleString()}人・${formatMoney(streamRevenue)}（制作費 -${formatMoney(STREAM_PRODUCTION_COST)}）/ 売上: ${formatMoney(totalRevenueWithGoods)} / 会場使用料: ${formatMoney(venueCost)} / 収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)} / 体力 -${stamina.cost}・疲労 +${stamina.fatigueGain}${fatigueNote}）！`);
+  });
+  if (todayLiveEntries.length) nextLivePromotionPoints = 0;
+  if (liveLogs.length) setLog(liveLogs.join(' '));
+
+  if (isLastWednesdayOfMonth()) {
+    // CD売上収入（8割）とタイアップの臨時収入を入金し、会費と給与を処理する
+    settleMonthlyIncome();
+  }
+  // テレビ出演・年末の大型イベントは、週をまたいで通過した日も含めて処理する
+  processScheduledPerformances(reachDate);
+  processYearEndEvents(reachDate);
+  processSpecialLiveEvents();
+}
+
+// 年末の大型イベント（赤白 12/31 ／ 日本CD大賞 12/30）
+// 週をまとめて進めるときに通過した日も含めて判定する
+function processYearEndEvents(reachDate = gameDate) {
+  const startDate = getGameDateObject();
+  const limitDate = getGameDateObject(reachDate);
+  const spanDays = Math.max(0, Math.round((limitDate - startDate) / 86400000));
+  for (let offset = 0; offset <= spanDays; offset++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + offset);
+    if (date.getMonth() + 1 !== 12) continue;
+
+    if (date.getDate() === AWARD_DATE.day && !yearEndAwardProcessed) {
+      yearEndAwardProcessed = true;
+      executeYearEndAwards();
+    }
+
+    if (date.getDate() === KOHAKU_DATE.day && !yearEndKohakuProcessed) {
+      yearEndKohakuProcessed = true;
+      executeKohaku();
+    }
+  }
+}
+
+// 赤白歌合戦（12/31）：成績上位2枠なら出演でき、人気が大きく伸びる
+function executeKohaku() {
+  const sorted = [...leagueTeams].sort((a, b) =>
+    ((b.sales * 0.6) + (b.audience * 0.4)) - ((a.sales * 0.6) + (a.audience * 0.4))
+  );
+  const qualified = sorted.slice(0, 2).some(team => team.id === 'player');
+  if (qualified) {
+    const gain = Math.round(REGULAR_PROGRAM_POPULARITY * 6);
+    adjustTargetPopularity(gain);
+    setLog(`【赤白歌合戦】上位2枠に入り、出演できました（人気 +${gain}）。`);
+  } else {
+    setLog('【赤白歌合戦】上位2枠には入れず、出演できませんでした。');
+  }
+}
+
+function processSpecialLiveEvents() {
+  specialLiveEvents.forEach(event => {
+    if (event.completed || event.liveDate !== gameDate) return;
+    const venue = VENUE_DATA.find(item => item.name === event.venue);
+    if (!venue) return;
+
+    const capacity = CAPACITY_MAP[venue.cap];
+    const eventMultiplier = (event.type === 'festival' ? 1.4 : 1.2) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
+    const audience = Math.min(capacity, Math.floor(
+      getLiveAudienceDemand(venue, getGameDateObject()) * eventMultiplier
+    ));
+    const ticketRevenue = audience * 8000;
+    const merchandiseSales = sellMerchandiseAtLive();
+    const venueCost = capacity * 2500;
+    const profit = ticketRevenue + merchandiseSales.revenue - venueCost;
+    yearlyStats.audience += audience;
+    funds += profit;
+    event.completed = true;
+    setLog(`【${event.name}】${venue.name}（動員 ${audience.toLocaleString()}人 / 収支 ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);
+  });
+}
+
+// 開催日数（1〜5day）と曜日別の埋まりやすさ
+const LIVE_DAY_OPTIONS = [1, 2, 3, 4, 5];
+const LIVE_DAY_LABELS = { 1: 'ワンデイ', 2: '2day', 3: '3day', 4: '4day', 5: '5day' };
+// 会場規模（cap）ティアごとの集客率
+const VENUE_TIER_RATE = { SS: 0.8, S: 0.75, A: 0.7, B: 0.65, C: 0.6, D: 0.55 };
+const VENUE_TIER_DEFAULT_RATE = 0.6;
+// 曜日重み（土日为1、金0.9、月0.8、その他0.7）
+const LIVE_WEEKDAY_WEIGHT = { 0: 1.0, 6: 1.0, 5: 0.9, 1: 0.8 };
+const LIVE_WEEKDAY_DEFAULT_WEIGHT = 0.7;
+// 卒コン特例（曜日関係なし）
+const GRADUATION_LIVE_RATE = 0.95;
+// 千秋楽補正（曜日関係なし。連日公演の最終日）
+const LIVE_FINALE_RATE = 0.9;
+
+// 会場規模ティアの集客率
+function getVenueTierRate(venue) {
+  return VENUE_TIER_RATE[venue?.cap] ?? VENUE_TIER_DEFAULT_RATE;
+}
+
+// 曜日の重み（日・土=1、金=0.9、月=0.8、その他=0.7）
+function getLiveDayWeight(date) {
+  if (!date || typeof date.getDay !== 'function') return LIVE_WEEKDAY_DEFAULT_WEIGHT;
+  return LIVE_WEEKDAY_WEIGHT[date.getDay()] ?? LIVE_WEEKDAY_DEFAULT_WEIGHT;
+}
+
+// ライブ1公演の動員を求める（ファン階層の参加率 × 会場ティアの集客率 × 曜日や特例の重み × 価格調整）
+function getLiveAudienceDemand(venue, date = getGameDateObject(), specialRate = null, priceFactor = 1) {
+  const weight = specialRate ?? getLiveDayWeight(date);
+  const rate = getVenueTierRate(venue) * priceFactor;
+  return Math.floor(getParticipatingFans('live') * rate * weight);
+}
+
+// 配信チケット（ライブ観戦配信）
+const STREAM_TICKET_PRICE = 5000;
+// 配信的制作費（1公演日程あたり1億円）
+const STREAM_PRODUCTION_COST = 100000000;
+// 配信購入割合（曜日で固定：土日0.9 / 月金0.8 / 火水木0.85）
+const STREAM_BUYER_RATE = { 0: 0.9, 6: 0.9, 1: 0.8, 5: 0.8, 2: 0.85, 3: 0.85, 4: 0.85 };
+const STREAM_BUYER_DEFAULT_RATE = 0.85;
+
+// 曜日の配信購入割合
+function getStreamBuyerRate(date = getGameDateObject()) {
+  if (!date || typeof date.getDay !== 'function') return STREAM_BUYER_DEFAULT_RATE;
+  return STREAM_BUYER_RATE[date.getDay()] ?? STREAM_BUYER_DEFAULT_RATE;
+}
+
+// 配信チケットを買う人数（(1-ライブ参戦割合) × 曜日の購入割合）
+function getStreamTicketBuyers(date = getGameDateObject()) {
+  const fans = calculateGroupFans();
+  const liveRate = getTierParticipationRate('live');
+  return Math.floor(fans * (1 - liveRate) * getStreamBuyerRate(date));
+}
+
+// 会場・席種から標準チケット価格を求める（Bティア基準×会場ティア倍率）
+function getStandardSeatPrice(venue, seatId) {
+  const group = SEAT_PRICE_GROUP[seatId] || 'stand';
+  const base = STANDARD_SEAT_PRICE[group] ?? STANDARD_SEAT_PRICE.stand;
+  const rate = VENUE_TIER_PRICE_RATE[venue?.cap] ?? VENUE_TIER_DEFAULT_PRICE_RATE;
+  return Math.round((base * rate) / 50) * 50;
+}
+
+// 実際の座席価格（未設定なら会場の標準価格）
+function getEffectiveSeatPrice(venue, entry, seat) {
+  const configured = Number(entry?.seatPrices?.[seat.id]);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  return getStandardSeatPrice(venue, seat.id);
+}
+
+// 価格設定による動員の増減（標準価格の2倍なら動員は半減）
+function getPriceDemandFactor(venue, entry) {
+  const seats = getLiveSeatCapacities(venue, entry?.seatOptions || {});
+  let configuredTotal = 0;
+  let standardTotal = 0;
+  seats.forEach(seat => {
+    configuredTotal += getEffectiveSeatPrice(venue, entry, seat) * seat.capacity;
+    standardTotal += getStandardSeatPrice(venue, seat.id) * seat.capacity;
+  });
+  if (configuredTotal <= 0 || standardTotal <= 0) return 1;
+  return Math.max(0.1, Math.min(5, standardTotal / configuredTotal));
+}
+
+function getLiveDayLabel(days) {
+  return LIVE_DAY_LABELS[days] || LIVE_DAY_LABELS[1];
+}
+
+function normalizeLiveDays(value) {
+  const days = Number.parseInt(value, 10);
+  return LIVE_DAY_OPTIONS.includes(days) ? days : 1;
+}
+
+function getLiveSeatCapacities(venue, seatOptions = {}) {
+  const capacity = CAPACITY_MAP[venue.cap];
+  const isDome = venue.name.includes('ドーム');
+  const shares = isDome
+    ? { arena: 0.28, stand1: 0.30, stand2: 0.24, stand3: 0.12, stand4: 0.06 }
+    : { arena: 0.40, stand1: 0.35, stand2: 0.25 };
+  const baseSeatIds = Object.keys(shares);
+  let assignedCapacity = 0;
+
+  return SEAT_TYPES.filter(seat => !seat.domeOnly || isDome)
+    .filter(seat => !seat.optional || seatOptions[seat.id])
+    .map(seat => {
+      let seatCapacity;
+      if (seat.optional) {
+        seatCapacity = Math.floor(capacity * (seat.id === 'annotation' ? 0.05 : 0.10));
+      } else if (seat.id === baseSeatIds[baseSeatIds.length - 1]) {
+        seatCapacity = capacity - assignedCapacity;
+      } else {
+        seatCapacity = Math.floor(capacity * shares[seat.id]);
+        assignedCapacity += seatCapacity;
+      }
+      return { ...seat, capacity: seatCapacity };
+    });
+}
+
+function ensureScheduledSong(year, month, plan) {
+  let song = songs.find(item => item.id === plan.songId);
+  if (!song) {
+    const id = `song-${year}-${month}`;
+    song = songs.find(item => item.id === id);
+    if (!song) {
+      const title = plan.songName || SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)];
+      song = { id, title, releaseYear: year, releaseMonth: month, releaseType: plan.release, experience: 0, level: 1, released: false };
+      songs.push(song);
+    }
+    plan.songId = song.id;
+  }
+  if (plan.songName) song.title = plan.songName;
+  song.releaseType = plan.release;
+  return song;
+}
+
+function addSongExperience(song, amount) {
+  song.experience = (song.experience || 0) + amount;
+  song.level = Math.min(20, 1 + Math.floor(song.experience / 12));
+}
+
+// 楽曲1枚あたりの単価（シングル／アルバム）
+const SONG_UNIT_PRICE = { single: 300, album: 600 };
+function getSongUnitPrice(song) {
+  return SONG_UNIT_PRICE[song?.releaseType] || SONG_UNIT_PRICE.single;
+}
+// シングル販促の初回売上の目安（グループファン数 × この係数）
+const SINGLE_PROMO_FAN_RATIO = 1.5;
+// アルバムは係数が2になる
+const ALBUM_PROMO_FAN_RATIO = 2;
+// 発売前の販促回数nによる発売時売上倍率（1 + n×0.005）
+const RELEASE_PROMO_ALPHA_STEP = 0.005;
+// 発売後の販促減衰率（発売週だけ8／通常10／過去作なら100）
+const PROMO_DIVISOR_RELEASE_WEEK = 8;
+const PROMO_DIVISOR_NORMAL = 10;
+const PROMO_DIVISOR_PAST_WORK = 100;
+// CD売上のうち月ごとに収入として計上される割合（残りは流通費等）
+const CD_REVENUE_MONTHLY_SHARE = 0.8;
+// 雑誌・TVタイアップ（月末の臨時収入）
+const TIE_UPS = [
+  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 0.5, popularityGain: 2, songExperience: 4 },
+  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1.1, popularityGain: 1, songExperience: 10 }
+];
+
+// w週後の販促累積売上 = Σ(i=1→w) S×(減衰率の逆数の積)（各週の減衰率で決まる）
+function getPromotionCumulativeSales(baseSales, divisors) {
+  const base = Math.max(0, Math.round(Number(baseSales) || 0));
+  if (!base || !Array.isArray(divisors) || !divisors.length) return 0;
+  let total = 0;
+  let factor = 1;
+  divisors.forEach(divisor => {
+    const d = Number(divisor) > 1 ? Number(divisor) : PROMO_DIVISOR_NORMAL;
+    total += base * factor;
+    factor /= d;
+  });
+  // 浮動小数点の誤差で整数境界を越えないよう、微小な余裕を引いてから切り上げる
+  return Math.ceil(total - 1e-6);
+}
+
+function trainSongs(summary) {
+  const weeklyExperience = Math.max(1, Math.round((summary.averages.vocal + summary.averages.dance) / 40));
+  songs.forEach(song => addSongExperience(song, weeklyExperience));
+}
+
+// 月の第n週の指定曜日の日付を求める（week=2なら「第2月曜日」）
+function getNthWeekdayOfMonth(year, month, weekday, week) {
+  let count = 0;
+  const lastDay = getDaysInMonth(year, month);
+  for (let day = 1; day <= lastDay; day++) {
+    const date = new Date(year, month - 1, day, 12);
+    if (date.getDay() !== weekday) continue;
+    count += 1;
+    if (count === week) return toDateKey(date);
+  }
+  return null;
+}
+
+// 固定日（month/day）の日付を求める
+function getFixedDateOfMonth(year, month, day) {
+  const clampedDay = Math.min(day, getDaysInMonth(year, month));
+  return toDateKey(new Date(year, month - 1, clampedDay, 12));
+}
+
+// 大型特番の放送日（8月の第2土曜など）
+function getSpecialBroadcastDate(broadcast, year) {
+  if (Number.isFinite(broadcast.weekday) && Number.isFinite(broadcast.week)) {
+    return getNthWeekdayOfMonth(year, broadcast.month, broadcast.weekday, broadcast.week);
+  }
+  return getFixedDateOfMonth(year, broadcast.month, broadcast.day);
+}
+
+// 大型特番の放送日をゲーム日付（Date形式）に変換する
+function getSpecialBroadcastGameDate(broadcast, year) {
+  const dateKey = getSpecialBroadcastDate(broadcast, year);
+  return dateKey ? getGameDateObject(dateKey) : null;
+}
+
+// 大型特番で披露する楽曲（直近の発売済み楽曲、なければ次のリリース予定）
+function findNearestProgramDate(year, month) {
+  const latestReleased = [...songs]
+    .filter(song => song.released)
+    .sort((a, b) => b.releaseYear - a.releaseYear || b.releaseMonth - a.releaseMonth)[0];
+  if (latestReleased) return latestReleased.id;
+  const upcoming = findUpcomingSinglePlan();
+  if (upcoming) return ensureScheduledSong(upcoming.year, upcoming.month, upcoming.plan).id;
+  const draftSong = [...songs].sort((a, b) => b.releaseYear - a.releaseYear || b.releaseMonth - a.releaseMonth)[0];
+  return draftSong ? draftSong.id : null;
+}
+
+// 定例音楽番組の出演打診（放送日は固定：CTV=月、Mコン=火、Song Station=金）
+function checkMusicProgramOffers() {
+  if (!isFirstWednesdayOfMonth()) return;
+
+  const targetMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+  const targetYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+  const targetKey = `${targetYear}-${targetMonth}`;
+  const releasePlan = productionSchedule[targetKey];
+
+  if (releasePlan && releasePlan.release && releasePlan.release !== 'none' && !releasePlan.musicOfferSent) {
+    const song = ensureScheduledSong(targetYear, targetMonth, releasePlan);
+    const calendarTargetYear = calendarYear + (targetYear - currentYear);
+    MUSIC_PROGRAMS.forEach(program => {
+      pendingPerformanceOffers.push({
+        id: `offer-${targetYear}-${targetMonth}-${program.id}`,
+        name: program.name,
+        airYear: targetYear,
+        airMonth: targetMonth,
+        airDate: getNthWeekdayOfMonth(calendarTargetYear, targetMonth, program.weekday, program.week),
+        isSpecial: false,
+        songId: song.id
+      });
+    });
+    releasePlan.musicOfferSent = true;
+  }
+}
+
+// 大型特番の出演打診（放送日の約4週間前に届く）
+function checkSpecialBroadcastOffers() {
+  const currentGameDate = getGameDateObject();
+  SPECIAL_BROADCASTS.forEach(broadcast => {
+    // 当年と翌年の放送日を調べ近い方を対象にする
+    const candidates = [
+      { year: calendarYear, date: getSpecialBroadcastGameDate(broadcast, calendarYear) },
+      { year: calendarYear + 1, date: getSpecialBroadcastGameDate(broadcast, calendarYear + 1) }
+    ].filter(candidate => candidate.date);
+    candidates.forEach(candidate => {
+      const diffDays = Math.round((candidate.date - currentGameDate) / 86400000);
+      if (diffDays < 0 || diffDays > SPECIAL_OFFER_LEAD_DAYS) return;
+      const offerKey = `${candidate.year}-${broadcast.id}`;
+      if (specialOffersSent.includes(offerKey)) return;
+      specialOffersSent.push(offerKey);
+      pendingPerformanceOffers.push({
+        id: `special-${offerKey}`,
+        name: broadcast.name,
+        airYear: currentYear + (candidate.year - calendarYear),
+        airMonth: broadcast.month,
+        airDate: toDateKey(candidate.date),
+        isSpecial: true,
+        broadcastId: broadcast.id,
+        extraNextDay: Boolean(broadcast.extraNextDay),
+        popularityMultiplier: broadcast.popularityMultiplier,
+        songExperience: broadcast.songExperience,
+        appearanceFee: broadcast.appearanceFee,
+        songId: findNearestProgramDate(candidate.year, broadcast.month)
+      });
+    });
+  });
+}
+
+// 出演予定（放送日ベース）を処理する
+// reachDate を渡すと、その週をまとめて進める際に通過した放送日ぶんもまとめて処理する
+function processScheduledPerformances(reachDate = null) {
+  const startKey = gameDate;
+  const limitKey = reachDate || startKey;
+  const remaining = [];
+  const logs = [];
+
+  scheduledPerformances.forEach(performance => {
+    if (!performance.airDate || performance.airDate > limitKey || (reachDate && performance.airDate < startKey)) {
+      remaining.push(performance);
+      return;
+    }
+    const song = songs.find(item => item.id === performance.songId);
+    const summary = calculateTeamAverages();
+
+    if (performance.isSpecial) {
+      // 大型特番は定例番組の何倍もの人気度が得られる
+      const multiplier = performance.popularityMultiplier || 4;
+      const gain = Math.round(REGULAR_PROGRAM_POPULARITY * multiplier * (0.6 + summary.overall / 100));
+      adjustTargetPopularity(gain);
+      if (song) addSongExperience(song, performance.songExperience ?? 30);
+      const fee = performance.appearanceFee || 3000000;
+      funds += fee;
+      logs.push(`【大型特番】${performance.name}で「${song ? song.title : '楽曲'}」を披露（人気 +${gain} / 出演料 ${formatMoney(fee)}）。`);
+    } else {
+      const gain = Math.round(REGULAR_PROGRAM_POPULARITY * (0.6 + summary.overall / 100));
+      adjustTargetPopularity(gain);
+      if (song) addSongExperience(song, REGULAR_PROGRAM_SONG_EXPERIENCE);
+      const fee = REGULAR_PROGRAM_APPEARANCE_FEE;
+      funds += fee;
+      logs.push(`【テレビ出演】${performance.name}で「${song ? song.title : '楽曲'}」を披露（人気 +${gain} / 出演料 ${formatMoney(fee)}）。`);
+    }
+  });
+
+  scheduledPerformances = remaining;
+  if (logs.length) setLog(logs.join(' '));
+}
+
+// 新曲発売10週前の選抜発表（ユーザー自身が選抜とセンターを選ぶ）
+function checkSenbatsuTrigger() {
+  if (!isFirstWednesdayOfMonth()) return;
+  if (pendingSelectionEvent) return;
+  const targetDate = getGameDateObject();
+  targetDate.setDate(targetDate.getDate() + SENBATSU_LEAD_DAYS);
+  const targetYear = currentYear + targetDate.getFullYear() - calendarYear;
+  const targetMonth = targetDate.getMonth() + 1;
+  const targetKey = `${targetYear}-${targetMonth}`;
+
+  const plan = productionSchedule[targetKey];
+  if (!plan || !plan.release || plan.release === 'none') return;
+  // 同じリリースの選抜発表は一度だけ
+  if (plan.senbatsuAnnounced) return;
+  plan.senbatsuAnnounced = true;
+
+  // 次作の発表時なので、前回のロックはここで外れる
+  selectionLock = null;
+
+  pendingSelectionEvent = createSelectionEvent({
+    trigger: 'release',
+    year: targetYear,
+    month: targetMonth,
+    releaseType: plan.release
+  });
+}
+
+// 選抜・センター選定イベントを生成する（既存の選抜を引き継ぐ）
+function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, releaseType = null } = {}) {
+  const currentSelected = idolRoster.filter(member => member.isSelected);
+  const currentCenter = idolRoster.find(member => member.isCenter);
+  const base = currentSelected.length >= MIN_SELECTION_SIZE
+    ? currentSelected
+    : [...idolRoster].sort((a, b) => calculateSingleOverall(b.stats) - calculateSingleOverall(a.stats))
+        .slice(0, Math.max(MIN_SELECTION_SIZE, 16));
+  // センターは選抜内に収める
+  const centerId = base.some(member => member.id === currentCenter?.id) ? currentCenter.id : base[0]?.id ?? null;
+  return {
+    trigger,
+    year,
+    month,
+    releaseType,
+    selectedIds: base.map(member => member.id),
+    centerId
+  };
+}

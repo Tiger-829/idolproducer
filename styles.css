@@ -1,0 +1,1184 @@
+    :root {
+      --primary: #e91e63;
+      --bg: #fce4ec;
+      --panel: #ffffff;
+      --text: #333333;
+    }
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overscroll-behavior-y: none;
+      display: flex;
+      justify-content: center;
+    }
+    .game-container {
+      background: var(--panel);
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.05);
+    }
+    .title-screen {
+      width: 100%;
+      max-width: 520px;
+      min-height: 100vh;
+      padding: 28px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: var(--panel);
+    }
+    .title-screen[hidden], .game-container[hidden] { display: none; }
+    .title-heading {
+      padding: 22px 14px;
+      background: #fdf2f4;
+      border-left: 4px solid var(--primary);
+    }
+    .title-heading h1 { margin-bottom: 8px; }
+    .title-heading p { margin: 0; color: #666; font-size: 12px; text-align: center; }
+    .save-slots { display: flex; flex-direction: column; gap: 10px; }
+    .save-slot {
+      padding: 12px;
+      border: 1px solid #eadde1;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .save-slot-heading { display: flex; justify-content: space-between; align-items: baseline; }
+    .save-slot-heading h2 { margin: 0; font-size: 14px; }
+    .save-slot-info { min-height: 36px; margin: 8px 0; color: #666; font-size: 11px; line-height: 1.6; }
+    .save-slot-actions { display: flex; gap: 6px; align-items: center; }
+    .save-slot-actions .main-btn { flex: 1; }
+    .slot-delete-btn { min-width: 40px; min-height: 40px; }
+    .weekly-event-note {
+      padding: 10px 12px;
+      background: #fdf2f4;
+      border-left: 4px solid var(--primary);
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .weekly-event-note ul { margin: 6px 0 0; padding-left: 20px; }
+    .weekly-member-target { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+    .weekly-member-target select { padding: 8px; font-size: 12px; }
+
+    /* 週間スケジュール */
+    .schedule-block {
+      padding: 8px;
+      background: #fff;
+      border: 1px solid #eadde1;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+    .schedule-block-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .schedule-block-title small { font-size: 9px; font-weight: normal; color: #777; }
+    .schedule-block select {
+      width: 100%;
+      padding: 7px;
+      font-size: 12px;
+      margin-bottom: 4px;
+      border: 1px solid #e0d5d8;
+      border-radius: 4px;
+      background: #fdfbfc;
+    }
+    .schedule-block select:disabled { background: #f0ecee; color: #aaa; }
+    /* 1週間のスケジュール（7日×午前/午後＝14枠） */
+    .week-vacation-btn {
+      width: 100%;
+      margin-bottom: 6px;
+      padding: 7px;
+      font-size: 11px;
+      font-weight: bold;
+      color: #555;
+      background: #fff;
+      border: 1px dashed #bbb;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .week-vacation-btn.active { color: #fff; background: #2e7d32; border-color: #2e7d32; border-style: solid; }
+    .week-vacation-btn:disabled { color: #aaa; background: #f4f1f2; border-color: #ddd; cursor: not-allowed; }
+    .week-grid { display: flex; flex-direction: column; gap: 3px; }
+    .week-row {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr);
+      gap: 4px;
+      align-items: center;
+    }
+    .week-row.is-rest-day { background: #f0f6f2; border-radius: 4px; }
+    .week-day-label { font-size: 11px; font-weight: bold; color: #555; text-align: center; }
+    .week-day-label small {
+      display: block;
+      color: #2e7d32;
+      font-size: 8px;
+      line-height: 1;
+    }
+    .week-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .week-cell-label { font-size: 8px; color: #999; text-align: center; }
+    .week-cell select { margin-bottom: 0; padding: 5px 4px; font-size: 11px; }
+    .week-cell select:disabled { background: #f0ecee; color: #aaa; }
+    /* テレビ出演で固定された枠（リハーサル／出演） */
+    .week-cell.is-fixed select {
+      background: #e8eef7;
+      color: #1a4b8c;
+      font-weight: bold;
+      border: 1px solid #9db8dd;
+      opacity: 1;
+    }
+    .week-cell.is-fixed .week-cell-label { color: #1a4b8c; }
+    .rest-toggle.focus { border-color: #4527a0; }
+    .rest-toggle.focus.active { background: #4527a0; border-color: #4527a0; }
+    /* 今週の事務作業（選択中だけ色を付ける） */
+    .rest-toggle.office { border-color: #ef6c00; color: #b35c00; }
+    .rest-toggle.office.active { background: #ef6c00; border-color: #ef6c00; color: #fff; }
+    .rest-toggle.office.active small { color: #ffe9d6; }
+    .schedule-note { font-size: 10px; color: #777; line-height: 1.5; margin-top: 4px; }
+    .schedule-note.warn { color: #c0392b; }
+    .rest-toggle-grid { display: flex; flex-wrap: wrap; gap: 4px; max-height: 130px; overflow-y: auto; }
+    .rest-toggle {
+      padding: 5px 8px;
+      font-size: 10px;
+      border: 1px solid #e0d5d8;
+      border-radius: 12px;
+      background: #fafafa;
+      color: #555;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .rest-toggle small { color: #999; font-size: 9px; }
+    .rest-toggle.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .rest-toggle.active small { color: #ffe4ec; }
+    .rest-toggle.warn:not(.active) { border-color: #e57373; color: #c0392b; }
+    .rest-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 選抜・センター選定 */
+    .selection-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: #fdf2f4;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #555;
+    }
+    .selection-summary strong { color: var(--primary); font-size: 14px; }
+    .selection-summary-center { font-size: 11px; color: #777; }
+    .selection-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      max-height: 34vh;
+      overflow-y: auto;
+      padding: 2px;
+    }
+    .selection-member {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      grid-template-areas: "check name score" "check meta score";
+      gap: 1px 5px;
+      align-items: center;
+      padding: 5px 6px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 5px;
+      text-align: left;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .selection-member.selected { background: #fce4ec; border-color: var(--primary); }
+    .selection-check { grid-area: check; font-size: 12px; font-weight: bold; color: var(--primary); }
+    .selection-name { grid-area: name; font-size: 11px; font-weight: bold; color: #333; }
+    .selection-meta { grid-area: meta; font-size: 9px; color: #888; }
+    .selection-score { grid-area: score; font-size: 12px; font-weight: bold; font-family: monospace; }
+    .selection-crown {
+      display: inline-block;
+      margin-left: 3px;
+      padding: 0 3px;
+      font-size: 8px;
+      font-style: normal;
+      color: #fff;
+      background: #ff1493;
+      border-radius: 3px;
+    }
+    .selection-center { margin-top: 10px; }
+    .selection-subtitle {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 11px;
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .selection-subtitle small { font-size: 9px; font-weight: normal; color: #999; }
+    .selection-center-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 22vh;
+      overflow-y: auto;
+    }
+    .selection-center-btn {
+      padding: 4px 8px;
+      font-size: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+      text-align: left;
+    }
+    .selection-center-btn small { display: block; font-size: 8px; color: #999; }
+    .selection-center-btn.active { background: #ff1493; border-color: #ff1493; color: #fff; }
+    .selection-center-btn.active small { color: #ffd9e8; }
+
+    /* マネージャー */
+    .manager-card {
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .manager-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+    .manager-head strong { font-size: 13px; }
+    .manager-head span { font-size: 10px; color: #777; }
+    .manager-skill-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 40px 92px;
+      gap: 6px;
+      align-items: center;
+      padding: 3px 0;
+    }
+    .manager-skill-name { font-size: 11px; }
+    .manager-skill-level { font-size: 11px; font-weight: bold; text-align: center; font-family: monospace; }
+    .manager-skill-level.max { color: #d4af37; }
+    .manager-skill-button {
+      padding: 5px 4px;
+      font-size: 9px;
+      font-weight: bold;
+      border: none;
+      border-radius: 4px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+    }
+    .manager-skill-button:disabled { background: #ddd; color: #999; cursor: not-allowed; }
+    .manager-total { font-size: 10px; color: #777; margin-top: 4px; line-height: 1.5; }
+    .manager-card.candidate { background: #fdfbfc; border-color: #eadde1; }
+    .manager-card.candidate .manager-head strong { color: var(--primary); }
+    .manager-fire-row { display: flex; justify-content: flex-end; margin-top: 6px; }
+    .manager-fire-button, .manager-hire-button {
+      padding: 6px 10px;
+      font-size: 10px;
+      font-weight: bold;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .manager-fire-button { background: #757575; color: #fff; }
+    .manager-fire-button:disabled { background: #ddd; color: #999; cursor: not-allowed; }
+    .manager-hire-button { background: var(--primary); color: #fff; }
+    .manager-hire-button:disabled { background: #ddd; color: #999; cursor: not-allowed; }
+    .manager-card.tier { background: #fdfbfc; border-color: #eadde1; }
+    .manager-card.tier .manager-head strong { color: var(--primary); font-size: 12px; }
+    .manager-tier-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 46px 40px 42px 56px minmax(0, 1fr);
+      gap: 5px;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px dotted #eee;
+      font-size: 10px;
+    }
+    .manager-tier-row:last-child { border-bottom: none; }
+    .manager-tier-name { color: #555; }
+    .manager-tier-total { text-align: right; font-family: monospace; font-weight: bold; color: #333; }
+    .manager-tier-badge {
+      text-align: center;
+      padding: 1px 0;
+      border-radius: 8px;
+      background: #eee;
+      color: #999;
+      font-size: 9px;
+      font-weight: bold;
+    }
+    .manager-tier-badge.on { background: var(--primary); color: #fff; }
+    .manager-tier-badge.high { background: #d4af37; color: #fff; }
+    .manager-tier-badge.max { background: linear-gradient(135deg, #ff1493, #d4af37, #4527a0); color: #fff; font-size: 10px; }
+    .manager-tier-mult { text-align: right; font-family: monospace; color: #e91e63; font-weight: bold; }
+    .manager-tier-bar { display: block; height: 5px; background: #eee; border-radius: 3px; overflow: hidden; }
+    .manager-tier-bar i { display: block; height: 100%; background: var(--primary); }
+    .manager-tier-next { color: #999; font-size: 9px; white-space: nowrap; }
+    .office-facilities { display: flex; flex-direction: column; gap: 8px; }
+    .office-facility-list { display: flex; flex-direction: column; border-top: 1px solid #eee; }
+    .office-facility-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 2px;
+      border-bottom: 1px solid #eee;
+    }
+    .office-facility-name { font-size: 12px; font-weight: bold; }
+    .office-facility-meta { margin-top: 3px; color: #777; font-size: 10px; line-height: 1.4; }
+    .facility-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .icon-round-btn {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex: 0 0 auto;
+    }
+    .icon-round-btn svg { width: 20px; height: 20px; display: block; }
+    .icon-round-btn.up {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .icon-round-btn.up svg { stroke: #fff; fill: none; }
+    .icon-round-btn.up:disabled { background: #d5c9cd; border-color: #d5c9cd; cursor: not-allowed; }
+    .icon-round-btn.down {
+      background: #fff;
+      border-color: #bdbdbd;
+    }
+    .icon-round-btn.down svg { stroke: #757575; fill: none; }
+    .icon-round-btn.down:hover { background: #f5f5f5; }
+    .icon-round-btn.is-max {
+      background: #eee;
+      border-color: #ddd;
+      cursor: default;
+    }
+    .icon-round-btn.is-max svg { stroke: #9e9e9e; fill: none; }
+    .facility-action-label {
+      font-size: 9px;
+      color: #777;
+      text-align: right;
+      line-height: 1.3;
+    }
+    .office-maintenance-note { color: #777; font-size: 10px; }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      color: var(--primary);
+      text-align: center;
+    }
+    .header-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fdf2f4;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .calendar-date-label { color: #777; font-size: 11px; font-weight: normal; }
+    .calendar-card {
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #eadde1;
+      border-radius: 6px;
+    }
+    .calendar-sheet { transform-origin: top center; }
+    .calendar-sheet.calendar-turn { animation: calendar-turn 360ms ease-out both; }
+    .calendar-month-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .calendar-month-heading strong { color: var(--primary); font-size: 14px; }
+    .calendar-month-heading span { color: #777; font-size: 10px; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+    .calendar-weekday, .calendar-day { display: grid; place-items: center; min-height: 28px; font-size: 10px; }
+    .calendar-weekday { color: #777; font-weight: bold; }
+    .calendar-weekday:first-child, .calendar-day.sunday { color: #c94f68; }
+    .calendar-day { position: relative; border-radius: 4px; color: #444; }
+    .calendar-day.wednesday { background: #f5f1f2; }
+    .calendar-day.live-day::after { position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%; background: #4f8877; content: ''; }
+    .calendar-day.rival-live-day::before { position: absolute; top: 2px; width: 4px; height: 4px; border-radius: 50%; background: #c88738; content: ''; }
+    .calendar-day.broadcast-day { background: #ede7f6; color: #4527a0; font-weight: bold; }
+    .calendar-day.broadcast-day.live-day { background: #d1c4e9; }
+    .calendar-day.release-day { background: #e2eefc; color: #12447e; font-weight: bold; }
+    .calendar-day.release-day.live-day { background: #cfe0f5; }
+    .calendar-day.plan-event-day { box-shadow: inset 0 0 0 1px #b8742a; }
+    .calendar-day.today { background: var(--primary); color: #fff; font-weight: bold; }
+    .calendar-day.today::after { background: #fff; }
+    @keyframes calendar-turn {
+      from { opacity: 0.55; transform: rotateX(-12deg) translateY(3px); }
+      to { opacity: 1; transform: rotateX(0) translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .calendar-sheet { animation: none; }
+    }
+    .page-nav {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      border-bottom: 1px solid #f0d5de;
+    }
+    .page-tab {
+      min-height: 58px;
+      padding: 7px 2px 6px;
+      color: #777;
+      background: transparent;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+    .page-tab .tab-icon {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #f5f1f2;
+      border: 2px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .page-tab .tab-icon svg { width: 20px; height: 20px; display: block; }
+    .page-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .page-tab.active .tab-icon {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+    .page-tab.active .tab-icon svg { stroke: #fff; fill: none; }
+    .page-tab .tab-icon svg { stroke: #777; fill: none; }
+    .page-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .page-panel[hidden] { display: none; }
+    .page-title {
+      margin: 0;
+      font-size: 15px;
+      color: var(--primary);
+    }
+    .funds-card {
+      padding: 14px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 8px;
+    }
+    .funds-total {
+      margin-top: 4px;
+      font-size: 24px;
+      font-weight: 900;
+      font-family: monospace;
+    }
+    .funds-exact {
+      margin-top: 2px;
+      color: #777;
+      font-size: 10px;
+    }
+    .team-fans-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .team-fans-count { font-size: 18px; font-family: monospace; }
+    .team-fans-tiers { color: #8a6d7a; font-size: 10px; font-weight: normal; text-align: right; }
+    .member-fan-count { display: block; color: #777; font-size: 9px; }
+
+    /* 常時表示のメンバー名一覧 */
+    .roster-namebar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 30vh;
+      overflow-y: auto;
+    }
+    .roster-namebar-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 7px;
+      font-size: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 11px;
+      color: #555;
+      white-space: nowrap;
+    }
+    .roster-namebar-item.selected { background: #fce4ec; border-color: #f8bbd0; color: #ad1457; font-weight: bold; }
+    .roster-namebar-item.center { border-color: #ff1493; }
+    .roster-namebar-crown { color: #ff1493; font-size: 9px; font-weight: bold; }
+    .roster-namebar-meta { color: #999; font-size: 9px; }
+    .roster-namebar-item.low .roster-namebar-meta { color: #c0392b; }
+    .fund-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .fund-stat {
+      padding: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+    }
+    .fund-stat-label { display: block; color: #777; font-size: 11px; }
+    .fund-stat-value { font-size: 15px; font-weight: bold; }
+    .song-list, .offer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .song-row, .offer-row {
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .song-sales-summary {
+      margin-bottom: 6px;
+      padding: 10px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .offer-row select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 8px;
+      font-size: 12px;
+    }
+    .offer-row.offer-special { background: #fff6fa; border-color: #f8bbd0; }
+    .offer-effect { font-size: 10px; color: #888; margin-top: 2px; }
+    .seat-settings {
+      margin-top: 6px;
+      padding: 6px;
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .seat-settings summary {
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .seat-settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .seat-price-field {
+      min-width: 0;
+      padding: 6px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+    .seat-price-field input[type="number"] {
+      width: 100%;
+      min-width: 0;
+      margin-top: 4px;
+      padding: 5px;
+      font-size: 12px;
+    }
+    .seat-availability {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+      color: #555;
+    }
+    .plan-month + .plan-month { margin-top: 10px; }
+    .plan-live-heading { color: var(--primary); }
+    .live-slot {
+      margin-top: 6px;
+      padding: 8px;
+      background: #fff;
+      border: 1px solid #f0d5de;
+      border-radius: 6px;
+    }
+    .live-slot + .live-slot { margin-top: 8px; }
+    .live-slot-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 11px;
+      font-weight: bold;
+      color: #555;
+    }
+    .show-date-list { display: flex; flex-direction: column; gap: 4px; }
+    .show-date-row { display: flex; gap: 4px; align-items: center; }
+    .show-date-row .show-date-input { flex: 1; min-width: 0; padding: 6px; font-size: 12px; }
+    .show-date-row .danger-btn { padding: 6px 8px; }
+    .show-date-actions { margin-top: 4px; }
+    .plan-add-show-btn {
+      width: 100%;
+      padding: 6px;
+      background: #fff;
+      border: 1px dashed #bbb;
+      border-radius: 4px;
+      color: #666;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .show-date-note { margin-top: 4px; color: #777; font-size: 10px; line-height: 1.5; }
+    .plan-add-live-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      background: #fff;
+      border: 1px dashed var(--primary);
+      border-radius: 6px;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .plan-add-live-btn:disabled {
+      border-color: #ccc;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+    .plan-booth-btn {
+      margin-left: 6px;
+      padding: 3px 8px;
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 10px;
+      color: var(--primary);
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .plan-event-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .plan-event-row { display: flex; gap: 4px; align-items: center; }
+    .plan-event-row .plan-event-date { flex: 0 0 128px; min-width: 0; padding: 6px; font-size: 12px; }
+    .plan-event-row .plan-event-kind { flex: 1; min-width: 0; padding: 6px; font-size: 11px; }
+    .plan-event-row .danger-btn { padding: 6px 8px; }
+
+    /* 半年計画カレンダー（6か月分） */
+    .plan-calendar-lead { margin: 0 0 8px; font-size: 11px; color: #666; line-height: 1.6; }
+    .plan-calendar-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #fdf2f4;
+      border: 1px solid #f8bbd0;
+      border-radius: 6px;
+    }
+    .plan-calendar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .plan-calendar-actions button {
+      padding: 8px 4px;
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .plan-calendar-actions button.ghost { border-color: #ccc; color: #888; }
+    .plan-calendar-selection { margin-top: 6px; font-size: 10px; color: #555; line-height: 1.5; }
+    .plan-calendar-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0; font-size: 10px; color: #666; }
+    .plan-calendar-legend span { display: flex; align-items: center; gap: 4px; }
+    .plan-calendar-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    .plan-calendar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .plan-calendar-month { padding: 6px; background: #fff; border: 1px solid #f0d5de; border-radius: 6px; }
+    .plan-calendar-month-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .plan-calendar-month-head strong { color: var(--primary); font-size: 12px; }
+    .plan-calendar-month-head button {
+      padding: 2px 6px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      color: #666;
+      font-size: 9px;
+      cursor: pointer;
+    }
+    .plan-calendar-weekday-row, .plan-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+    .plan-calendar-weekday { display: grid; place-items: center; min-height: 14px; color: #999; font-size: 9px; font-weight: bold; }
+    .plan-calendar-weekday:first-child { color: #c94f68; }
+    .plan-calendar-day {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 26px;
+      background: #fafafa;
+      border-radius: 3px;
+      color: #444;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .plan-calendar-day.plan-calendar-blank { background: transparent; cursor: default; }
+    .plan-calendar-day.is-past { background: #f2f2f2; color: #bbb; cursor: not-allowed; }
+    .plan-calendar-day.is-today { box-shadow: inset 0 0 0 2px var(--primary); }
+    .plan-calendar-day.has-release { background: #e2eefc; color: #12447e; font-weight: bold; }
+    .plan-calendar-day.has-live { background: #e0f1ea; color: #1f5c49; }
+    .plan-calendar-day.has-event { background: #fdf0da; color: #8a5a12; }
+    .plan-calendar-day.has-rival { box-shadow: inset 0 0 0 1px #c88738; }
+    .plan-calendar-day.is-selected { background: var(--primary); color: #fff; font-weight: bold; }
+    .plan-calendar-marks { position: absolute; bottom: 2px; left: 0; right: 0; display: flex; justify-content: center; gap: 1px; }
+    .plan-calendar-marks i { width: 3px; height: 3px; border-radius: 50%; }
+    .plan-calendar-marks .mark-release { background: #2f6fb5; }
+    .plan-calendar-marks .mark-live { background: #2f7d63; }
+    .plan-calendar-marks .mark-event { background: #b8742a; }
+    .plan-calendar-marks .mark-rival { background: #c88738; }
+    .plan-calendar-marks .mark-broadcast { background: #6b4fc7; }
+    .plan-calendar-day.is-selected .plan-calendar-marks i { background: #fff; }
+    .plan-calendar-month-note { margin-top: 4px; color: #777; font-size: 9px; line-height: 1.5; }
+    
+    /* チーム総合力カード */
+    .team-summary-card {
+      background: #fff;
+      border: 1px solid #f8bbd0;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .team-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .overall-score {
+      font-size: 24px;
+      font-weight: 900;
+      font-family: monospace;
+    }
+    .rank-badge {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      font-weight: 900;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .avg-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+    .avg-item {
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      padding: 3px 4px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .avg-label { font-size: 9px; color: #777; display: block; }
+    .avg-val { font-size: 11px; font-weight: bold; font-family: monospace; }
+
+    /* 名簿エリア */
+    .roster-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .roster-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .roster-tab-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 11px;
+      background: #eee;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .roster-tab-btn.active {
+      background: var(--primary);
+
+
+      color: white;
+      font-weight: bold;
+    }
+    .roster-list {
+      max-height: min(55vh, 420px);
+      overflow-y: auto;
+      /* スクロールバーが出ても他の行の幅が変わらないようにする */
+      scrollbar-gutter: stable;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .roster-list > .member-details {
+      flex: 0 0 auto;
+      width: 100%;
+    }
+    .member-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+      border: 1px solid #eee;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .member-details {
+      border: 1px solid #eee;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .member-details summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .member-details summary::-webkit-details-marker { display: none; }
+    .member-summary:hover { background: #f2f2f2; }
+    .member-summary::after {
+      content: '＋';
+      color: var(--primary);
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .member-details[open] .member-summary::after { content: '−'; }
+    /* 名前に下線を付け、開く場所を示す */
+    .member-name-toggle {
+      font-size: 13px;
+      font-weight: bold;
+      border-bottom: 1px dotted var(--primary);
+    }
+    .member-summary:hover .member-name-toggle { color: var(--primary); }
+    /* 名前の右に添える基本情報 */
+    .member-basic-info {
+      color: #777;
+      font-size: 10px;
+      font-weight: normal;
+      white-space: nowrap;
+    }
+    /* 折りたたみ時の左寄せ（名前を先に並べる） */
+    .member-summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .member-name-line {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    /* 閉じているときだけ「詳細」のヒントを出す */
+    .member-toggle-hint {
+      color: var(--primary);
+      font-size: 9px;
+      border: 1px solid var(--primary);
+      border-radius: 3px;
+      padding: 0 4px;
+    }
+    .member-details[open] .member-toggle-hint { display: none; }
+    /* 固有能力値を表示するボタン */
+    .member-ability-area { padding: 0 8px 8px; }
+    .member-ability-btn {
+      width: 100%;
+      padding: 5px;
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--primary);
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .member-ability-btn:hover { background: var(--primary); color: #fff; }
+    .member-ability-area > .member-stats { padding: 8px 0 0; }
+    /* ステータスをグループごとに整理して表示する */
+    .member-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+    }
+    .member-stat-group-label {
+      color: #888;
+      font-size: 9px;
+      margin-bottom: 3px;
+    }
+    .member-stat-group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));
+      gap: 4px;
+    }
+    .member-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+      padding: 8px;
+    }
+    .member-stat {
+      min-width: 0;
+      padding: 5px 2px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .member-stat span { display: block; color: #777; font-size: 9px; }
+    .member-stat strong { font-size: 12px; }
+    .member-vital {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: center;
+      padding: 6px 8px;
+      background: #fdfbfc;
+      border-bottom: 1px solid #f0e6ea;
+      font-size: 10px;
+      color: #666;
+    }
+    .vital-bar {
+      display: inline-block;
+      width: 84px;
+      height: 6px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+      vertical-align: middle;
+    }
+    .vital-bar i { display: block; height: 100%; }
+    .stat-exp-bar {
+      display: block;
+      height: 3px;
+      margin-top: 3px;
+      background: #eee;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .stat-exp-bar b { display: block; height: 100%; background: var(--primary); }
+
+    /* アクション・進行 */
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    button.main-btn {
+      padding: 12px;
+      font-size: 14px;
+      font-weight: bold;
+      color: white;
+      background-color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button.main-btn:active { transform: scale(0.98); }
+    button.main-btn:disabled { background-color: #aaa; cursor: not-allowed; opacity: 0.75; }
+    .danger-btn {
+      background-color: #757575;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    #log-box {
+      padding: 8px 10px;
+      background: #fafafa;
+      border-left: 4px solid var(--primary);
+      font-size: 11px;
+      min-height: 48px;
+      line-height: 1.4;
+      border-radius: 4px;
+    }
+
+    /* ゲーム説明（ヘルプ） */
+    button.ghost-btn {
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--primary);
+      background: #fff;
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button.ghost-btn:active { transform: scale(0.98); }
+    .title-actions { display: flex; justify-content: center; }
+    .title-actions .ghost-btn { width: 100%; }
+    .records-help {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-start;
+    }
+    .records-help-note { margin: 0; color: #888; font-size: 11px; line-height: 1.6; }
+    .help-modal-content { max-width: 560px; }
+    .help-body { max-height: 66vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .help-section { padding: 10px 0; border-bottom: 1px solid #f0e4e8; }
+    .help-section:last-child { border-bottom: none; }
+    .help-section-title {
+      margin: 0 0 6px;
+      padding-left: 8px;
+      border-left: 3px solid var(--primary);
+      font-size: 13px;
+    }
+    .help-p { margin: 0 0 6px; font-size: 12px; line-height: 1.8; color: #444; }
+    .help-ul { margin: 0 0 6px; padding-left: 18px; }
+    .help-ul li { margin-bottom: 4px; font-size: 12px; line-height: 1.7; color: #444; }
+    .help-table { width: 100%; margin: 0 0 6px; border-collapse: collapse; font-size: 11px; }
+    .help-table th, .help-table td {
+      padding: 5px 6px;
+      border: 1px solid #eee;
+      text-align: left;
+      line-height: 1.6;
+      vertical-align: top;
+    }
+    .help-table th { background: #fdf2f4; font-weight: bold; color: #555; }
+    .help-table td { color: #444; }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 420px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 16px;
+      border-radius: 12px;
+    }
+    /* 業界順位 */
+    .ranking-note { font-size: 11px; color: #777; line-height: 1.6; margin-bottom: 6px; }
+    .ranking-list { display: flex; flex-direction: column; gap: 5px; }
+    .ranking-row {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .ranking-row.player {
+      background: #fdf2f4;
+      border-color: var(--primary);
+      font-weight: bold;
+    }
+    .ranking-rank { text-align: center; font-weight: 900; font-family: monospace; }
+    .ranking-rank.top { color: #d4af37; }
+    .ranking-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ranking-name-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ranking-name-sub { font-size: 9px; color: #777; font-weight: normal; }
+    .ranking-power { text-align: right; font-family: monospace; font-weight: 900; }
+    .ranking-trend { font-size: 9px; color: #888; }
+
+    /* ドラフト会議 */
+    .draft-standings { display: flex; flex-direction: column; gap: 3px; margin: 8px 0; }
+    .draft-standing-row {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr) 46px 38px;
+      gap: 6px;
+      align-items: center;
+      padding: 5px 7px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .draft-standing-row.player { background: #fdf2f4; border-color: var(--primary); font-weight: bold; }
+    .draft-stand-rank { text-align: center; color: #777; }
+    .draft-stand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .draft-stand-power, .draft-stand-pick { text-align: right; font-family: monospace; color: #555; }
+    .draft-pick-count { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+    .draft-pick-count button {
+      flex: 1 0 28px;
+      padding: 8px 0;
+      font-size: 12px;
+      font-weight: bold;
+      color: #fff;
+      background: #bdbdbd;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .draft-pick-count button.active { background: var(--primary); }
+    .draft-candidates { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+    .draft-candidate {
+      padding: 8px 10px;
+      background: #fff;
+      border: 1px solid #f0d5de;
+      border-radius: 6px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .draft-candidate:active { background: #fdf2f4; }
+    .draft-candidate-name { font-size: 13px; font-weight: bold; color: var(--text); }
+    .draft-candidate-name small { font-size: 10px; font-weight: normal; color: #777; }
+    .draft-candidate-score { font-size: 11px; color: #555; margin-top: 2px; }
+    .draft-candidate-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 9px; color: #777; }
+    .draft-lottery { padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.7; }
+    .draft-lottery.win { background: #e8f5e9; border: 1px solid #66bb6a; }
+    .draft-lottery.lose { background: #ffebee; border: 1px solid #e57373; }
+    .draft-lottery.none { background: #f5f1f2; border: 1px solid #ddd; }
+    .draft-acquired { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 10px; color: #555; }
+    .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }
