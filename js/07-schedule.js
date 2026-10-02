@@ -5,6 +5,9 @@
 // 週間スケジュール（グループレッスン／休養日／特別強化）
 // ==========================================
 
+// 直前週に確定したスケジュール（次週の初期値に使う）
+let lastWeekSchedule = null;
+
 function createEmptyWeeklySchedule() {
   // 1週間は14枠（7日×午前/午後）で固定。休養を1日フル＋2枠あけて、残りをレッスンで埋める
   const slots = [...DEFAULT_WEEK_SLOTS];
@@ -21,7 +24,7 @@ function createEmptyWeeklySchedule() {
 
 function ensureWeeklySchedule() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
-    weeklySchedule = createEmptyWeeklySchedule();
+    weeklySchedule = lastWeekSchedule ? createScheduleFromLastWeek() : createEmptyWeeklySchedule();
     return;
   }
   // 旧セーブ（可変長の枠）を14枠へ移行する
@@ -88,10 +91,11 @@ function countWeekSlots(itemId, excludeIndex = -1) {
   return weeklySchedule.slots.filter((slotId, index) => slotId === itemId && index !== excludeIndex).length;
 }
 
-// 週の起点（水曜）から◯日後が、週グリッドの何曜目に当たるかを求める
-// 0=月曜 … 2=水曜（ゲーム内の起点） … 6=日曜
+// 週の起点（水曜）から offsetDays 日後が、週グリッドの何番目の曜目に当たるかを求める
+// WEEK_DAY_LABELS は「木曜起点」で並んでいるため、
+// offset 1（木曜）= index 0 / offset 7（水曜）= index 6 となる。
 function getWeekDayIndexForOffset(offsetDays) {
-  return (offsetDays + 2) % WEEK_DAY_LABELS.length;
+  return (((offsetDays - 1) % WEEK_DAY_LABELS.length) + WEEK_DAY_LABELS.length) % WEEK_DAY_LABELS.length;
 }
 
 // 今週のテレビ出演（歌番組・大型特番）を週枠に固定する
@@ -139,9 +143,53 @@ function getWeekBroadcastCounts() {
   return counts;
 }
 
-// 週が変わったら下書きをリセットする
+// スケジュールを複製する（参照を共有しないため）
+function cloneWeeklySchedule(schedule) {
+  if (!schedule) return null;
+  return {
+    slots: Array.isArray(schedule.slots) ? schedule.slots.slice() : [],
+    vacation: Boolean(schedule.vacation),
+    individualMemberId: schedule.individualMemberId || '',
+    individualStat: schedule.individualStat || 'vocal',
+    focusMemberIds: Array.isArray(schedule.focusMemberIds) ? schedule.focusMemberIds.slice() : [],
+    restDayMembers: Array.isArray(schedule.restDayMembers) ? schedule.restDayMembers.slice() : [],
+    officeAction: schedule.officeAction || ''
+  };
+}
+
+// 確定した週のスケジュールを「直前週」として保存する
+function rememberWeeklySchedule(schedule) {
+  lastWeekSchedule = cloneWeeklySchedule(schedule);
+}
+
+// 直前週のスケジュールから下書きを作る
+// テレビ出演などの固定枠は今週の予定で上書きする
+function createScheduleFromLastWeek() {
+  const base = createEmptyWeeklySchedule();
+  if (!lastWeekSchedule) return base;
+  const slots = lastWeekSchedule.slots.map(slot => slot || '');
+  while (slots.length < WEEK_SLOT_COUNT) slots.push('');
+  slots.length = WEEK_SLOT_COUNT;
+  // 固定枠（リハーサル／テレビ出演）を今週の予定で上書きする
+  getWeekFixedSlots().forEach((slot, index) => {
+    if (index >= 0 && index < slots.length) slots[index] = slot.kind;
+  });
+  base.slots = slots;
+  base.vacation = lastWeekSchedule.vacation;
+  base.individualMemberId = lastWeekSchedule.individualMemberId || base.individualMemberId;
+  base.individualStat = lastWeekSchedule.individualStat || base.individualStat;
+  // 特別強化の対象は、在籍するメンバーだけを残す
+  base.focusMemberIds = lastWeekSchedule.focusMemberIds.filter(id =>
+    idolRoster.some(member => member.id === id)
+  );
+  base.officeAction = lastWeekSchedule.officeAction || '';
+  return base;
+}
+
+// 週が変わったら下書きを作り直す
+// 直前週に確定したスケジュールがあれば、それを初期値として引き継ぐ
 function resetWeeklySchedule() {
-  weeklySchedule = null;
+  weeklySchedule = lastWeekSchedule ? createScheduleFromLastWeek() : null;
   weeklyRecoveryDone = false;
 }
 
@@ -568,6 +616,8 @@ function applyOfficeAction(actionId) {
 function confirmWeeklySchedule() {
   if (hasLiveWithinWeek()) return;
   if (!validateWeeklySchedule()) return;
+  // 確定した内容は次週の初期値として覚えておく
+  rememberWeeklySchedule(weeklySchedule);
   applyWeeklySchedule();
   advanceOneWeek();
 }

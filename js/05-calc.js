@@ -284,6 +284,44 @@ function getLiveFatigueGain(isMultiDay, isConsecutive) {
   return gain;
 }
 
+// ライブ1回あたりの付与内容を記録する（検証・実績表示用）
+const liveExperienceLogs = [];
+
+// ライブ1回あたりの経験値を会場・観客・日数から算出する
+//   観客数 ÷ キャパシティ … 埋まり率（上限 LIVE_FILL_RATE_CAP 倍）
+//   収容しやすさ（ease）    … SS=1.3 / S=1.22 / A=1.15 / B=1.0 / C=0.85 / D=0.7
+//   公演日数               … 1日=1.0、日数が増えるほど LIVE_MULTI_DAY_BONUS ずつ上乗せ
+// 基礎値は「グループレッスン×特別強化倍率（=10倍）」を基準にする。
+// ※ 全公演日が終わった1回だけ、全公演の合計動員と公演日数で算出する。
+function getLiveExperienceGain(venue, audience, showDays = 1) {
+  const capacity = CAPACITY_MAP[venue?.cap] || 0;
+  const fillRate = capacity > 0 ? audience / capacity : 0;
+  const fillMultiplier = 1 + Math.min(fillRate, LIVE_FILL_RATE_CAP);
+  const easeMultiplier = LIVE_EASE_MULTIPLIER[venue?.ease] ?? 1;
+  const days = Math.max(1, showDays || 1);
+  const dayMultiplier = 1 + (days - 1) * LIVE_MULTI_DAY_BONUS;
+  return Math.max(1, Math.round(
+    LIVE_BASE_EXP * fillMultiplier * easeMultiplier * dayMultiplier
+  ));
+}
+
+// ライブの経験値を選抜全員に付与する（対象能力は LIVE_STAT_WEIGHTS のとおり配分）
+function applyLiveExperience(venue, audience, showDays = 1) {
+  const total = getLiveExperienceGain(venue, audience, showDays);
+  const selected = idolRoster.filter(member => member.isSelected);
+  const participants = selected.length ? selected : idolRoster;
+  let levelUps = 0;
+  const gained = {};
+  Object.entries(LIVE_STAT_WEIGHTS).forEach(([statId, weight]) => {
+    const amount = Math.max(1, Math.round(total * weight));
+    gained[statId] = amount;
+    participants.forEach(member => {
+      levelUps += addMemberStatExp(member, statId, amount);
+    });
+  });
+  return { total, gained, levelUps, memberCount: participants.length };
+}
+
 // ライブの体力消費と疲労の蓄積（選抜全員）
 function applyLiveStaminaCost(venue, isMultiDay, isConsecutive) {
   const selected = idolRoster.filter(member => member.isSelected);

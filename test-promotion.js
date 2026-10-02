@@ -581,6 +581,236 @@ check('help is reachable from the title screen and the records tab', run(`
   !!(titleBtn && recordBtn)
 `) === true);
 
+// ---- ファン階層のパーセントバー可視化 ----
+check('the fan tier share renders a percent bar with 3 segments', run(`
+  updateUI();
+  const el = document.getElementById('txt-group-fan-tiers');
+  const bar = el.querySelector('.fan-share-bar');
+  const segs = bar.querySelectorAll('.fan-share-seg');
+  segs.length === 3
+    && ['core', 'fan', 'light'].every(k => !!bar.querySelector('.fan-share-' + k))
+    && bar.getAttribute('role') === 'img'
+`) === true);
+check('bar segment widths match the actual shares and sum to 100%', run(`
+  updateUI();
+  const shares = getFanTiers().shares;
+  const widths = Array.from(document.querySelectorAll('#txt-group-fan-tiers .fan-share-seg'))
+    .map(s => parseFloat(s.style.width));
+  const expected = [shares.core, shares.fan, shares.light].map(v => Math.round(v * 100));
+  JSON.stringify(widths) === JSON.stringify(expected)
+    && widths.reduce((a, b) => a + b, 0) === 100
+`) === true);
+check('the legend labels every tier with its percent', run(`
+  updateUI();
+  const items = Array.from(document.querySelectorAll('#txt-group-fan-tiers .fan-share-legend-item'))
+    .map(el => el.textContent.trim());
+  const shares = getFanTiers().shares;
+  JSON.stringify(items) === JSON.stringify([
+    'コア ' + Math.round(shares.core * 100) + '%',
+    'ファン ' + Math.round(shares.fan * 100) + '%',
+    'ライト ' + Math.round(shares.light * 100) + '%'
+  ])
+`) === true);
+check('the bar note shows the real live participation rate', run(`
+  updateUI();
+  const note = document.querySelector('#txt-group-fan-tiers .fan-share-note').textContent;
+  const rate = getTierParticipationRate('live');
+  note.includes('ライブ参加')
+    && note.includes((rate * 100).toFixed(1) + '%')
+    // ハードコードされた旧表記（8割/5割/3割）が残っていない
+    && !note.includes('8割')
+`) === true);
+check('the tooltip reports per-tier live/event rates from the data', run(`
+  updateUI();
+  const tip = document.getElementById('txt-group-fan-tiers').title;
+  ['コア', 'ファン', 'ライト'].every(name => tip.includes(name))
+    && tip.includes((FAN_TIER_PARTICIPATION.live.core * 100).toFixed(1) + '%')
+    && tip.includes((FAN_TIER_PARTICIPATION.event.core * 100).toFixed(1) + '%')
+`) === true);
+
+// ---- 情報メディア（The Hour / グーテンモルゲン / web / スタコン / kahoo news） ----
+check('five info media are defined with unique ids', run(`
+  (() => {
+    const ids = Object.keys(INFO_MEDIA);
+    return ids.length === 5
+      && ids.includes('thehour') && ids.includes('gutenmorgen')
+      && ids.includes('web') && ids.includes('stacon') && ids.includes('kahoo')
+      && Object.values(INFO_MEDIA).every(m => m.name && m.fame > 0 && m.fans >= 0 && m.fee >= 0);
+  })()
+`) === true);
+check('The Hour reports venue, days and total audience', run(`
+  buildInfoMediaArticle(INFO_MEDIA.thehour, {
+    liveName: '夏ツアー', venueName: 'Saitama球場',
+    audience: 12345, showDays: 3, startDate: '7月15日'
+  }) === 'Saitama球場で7月15日から3日間開催し、計12,345人が参戦。'
+`) === true);
+check('kahoo news reports the show days and audience', run(`
+  buildInfoMediaArticle(INFO_MEDIA.kahoo, {
+    liveName: '夏ツアー', venueName: 'Saitama球場',
+    audience: 12345, showDays: 3
+  }).includes('3日間') && buildInfoMediaArticle(INFO_MEDIA.kahoo, {
+    liveName: '夏ツアー', audience: 12345, showDays: 3
+  }).includes('12,345人')
+`) === true);
+check('Gutenmorgen reports the new song, first-week sales and center age', run(`
+  const text = buildInfoMediaArticle(INFO_MEDIA.gutenmorgen, {
+    releaseType: 'single', songTitle: '星の歌', sales: 234613,
+    releaseNth: 3, releaseDate: '3月10日', centerText: '桜井 真衣（21歳）'
+  });
+  text.includes('3rdシングル')
+    && text.includes('星の歌')
+    && text.includes('3月10日発売')
+    && text.includes('234,613枚')
+    && text.includes('桜井 真衣（21歳）')
+`) === true);
+check('Stacon reports the song title and first-week sales', run(`
+  const text = buildInfoMediaArticle(INFO_MEDIA.stacon, {
+    releaseType: 'album', songTitle: '名曲集', sales: 150000,
+    releaseNth: 2, releaseDate: '5月1日'
+  });
+  text.includes('名曲集') && text.includes('150,000枚')
+`) === true);
+check('the web media covers both live and release', run(`
+  (() => {
+    if (INFO_MEDIA.web.kind !== 'both') return false;
+    const live = buildInfoMediaArticle(INFO_MEDIA.web, { audience: 1000, showDays: 2, liveName: 'X' });
+    const rel = buildInfoMediaArticle(INFO_MEDIA.web, { releaseType: 'single', songTitle: 'Y', sales: 500 });
+    return live.includes('動員1,000人') && live.includes('2日間')
+      && rel.includes('初週売上500枚') && rel.includes('Y')
+      // 入力が無い項目が undefined として出力されない
+      && !live.includes('undefined') && !rel.includes('undefined');
+  })()
+`) === true);
+check('a live schedules info media that airs shortly after', run(`
+  (() => {
+    scheduledPerformances = [];
+    const base = getGameDateObject();
+    const entry = scheduleInfoMedia('live', {
+      liveName: 'テスト', venueName: '原宿体育館',
+      audience: 5000, showDays: 2, startDate: '7月15日'
+    });
+    if (!entry) return false;
+    const diff = Math.round((new Date(entry.airDate) - new Date(base)) / 86400000);
+    const ok = entry.isInfoMedia
+      && INFO_MEDIA[entry.mediaId].kind !== 'release'
+      && diff >= 1 && diff <= 3
+      && entry.fameGain > 0;
+    scheduledPerformances = [];
+    return ok;
+  })()
+`) === true);
+check('publishing the media applies fame, fans and any fee', run(`
+  (() => {
+    scheduledPerformances = [];
+    scheduleInfoMedia('release', {
+      releaseType: 'album', songTitle: '名曲集', sales: 200000, releaseNth: 2,
+      releaseDate: '5月1日', centerText: 'X（20歳）'
+    });
+    const entry = scheduledPerformances.find(p => p.isInfoMedia);
+    if (!entry) return false;
+    const fansBefore = fansFromSales;
+    const fundsBefore = funds;
+    const popBefore = idolRoster.filter(m => m.isSelected)
+      .reduce((t, m) => t + m.stats.popularity, 0);
+    processInfoMedia(entry);
+    const popAfter = idolRoster.filter(m => m.isSelected)
+      .reduce((t, m) => t + m.stats.popularity, 0);
+    const ok = fansFromSales > fansBefore && popAfter > popBefore
+      && funds >= fundsBefore;
+    scheduledPerformances = [];
+    return ok;
+  })()
+`) === true);
+
+// ---- ライブによる経験値（ライブ関連能力値） ----
+check('the live experience base is 10x a group lesson', run(`
+  LIVE_BASE_EXP === LESSON_BASE_EXP * SPECIAL_TRAINING_MULTIPLIER
+    && LIVE_BASE_EXP === 800
+`) === true);
+check('a fuller venue and a bigger venue both raise the experience', run(`
+  const v = VENUE_DATA.find(x => x.cap === 'D');
+  const capacity = CAPACITY_MAP.D;
+  const empty = getLiveExperienceGain(v, 0, 1);
+  const half = getLiveExperienceGain(v, Math.round(capacity * 0.5), 1);
+  const full = getLiveExperienceGain(v, capacity, 1);
+  empty < half && half < full
+`) === true);
+check('a full house is capped at the fill-rate limit', run(`
+  const v = VENUE_DATA.find(x => x.cap === 'D');
+  const capacity = CAPACITY_MAP.D;
+  // 動員率は LIVE_FILL_RATE_CAP（1.5倍）まで，超过しても頭打ちになる
+  const overCap = getLiveExperienceGain(v, capacity * 2, 1);
+  const wayOver = getLiveExperienceGain(v, capacity * 10, 1);
+  const base = getLiveExperienceGain(v, 0, 1);
+  overCap === wayOver
+    && overCap === Math.round(base * (1 + LIVE_FILL_RATE_CAP))
+`) === true);
+check('an easier-to-fill venue grants more experience', run(`
+  const easy = VENUE_DATA.find(v => v.ease === 'SS');
+  const hard = VENUE_DATA.find(v => v.ease === 'C');
+  getLiveExperienceGain(easy, CAPACITY_MAP[hard.cap], 1)
+    > getLiveExperienceGain(hard, CAPACITY_MAP[hard.cap], 1)
+`) === true);
+check('more show days grant more experience', run(`
+  const v = VENUE_DATA.find(x => x.cap === 'D');
+  const d1 = getLiveExperienceGain(v, CAPACITY_MAP.D, 1);
+  const d2 = getLiveExperienceGain(v, CAPACITY_MAP.D, 2);
+  const d3 = getLiveExperienceGain(v, CAPACITY_MAP.D, 3);
+  d1 < d2 && d2 < d3
+    && d3 === Math.round(d1 * (1 + 2 * LIVE_MULTI_DAY_BONUS))
+`) === true);
+check('live experience is split across the performance-related stats', run(`(() => {
+  const v = VENUE_DATA.find(x => x.cap === 'D');
+  const member = idolRoster.find(m => m.isSelected);
+  const before = Object.values(member.statExp || {}).reduce((a, b) => a + b, 0);
+  const result = applyLiveExperience(v, CAPACITY_MAP.D, 2);
+  const after = Object.values(member.statExp || {}).reduce((a, b) => a + b, 0);
+  const keys = Object.keys(LIVE_STAT_WEIGHTS);
+  return keys.length === 6
+    && keys.every(k => result.gained[k] > 0)
+    // ダンス（重み1.0）が最も大きい
+    && result.gained.dance === Math.max(...keys.map(k => result.gained[k]))
+    && result.total === getLiveExperienceGain(v, CAPACITY_MAP.D, 2)
+    && result.memberCount > 0
+    && after !== before;
+})()`) === true);
+check('live experience is granted once, after the final show only', run(`(() => {
+  const v = VENUE_DATA.find(x => x.cap === 'D');
+  const member = idolRoster.find(m => m.isSelected);
+  const sum = () => Object.values(member.statExp || {}).reduce((a, b) => a + b, 0);
+  const before = sum();
+  applyLiveExperience(v, CAPACITY_MAP.D, 1);
+  return sum() > before;
+})()`) === true);
+check('a multi-day live pays experience only on the final show', run(`(() => {
+  const venue = VENUE_DATA.find(x => x.cap === 'D');
+  const key = currentYear + '-' + currentMonth;
+  const d0 = new Date(gameDate + 'T12:00:00');
+  const d1 = new Date(d0.getTime() + 7 * 864e5);
+  const d2 = new Date(d0.getTime() + 14 * 864e5);
+  productionSchedule[key] = {
+    release: 'none',
+    liveVenue: venue.name,
+    liveDate: toDateKey(d0),
+    liveDates: [toDateKey(d1), toDateKey(d2)],
+    additionalLives: [],
+    liveCompleted: false
+  };
+  liveExperienceLogs.length = 0;
+  const dates = [toDateKey(d0), toDateKey(d1), toDateKey(d2)];
+  const counts = [];
+  for (const date of dates) {
+    gameDate = date;
+    processMonthlyReleaseAndLive();
+    counts.push(liveExperienceLogs.length);
+  }
+  // 1日目・2日目では付与されず、最終公演の3日目で1回だけ付与される
+  const last = liveExperienceLogs[0];
+  return counts.join(',') === '0,0,1'
+    && last.showDays === 3
+    && last.total === getLiveExperienceGain(venue, last.audience, 3);
+})()`) === true);
+
 console.log('\n================ RESULT ================');
 const failed = results.filter(r => !r.ok);
 console.log('PASS ' + (results.length - failed.length) + ' / ' + results.length);

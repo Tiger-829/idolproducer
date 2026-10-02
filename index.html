@@ -54,10 +54,10 @@
       </div>
       <div class="avg-grid" id="team-avg-grid"></div>
     </div>
-    <div class="team-fans-card">
+    <div class="team-fans-card team-fans-card-stack">
       <span>グループ推定ファン数</span>
       <span><strong class="team-fans-count" id="txt-group-fans">--</strong> 人</span>
-      <span class="team-fans-tiers" id="txt-group-fan-tiers">--</span>
+      <div class="team-fans-tiers" id="txt-group-fan-tiers">--</div>
     </div>
     <div class="team-fans-card">
       <span>グループ危機回避力</span>
@@ -164,6 +164,16 @@
 </div>
 
 <div class="modal-overlay" id="selection-modal"></div>
+
+<!-- ライブ後の詳細収支（表） -->
+<div class="modal-overlay" id="live-finance-modal">
+  <div class="modal-content live-finance-modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;">ライブ収支</h3>
+    <p style="margin:0 0 8px; font-size:11px; color:#666;">公演日ごとの実績です。1公演日＝1行で、その日の収支を示します。</p>
+    <div class="live-finance-body"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="closeLiveFinanceModal()">閉じる</button>
+  </div>
+</div>
 
 <!-- ゲーム説明（タイトル画面・記録タブから開く） -->
 <div class="modal-overlay" id="help-modal">

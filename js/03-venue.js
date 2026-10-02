@@ -1,9 +1,154 @@
 // ==========================================
-// ライブ設定（会場・動員）
+// 情報メディア（実績を報道する番組・サイト）
+// ライブ後・CD発売後にメディアが掲載され、実績が告知される
 // ==========================================
-// ==========================================
-// 3. ライブ設定（1月あたり複数回開催）
-// ==========================================
+// メディア定義：fame=人気, fans=新規ファン, fee=出演料/記事料
+const INFO_MEDIA = {
+  thehour: {
+    id: 'thehour', name: 'The Hour', isWeb: false, kind: 'live',
+    fame: 10, fans: 0.05, fee: 0, label: '番組'
+  },
+  gutenmorgen: {
+    id: 'gutenmorgen', name: 'グーテンモルゲン', isWeb: false, kind: 'release',
+    fame: 8, fans: 0.15, fee: 2000000, label: '番組'
+  },
+  web: {
+    id: 'web', name: 'アイドルWebメディア', isWeb: true, kind: 'both',
+    fame: 4, fans: 0.08, fee: 0, label: 'サイト'
+  },
+ 
+  stacon: {
+    id: 'stacon', name: 'スタコン', isWeb: true, kind: 'release',
+    fame: 5, fans: 0.12, fee: 0, label: 'ファンサイト'
+  },
+  kahoo: {
+    id: 'kahoo', name: 'kahoo news', isWeb: true, kind: 'live',
+    fame: 5, fans: 0.10, fee: 0, label: 'ニュースサイト'
+  }
+};
+// 各メディアの放送日倍率（何日後に放送／掲載されるか）
+const INFO_MEDIA_DELAY = {
+  thehour: 2, gutenmorgen: 1, web: 1, stacon: 1, kahoo: 1
+};
+// 情報メディアで得られる楽曲経験値
+const INFO_MEDIA_SONG_EXPERIENCE = 20;
+
+// 現在のセンター名（年齢つき）
+function getCurrentCenterText() {
+  const targets = idolRoster.filter(member => member.isSelected);
+  const pool = targets.length ? targets : idolRoster;
+  const center = pool.find(member => member.isCenter);
+  if (!center) return '';
+  const age = Number.isFinite(center.age) ? center.age : '';
+  return age === '' ? center.name : `${center.name}（${age}歳）`;
+}
+
+// メディア結果を組み立てる
+function buildInfoMediaArticle(media, data) {
+  const d = data || {};
+  if (media.kind === 'release' || (media.kind === 'both' && d.releaseType)) {
+    const type = d.releaseType === 'album' ? 'アルバム' : 'シングル';
+    // 序数（1st / 2nd / 3rd / 4th …）
+    const ORDINAL_SUFFIX = { 1: 'st', 2: 'nd', 3: 'rd' };
+    const suffix = ORDINAL_SUFFIX[d.releaseNth] || 'th';
+    const nth = d.releaseNth ? `${d.releaseNth}${suffix}` : '';
+    const sales = (d.sales || 0).toLocaleString();
+    // 未入力の日は「発売日を後日発表」の表現に落とす
+    const dateText = d.releaseDate ? `${d.releaseDate}発売` : '発売';
+    const parts = [];
+    if (media.id === 'gutenmorgen') {
+      parts.push(`${nth}${type}「${d.songTitle || ''}」${dateText}。`);
+      parts.push(`初週売上${sales}枚を記録。`);
+      if (d.centerText) parts.push(`楽曲のセンター${d.centerText}がセンターを務める。`);
+    } else {
+      parts.push(`新曲『${d.songTitle || ''}』${nth ? `（${nth}${type}）` : type}、${dateText}。`);
+      parts.push(`初週売上${sales}枚と報告されました。`);
+    }
+    return parts.join('');
+  }
+  // ライブ情報
+  const days = d.showDays || 1;
+  const audience = (d.audience || 0).toLocaleString();
+  if (media.id === 'kahoo') {
+    // kahoo news はライブ日数と動員数を報道する
+    return `${d.liveName || 'ライブ'}は${days}日間開催され、${audience}人が動員したと報道されました。`;
+  }
+  if (media.id === 'thehour') {
+    // The Hour は「場所／期間／動員」を伝える
+    const venue = d.venueName || '会場';
+    const from = d.startDate ? `${d.startDate}から` : '';
+    return `${venue}で${from}${days}日間開催し、計${audience}人が参戦。`;
+  }
+  const venue = d.venueName ? `${d.venueName}で` : '';
+  return `ライブ「${d.liveName || ''}」が${venue}${days}日間開催され、動員${audience}人。`;
+}
+
+// メディアへの掲載／放送を予約する
+function scheduleInfoMedia(kind, payload) {
+  // kind に対応しうるメディアを抽取する
+  const candidates = Object.values(INFO_MEDIA).filter(m =>
+    m.kind === kind || m.kind === 'both'
+  );
+  if (!candidates.length) return null;
+  const media = candidates[Math.floor(Math.random() * candidates.length)];
+  const delay = INFO_MEDIA_DELAY[media.id] || 1;
+  const airDate = new Date(getGameDateObject());
+  airDate.setDate(airDate.getDate() + delay);
+  const summary = calculateTeamAverages();
+  const scale = 0.7 + summary.overall / 100;
+  const fameGain = Math.round(media.fame * scale);
+  const base = kind === 'live' ? (payload.audience || 0) : (payload.sales || 0);
+  const bonusFans = Math.round(base * media.fans);
+  const fee = Math.round(media.fee * scale);
+
+  scheduledPerformances.push({
+    id: `info-${media.id}-${gameDate}-${Math.floor(Math.random() * 1e6)}`,
+    name: media.name,
+    mediaId: media.id,
+    isWebMedia: media.isWeb,
+    mediaLabel: media.label,
+    airDate: toDateKey(airDate),
+    isInfoMedia: true,
+    infoKind: kind,
+    liveName: payload.liveName || '',
+    venueName: payload.venueName || '',
+    audience: payload.audience || 0,
+    showDays: payload.showDays || 1,
+    startDate: payload.startDate || '',
+    endDate: payload.endDate || '',
+    sales: payload.sales || 0,
+    releaseType: payload.releaseType || '',
+    releaseNth: payload.releaseNth || 0,
+    releaseDate: payload.releaseDate || '',
+    songTitle: payload.songTitle || '',
+    centerText: payload.centerText || '',
+    songId: payload.songId || null,
+    fameGain,
+    bonusFans,
+    fee
+  });
+  return scheduledPerformances[scheduledPerformances.length - 1];
+}
+
+// 情報メディアの放送／掲載を処理する
+function processInfoMedia(performance) {
+  const media = INFO_MEDIA[performance.mediaId] || INFO_MEDIA.web;
+  const summary = calculateTeamAverages();
+  const gain = performance.fameGain || Math.round(media.fame * (0.7 + summary.overall / 100));
+  adjustTargetPopularity(gain);
+  const fee = performance.fee || 0;
+  if (fee) funds += fee;
+  if (performance.songId) {
+    const song = songs.find(item => item.id === performance.songId);
+    if (song) addSongExperience(song, INFO_MEDIA_SONG_EXPERIENCE);
+  }
+  // Gets new fans from media exposure
+  fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + (performance.bonusFans || 0));
+  const article = buildInfoMediaArticle(media, performance);
+  const result = `（人気 +${gain} / 新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
+  setLog(`【${media.label}】${article}${result}`);
+}
+
 // 1か月の計画から、メインライブ＋追加ライブの開催情報を列挙する
 // （旧セーブで保存された単一ライブ形式もそのまま扱える）
 function getMonthLiveEntries(plan) {

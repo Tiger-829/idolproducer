@@ -1145,4 +1145,4 @@ if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(window.
 openTitleScreen();
 
 // ページタブは初回描画時に用意しておく
-renderPageNav('group');
+renderPageNav(DEFAULT_PAGE);

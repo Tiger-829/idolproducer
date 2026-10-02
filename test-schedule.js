@@ -110,7 +110,9 @@ check('live promotion can be combined with lessons too', run(`
   applyWeeklySchedule();
   nextLivePromotionPoints - promoBefore2
 `) === 1);
-check('the schedule resets for the next week', run(`
+// 事務作業は「レッスンと同じ週に実行」されるが、確定していないので次の週には残らない
+// （ただし confirmWeeklySchedule で確定した場合は前週の計画として引き継がれる）
+check('the office action does not carry over after a plain apply', run(`
   advanceOneWeek();
   ensureWeeklySchedule();
   weeklySchedule.officeAction
@@ -292,6 +294,153 @@ const duoCoordination = run(`
   (target.stats.coordination > before.level || (target.statExp.coordination || 0) > before.exp)
 `);
 check('連携 works when 2 members attend', duoCoordination === true, String(duoCoordination));
+
+// ---- ライブ動員は「ライブ後（1日程ごと）」に詳細収支とともに発表される ----
+check('the live slot does not reveal audience in advance', run(`
+  const venue = VENUE_DATA.find(v => v.cap === 'B');
+  const predicted = getLiveAudienceDemand(venue, new Date(2027, 0, 3)).toLocaleString();
+  const slot = { liveVenue: venue.name, seatPrices: {}, seatOptions: {} };
+  const html = renderLiveSlotHtml(1, 0, slot);
+  !html.includes('動員') && !html.includes(predicted)
+`) === true);
+
+// ---- ファンバーは細目になった ----
+check('the fan share bar is styled as a thin bar', (() => {
+  // jsdom は外部CSSを読み込まないため、styles.css を直接読む
+  const css = require('fs').readFileSync(require('path').join(__dirname, 'styles.css'), 'utf8');
+  const rule = css.match(/\.fan-share-bar\s*\{([^}]*)\}/);
+  if (!rule) return false;
+  const height = parseFloat((rule[1].match(/height:\s*([\d.]+)px/) || [])[1]);
+  return Number.isFinite(height) && height > 0 && height <= 8;
+})());
+check('the fan share bar is rendered in the DOM', run(`
+  updateUI();
+  !!document.querySelector('#txt-group-fan-tiers .fan-share-bar')
+`) === true);
+
+// ---- ゲーム開始時の既定タブ ----
+check('the default page is the office tab', run(`
+  DEFAULT_PAGE === 'office'
+    && PAGE_TABS.some(tab => tab.id === DEFAULT_PAGE)
+`) === true);
+check('starting a new game opens the office panel', run(`
+  renderPageNav(DEFAULT_PAGE);
+  const shown = PAGE_TABS
+    .filter(tab => !document.getElementById('page-' + tab.id).hidden)
+    .map(tab => tab.id);
+  const active = document.querySelector('#page-nav .page-tab.active');
+  shown.length === 1
+    && shown[0] === 'office'
+    && active && active.id === 'page-tab-office'
+`) === true);
+check('switching pages still shows exactly one panel', run(`
+  const results = ['group', 'ranking', 'records', 'office'].map(page => {
+    switchPage(page);
+    const shown = PAGE_TABS
+      .filter(tab => !document.getElementById('page-' + tab.id).hidden)
+      .map(tab => tab.id);
+    return shown.length === 1 && shown[0] === page;
+  });
+  renderPageNav(DEFAULT_PAGE);
+  results.every(Boolean)
+`) === true);
+check('an unknown page falls back to the default', run(`
+  renderPageNav('does-not-exist');
+  const shown = PAGE_TABS
+    .filter(tab => !document.getElementById('page-' + tab.id).hidden)
+    .map(tab => tab.id);
+  renderPageNav(DEFAULT_PAGE);
+  shown.length === 1 && shown[0] === 'office'
+`) === true);
+
+// ---- 前週のスケジュールを引き継ぐ ----
+check('a confirmed schedule is remembered for the next week', run(`
+  (() => {
+    lastWeekSchedule = null;
+    resetWeeklySchedule();
+    ensureWeeklySchedule();
+    const custom = ['dance-lesson','vocal-lesson','literacy','rest-day',
+                    'dance-lesson','vocal-lesson','literacy','rest-day',
+                    'dance-lesson','vocal-lesson','literacy','rest-day',
+                    'dance-lesson','vocal-lesson'];
+    weeklySchedule.slots = custom.slice();
+    weeklySchedule.officeAction = 'goods-development';
+    const member = idolRoster.filter(m => m.isSelected)[0];
+    weeklySchedule.focusMemberIds = [member.id];
+    weeklySchedule.individualStat = 'dance';
+    rememberWeeklySchedule(weeklySchedule);
+    return lastWeekSchedule
+      && JSON.stringify(lastWeekSchedule.slots) === JSON.stringify(custom)
+      && lastWeekSchedule.officeAction === 'goods-development';
+  })()
+`) === true);
+check('the next week starts from the previous schedule', run(`
+  (() => {
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    const restored = JSON.stringify(weeklySchedule.slots) === JSON.stringify(lastWeekSchedule.slots);
+    const office = weeklySchedule.officeAction === 'goods-development';
+    const focus = weeklySchedule.focusMemberIds.length === 1;
+    const stat = weeklySchedule.individualStat === 'dance';
+    return restored && office && focus && stat;
+  })()
+`) === true);
+check('the restored schedule is an independent copy', run(`
+  (() => {
+    const before = weeklySchedule.slots[0];
+    weeklySchedule.slots[0] = 'literacy';
+    const untouched = lastWeekSchedule.slots[0] === before;
+    weeklySchedule.slots[0] = before;
+    return untouched;
+  })()
+`) === true);
+check('a fresh game starts with no remembered schedule', run(`
+  (() => {
+    lastWeekSchedule = null;
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    const isDefault = JSON.stringify(weeklySchedule.slots) === JSON.stringify(DEFAULT_WEEK_SLOTS)
+      || weeklySchedule.slots.length === WEEK_SLOT_COUNT;
+    return lastWeekSchedule === null && isDefault;
+  })()
+`) === true);
+
+// ---- 週間スケジュールの曜日並び（水曜起点） ----
+check('the week runs from Thursday to the following Wednesday', run(`
+  JSON.stringify(WEEK_DAY_LABELS) === JSON.stringify(['木','金','土','日','月','火','水'])
+`) === true);
+check('each slot label matches the actual weekday it represents', run(`
+  (() => {
+    const start = getGameDateObject();
+    const actual = ['日','月','火','水','木','金','土'];
+    // offset 1..7 が 木曜..水曜 に対応し、ラベルと一致すること
+    for (let offset = 1; offset <= 7; offset++) {
+      const idx = getWeekDayIndexForOffset(offset);
+      const date = new Date(start);
+      date.setDate(date.getDate() + offset);
+      if (WEEK_DAY_LABELS[idx] !== actual[date.getDay()]) return false;
+      if (getWeekSlotLabel(idx * 2) !== WEEK_DAY_LABELS[idx] + '曜午前') return false;
+    }
+    return true;
+  })()
+`) === true);
+check('a broadcast lands on the afternoon of its actual air date', run(`
+  (() => {
+    scheduledPerformances = [];
+    const start = getGameDateObject();
+    const air = new Date(start);
+    air.setDate(air.getDate() + 2);
+    const actual = ['日','月','火','水','木','金','土'];
+    const expected = actual[air.getDay()];
+    scheduledPerformances.push({
+      id: 'weekday-check', name: 'Mコン', airDate: toDateKey(air), songId: null, isSpecial: false
+    });
+    const broadcast = [...getWeekFixedSlots().values()].find(s => s.kind === 'broadcast');
+    const ok = !!broadcast && getWeekSlotLabel(broadcast.index) === expected + '曜午後';
+    scheduledPerformances = [];
+    return ok;
+  })()
+`) === true);
 
 console.log('\n================ RESULT ================');
 const failed = results.filter(r => !r.ok);

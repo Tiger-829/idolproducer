@@ -578,7 +578,9 @@ const MEMBER_SALARY_FAN_DAYS = 365;
 const MEMBER_SALARY_GROUP_GROWTH_FACTOR = 6;
 
 // 週間スケジュール（1週間＝7日×午前/午後＝14枠）
-const WEEK_DAY_LABELS = ['月', '火', '水', '木', '金', '土', '日'];
+// 曜日は「起点（水曜）の翌日」から「次の週の水曜の前日」までの順。
+// ゲームは毎週水曜に進むので、この並びが実際の1周に対応する。
+const WEEK_DAY_LABELS = ['木', '金', '土', '日', '月', '火', '水'];
 const WEEK_PERIOD_LABELS = ['午前', '午後'];
 const WEEK_SLOT_COUNT = WEEK_DAY_LABELS.length * WEEK_PERIOD_LABELS.length; // 14
 // 枠インデックス（0-13）から曜日・午前午後を求める
@@ -636,6 +638,27 @@ const INDIVIDUAL_LESSON_STATS = ['vocal', 'dance', 'talk', 'variety', 'academics
 const LESSON_BASE_EXP = 80;
 // 特別強化（1名集中）の倍率
 const SPECIAL_TRAINING_MULTIPLIER = 10;
+
+// ==========================================
+// ライブによる経験値（ライブ関連能力値）
+// ==========================================
+// ライブ1公演あたりの基礎経験値（特別強化の10倍を基準にする）
+const LIVE_BASE_EXP = LESSON_BASE_EXP * SPECIAL_TRAINING_MULTIPLIER;
+// 観客数（動員）÷キャパシティ で決まる「埋まり率」による倍率の上限
+const LIVE_FILL_RATE_CAP = 1.5;
+// 会場の「収容しやすさ」（ease）による倍率（S/SS 会場は手ごたえが大きい）
+const LIVE_EASE_MULTIPLIER = { SS: 1.3, S: 1.22, A: 1.15, B: 1.0, C: 0.85, D: 0.7 };
+// 公演日数ごとの倍率（1日＝1.0／日数が多いほど伸びる）
+const LIVE_MULTI_DAY_BONUS = 0.25;
+// ライブで経験値を付与する対象能力と、その配分
+const LIVE_STAT_WEIGHTS = {
+  dance: 1.0,        // ダンス
+  vocal: 0.8,         // 歌唱
+  athletics: 0.5,     // 運動能力
+  coordination: 0.4,  // 連携力
+  stamina: 0.3,       // 体力
+  recovery: 0.5,      // 回復力
+};
 
 // 体力値（スタミナゲージ）
 const MAX_STAMINA_VALUE = 100;

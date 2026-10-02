@@ -14,29 +14,33 @@ const PAGE_TABS = [
   { id: 'records', label: '記録', icon: 'records' }
 ];
 
-function renderPageNav(activePage = 'group') {
+// ゲーム開始時に表示するタブ（毎週の行動を決める「事務所」を既定にする）
+const DEFAULT_PAGE = 'office';
+
+// タブのボタンを描画し、指定したタブのパネルだけを表示する
+function renderPageNav(activePage = DEFAULT_PAGE) {
+  const target = PAGE_TABS.some(tab => tab.id === activePage) ? activePage : DEFAULT_PAGE;
   const nav = document.getElementById('page-nav');
-  if (!nav) return;
-  nav.innerHTML = PAGE_TABS.map(tab => {
-    const active = tab.id === activePage;
-    return `
+  if (nav) {
+    nav.innerHTML = PAGE_TABS.map(tab => {
+      const active = tab.id === target;
+      return `
       <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
         aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
         onclick="switchPage('${tab.id}')">
         <span class="tab-icon">${getIconSvg(tab.icon)}</span>${tab.label}
       </button>`;
-  }).join('');
+    }).join('');
+  }
+  // パネルの表示も同時に切り替える（ゲーム開始時は既定タブが表示される）
+  PAGE_TABS.forEach(tab => {
+    const panel = document.getElementById(`page-${tab.id}`);
+    if (panel) panel.hidden = tab.id !== target;
+  });
 }
 
 function switchPage(page) {
-  const pages = PAGE_TABS.map(tab => tab.id);
-  if (!pages.includes(page)) return;
   renderPageNav(page);
-
-  pages.forEach(name => {
-    const active = name === page;
-    document.getElementById(`page-${name}`).hidden = !active;
-  });
 }
 
 // 競合チームの現在の影響力（売上に応じて増減する）

@@ -36,12 +36,33 @@ function updateUI() {
   fansEl.textContent = formatFanCount(groupFans);
   // 6桁以上は見単位が省略されるため、正確な人数をツールチップに出す
   fansEl.title = groupFans >= 100000 ? `${groupFans.toLocaleString()}人` : '';
-  // ファン内訳（コア／ファン／ライト）と各階層の参加率
+  // ファン内訳（コア／ファン／ライト）をパーセントバーで可視化
   const fanTiers = getFanTiers();
   const tierEl = document.getElementById('txt-group-fan-tiers');
   if (tierEl) {
-    tierEl.textContent = `コア ${Math.round(fanTiers.shares.core * 100)}% / ファン ${Math.round(fanTiers.shares.fan * 100)}% / ライト ${Math.round(fanTiers.shares.light * 100)}%`;
-    tierEl.title = `コア ${formatFanCount(fanTiers.core)}（ライブ8割・イベント7割）\nファン ${formatFanCount(fanTiers.fan)}（各5割）\nライト ${formatFanCount(fanTiers.light)}（各3割）`;
+    const share = fanTiers.shares;
+    const pct = value => Math.round(value * 100);
+    // 実際の参加率（ライブ）を配分表から取る（ハードコード禁止）
+    const liveRates = FAN_TIER_PARTICIPATION.live;
+    const liveRate = getTierParticipationRate('live');
+    const segs = [
+      { key: 'core', name: 'コア', share: share.core, count: fanTiers.core, rate: liveRates.core },
+      { key: 'fan', name: 'ファン', share: share.fan, count: fanTiers.fan, rate: liveRates.fan },
+      { key: 'light', name: 'ライト', share: share.light, count: fanTiers.light, rate: liveRates.light },
+    ];
+    tierEl.innerHTML = `
+      <div class="fan-share-bar" role="img" aria-label="${segs.map(s => `${s.name}${pct(s.share)}%`).join('、')}">
+        ${segs.map(s => `<i class="fan-share-seg fan-share-${s.key}" style="width:${pct(s.share)}%"
+          title="${s.name} ${pct(s.share)}%（${formatFanCount(s.count)}）"></i>`).join('')}
+      </div>
+      <div class="fan-share-legend">
+        ${segs.map(s => `<span class="fan-share-legend-item"><i class="fan-share-dot fan-share-${s.key}"></i>${s.name} ${pct(s.share)}%</span>`).join('')}
+      </div>
+      <div class="fan-share-note">ライブ参加 ${(liveRate * 100).toFixed(1)}%（参加者 ${formatFanCount(getParticipatingFans('live'))}）</div>
+    `;
+    tierEl.title = segs.map(s =>
+      `${s.name}：${pct(s.share)}%（${s.count.toLocaleString()}人）\n　ライブ参加率 ${(s.rate * 100).toFixed(1)}% ／ イベント参加率 ${(FAN_TIER_PARTICIPATION.event[s.key] * 100).toFixed(1)}%`
+    ).join('\n');
   }
   document.getElementById('txt-group-crisis').textContent = groupCrisis;
   document.getElementById('txt-effective-crisis').textContent = calculateGroupCrisisResilience();

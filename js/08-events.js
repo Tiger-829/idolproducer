@@ -527,7 +527,7 @@ function processPlanEvents(reachDate = gameDate) {
 // 月ごとのリリース＆ライブ実行
 function processMonthlyReleaseAndLive(reachDate = gameDate) {
   const planKey = `${currentYear}-${currentMonth}`;
-  const plan = productionSchedule[planKey];
+  const plan = productionSchedule[planKey] || null;
   const summary = calculateTeamAverages();
 
   // CDリリース（計画で指定した日に発売する。未定なら従来どおり最終水曜）
@@ -559,6 +559,16 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const benefitText = benefit
       ? ` ${benefit.name}経費: ${formatMoney(benefit.cost)} / 参加メンバー平均完売率 ${Math.round(benefitSales.sellThrough * 100)}%。`
       : '';
+        // 発売実績を報道する情報メディアを予約する
+    scheduleInfoMedia('release', {
+      releaseType: plan.release,
+      songTitle: song.title,
+      sales,
+      songId: song.id,
+      releaseNth: songs.filter(s => s.releaseType === plan.release).length,
+      releaseDate: formatPlanDayLabel(gameDate),
+      centerText: getCurrentCenterText()
+    });
     setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
   }
 
@@ -568,6 +578,10 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === gameDate
   );
   const liveLogs = [];
+  // ライブ後の発表用：1公演日＝1行の詳細収支
+  const liveFinanceRows = [];
+  // ライブ関連能力値に付与した経験値（ログ表示用）
+  let liveExperience = null;
   todayLiveEntries.forEach(entry => {
     const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
     if (!v) return;
@@ -614,6 +628,17 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     yearlyStats.streamCost = (yearlyStats.streamCost || 0) + STREAM_PRODUCTION_COST;
     funds += profit;
 
+    // 公演日は残りで減っていくため、最初の公演日に総公演日数を記録しておく
+    // entry は毎回生成される一時オブジェクトのため、実際の保存先（target0）を直接書き換える
+    const target0 = entry.isPrimary ? entry.plan : entry.plan.additionalLives[entry.extraIndex];
+    if (!target0.liveTotalShowCount) {
+      target0.liveTotalShowCount = totalShowCount;
+      target0.liveTotalAudience = 0;
+    }
+    const grandShowCount = target0.liveTotalShowCount || totalShowCount;
+    // 今回のライブの累計動員（公演日ごとに加算して保持する）
+    target0.liveTotalAudience = (target0.liveTotalAudience || 0) + totalAudience;
+    const grandAudience = target0.liveTotalAudience;
     // ライブの体力消費と疲労の蓄積
     const stamina = applyLiveStaminaCost(v, isMultiDay, isConsecutive);
     lastLiveDate = gameDate;
@@ -621,6 +646,12 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     if (!weeklyRecoveryDone) {
       applyLiveWeekRecovery();
       weeklyRecoveryDone = true;
+    }
+
+    // ライブ関連能力値の経験値：全公演日が終わった1回だけ付与する
+    // 観客数・キャパシティ・収容しやすさ・公演日数で変動する
+    if (!remainingDates.length) {
+      liveExperience = applyLiveExperience(v, grandAudience, grandShowCount);
     }
 
     // 当日の公演を処理し、残りの公演があれば次回へ回す
@@ -635,10 +666,59 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const fatigueNote = stamina.fatigueGain >= LIVE_FATIGUE_GAIN + LIVE_FATIGUE_MULTI_DAY_BONUS
       ? '・疲労が大きく累積'
       : (stamina.fatigueGain > LIVE_FATIGUE_GAIN ? '・疲労が累積' : '');
-    liveLogs.push(`【ライブ成功】${entry.liveName || v.name}（${v.name} / ${totalShowCount}公演中・残り${remainingDates.length}${isFinale ? '・千秋楽' : ''} / 動員: ${totalAudience.toLocaleString()}人 / 配信: ${streamBuyers.toLocaleString()}人・${formatMoney(streamRevenue)}（制作費 -${formatMoney(STREAM_PRODUCTION_COST)}）/ 売上: ${formatMoney(totalRevenueWithGoods)} / 会場使用料: ${formatMoney(venueCost)} / 収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)} / 体力 -${stamina.cost}・疲労 +${stamina.fatigueGain}${fatigueNote}）！`);
+    // 当日の詳細収支を表として1公演日＝1行でまとめる（発表はライブ後）
+    const profitText = `収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)}`;
+    liveFinanceRows.push({
+      date: gameDate,
+      venueName: v.name,
+      liveName: entry.liveName || v.name,
+      isFinale,
+      audience: totalAudience,
+      ticketRevenue: totalRevenue,
+      merchandise: totalMerchandise,
+      streamBuyers,
+      streamRevenue,
+      streamCost: STREAM_PRODUCTION_COST,
+      revenue: totalRevenueWithGoods,
+      venueCost,
+      profit,
+      staminaCost: stamina.cost,
+      fatigueGain: stamina.fatigueGain,
+      fatigueNote
+    });
+    liveLogs.push(`【ライブ成功】${entry.liveName || v.name}（${v.name} / ${totalShowCount}公演中・残り${remainingDates.length}${isFinale ? '・千秋楽' : ''}）`);
+    // ライブ関連能力値の経験値（最終公演後に1回だけ付与）
+    if (liveExperience) {
+      // 検証・画面表示用に今回の付与内容を残す
+      liveExperienceLogs.push({
+        venue: v.name,
+        showDays: grandShowCount,
+        audience: grandAudience,
+        ...liveExperience
+      });
+      const expText = Object.entries(liveExperience.gained)
+        .map(([statId, amount]) => `${STATUS_KEYS.find(s => s.id === statId)?.name || statId}+${amount}`)
+        .join(' / ');
+      liveLogs.push(`　▼経験値 基礎${liveExperience.total}（${expText}）${liveExperience.levelUps ? ` / 能力UP ${liveExperience.levelUps}件` : ''}`);
+    }
+    // ライブ実績を報道する情報メディアを予約する（全公演日が終わった1回だけ）
+    if (!remainingDates.length) {
+      // showDates はこのライブの全公演日（開始日〜最終日）を保持している
+      scheduleInfoMedia('live', {
+        liveName: entry.liveName || v.name,
+        venueName: v.name,
+        audience: grandAudience,
+        showDays: grandShowCount,
+        startDate: formatPlanDayLabel(showDates[0] || gameDate),
+        endDate: formatPlanDayLabel(showDates[showDates.length - 1] || gameDate)
+      });
+    }
+    liveLogs.push(`　▼当日 動員 ${totalAudience.toLocaleString()}人 / 配信 ${streamBuyers.toLocaleString()}人・${formatMoney(streamRevenue)}（制作費 -${formatMoney(STREAM_PRODUCTION_COST)}） / 売上: ${formatMoney(totalRevenueWithGoods)} / 会場使用料: ${formatMoney(venueCost)} / ${profitText} / 体力 -${stamina.cost}・疲労 +${stamina.fatigueGain}${fatigueNote}`);
   });
   if (todayLiveEntries.length) nextLivePromotionPoints = 0;
   if (liveLogs.length) setLog(liveLogs.join(' '));
+  // ライブ後に詳細収支を表で提示する
+  if (liveFinanceRows.length) showLiveFinanceModal(liveFinanceRows);
 
   if (isLastWednesdayOfMonth()) {
     // CD売上収入（8割）とタイアップの臨時収入を入金し、会費と給与を処理する
@@ -733,6 +813,73 @@ function getVenueTierRate(venue) {
 function getLiveDayWeight(date) {
   if (!date || typeof date.getDay !== 'function') return LIVE_WEEKDAY_DEFAULT_WEIGHT;
   return LIVE_WEEKDAY_WEIGHT[date.getDay()] ?? LIVE_WEEKDAY_DEFAULT_WEIGHT;
+}
+
+// ライブ後の詳細収支を表で表示する
+function showLiveFinanceModal(rows) {
+  const modal = document.getElementById('live-finance-modal');
+  if (!modal || !rows.length) return;
+  const zero = { audience: 0, ticketRevenue: 0, merchandise: 0, streamRevenue: 0,
+    streamCost: 0, venueCost: 0, profit: 0 };
+  const total = rows.reduce((sum, r) => ({
+    audience: sum.audience + r.audience,
+    ticketRevenue: sum.ticketRevenue + r.ticketRevenue,
+    merchandise: sum.merchandise + r.merchandise,
+    streamRevenue: sum.streamRevenue + r.streamRevenue,
+    streamCost: sum.streamCost + r.streamCost,
+    venueCost: sum.venueCost + r.venueCost,
+    profit: sum.profit + r.profit
+  }), zero);
+
+  const yens = v => `${v > 0 ? '+' : ''}${formatMoney(v)}`;
+  const minus = v => `-${formatMoney(v)}`;
+  const body = modal.querySelector('.live-finance-body');
+  body.innerHTML = `
+    <table class="live-finance-table">
+      <thead>
+        <tr>
+          <th>公演日</th><th>会場</th><th>動員</th>
+          <th>チケット</th><th>グッズ</th><th>配信</th><th>配信制作費</th>
+          <th>売上合計</th><th>会場使用料</th><th>収支</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td>${escapeHtml(r.date)}${r.isFinale ? '<small class="tag-finale">千秋楽</small>' : ''}</td>
+            <td>${escapeHtml(r.venueName)}</td>
+            <td class="num">${r.audience.toLocaleString()}</td>
+            <td class="num">${formatMoney(r.ticketRevenue)}</td>
+            <td class="num">${formatMoney(r.merchandise)}</td>
+            <td class="num">${formatMoney(r.streamRevenue)}<small>${r.streamBuyers.toLocaleString()}人</small></td>
+            <td class="num minus">${minus(r.streamCost)}</td>
+            <td class="num">${formatMoney(r.revenue)}</td>
+            <td class="num minus">${minus(r.venueCost)}</td>
+            <td class="num ${r.profit > 0 ? 'plus' : 'minus'}">${yens(r.profit)}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">合計（${rows.length}公演日）</th>
+          <td class="num">${total.audience.toLocaleString()}</td>
+          <td class="num">${formatMoney(total.ticketRevenue)}</td>
+          <td class="num">${formatMoney(total.merchandise)}</td>
+          <td class="num">${formatMoney(total.streamRevenue)}</td>
+          <td class="num minus">${minus(total.streamCost)}</td>
+          <td class="num">${formatMoney(total.revenue)}</td>
+          <td class="num minus">${minus(total.venueCost)}</td>
+          <td class="num ${total.profit > 0 ? 'plus' : 'minus'}">${yens(total.profit)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="live-finance-note">配信購入者にはライブの配信も放送されています。動員は会場の収容人数で頭打ちになります。</p>
+  `;
+  modal.style.display = 'flex';
+}
+
+function closeLiveFinanceModal() {
+  const modal = document.getElementById('live-finance-modal');
+  if (modal) modal.style.display = 'none';
 }
 
 // ライブ1公演の動員を求める（ファン階層の参加率 × 会場ティアの集客率 × 曜日や特例の重み × 価格調整）
@@ -1010,6 +1157,12 @@ function processScheduledPerformances(reachDate = null) {
     }
     const song = songs.find(item => item.id === performance.songId);
     const summary = calculateTeamAverages();
+
+    if (performance.isInfoMedia) {
+      // ライブ後・CD発売後に報道される情報メディア
+      processInfoMedia(performance);
+      return;
+    }
 
     if (performance.isSpecial) {
       // 大型特番は定例番組の何倍もの人気度が得られる

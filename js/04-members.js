@@ -422,7 +422,7 @@ function initGame(slot, startFresh) {
   document.getElementById('title-screen').hidden = true;
   document.getElementById('game-screen').hidden = false;
   updateUI();
-  renderPageNav('group');
+  renderPageNav(DEFAULT_PAGE);
   document.getElementById('active-slot-label').textContent = `セーブ枠 ${slot}`;
   // ゲーム開始直後に当年7月〜12月の計画決定を行う
   if (startFresh) openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
