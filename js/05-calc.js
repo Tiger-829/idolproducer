@@ -114,6 +114,59 @@ function calculateGroupFans() {
 function addGroupSales(copies) {
   yearlyStats.sales += copies;
   lifetimeSales = (lifetimeSales || 0) + copies;
+  // CD累積売上の推移グラフ用に、生涯累計を記録する（週次）
+  recordGroupSalesHistory();
+}
+
+// ==========================================
+// CD売上推移の履歴（記録タブのグラフ用）
+// ==========================================
+// グラフの表示期間（週）。直近1年間
+const SALES_HISTORY_WEEKS = 52;
+// 1曲ごとの推移で採用する期間（週）。発売後1年間
+const SONG_HISTORY_WEEKS = 52;
+
+// 週次のCD累積売上を履歴へ追記する（同じ週は上書きして1点だけ残す）
+function recordGroupSalesHistory() {
+  if (!Array.isArray(salesHistory)) salesHistory = [];
+  const weekKey = gameDate;
+  const entry = { weekKey, sales: lifetimeSales || 0 };
+  const last = salesHistory[salesHistory.length - 1];
+  if (last && last.weekKey === weekKey) salesHistory[salesHistory.length - 1] = entry;
+  else salesHistory.push(entry);
+  // 表示期間より古い履歴は捨てる（セーブが膨らまないよう）
+  if (salesHistory.length > SALES_HISTORY_WEEKS) {
+    salesHistory = salesHistory.slice(-SALES_HISTORY_WEEKS);
+  }
+}
+
+// 1曲の発売後累積売上を履歴へ追記する（週次）
+function recordSongSalesHistory(song) {
+  if (!song || !song.released) return;
+  if (!Array.isArray(song.salesHistory)) song.salesHistory = [];
+  const weekKey = gameDate;
+  const entry = { weekKey, sales: song.totalSales || 0 };
+  const last = song.salesHistory[song.salesHistory.length - 1];
+  if (last && last.weekKey === weekKey) song.salesHistory[song.salesHistory.length - 1] = entry;
+  else song.salesHistory.push(entry);
+  if (song.salesHistory.length > SONG_HISTORY_WEEKS + 1) {
+    song.salesHistory = song.salesHistory.slice(-(SONG_HISTORY_WEEKS + 1));
+  }
+}
+
+// 全曲の売上推移を週次で記録する（週の進行時に呼ぶ）
+function recordAllSongSalesHistory() {
+  songs.forEach(song => recordSongSalesHistory(song));
+}
+
+// 履歴を「何週前の記録か」と「累積売上」の形にして読みやすくする
+function normalizeSalesHistory(history, limitWeeks) {
+  if (!Array.isArray(history) || !history.length) return [];
+  const list = history
+    .filter(entry => entry && typeof entry.weekKey === 'string')
+    .map(entry => ({ weekKey: entry.weekKey, sales: Math.max(0, Math.round(Number(entry.sales) || 0)) }));
+  const limit = limitWeeks || SALES_HISTORY_WEEKS;
+  return list.slice(-(limit + 1));
 }
 
 // ファン階層（コア／ファン／ライト）の参加率（ライブは原案の1/4）
@@ -213,8 +266,13 @@ function ensureMemberVitalState() {
     member.staminaValue = Math.max(0, Math.min(MAX_STAMINA_VALUE, Math.round(member.staminaValue)));
     if (!Number.isFinite(member.liveFatigue)) member.liveFatigue = 0;
     member.liveFatigue = Math.max(0, Math.min(MAX_LIVE_FATIGUE, Math.round(member.liveFatigue)));
-    if (member.injury && (!Number.isFinite(member.injury.weeksLeft) || member.injury.weeksLeft <= 0)) {
-      member.injury = null;
+    if (member.injury) {
+      if (!Number.isFinite(member.injury.weeksLeft) || member.injury.weeksLeft <= 0) {
+        member.injury = null;
+      } else if (!Number.isFinite(member.injury.totalWeeks)) {
+        // 旧セーブには全治期間の記録が無い（残りが全治なので、そのまま扱う）
+        member.injury.totalWeeks = member.injury.weeksLeft;
+      }
     }
   });
 }
@@ -351,25 +409,41 @@ function applyLiveWeekRecovery() {
 function rollMemberInjury(member, extraReduction = 0) {
   if ((member.staminaValue ?? 0) >= STAMINA_WARNING_THRESHOLD) return false;
   const severity = (STAMINA_WARNING_THRESHOLD - member.staminaValue) / STAMINA_WARNING_THRESHOLD;
-  const risk = severity * 0.45 * Math.max(0, 1 - extraReduction);
+  const risk = severity * INJURY_BASE_RATE * Math.max(0, 1 - extraReduction);
   if (Math.random() >= risk) return false;
-  const isAccident = Math.random() < 0.5;
-  const weeks = isAccident ? 2 + Math.floor(Math.random() * 2) : 1;
+  const isAccident = Math.random() < INJURY_ACCIDENT_RATE;
+  const [minWeeks, maxWeeks] = INJURY_ACCIDENT_WEEKS_RANGE;
+  const weeks = isAccident
+    ? minWeeks + Math.floor(Math.random() * (maxWeeks - minWeeks + 1))
+    : INJURY_ILLNESS_WEEKS;
   member.injury = {
     type: isAccident ? 'ケガ' : '体調不良',
     weeksLeft: weeks,
+    // 全治期間（発生時に確定する。表示と回復判定に使う）
+    totalWeeks: weeks,
     since: gameDate
   };
   return true;
+}
+
+// ケガ・体調不良の残り週数と全治期間の表示（例：残り2週／全3週）
+// 全治期間不明（旧セーブなど）のときは残り週数だけを表示する
+function formatInjuryWeeks(injury) {
+  if (!injury) return '';
+  const left = Math.max(0, Number.isFinite(injury.weeksLeft) ? injury.weeksLeft : 0);
+  const total = Number.isFinite(injury.totalWeeks) && injury.totalWeeks > 0 ? injury.totalWeeks : 0;
+  if (total > 0) return `残り${left}週／全${total}週`;
+  return `残り${left}週`;
 }
 
 // ケガ・体調不良の回復判定
 function processMemberInjuries() {
   idolRoster.forEach(member => {
     if (!member.injury) return;
-    member.injury.weeksLeft -= 1;
+    // 残り週数は0未満にしない（表示で全治期間が保たれるように）
+    member.injury.weeksLeft = Math.max(0, member.injury.weeksLeft - 1);
     if (member.injury.weeksLeft <= 0) {
-      setLog(`【復帰】${member.name}の${member.injury.type}が治りました。`);
+      setLog(`【復帰】${member.name}の${member.injury.type}が治りました（${formatInjuryWeeks(member.injury)}）。`);
       member.injury = null;
     }
   });

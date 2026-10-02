@@ -187,7 +187,7 @@ function renderRosterNameBar() {
   bar.innerHTML = ordered.map(member => {
     const staminaValue = member.staminaValue ?? MAX_STAMINA_VALUE;
     const lowStamina = staminaValue < STAMINA_WARNING_THRESHOLD;
-    const injuryMark = member.injury ? ` ${member.injury.type}` : '';
+    const injuryMark = member.injury ? ` ${member.injury.type} ${formatInjuryWeeks(member.injury)}` : '';
     const classes = [
       'roster-namebar-item',
       member.isSelected ? 'selected' : '',
@@ -224,7 +224,7 @@ function renderRosterList() {
     const staminaColor = staminaValue < STAMINA_WARNING_THRESHOLD ? '#c0392b' : (staminaValue < 60 ? '#e08e0b' : '#2e7d32');
     const liveFatigue = m.liveFatigue || 0;
     const injuryTag = m.injury
-      ? `<span style="color:#c0392b; font-size:9px;">[${escapeHtml(m.injury.type)} 残り${m.injury.weeksLeft}週]</span>`
+      ? `<span style="color:#c0392b; font-size:9px;">[${escapeHtml(m.injury.type)} ${escapeHtml(formatInjuryWeeks(m.injury))}]</span>`
       : '';
     const topStat = [...STATUS_KEYS]
       .filter(status => status.id !== 'popularity')
@@ -298,6 +298,8 @@ function renderRosterList() {
 
 function setLog(msg) {
   document.getElementById('log-box').textContent = msg;
+  // テレビ関連の放送であれば画面演出を出す
+  playTvEffectFromLog(msg);
 }
 
 // 半年計画モーダル

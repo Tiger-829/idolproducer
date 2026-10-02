@@ -17,6 +17,7 @@ const ASSETS = [
   './js/11-ui-roster.js',
   './js/12-ui-plan-save.js',
   './js/13-help.js',
+  './js/14-ui-records.js',
   './manifest.json'
 ];
 

@@ -7,6 +7,9 @@
 
 // 直前週に確定したスケジュール（次週の初期値に使う）
 let lastWeekSchedule = null;
+// 歌番組（テレビ出演）で枠が潰されていない週のスケジュール。
+// 歌番組の翌週はその前の週のスケジュールを仮組として呼び出すために保持する。
+let savedCleanWeekSchedule = null;
 
 function createEmptyWeeklySchedule() {
   // 1週間は14枠（7日×午前/午後）で固定。休養を1日フル＋2枠あけて、残りをレッスンで埋める
@@ -24,7 +27,7 @@ function createEmptyWeeklySchedule() {
 
 function ensureWeeklySchedule() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
-    weeklySchedule = lastWeekSchedule ? createScheduleFromLastWeek() : createEmptyWeeklySchedule();
+    weeklySchedule = getDraftSourceSchedule() ? createScheduleFromLastWeek() : createEmptyWeeklySchedule();
     return;
   }
   // 旧セーブ（可変長の枠）を14枠へ移行する
@@ -157,17 +160,42 @@ function cloneWeeklySchedule(schedule) {
   };
 }
 
+// テレビ出演の固定枠（リハーサル／出演）で埋まった枠か
+// WEEKLY_SCHEDULE_ITEMS に無い枠（例：放送枠）も固定枠として扱う
+function isFixedSlotId(slotId) {
+  if (!slotId) return false;
+  const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId);
+  return !item || item.fixed;
+}
+
+// スケジュールに歌番組の固定枠が混ざっているか
+function hasFixedSlotInSchedule(schedule) {
+  return Boolean(schedule && Array.isArray(schedule.slots) && schedule.slots.some(isFixedSlotId));
+}
+
 // 確定した週のスケジュールを「直前週」として保存する
 function rememberWeeklySchedule(schedule) {
   lastWeekSchedule = cloneWeeklySchedule(schedule);
+  // 歌番組で枠が潰されていない週は保存版としても残す（歌番組の翌週の仮組に使う）
+  if (!hasFixedSlotInSchedule(schedule)) savedCleanWeekSchedule = cloneWeeklySchedule(schedule);
+}
+
+// 歌番組の翌週に使う仮組の素になるスケジュール
+// 直前週が歌番組の週なら、挟まる前の週（保存版）を呼び出す
+// 保存版が無い場合は直前週から固定枠だけを落として使う
+function getDraftSourceSchedule() {
+  if (hasFixedSlotInSchedule(lastWeekSchedule) && savedCleanWeekSchedule) return savedCleanWeekSchedule;
+  return lastWeekSchedule;
 }
 
 // 直前週のスケジュールから下書きを作る
-// テレビ出演などの固定枠は今週の予定で上書きする
+// テレビ出演などの固定枠は前の週から引き継がない（今週の予定で作り直す）
 function createScheduleFromLastWeek() {
   const base = createEmptyWeeklySchedule();
-  if (!lastWeekSchedule) return base;
-  const slots = lastWeekSchedule.slots.map(slot => slot || '');
+  const source = getDraftSourceSchedule();
+  if (!source) return base;
+  // 前の週の固定枠は残さず「空き」にする（今週の固定枠で上書きするため）
+  const slots = source.slots.map(slotId => (isFixedSlotId(slotId) ? '' : slotId || ''));
   while (slots.length < WEEK_SLOT_COUNT) slots.push('');
   slots.length = WEEK_SLOT_COUNT;
   // 固定枠（リハーサル／テレビ出演）を今週の予定で上書きする
@@ -175,21 +203,21 @@ function createScheduleFromLastWeek() {
     if (index >= 0 && index < slots.length) slots[index] = slot.kind;
   });
   base.slots = slots;
-  base.vacation = lastWeekSchedule.vacation;
-  base.individualMemberId = lastWeekSchedule.individualMemberId || base.individualMemberId;
-  base.individualStat = lastWeekSchedule.individualStat || base.individualStat;
+  base.vacation = source.vacation;
+  base.individualMemberId = source.individualMemberId || base.individualMemberId;
+  base.individualStat = source.individualStat || base.individualStat;
   // 特別強化の対象は、在籍するメンバーだけを残す
-  base.focusMemberIds = lastWeekSchedule.focusMemberIds.filter(id =>
+  base.focusMemberIds = source.focusMemberIds.filter(id =>
     idolRoster.some(member => member.id === id)
   );
-  base.officeAction = lastWeekSchedule.officeAction || '';
+  base.officeAction = source.officeAction || '';
   return base;
 }
 
 // 週が変わったら下書きを作り直す
 // 直前週に確定したスケジュールがあれば、それを初期値として引き継ぐ
 function resetWeeklySchedule() {
-  weeklySchedule = lastWeekSchedule ? createScheduleFromLastWeek() : null;
+  weeklySchedule = getDraftSourceSchedule() ? createScheduleFromLastWeek() : null;
   weeklyRecoveryDone = false;
 }
 
@@ -470,7 +498,7 @@ function applyWeeklySchedule() {
       consumeMemberStamina(member, staminaCost);
       // リスクマネジメントで特別強化中のケガ・体調不良を抑える
       if (rollMemberInjury(member, isFocus ? riskReduction : 0)) {
-        injuries.push(`${member.name}（${member.injury.type}・${member.injury.weeksLeft}週）`);
+        injuries.push(`${member.name}（${member.injury.type}・${formatInjuryWeeks(member.injury)}）`);
       }
     }
 
@@ -716,6 +744,8 @@ function advanceOneWeek() {
     checkMusicProgramOffers();
     resolveIndustryOffer();
     trainSongs(summary);
+    // CD累積売上の推移を週次で記録する（記録タブのグラフ用）
+    recordAllSongSalesHistory();
     if (isLastWednesdayOfMonth(currentDate) && officeUpgrades.snsTraining > 1) {
       const snsGain = officeUpgrades.snsTraining - 1;
       idolRoster.filter(member => member.isSelected).forEach(member => {

@@ -552,6 +552,9 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     song.released = true;
     song.releaseDateKey = gameDate;
     song.releasePromoAlpha = promoAlpha;
+    // 初週売上（記録タブのランキング用）と発売時点の推移を保存する
+    song.firstWeekSales = sales;
+    song.salesHistory = [{ weekKey: gameDate, sales }];
     const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
     if (benefit) funds -= benefit.cost;
     const benefitSales = benefit ? recordReleaseBenefitSales(benefit.id) : null;

@@ -41,6 +41,8 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
 
 function switchPage(page) {
   renderPageNav(page);
+  // 記録タブを開いたときにグラフと一覧を描画する
+  if (page === 'records') renderRecordsPanel();
 }
 
 // 競合チームの現在の影響力（売上に応じて増減する）

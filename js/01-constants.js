@@ -631,11 +631,11 @@ const DEFAULT_WEEK_SLOTS = [
   'literacy', 'dance-lesson', 'vocal-lesson', 'literacy',
   'dance-lesson', 'rest-day'
 ];
-// 個別レッスンで鍛えられる能力
-const INDIVIDUAL_LESSON_STATS = ['vocal', 'dance', 'talk', 'variety', 'academics', 'stamina', 'recovery', 'athletics', 'sns', 'style', 'crisis'];
-// 特別強化（1名集中）の倍率を掛けられるのはこの4能力だけ（歌唱・ダンス・体力・回復力）
+// 特別強化（1名集中）の倍率を掛けられる4能力（歌唱・ダンス・体力・回復力）
 // ※ 頭脳系（学力・トーク・SNS・バラエティ・危機回避）や運動能力・連携力・スタイルは等倍のまま
 const SPECIAL_TRAINING_STATS = ['vocal', 'dance', 'stamina', 'recovery'];
+// 個別レッスンで鍛えられる能力（特別強化と同じくこの4能力だけ）
+const INDIVIDUAL_LESSON_STATS = SPECIAL_TRAINING_STATS.slice();
 // グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
 // 14枠化で1週のレッスン回数が増えたため、1回あたりの経験値は従来の約4割に調整している
 const LESSON_BASE_EXP = 80;
@@ -670,6 +670,14 @@ const STAMINA_BASE_RECOVERY = 6;
 const STAMINA_RECOVERY_PER_STAT = 0.12;
 const STAMINA_REST_RECOVERY_MULTIPLIER = 2.5;
 const SPECIAL_TRAINING_EXTRA_COST = 10;
+// ケガ・体調不良の週次発生率の上限（体力値が0のとき）。
+// 実際の発生率はこれに「体力値の低さ」を掛けて決める。
+const INJURY_BASE_RATE = 0.18;
+// 全治期間の分布（体調不良は1週、ケガは INJURY_ACCIDENT_WEEKS_RANGE の範囲から）
+const INJURY_ILLNESS_WEEKS = 1;
+const INJURY_ACCIDENT_WEEKS_RANGE = [2, 3];
+// ケガと体調不良の確率比（ケガを選ぶ確率）
+const INJURY_ACCIDENT_RATE = 0.5;
 // 14枠化に伴う体力消費の再調整（1枠あたりの基準消費）
 const GROUP_LESSON_STAMINA_COST = 6;
 const INDIVIDUAL_LESSON_STAMINA_COST = 8;

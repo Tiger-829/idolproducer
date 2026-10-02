@@ -80,6 +80,8 @@ let productionSchedule = {
 let yearlyStats = { sales: 0, audience: 0 };
 // 生涯累計売上（年を跨いでも積み上がり、ファン成長に使う）
 let lifetimeSales = 0;
+// CD累積売上の週次推移（記録タブのグラフ用。直近1年分だけ保持する）
+let salesHistory = [];
 let funds = INITIAL_FUNDS;
 
 // 競合チーム（初期6チーム）

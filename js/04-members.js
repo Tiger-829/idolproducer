@@ -210,6 +210,7 @@ function initializeNewGameState() {
   };
   yearlyStats = { sales: 0, audience: 0 };
   lifetimeSales = 0;
+  salesHistory = [];
   fansFromSales = 0;
   funds = INITIAL_FUNDS;
   leagueTeams = createInitialLeagueTeams();
@@ -223,6 +224,8 @@ function initializeNewGameState() {
   managerMarketCandidates = [];
   refreshManagerMarket();
   weeklySchedule = null;
+  lastWeekSchedule = null;
+  savedCleanWeekSchedule = null;
   previousYearGroupFansAtYearStart = 0;
   groupFansAtYearStart = 0;
   yearEndAwardProcessed = false;
@@ -286,6 +289,8 @@ function applySavedGame(data) {
   yearlyStats = data.yearlyStats || { sales: 0, audience: 0 };
   // 旧セーブには生涯売上が無いので、今年度の売上から補完する
   lifetimeSales = Number.isFinite(data.lifetimeSales) ? data.lifetimeSales : (yearlyStats.sales || 0);
+  // 旧セーブには売上推移の履歴が無いので空から始める（グラフは発売分から貯まる）
+  salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
   // ファンの積み上げも復元（無いセーブは売上から目標値を復元）
   fansFromSales = Number.isFinite(data.fansFromSales) ? data.fansFromSales : getTargetSalesFans();
   // 目標値の範囲に収める（壊れたセーブで異常なファン数にならないように）

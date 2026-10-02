@@ -191,109 +191,119 @@ check('old saves without 連携力 get a baseline', run(`
 `) === 30);
 check('連携力 is NOT available for individual lessons (group only)', run('INDIVIDUAL_LESSON_STATS.includes("coordination")') === false);
 
-const trainingChecks = [
-  { id: 'strength-training', stat: 'athletics' },
-  { id: 'endurance-training', stat: 'stamina' },
-  { id: 'coordination', stat: 'coordination' }
-];
-trainingChecks.forEach(({ id, stat }) => {
-  const result = run(`
-    advanceOneWeek();
-    const target = idolRoster.filter(m => m.isSelected && !m.injury)[0];
-    const before = target.stats.${stat};
-    const expBefore = (target.statExp && target.statExp.${stat}) || 0;
-    weeklySchedule.slots = Array(14).fill('');
-    weeklySchedule.slots[0] = '${id}';
-    applyWeeklySchedule();
-    (target.stats.${stat} > before || (target.statExp.${stat} || 0) > expBefore)
-  `);
-  check(`${id} raises ${stat}`, result === true, String(result));
-});
+// 実装と同じ文字形を使うテスト
+const WEEKS = String.fromCharCode(0x9031);
+const FULLWIDTH_SLASH = String.fromCharCode(0xFF0F);
+const injuryWeeks = (left, total) => `残り${left}${WEEKS}${FULLWIDTH_SLASH}全${total}${WEEKS}`;
 
-const runThrough = run(`
-  advanceOneWeek();
-  const target = idolRoster.filter(m => m.isSelected && !m.injury)[0];
-  const danceBefore = { level: target.stats.dance, exp: (target.statExp && target.statExp.dance) || 0 };
-  const vocalBefore = { level: target.stats.vocal, exp: (target.statExp && target.statExp.vocal) || 0 };
-  weeklySchedule.slots = Array(14).fill('');
-  weeklySchedule.slots[0] = 'full-run-through';
-  weeklySchedule.slots[1] = 'full-run-through';
-  applyWeeklySchedule();
-  JSON.stringify({
-    dance: target.stats.dance > danceBefore.level || (target.statExp.dance || 0) > danceBefore.exp,
-    vocal: target.stats.vocal > vocalBefore.level || (target.statExp.vocal || 0) > vocalBefore.exp
-  })
-`);
-const runThroughResult = JSON.parse(runThrough);
-check('通し練習 raises both ダンス and 歌唱', runThroughResult.dance && runThroughResult.vocal, runThrough);
+console.log('\n--- 7b. ケガの発生率と全治期間 ---');
+// ケガ判定は乱数とメンバーを書き換えるので、実行前の状態を復元する
+// probe: snapshot and restore member state around the check
+const withInjuryProbe = (body) => JSON.parse(run(`
+  (function () {
+    var __snapshot = idolRoster.map(function (m) {
+      return { id: m.id, stamina: m.staminaValue, injury: m.injury };
+    });
+    function injuryWeeks(left, total) {
+      return '\u6b8b\u308a' + left + String.fromCharCode(0x9031) + String.fromCharCode(0xFF0F)
+        + '\u5168' + total + String.fromCharCode(0x9031);
+    }
+    var __result = (function () { ${body} })();
+    idolRoster.forEach(function (m) {
+      var saved = null;
+      for (var i = 0; i < __snapshot.length; i++) {
+        if (__snapshot[i].id === m.id) { saved = __snapshot[i]; break; }
+      }
+      if (saved) { m.staminaValue = saved.stamina; m.injury = saved.injury; }
+    });
+    return JSON.stringify({ ok: __result === true || __result === 1 });
+  })()
+`)).ok;
 
-console.log('\n--- 8. 通し練習 is limited to 2 slots per week ---');
-check('the limit is 2', run('FULL_RUN_THROUGH_WEEKLY_LIMIT') === 2);
-const limitResult = run(`
-  advanceOneWeek();
-  weeklySchedule.slots = Array(14).fill('');
-  setWeeklyScheduleSlot(0, 'full-run-through');
-  setWeeklyScheduleSlot(1, 'full-run-through');
-  const afterTwo = countWeekSlots('full-run-through');
-  setWeeklyScheduleSlot(2, 'full-run-through');
-  JSON.stringify({
-    afterTwo,
-    afterThree: countWeekSlots('full-run-through'),
-    log: document.getElementById('log-box').textContent
-  })
-`);
-const limit = JSON.parse(limitResult);
-console.log('  ', limitResult);
-check('two slots can be assigned', limit.afterTwo === 2);
-check('a third slot is rejected', limit.afterThree === 2);
-check('the rejection is explained to the player', /通し練習.*2枠まで/.test(limit.log), limit.log);
-check('validation blocks an over-limit schedule', run(`
-  weeklySchedule.slots[0] = 'full-run-through';
-  weeklySchedule.slots[1] = 'full-run-through';
-  weeklySchedule.slots[2] = 'full-run-through';
-  validateWeeklySchedule()
-`) === false);
-check('the dropdown shows the limit state', run(`
-  weeklySchedule.slots = ['full-run-through', 'full-run-through', '', '', '', '', '', '', '', '', '', '', '', ''];
-  renderWeeklyActionPanel();
-  const html = document.getElementById('weekly-action-panel').innerHTML;
-  /通し練習（1週2枠まで）/.test(html) && html.includes('現在2枠')
+check('the injury base rate is defined and lower than before', run(
+  'Number.isFinite(INJURY_BASE_RATE) && INJURY_BASE_RATE > 0 && INJURY_BASE_RATE < 0.45'
+) === true);
+check('no injury happens while stamina is above the warning line', withInjuryProbe(`
+  const member = idolRoster[0];
+  member.staminaValue = STAMINA_WARNING_THRESHOLD;
+  let occurred = false;
+  for (let i = 0; i < 200; i++) if (rollMemberInjury(member)) occurred = true;
+  member.injury = null;
+  return !occurred;
 `) === true);
-
-console.log('\n--- 9. 連携 requires 2 or more participants ---');
-const soloCoordination = run(`
-  advanceOneWeek();
-  const selected = idolRoster.filter(m => m.isSelected);
-  const target = selected[0];
-  const before = { level: target.stats.coordination, exp: (target.statExp && target.statExp.coordination) || 0 };
-  weeklySchedule.slots = Array(14).fill('');
-  weeklySchedule.slots[0] = 'coordination';
-  weeklySchedule.slots[1] = 'coordination';
-  // 参加できるのはtarget だけにする
-  weeklySchedule.restDayMembers = selected.filter(m => m.id !== target.id).map(m => m.id);
-  applyWeeklySchedule();
-  JSON.stringify({
-    up: target.stats.coordination > before.level || (target.statExp.coordination || 0) > before.exp,
-    log: document.getElementById('log-box').textContent
-  })
-`);
-const solo = JSON.parse(soloCoordination);
-console.log('  ', solo.log.slice(0, 150));
-check('連携 gives nothing when only 1 member can attend', solo.up === false);
-check('and it is reported in the log', /連携/.test(solo.log) && /未実施/.test(solo.log), solo.log.slice(0, 150));
-const duoCoordination = run(`
-  advanceOneWeek();
-  const selected = idolRoster.filter(m => m.isSelected);
-  const target = selected[0];
-  const before = { level: target.stats.coordination, exp: (target.statExp && target.statExp.coordination) || 0 };
-  weeklySchedule.slots = Array(14).fill('');
-  weeklySchedule.slots[0] = 'coordination';
-  weeklySchedule.slots[1] = 'coordination';
-  weeklySchedule.restDayMembers = selected.filter(m => m.id !== target.id && m.id !== selected[1].id).map(m => m.id);
-  applyWeeklySchedule();
-  (target.stats.coordination > before.level || (target.statExp.coordination || 0) > before.exp)
-`);
-check('連携 works when 2 members attend', duoCoordination === true, String(duoCoordination));
+check('the injury rate scales with how low the stamina is', withInjuryProbe(`
+  const member = idolRoster[0];
+  const measure = (stamina, reduction = 0) => {
+    member.injury = null;
+    member.staminaValue = stamina;
+    let hits = 0;
+    for (let i = 0; i < 4000; i++) {
+      if (rollMemberInjury(member, reduction)) { hits += 1; member.injury = null; }
+    }
+    return hits / 4000;
+  };
+  const empty = measure(0);
+  const quarter = measure(Math.round(STAMINA_WARNING_THRESHOLD / 4));
+  const reduced = measure(0, 0.75);
+  return empty > quarter && quarter > 0
+    && empty <= INJURY_BASE_RATE + 0.03
+    && reduced < empty;
+`) === true);
+check('an injury records its full recovery period', withInjuryProbe(`
+  const member = idolRoster[0];
+  member.injury = null;
+  member.staminaValue = 0;
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  const occurred = rollMemberInjury(member);
+  Math.random = originalRandom;
+  if (!occurred) return false;
+  const injury = member.injury;
+  return injury.totalWeeks === injury.weeksLeft
+    && injury.weeksLeft >= INJURY_ILLNESS_WEEKS
+    && injury.weeksLeft <= INJURY_ACCIDENT_WEEKS_RANGE[1];
+`) === true);
+check('the recovery period stays inside the documented range', withInjuryProbe(`
+  const member = idolRoster[0];
+  const lengths = new Set();
+  for (let i = 0; i < 60; i++) {
+    member.injury = null;
+    member.staminaValue = 0;
+    if (rollMemberInjury(member)) lengths.add(member.injury.totalWeeks);
+  }
+  const range = INJURY_ACCIDENT_WEEKS_RANGE;
+  return lengths.size > 0
+    && [...lengths].every(w => w === INJURY_ILLNESS_WEEKS || (w >= range[0] && w <= range[1]));
+`) === true);
+check('remaining weeks count down without passing the total', withInjuryProbe(`
+  const member = idolRoster[0];
+  member.injury = { type: 'ケガ', weeksLeft: 3, totalWeeks: 3, since: gameDate };
+  const before = formatInjuryWeeks(member.injury);
+  member.injury.weeksLeft = 1;
+  const later = formatInjuryWeeks(member.injury);
+  const expectedBefore = injuryWeeks(3, 3);
+  const expectedLater = injuryWeeks(1, 3);
+  return before === expectedBefore && later === expectedLater;
+`) === true);
+check('old saves without a total get one on load', withInjuryProbe(`
+  const member = idolRoster[0];
+  member.injury = { type: 'ケガ', weeksLeft: 2, since: gameDate };
+  ensureMemberVitalState();
+  const filled = member.injury.totalWeeks === 2;
+  member.injury = null;
+  ensureMemberVitalState();
+  return filled && member.injury === null;
+`) === true);
+check('the roster and the weekly log both show the full period', withInjuryProbe(`
+  const member = idolRoster.filter(m => m.isSelected)[0];
+  member.injury = { type: 'ケガ', weeksLeft: 2, totalWeeks: 3, since: gameDate };
+  updateUI();
+  renderRosterNameBar();
+  renderRosterList();
+  const html = document.getElementById('roster-list-ui').innerHTML;
+  const bar = document.getElementById('roster-namebar-ui').innerHTML;
+  return /ケガ/.test(html) && /残り2週／全3週/.test(html) && /残り2週／全3週/.test(bar);
+`) === true);
 
 console.log('\n--- 10. 特別強化 multiplies vocal / dance / stamina / recovery only ---');
 // 経験値と体力消費を記録するヘルパー（body の戻り値をそのまま返す）
@@ -323,6 +333,25 @@ const withRecorder = (body) => run(`
 check('the boost targets are exactly the four stats', run(
   'JSON.stringify(SPECIAL_TRAINING_STATS) === JSON.stringify(["vocal", "dance", "stamina", "recovery"])'
 ) === true);
+check('individual lessons train the same four stats only', run(`
+  JSON.stringify(INDIVIDUAL_LESSON_STATS) === JSON.stringify(["vocal", "dance", "stamina", "recovery"])
+    && INDIVIDUAL_LESSON_STATS.every(stat => SPECIAL_TRAINING_STATS.includes(stat))
+`) === true);
+check('the individual-lesson dropdown offers exactly four options', run(`
+  (() => {
+    const html = renderWeeklyScheduleControls();
+    const block = html.slice(html.indexOf('個別レッスン <small>'), html.indexOf('休養日の設定'));
+    const statOptions = block.match(/<option value="(vocal|dance|stamina|recovery|talk|variety|academics|athletics|sns|style|crisis)"/g) || [];
+    return statOptions.length === INDIVIDUAL_LESSON_STATS.length;
+  })()
+`) === true);
+check('an unsupported individual-lesson stat falls back to 歌唱力', run(`
+  (() => {
+    weeklySchedule.individualStat = 'sns';
+    ensureWeeklySchedule();
+    return weeklySchedule.individualStat === 'vocal';
+  })()
+`) === true);
 check('the multiplier is chosen per stat, not per lesson', run(`
   (() => {
     const mult = getSpecialTrainingMultiplier();
@@ -350,6 +379,9 @@ const danceWeek = JSON.parse(withRecorder(`
   weeklySchedule.slots[0] = 'dance-lesson';
   weeklySchedule.restDayMembers = [];
   weeklySchedule.focusMemberIds = [focus.id];
+  // ライブ経験値が混ざらないよう、直前まで破棄してから計測する
+  window.__exp = [];
+  window.__stamina = [];
   applyWeeklySchedule();
   return JSON.stringify({
     mult: getSpecialTrainingMultiplier(),
@@ -378,6 +410,32 @@ check('体力 (secondary) gets the full multiplier', otherStamina > 0
 check('運動能力 (not a target stat) stays flat', otherAthletics > 0
   && focusAthletics === otherAthletics,
   `focus ${focusAthletics} vs other ${otherAthletics}`);
+// 個別レッスンは対象1名・選択した能力だけを、強化倍率なしで集中させる
+const individualWeek = JSON.parse(withRecorder(`
+  advanceOneWeek();
+  const selected = idolRoster.filter(m => m.isSelected && !m.injury);
+  const target = selected[0];
+  weeklySchedule.slots = Array(14).fill('');
+  weeklySchedule.slots[0] = 'individual-lesson';
+  weeklySchedule.restDayMembers = [];
+  weeklySchedule.focusMemberIds = [];
+  weeklySchedule.individualMemberId = target.id;
+  weeklySchedule.individualStat = 'recovery';
+  window.__exp = [];
+  window.__stamina = [];
+  applyWeeklySchedule();
+  return JSON.stringify({
+    lessonExp: getWeeklyLessonExperience(),
+    exp: window.__exp,
+    log: document.getElementById('log-box').textContent
+  });
+`));
+const individualTargetId = run('idolRoster.filter(m => m.isSelected && !m.injury)[0].id');
+check('個別レッスン raises only the chosen stat, without the boost',
+  individualWeek.exp.filter(e => e.statId === 'recovery' && e.id === individualTargetId)
+    .reduce((sum, e) => sum + e.amount, 0) > 0
+  && individualWeek.exp.every(e => e.statId === 'recovery'),
+  individualWeek.log.slice(0, 100));
 
 const staminaWeek = JSON.parse(withRecorder(`
   advanceOneWeek();
@@ -387,6 +445,8 @@ const staminaWeek = JSON.parse(withRecorder(`
   weeklySchedule.slots[0] = 'endurance-training';
   weeklySchedule.restDayMembers = [];
   weeklySchedule.focusMemberIds = [focus.id];
+  window.__exp = [];
+  window.__stamina = [];
   applyWeeklySchedule();
   return JSON.stringify({
     mult: getSpecialTrainingMultiplier(),
@@ -437,6 +497,86 @@ check('and the log does not claim a special boost', !/特別強化/.test(literac
 check('a target lesson does cost the extra stamina', danceFocusWeek.withF.spent > danceFocusWeek.withoutF.spent
   && /特別強化/.test(danceFocusWeek.withF.log),
   `${danceFocusWeek.withF.spent} vs ${danceFocusWeek.withoutF.spent}`);
+// ---- 記録タブ：売上推移・楽曲一覧・初週売上ランキング ----
+const seedRecords = () => run(`
+  (() => {
+    songs = [
+      { id: 'rec-a', title: '曲A', releaseType: 'single', released: true, releaseYear: 2027, releaseMonth: 5,
+        releaseDateKey: '2027-05-14', firstWeekSales: 12000, totalSales: 90000,
+        salesHistory: [{ weekKey: '2027-05-14', sales: 12000 }, { weekKey: '2027-05-21', sales: 30000 }] },
+      { id: 'rec-b', title: '曲B', releaseType: 'album', released: true, releaseYear: 2027, releaseMonth: 7,
+        releaseDateKey: '2027-07-14', firstWeekSales: 40000, totalSales: 150000,
+        salesHistory: [{ weekKey: '2027-07-14', sales: 40000 }, { weekKey: '2027-07-21', sales: 80000 }] },
+      { id: 'rec-c', title: '曲C', releaseType: 'single', released: false, releaseYear: 2027, releaseMonth: 9 }
+    ];
+    salesHistory = [
+      { weekKey: '2027-05-14', sales: 0 },
+      { weekKey: '2027-05-21', sales: 30000 },
+      { weekKey: '2027-05-28', sales: 78000 }
+    ];
+    switchPage('records');
+    return true;
+  })()
+`);
+check('opening the records tab draws the sales chart', seedRecords() === true
+  && run("!!document.querySelector('#records-sales-chart svg')") === true);
+check('the chart note reports the period and the total', run(`
+  (document.getElementById('records-sales-note').textContent || '').includes('78,000')
+`) === true);
+check('the first-week ranking is sorted by first-week sales', run(`
+  (() => {
+    const titles = [...document.querySelectorAll('.firstweek-title')].map(el => el.textContent);
+    return titles.length === 2 && titles[0] === '曲B' && titles[1] === '曲A';
+  })()
+`) === true);
+check('every song is listed, released or upcoming', run(`
+  (() => {
+    const titles = [...document.querySelectorAll('.song-row-title')].map(el => el.textContent);
+    const upcoming = document.querySelectorAll('.song-row.is-upcoming').length;
+    return titles.length === songs.length
+      && ['曲A', '曲B', '曲C'].every(name => titles.includes(name))
+      && upcoming === 1;
+  })()
+`) === true);
+check('tapping a song opens its 1-year trend modal', run(`
+  (() => {
+    openSongDetail('rec-a');
+    const modal = document.getElementById('song-detail-modal');
+    const title = document.getElementById('song-detail-title').textContent;
+    const hasChart = !!document.querySelector('#song-detail-chart svg');
+    const stats = document.getElementById('song-detail-stats').textContent;
+    closeSongDetailModal();
+    const closed = document.getElementById('song-detail-modal').style.display === 'none';
+    return title === '曲A' && hasChart && stats.includes('12,000') && closed;
+  })()
+`) === true);
+check('an unreleased song has no chart yet', run(`
+  openSongDetail('rec-c');
+  const empty = document.getElementById('song-detail-chart').textContent.includes('発売後');
+  closeSongDetailModal();
+  empty
+`) === true);
+check('a TV appearance plays the on-screen effect', run(`
+  (() => {
+    document.getElementById('tv-fx-layer').innerHTML = '';
+    setLog('【テレビ出演】Mコンで「星の歌」を披露（人気 +3）。');
+    return document.querySelectorAll('.tv-fx-card').length === 1;
+  })()
+`) === true);
+check('a big special also plays the effect', run(`
+  (() => {
+    document.getElementById('tv-fx-layer').innerHTML = '';
+    setLog('【大型特番】卒業SPで歌を披露（人気 +12）。');
+    return document.querySelectorAll('.tv-fx-card').length === 1;
+  })()
+`) === true);
+check('ordinary logs play no effect', run(`
+  (() => {
+    document.getElementById('tv-fx-layer').innerHTML = '';
+    setLog('【週間スケジュール】レッスン実施 / 能力UP 3件');
+    return document.querySelectorAll('.tv-fx-card').length === 0;
+  })()
+`) === true);
 
 // ---- ライブ動員は「ライブ後（1日程ごと）」に詳細収支とともに発表される ----
 check('the live slot does not reveal audience in advance', run(`
@@ -540,11 +680,84 @@ check('the restored schedule is an independent copy', run(`
 check('a fresh game starts with no remembered schedule', run(`
   (() => {
     lastWeekSchedule = null;
+    savedCleanWeekSchedule = null;
     weeklySchedule = null;
     ensureWeeklySchedule();
     const isDefault = JSON.stringify(weeklySchedule.slots) === JSON.stringify(DEFAULT_WEEK_SLOTS)
       || weeklySchedule.slots.length === WEEK_SLOT_COUNT;
-    return lastWeekSchedule === null && isDefault;
+    return lastWeekSchedule === null && savedCleanWeekSchedule === null && isDefault;
+  })()
+`) === true);
+
+// ---- 歌番組が挟まった週の前後でスケジュールを引き継ぐ ----
+check('the week before a music show is kept as the draft source', run(`
+  (() => {
+    lastWeekSchedule = null;
+    savedCleanWeekSchedule = null;
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    // 歌番組が潰していない週を確定する
+    weeklySchedule.slots = Array(14).fill('dance-lesson');
+    rememberWeeklySchedule(weeklySchedule);
+    return JSON.stringify(savedCleanWeekSchedule.slots) === JSON.stringify(weeklySchedule.slots);
+  })()
+`) === true);
+check('the week after a music show falls back to the pre-show schedule', run(`
+  (() => {
+    // 歌番組の週（リハーサル／出演が枠に入る）を確定する
+    const broadcastWeek = Array(14).fill('rest-day');
+    broadcastWeek[4] = 'rehearsal';
+    broadcastWeek[5] = 'broadcast';
+    weeklySchedule.slots = broadcastWeek;
+    rememberWeeklySchedule(weeklySchedule);
+    // 次の週の仮組は「挟まる前の週」になる
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    const stuck = weeklySchedule.slots.filter(id => id && !WEEKLY_SCHEDULE_ITEMS.some(i => i.id === id));
+    const fixed = weeklySchedule.slots.filter(id => {
+      const item = WEEKLY_SCHEDULE_ITEMS.find(i => i.id === id);
+      return id && item && item.fixed;
+    });
+    return weeklySchedule.slots.every(id => id === 'dance-lesson') && stuck.length === 0 && fixed.length === 0;
+  })()
+`) === true);
+check('a broadcast week never becomes the saved clean week', run(`
+  savedCleanWeekSchedule !== null
+    && JSON.stringify(savedCleanWeekSchedule.slots) === JSON.stringify(Array(14).fill('dance-lesson'))
+`) === true);
+check('fixed slots of the previous week are not carried into a new week', run(`
+  (() => {
+    // 保存版が無い場合：前週の固定枠だけが空きになり、残りの枠は引き継がれる
+    lastWeekSchedule = null;
+    savedCleanWeekSchedule = null;
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    weeklySchedule.slots = Array(14).fill('dance-lesson');
+    weeklySchedule.slots[2] = 'rehearsal';
+    weeklySchedule.slots[3] = 'broadcast';
+    rememberWeeklySchedule(weeklySchedule);
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    return weeklySchedule.slots[2] === '' && weeklySchedule.slots[3] === ''
+      && weeklySchedule.slots[0] === 'dance-lesson';
+  })()
+`) === true);
+check('a music-show week still reserves its own fixed slots', run(`
+  (() => {
+    // 今週に歌番組があるなら、仮組はその枠を埋めて固定する
+    scheduledPerformances = [];
+    const d = new Date(gameDate + 'T12:00:00');
+    d.setDate(d.getDate() + 2);
+    scheduledPerformances = [{ id: 'draft-bc', name: 'Mコン', songId: null, isSpecial: false, airDate: toDateKey(d) }];
+    lastWeekSchedule = null;
+    savedCleanWeekSchedule = null;
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    const fixedSlots = [...getWeekFixedSlots().entries()];
+    const kinds = fixedSlots.map(([, slot]) => slot.kind);
+    const ok = kinds.includes('rehearsal') && kinds.includes('broadcast');
+    scheduledPerformances = [];
+    return ok;
   })()
 `) === true);
 

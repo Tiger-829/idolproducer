@@ -138,7 +138,7 @@ function renderSelectionModal() {
         onclick="toggleSelectionMember(${member.id})">
         <span class="selection-check">${selected ? '✓' : ''}</span>
         <span class="selection-name">${escapeHtml(formatMemberDisplayName(member))}${member.isCenter ? '<i class="selection-crown">C</i>' : ''}</span>
-        <span class="selection-meta">${member.age}歳 / 体力${member.staminaValue}${member.injury ? ` / ${escapeHtml(member.injury.type)}` : ''}</span>
+        <span class="selection-meta">${member.age}歳 / 体力${member.staminaValue}${member.injury ? ` / ${escapeHtml(member.injury.type)} ${escapeHtml(formatInjuryWeeks(member.injury))}` : ''}</span>
         <span class="selection-score" style="color:${rInfo.color};">${overall}</span>
       </button>
     `;

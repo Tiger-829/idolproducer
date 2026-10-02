@@ -156,6 +156,24 @@
   <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
     <h2 class="page-title">最新の記録</h2>
     <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
+    <div id="tv-fx-layer" class="tv-fx-layer" aria-hidden="true"></div>
+
+    <div class="records-block">
+      <div class="records-block-title">CD累積売上の推移 <small>直近1年間</small></div>
+      <div class="records-chart" id="records-sales-chart"></div>
+      <div class="records-chart-note" id="records-sales-note"></div>
+    </div>
+
+    <div class="records-block">
+      <div class="records-block-title">初週売上ランキング <small>自グループの作品</small></div>
+      <div class="records-firstweek" id="records-firstweek-list"></div>
+    </div>
+
+    <div class="records-block">
+      <div class="records-block-title">楽曲一覧 <small>曲名をタップすると発売後1年間の推移</small></div>
+      <div class="records-songs" id="records-song-list"></div>
+    </div>
+
     <div class="records-help">
       <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
       <p class="records-help-note">売上計算や動員ルールなど、ゲームの仕様を確認できます。</p>
@@ -164,6 +182,17 @@
 </div>
 
 <div class="modal-overlay" id="selection-modal"></div>
+
+<!-- 楽曲ごとの発売後1年間の累積売上推移 -->
+<div class="modal-overlay" id="song-detail-modal">
+  <div class="modal-content song-detail-modal-content">
+    <h3 class="page-title" style="margin:0 0 8px;" id="song-detail-title">楽曲</h3>
+    <p style="margin:0 0 10px; font-size:11px; color:#666;" id="song-detail-meta"></p>
+    <div class="song-detail-chart" id="song-detail-chart"></div>
+    <div class="song-detail-stats" id="song-detail-stats"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="closeSongDetailModal()">閉じる</button>
+  </div>
+</div>
 
 <!-- ライブ後の詳細収支（表） -->
 <div class="modal-overlay" id="live-finance-modal">
@@ -293,6 +322,7 @@
 <script src="./js/11-ui-roster.js"></script>
 <script src="./js/12-ui-plan-save.js"></script>
 <script src="./js/13-help.js"></script>
+<script src="./js/14-ui-records.js"></script>
 
 </body>
 </html>
