@@ -282,20 +282,62 @@ function getWeeklyLessonExperience() {
   return Math.round(LESSON_BASE_EXP * lessonMultiplier);
 }
 
+// 特別強化の対象4能力（歌唱・ダンス・体力・回復力）の表示名
+function getSpecialTrainingStatNames() {
+  return SPECIAL_TRAINING_STATS
+    .map(statId => STATUS_KEYS.find(key => key.id === statId)?.name || statId);
+}
+
+// 特別強化の倍率を掛けられる能力か（対象4能力だけ。倍率1なら全部等倍）
+function getSpecialTrainingStatMultiplier(statId, multiplier) {
+  if (!statId || !(multiplier > 1)) return 1;
+  return SPECIAL_TRAINING_STATS.includes(statId) ? multiplier : 1;
+}
+
+// レッスン項目が経験値を配る能力（主効果＋派生）
+function getLessonItemStatIds(item) {
+  return [item.expStat].concat(Object.keys(item.secondaryExp || {})).filter(Boolean);
+}
+
+// 特別強化の倍率が掛かるレッスン項目か（対象4能力を鍛える枠）
+// 休養・食事会・テレビ出演の固定枠・個別レッスンは対象外
+function isSpecialTrainingLessonItem(item) {
+  if (!item || item.rest || item.fixed || item.social || item.individual) return false;
+  return getLessonItemStatIds(item).some(statId => SPECIAL_TRAINING_STATS.includes(statId));
+}
+
+// 特別強化の倍率が掛かるレッスン項目の一覧（UIの補足表示用）
+function getSpecialTrainingLessonItems() {
+  return WEEKLY_SCHEDULE_ITEMS.filter(isSpecialTrainingLessonItem);
+}
+
+// 今週のレッスンに「特別強化の倍率」が掛かる枠があるか
+// 対象4能力を鍛えるレッスンがない週は、強化しても何も得られないため強化扱いしない
+function hasSpecialTrainingLessons() {
+  if (!weeklySchedule || weeklySchedule.vacation) return false;
+  return weeklySchedule.slots.some(slotId =>
+    isSpecialTrainingLessonItem(WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId))
+  );
+}
+
 // 1人のメンバーに週次レッスン効果をかける
+// multiplier は特別強化の倍率。SPECIAL_TRAINING_STATS の能力にだけ掛かる
 function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null) {
   if (!member || member.injury) return { exp: 0, levels: 0 };
   const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId);
   if (!item || item.rest) return { exp: 0, levels: 0 };
 
-  const exp = Math.round(getWeeklyLessonExperience() * multiplier);
-  let levels = 0;
+  const baseExp = getWeeklyLessonExperience();
+  // 能力ごとに倍率を決める（歌唱・ダンス・体力・回復力以外は等倍）
+  const statExp = statId => Math.round(baseExp * getSpecialTrainingStatMultiplier(statId, multiplier));
   const primaryStat = itemId === 'individual-lesson'
     ? (INDIVIDUAL_LESSON_STATS.includes(individualStat) ? individualStat : 'vocal')
     : item.expStat;
+  const exp = primaryStat ? statExp(primaryStat) : 0;
+  let levels = 0;
   if (primaryStat) levels += addMemberStatExp(member, primaryStat, exp);
   Object.entries(item.secondaryExp || {}).forEach(([secondaryStat, ratio]) => {
-    levels += addMemberStatExp(member, secondaryStat, exp * ratio);
+    levels += addMemberStatExp(member, secondaryStat, statExp(secondaryStat) * ratio);
   });
   return { exp, levels };
 }
@@ -358,7 +400,9 @@ function applyWeeklySchedule() {
   const lessonSlotIds = weeklySchedule.slots
     .filter(slotId => slotId && slotId !== 'rest-day' && slotId !== 'meal-party');
   const restSlotCount = weeklySchedule.slots.filter(slotId => slotId === 'rest-day').length;
-  const hasLessons = lessonSlotIds.length > 0;
+  // 特別強化は「対象4能力（歌唱・ダンス・体力・回復力）を鍛えるレッスン」がある週だけ効く
+  const specialTrainingActive = hasSpecialTrainingLessons();
+  const activeFocusMembers = specialTrainingActive ? focusMembers : [];
   // グループ練習のみ項目（連携）の今週の枠数
   const groupOnlySlots = lessonSlotIds.filter(slotId =>
     WEEKLY_SCHEDULE_ITEMS.some(item => item.id === slotId && item.groupOnly)
@@ -390,7 +434,7 @@ function applyWeeklySchedule() {
 
   participants.forEach(member => {
     const isResting = restDayMemberIds.has(member.id);
-    const isFocus = focusIds.has(member.id) && hasLessons;
+    const isFocus = focusIds.has(member.id) && specialTrainingActive;
     let staminaCost = 0;
     let memberLevels = 0;
 
@@ -406,7 +450,7 @@ function applyWeeklySchedule() {
         }
         // グループ練習のみの項目は、参加者2名未満では成立しない（経験値も体力消費も発生しない）
         if (item.groupOnly && !groupOnlyEnabled) return;
-        // グループレッスンは選抜全員が受講。特別強化の対象は強化倍率
+        // グループレッスンは選抜全員が受講。特別強化の対象は対象4能力（歌唱・ダンス・体力・回復力）だけの強化倍率
         const multiplier = isFocus ? specialMultiplier : 1;
         memberLevels += applyMemberLesson(member, slotId, multiplier).levels;
         staminaCost += GROUP_LESSON_STAMINA_COST * item.staminaCost;
@@ -459,9 +503,9 @@ function applyWeeklySchedule() {
   if (breakdown.length) parts.push(`実施: ${breakdown.join(' / ')}`);
   if (restNames.length) parts.push(`休養: ${restNames.join('、')}`);
   if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * MEAL_PARTY_COST)}）`);
-  if (focusMembers.length && hasLessons) {
+  if (activeFocusMembers.length) {
     const rounded = Math.round(specialMultiplier * 10) / 10;
-    parts.push(`特別強化: ${focusMembers.map(member => member.name).join('、')}（${rounded}倍）`);
+    parts.push(`特別強化: ${activeFocusMembers.map(member => member.name).join('、')}（${rounded}倍 / ${getSpecialTrainingStatNames().join('・')}）`);
   }
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
   if (skippedGroupOnly) parts.push('連携: 参加者が2名未満のため未実施');

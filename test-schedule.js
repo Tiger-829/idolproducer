@@ -295,6 +295,149 @@ const duoCoordination = run(`
 `);
 check('連携 works when 2 members attend', duoCoordination === true, String(duoCoordination));
 
+console.log('\n--- 10. 特別強化 multiplies vocal / dance / stamina / recovery only ---');
+// 経験値と体力消費を記録するヘルパー（body の戻り値をそのまま返す）
+const withRecorder = (body) => run(`
+  const __result = (() => {
+    window.__exp = [];
+    window.__stamina = [];
+    const __originalExp = addMemberStatExp;
+    const __originalStamina = consumeMemberStamina;
+    addMemberStatExp = (member, statId, amount) => {
+      window.__exp.push({ id: member.id, statId, amount });
+      return __originalExp(member, statId, amount);
+    };
+    consumeMemberStamina = (member, amount) => {
+      window.__stamina.push({ id: member.id, amount });
+      return __originalStamina(member, amount);
+    };
+    try {
+      return (() => { ${body} })();
+    } finally {
+      addMemberStatExp = __originalExp;
+      consumeMemberStamina = __originalStamina;
+    }
+  })();
+  __result;
+`);
+check('the boost targets are exactly the four stats', run(
+  'JSON.stringify(SPECIAL_TRAINING_STATS) === JSON.stringify(["vocal", "dance", "stamina", "recovery"])'
+) === true);
+check('the multiplier is chosen per stat, not per lesson', run(`
+  (() => {
+    const mult = getSpecialTrainingMultiplier();
+    const boosted = SPECIAL_TRAINING_STATS
+      .every(stat => getSpecialTrainingStatMultiplier(stat, mult) === mult);
+    const plain = STATUS_KEYS.filter(key => !SPECIAL_TRAINING_STATS.includes(key.id))
+      .every(key => getSpecialTrainingStatMultiplier(key.id, mult) === 1);
+    return boosted && plain && getSpecialTrainingStatMultiplier('vocal', 1) === 1;
+  })()
+`) === true);
+check('the schedule panel names the four target stats', run(`
+  (() => {
+    const html = renderWeeklyScheduleControls();
+    return getSpecialTrainingStatNames().every(name => html.includes(name))
+      && html.includes('それ以外の能力は等倍');
+  })()
+`) === true);
+
+const danceWeek = JSON.parse(withRecorder(`
+  advanceOneWeek();
+  const selected = idolRoster.filter(m => m.isSelected && !m.injury);
+  const focus = selected[0];
+  const other = selected[1];
+  weeklySchedule.slots = Array(14).fill('');
+  weeklySchedule.slots[0] = 'dance-lesson';
+  weeklySchedule.restDayMembers = [];
+  weeklySchedule.focusMemberIds = [focus.id];
+  applyWeeklySchedule();
+  return JSON.stringify({
+    mult: getSpecialTrainingMultiplier(),
+    lessonExp: getWeeklyLessonExperience(),
+    exp: window.__exp,
+    focusId: focus.id,
+    otherId: other.id
+  });
+`));
+console.log('  ', `mult ${danceWeek.mult} / lessonExp ${danceWeek.lessonExp} / members ${danceWeek.exp.length}`);
+const gainOf = (exp, memberId, statId) => exp
+  .filter(entry => entry.id === memberId && entry.statId === statId)
+  .reduce((sum, entry) => sum + entry.amount, 0);
+const focusDance = gainOf(danceWeek.exp, danceWeek.focusId, 'dance');
+const otherDance = gainOf(danceWeek.exp, danceWeek.otherId, 'dance');
+const focusStamina = gainOf(danceWeek.exp, danceWeek.focusId, 'stamina');
+const otherStamina = gainOf(danceWeek.exp, danceWeek.otherId, 'stamina');
+const focusAthletics = gainOf(danceWeek.exp, danceWeek.focusId, 'athletics');
+const otherAthletics = gainOf(danceWeek.exp, danceWeek.otherId, 'athletics');
+check('ダンス gets the full multiplier', otherDance > 0
+  && Math.abs(focusDance - otherDance * danceWeek.mult) <= 1,
+  `focus ${focusDance} vs other ${otherDance} (x${danceWeek.mult})`);
+check('体力 (secondary) gets the full multiplier', otherStamina > 0
+  && Math.abs(focusStamina - otherStamina * danceWeek.mult) <= 1,
+  `focus ${focusStamina} vs other ${otherStamina}`);
+check('運動能力 (not a target stat) stays flat', otherAthletics > 0
+  && focusAthletics === otherAthletics,
+  `focus ${focusAthletics} vs other ${otherAthletics}`);
+
+const staminaWeek = JSON.parse(withRecorder(`
+  advanceOneWeek();
+  const selected = idolRoster.filter(m => m.isSelected && !m.injury);
+  const focus = selected[0];
+  weeklySchedule.slots = Array(14).fill('');
+  weeklySchedule.slots[0] = 'endurance-training';
+  weeklySchedule.restDayMembers = [];
+  weeklySchedule.focusMemberIds = [focus.id];
+  applyWeeklySchedule();
+  return JSON.stringify({
+    mult: getSpecialTrainingMultiplier(),
+    lessonExp: getWeeklyLessonExperience(),
+    exp: window.__exp,
+    focusId: focus.id
+  });
+`));
+const focusEndurance = gainOf(staminaWeek.exp, staminaWeek.focusId, 'stamina');
+check('持久力トレーニング stacks the multiplier on 体力', focusEndurance > 0
+  && Math.abs(focusEndurance - Math.round(staminaWeek.lessonExp * staminaWeek.mult)) <= 1,
+  `stamina ${focusEndurance} (x${staminaWeek.mult})`);
+
+// 強化しないレッスンの週には弱化の追加消費も無く、ログも特別強化と出さない
+const runFocusWeek = (slotId) => withRecorder(`
+  advanceOneWeek();
+  const selected = idolRoster.filter(m => m.isSelected && !m.injury);
+  const focus = selected[0];
+  weeklySchedule.slots = Array(14).fill('');
+  weeklySchedule.slots[0] = '${slotId}';
+  weeklySchedule.restDayMembers = [];
+  const pass = withFocus => {
+    weeklySchedule.focusMemberIds = withFocus ? [focus.id] : [];
+    window.__exp = [];
+    window.__stamina = [];
+    applyWeeklySchedule();
+    const sum = list => list.reduce((total, entry) => total + entry.amount, 0);
+    return {
+      academics: sum(window.__exp.filter(e => e.statId === 'academics')),
+      talk: sum(window.__exp.filter(e => e.statId === 'talk')),
+      spent: sum(window.__stamina.filter(e => e.id === focus.id)),
+      log: document.getElementById('log-box').textContent
+    };
+  };
+  return JSON.stringify({ withF: pass(true), withoutF: pass(false) });
+`);
+const literacyWeek = JSON.parse(runFocusWeek('literacy'));
+const danceFocusWeek = JSON.parse(runFocusWeek('dance-lesson'));
+check('学力 / トーク are not multiplied', literacyWeek.withF.academics > 0
+  && literacyWeek.withF.academics === literacyWeek.withoutF.academics
+  && literacyWeek.withF.talk === literacyWeek.withoutF.talk,
+  JSON.stringify(literacyWeek.withF));
+check('a week with no target lesson costs no extra stamina',
+  literacyWeek.withF.spent === literacyWeek.withoutF.spent,
+  `${literacyWeek.withF.spent} vs ${literacyWeek.withoutF.spent}`);
+check('and the log does not claim a special boost', !/特別強化/.test(literacyWeek.withF.log),
+  literacyWeek.withF.log.slice(0, 120));
+check('a target lesson does cost the extra stamina', danceFocusWeek.withF.spent > danceFocusWeek.withoutF.spent
+  && /特別強化/.test(danceFocusWeek.withF.log),
+  `${danceFocusWeek.withF.spent} vs ${danceFocusWeek.withoutF.spent}`);
+
 // ---- ライブ動員は「ライブ後（1日程ごと）」に詳細収支とともに発表される ----
 check('the live slot does not reveal audience in advance', run(`
   const venue = VENUE_DATA.find(v => v.cap === 'B');

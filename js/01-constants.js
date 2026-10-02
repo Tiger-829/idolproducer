@@ -597,7 +597,7 @@ const WEEKLY_SCHEDULE_ITEMS = [
   { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaCost: 1.0 },
   { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaCost: 0.8 },
   { id: 'literacy', name: 'リテラシー講義', expStat: 'academics', secondaryExp: { talk: 0.3 }, staminaCost: 0.7 },
-  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7 },
+  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7, individual: true },
   { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: {}, staminaCost: 1.1, effect: '運動能力' },
   { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: {}, staminaCost: 1.0, effect: '体力' },
   { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaCost: 1.2, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
@@ -633,6 +633,9 @@ const DEFAULT_WEEK_SLOTS = [
 ];
 // 個別レッスンで鍛えられる能力
 const INDIVIDUAL_LESSON_STATS = ['vocal', 'dance', 'talk', 'variety', 'academics', 'stamina', 'recovery', 'athletics', 'sns', 'style', 'crisis'];
+// 特別強化（1名集中）の倍率を掛けられるのはこの4能力だけ（歌唱・ダンス・体力・回復力）
+// ※ 頭脳系（学力・トーク・SNS・バラエティ・危機回避）や運動能力・連携力・スタイルは等倍のまま
+const SPECIAL_TRAINING_STATS = ['vocal', 'dance', 'stamina', 'recovery'];
 // グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
 // 14枠化で1週のレッスン回数が増えたため、1回あたりの経験値は従来の約4割に調整している
 const LESSON_BASE_EXP = 80;

@@ -176,6 +176,7 @@ function renderWeeklyScheduleControls() {
   const focusIds = new Set(weeklySchedule.focusMemberIds || []);
   const focusLimit = getSpecialTrainingTargetLimit();
   const specialMultiplier = getSpecialTrainingMultiplier();
+  const specialStatNames = getSpecialTrainingStatNames();
   const memberOptions = idolRoster
     .filter(member => !member.injury)
     .map(member => `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`)
@@ -256,7 +257,7 @@ function renderWeeklyScheduleControls() {
     return `
       <button type="button" class="rest-toggle focus${isFocus ? ' active' : ''}"
         onclick="toggleFocusMember(${member.id})" ${atLimit ? 'disabled' : ''}
-        title="特別強化（${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍）">
+        title="特別強化（${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍 / ${escapeHtml(specialStatNames.join('・'))}）">
         ${escapeHtml(formatMemberDisplayName(member))} <small>${member.staminaValue}</small>
       </button>
     `;
@@ -322,7 +323,8 @@ function renderWeeklyScheduleControls() {
 
     <div class="schedule-block">
       <div class="schedule-block-title">特別強化 <small>対象にチェック（上限${focusLimit}名）</small></div>
-      <div class="schedule-note">対象にはグループレッスンの <strong>${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍</strong> の経験値を得られます。</div>
+      <div class="schedule-note">対象には <strong>${escapeHtml(specialStatNames.join('・'))}</strong> の経験値がグループレッスンの <strong>${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍</strong> になります。それ以外の能力は等倍のままです。</div>
+      <div class="schedule-note">倍率が掛かるのは${escapeHtml(getSpecialTrainingLessonItems().map(item => item.name).join('・'))}の枠のみ。対象4能力を鍛えるレッスンがない週は、強化しても倍率も体力の追加消費も発生しません。</div>
       <div class="schedule-note">統率力 ${escapeHtml(leadTier.label)}: 連携の効果 / スケジュール管理力 ${escapeHtml(schedTier.label)}: 強化人数 / メンタルケア ${escapeHtml(mentalTier.label)}: 体力消費抑制・回復 / リスクマネジメント ${escapeHtml(riskTier.label)}: 危機回避力の補正</div>
       <div class="rest-toggle-grid">${focusToggles || '<div class="schedule-note">強化できるメンバーがいません。</div>'}</div>
     </div>
