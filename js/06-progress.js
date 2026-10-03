@@ -57,6 +57,21 @@ function findWeekLiveStop(date = getGameDateObject()) {
   return findNextScheduledLiveDate(date, getNextWednesday(date));
 }
 
+// 最も近い開催日に自グループの予定がなく、外部出演だけがある週はスケジュール可能
+function getEditableSpecialLiveEventsForWeek(date = getGameDateObject()) {
+  const stopDate = findWeekLiveStop(date);
+  if (!stopDate) return [];
+  const dateKey = toDateKey(stopDate);
+  const hasGroupLive = getScheduledLiveEntries().some(entry =>
+    !entry.completed && getLiveEntryShowDates(entry).includes(dateKey)
+  );
+  const hasRivalLive = rivalLiveBookings.some(booking =>
+    (booking.venueDates || [booking.liveDate]).includes(dateKey)
+  );
+  if (hasGroupLive || hasRivalLive) return [];
+  return specialLiveEvents.filter(event => !event.completed && event.liveDate === dateKey);
+}
+
 // 指定期間の次に開催されるライブ日を探す（自分のライブ・出演決定済みイベント・競合公演）
 function findNextScheduledLiveDate(startDate, endDate) {
   let nextLiveDate = null;

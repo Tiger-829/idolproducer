@@ -54,31 +54,34 @@ function createEmptyWeeklySchedule() {
 function ensureWeeklySchedule() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = getDraftSourceSchedule() ? createScheduleFromLastWeek() : createEmptyWeeklySchedule();
-    return;
+  } else {
+    // 旧セーブ（可変長の枠）を14枠へ移行する
+    const slots = weeklySchedule.slots.slice(0, WEEK_SLOT_COUNT);
+    while (slots.length < WEEK_SLOT_COUNT) slots.push('');
+    weeklySchedule.slots = slots;
+    weeklySchedule.vacation = Boolean(weeklySchedule.vacation);
+    if (!Array.isArray(weeklySchedule.restDayMembers)) weeklySchedule.restDayMembers = [];
+    if (!Array.isArray(weeklySchedule.autoRestMemberIds)) weeklySchedule.autoRestMemberIds = [];
+    if (!Array.isArray(weeklySchedule.focusMemberIds)) {
+      // 旧セーブ（focusMemberId 単一）を複数人対応へ移行する
+      weeklySchedule.focusMemberIds = weeklySchedule.focusMemberId ? [weeklySchedule.focusMemberId] : [];
+    }
+    delete weeklySchedule.focusMemberId;
+    if (!INDIVIDUAL_LESSON_STATS.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
+    // 事務作業は「未選択 or 定義済みの1件」のみ認める
+    if (!OFFICE_ACTIONS.some(action => action.id === weeklySchedule.officeAction)) weeklySchedule.officeAction = '';
+    // 強化人数の上限はマネージャー側で管理するため、ここではトリムしない
   }
-  // 旧セーブ（可変長の枠）を14枠へ移行する
-  const slots = weeklySchedule.slots.slice(0, WEEK_SLOT_COUNT);
-  while (slots.length < WEEK_SLOT_COUNT) slots.push('');
-  weeklySchedule.slots = slots;
-  weeklySchedule.vacation = Boolean(weeklySchedule.vacation);
-  if (!Array.isArray(weeklySchedule.restDayMembers)) weeklySchedule.restDayMembers = [];
-  if (!Array.isArray(weeklySchedule.autoRestMemberIds)) weeklySchedule.autoRestMemberIds = [];
-  if (!Array.isArray(weeklySchedule.focusMemberIds)) {
-    // 旧セーブ（focusMemberId 単一）を複数人対応へ移行する
-    weeklySchedule.focusMemberIds = weeklySchedule.focusMemberId ? [weeklySchedule.focusMemberId] : [];
-  }
-  delete weeklySchedule.focusMemberId;
-  if (!INDIVIDUAL_LESSON_STATS.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
-  // 事務作業は「未選択 or 定義済みの1件」のみ認める
-  if (!OFFICE_ACTIONS.some(action => action.id === weeklySchedule.officeAction)) weeklySchedule.officeAction = '';
-  // 強化人数の上限はマネージャー側で管理するため、ここではトリムしない
+  getWeekFixedSlots().forEach((slot, index) => {
+    if (index >= 0 && index < WEEK_SLOT_COUNT) weeklySchedule.slots[index] = slot.slotId || slot.kind;
+  });
 }
 
 // 1週間の休暇を切り替える（オンなら14枠すべてが休養になる。テレビ出演枠がある週は不可）
 function toggleWeekVacation() {
   ensureWeeklySchedule();
   if (getWeekFixedSlots().size) {
-    setLog('【週間スケジュール】テレビ出演がある週は1週間の休暇をとれません。');
+    setLog('【週間スケジュール】固定予定がある週は1週間の休暇をとれません。');
     return;
   }
   weeklySchedule.vacation = !weeklySchedule.vacation;
@@ -167,6 +170,41 @@ function getWeekFixedSlots() {
       performanceId: performance.id
     }, performance.airDate);
   });
+  specialLiveEvents.forEach(event => {
+    if (event.completed || !event.liveDate) return;
+    const liveDate = getGameDateObject(event.liveDate);
+    const offsetDays = Math.round((liveDate - startDate) / 86400000);
+    if (offsetDays < 1 || offsetDays > WEEK_DAY_LABELS.length) return;
+    const liveBase = getWeekDayIndexForOffset(offsetDays) * WEEK_PERIOD_LABELS.length;
+    [liveBase - 2, liveBase - 1, liveBase].forEach(index => {
+      addFixed({
+        index,
+        kind: 'rehearsal',
+        slotId: 'rehearsal',
+        label: 'リハーサル',
+        names: [event.name],
+        description: `${event.name}の前日〜当日午前の固定リハーサル`
+      }, event.liveDate);
+    });
+    addFixed({
+      index: liveBase + 1,
+      kind: 'external-live',
+      slotId: 'external-live',
+      label: event.name,
+      names: [event.name],
+      description: `${event.name}の出演枠`
+    }, event.liveDate);
+    [liveBase + 2, liveBase + 3].forEach(index => {
+      addFixed({
+        index,
+        kind: 'rest-day',
+        slotId: 'rest-day',
+        label: '出演翌日・休養',
+        names: [event.name],
+        description: `${event.name}出演翌日の固定休養`
+      }, event.liveDate);
+    });
+  });
   return fixedSlots;
 }
 
@@ -181,7 +219,9 @@ function getWeekBroadcastSummaries() {
 // テレビ出演の枠数（リハーサル／出演の内訳）
 function getWeekBroadcastCounts() {
   const counts = { rehearsal: 0, broadcast: 0 };
-  getWeekFixedSlots().forEach(slot => { counts[slot.kind] += 1; });
+  getWeekFixedSlots().forEach(slot => {
+    if (slot.kind in counts) counts[slot.kind] += 1;
+  });
   return counts;
 }
 
@@ -240,7 +280,7 @@ function createScheduleFromLastWeek() {
   slots.length = WEEK_SLOT_COUNT;
   // 固定枠（リハーサル／テレビ出演）を今週の予定で上書きする
   getWeekFixedSlots().forEach((slot, index) => {
-    if (index >= 0 && index < slots.length) slots[index] = slot.kind;
+    if (index >= 0 && index < slots.length) slots[index] = slot.slotId || slot.kind;
   });
   base.slots = slots;
   base.vacation = source.vacation;
@@ -305,7 +345,10 @@ function toggleRestDayMember(memberId) {
 // その週にグループレッスン（特別強化の対象になるレッスン）が組まれているか
 function hasScheduledLessons() {
   if (!weeklySchedule || weeklySchedule.vacation) return false;
-  return weeklySchedule.slots.some(slotId => slotId && slotId !== 'rest-day' && slotId !== 'meal-party');
+  const fixed = getWeekFixedSlots();
+  return weeklySchedule.slots.some((slotId, index) =>
+    !fixed.has(index) && slotId && slotId !== 'rest-day' && slotId !== 'meal-party'
+  );
 }
 
 // 休養が「1日フル（午前午後とも）＋余り何枠」に分かっているか
@@ -370,7 +413,10 @@ function getWeekMealPartyCount() {
 function getWeekLessonCount() {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return 0;
-  return weeklySchedule.slots.filter(slotId => slotId && slotId !== 'rest-day' && slotId !== 'meal-party').length;
+  const fixed = getWeekFixedSlots();
+  return weeklySchedule.slots.filter((slotId, index) =>
+    !fixed.has(index) && slotId && slotId !== 'rest-day' && slotId !== 'meal-party'
+  ).length;
 }
 
 // グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
@@ -418,6 +464,37 @@ function hasSpecialTrainingLessons() {
   );
 }
 
+// ==========================================
+// 歌番組リハーサル前の準備（裏効果）
+// ==========================================
+// リハーサルの直前の枠（1つ前）が「通し練習」か「連携」なら、
+// その歌番組が楽曲経験値に与える影響が5倍になる（ヘルプには記載しない）
+const MUSIC_PREP_BONUS_MULTIPLIER = 5;
+const MUSIC_PREP_ITEMS = ['full-run-through', 'coordination'];
+
+// 歌番組（・大型特番）のリハーサル直前の枠がリハーサル準備に当たるかを判定する
+// 出演IDごとにリハーサル準備に当たったかどうかを返す
+function collectMusicPreparationFlags() {
+  const flags = {};
+  if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) return flags;
+  getWeekFixedSlots().forEach((slot, index) => {
+    if (slot.kind !== 'rehearsal' || !slot.performanceId) return;
+    const before = index > 0 ? weeklySchedule.slots[index - 1] : '';
+    flags[slot.performanceId] = MUSIC_PREP_ITEMS.includes(before);
+  });
+  return flags;
+}
+
+
+// リハーサル準備に当たった歌番組に「準備済み」フラグを立てる（裏効果の反映）
+function markMusicPreparations() {
+  const flags = collectMusicPreparationFlags();
+  Object.keys(flags).forEach(performanceId => {
+    const performance = scheduledPerformances.find(item => item.id === performanceId);
+    if (performance) performance.prepared = flags[performanceId];
+  });
+}
+
 // 1人のメンバーに週次レッスン効果をかける
 // multiplier は特別強化の倍率。SPECIAL_TRAINING_STATS の能力にだけ掛かる
 // slotEffect は枠の午前／午後による効果（午前は午後枠の8割）
@@ -439,6 +516,11 @@ function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null
     levels += addMemberStatExp(member, secondaryStat, statExp(secondaryStat) * ratio);
   });
   return { exp, levels };
+}
+
+function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
+  if (!item || !Number.isFinite(item.staminaRatio)) return 0;
+  return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
 }
 
 // 週間スケジュールの実行前チェック（食事会の経費など）
@@ -487,12 +569,42 @@ function validateWeeklySchedule() {
 }
 
 // 週間スケジュールを適用する（経験値・体力値の消費／回復・ケガ判定）
+function getAutoRestReleaseSlots(autoRestMemberIds, fixedSlots) {
+  const releaseSlots = new Map();
+  idolRoster.forEach(member => {
+    if (!autoRestMemberIds.has(member.id)) return;
+    let stamina = member.staminaValue ?? MAX_STAMINA_VALUE;
+    if (stamina >= AUTO_REST_STAMINA_TARGET) {
+      releaseSlots.set(member.id, -1);
+      return;
+    }
+    for (let index = 0; index < weeklySchedule.slots.length; index++) {
+      const slotId = weeklySchedule.slots[index];
+      const fixed = fixedSlots.get(index);
+      if ((fixed && fixed.kind === 'rest-day') || (!fixed && slotId === 'rest-day')) {
+        stamina = Math.min(MAX_STAMINA_VALUE, stamina + REST_SLOT_RECOVERY);
+      } else if (!fixed && slotId === 'meal-party') {
+        stamina = Math.min(MAX_STAMINA_VALUE, stamina + MEAL_PARTY_RECOVERY);
+      }
+      if (stamina >= AUTO_REST_STAMINA_TARGET) {
+        releaseSlots.set(member.id, index);
+        return;
+      }
+    }
+    releaseSlots.set(member.id, null);
+  });
+  return releaseSlots;
+}
+
 function applyWeeklySchedule() {
   ensureWeeklySchedule();
   // 練習には選抜外のメンバーも参加する（事務所は所属員全員を育成する）
   const participants = idolRoster;
   const selectedMembers = idolRoster.filter(member => member.isSelected);
-  const restDayMemberIds = new Set(weeklySchedule.restDayMembers || []);
+  const scheduledRestDayMemberIds = new Set(weeklySchedule.restDayMembers || []);
+  const autoRestMemberIds = new Set(weeklySchedule.autoRestMemberIds || []);
+  const manualRestDayMemberIds = new Set([...scheduledRestDayMemberIds]
+    .filter(memberId => !autoRestMemberIds.has(memberId)));
   const individualMember = idolRoster.find(member => member.id === weeklySchedule.individualMemberId);
   const focusIds = new Set(weeklySchedule.focusMemberIds || []);
   const focusMembers = participants.filter(member => focusIds.has(member.id));
@@ -511,13 +623,23 @@ function applyWeeklySchedule() {
   }
 
   // 枠インデックス（午前／午後）を控えておき、午前は午後枠の8割効果にする
+  const fixedSlots = getWeekFixedSlots();
+  const autoRestReleaseSlots = getAutoRestReleaseSlots(autoRestMemberIds, fixedSlots);
+  const releasedAutoRestMemberIds = new Set([...autoRestReleaseSlots.entries()]
+    .filter(([, releaseIndex]) => releaseIndex !== null)
+    .map(([memberId]) => memberId));
+  weeklySchedule.autoRestMemberIds = (weeklySchedule.autoRestMemberIds || [])
+    .filter(memberId => !releasedAutoRestMemberIds.has(memberId));
+  weeklySchedule.restDayMembers = (weeklySchedule.restDayMembers || [])
+    .filter(memberId => !releasedAutoRestMemberIds.has(memberId));
   const lessonSlotIds = weeklySchedule.slots
     .map((slotId, index) => ({
       slotId,
       index,
       slotEffect: getWeekSlotPeriod(index) === 0 ? MORNING_SLOT_MULTIPLIER : 1
     }))
-    .filter(entry => entry.slotId && entry.slotId !== 'rest-day' && entry.slotId !== 'meal-party');
+    .filter(entry => !fixedSlots.has(entry.index)
+      && entry.slotId && entry.slotId !== 'rest-day' && entry.slotId !== 'meal-party');
   const restSlotCount = weeklySchedule.slots.filter(slotId => slotId === 'rest-day').length;
   // 特別強化は「対象4能力（歌唱・ダンス・体力・回復力）を鍛えるレッスン」がある週だけ効く
   const specialTrainingActive = hasSpecialTrainingLessons();
@@ -526,16 +648,16 @@ function applyWeeklySchedule() {
   const groupOnlySlots = lessonSlotIds.filter(entry =>
     WEEKLY_SCHEDULE_ITEMS.some(item => item.id === entry.slotId && item.groupOnly)
   );
-  // テレビ出演で固定された枠（リハーサル／出演）はレッスン経験値ではなく体力消費だけ
-  const broadcastCounts = getWeekBroadcastCounts();
-  const fixedStaminaCost = (broadcastCounts.rehearsal * REHEARSAL_STAMINA_COST)
-    + (broadcastCounts.broadcast * BROADCAST_STAMINA_COST);
   // 連携はグループ練習のみ：実際に参加できるメンバーが2名未満なら成立しない
-  const availableMembers = participants.filter(member =>
-    !restDayMemberIds.has(member.id) && !member.injury
-  );
-  const groupOnlyEnabled = availableMembers.length >= 2;
-  const skippedGroupOnly = groupOnlySlots.length > 0 && !groupOnlyEnabled;
+  const groupOnlyAvailableSlots = new Set(groupOnlySlots
+    .filter(entry => participants.filter(member => {
+      if (manualRestDayMemberIds.has(member.id) || member.injury) return false;
+      if (!autoRestMemberIds.has(member.id)) return true;
+      const releaseIndex = autoRestReleaseSlots.get(member.id);
+      return releaseIndex !== null && releaseIndex <= entry.index;
+    }).length >= 2)
+    .map(entry => entry.index));
+  const skippedGroupOnly = groupOnlySlots.some(entry => !groupOnlyAvailableSlots.has(entry.index));
 
   // 食事会：100万円/回。人気とグループ危機回避力をわずかに伸ばし、体力も回復する
   const mealCount = getWeekMealPartyCount();
@@ -554,35 +676,62 @@ function applyWeeklySchedule() {
     .filter(Boolean);
 
   participants.forEach(member => {
-    const isResting = restDayMemberIds.has(member.id);
+    const isManuallyResting = manualRestDayMemberIds.has(member.id);
+    const autoRestReleaseIndex = autoRestReleaseSlots.get(member.id);
+    const staysAutoResting = autoRestMemberIds.has(member.id) && autoRestReleaseIndex === null;
     const isFocus = focusIds.has(member.id) && specialTrainingActive;
     let staminaCost = 0;
+    let remainingStamina = member.staminaValue ?? MAX_STAMINA_VALUE;
     let memberLevels = 0;
 
-    if (!isResting && !member.injury) {
-      lessonSlotIds.forEach(entry => {
-        const item = WEEKLY_SCHEDULE_ITEMS.find(row => row.id === entry.slotId);
+    if (!isManuallyResting && !member.injury) {
+      weeklySchedule.slots.forEach((slotId, index) => {
+        const fixed = fixedSlots.get(index);
+        if (fixed) {
+          if (fixed.kind === 'rest-day') {
+            remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + REST_SLOT_RECOVERY);
+            return;
+          }
+          if (autoRestMemberIds.has(member.id)
+            && (autoRestReleaseIndex === null || index < autoRestReleaseIndex)) return;
+          const fixedCost = fixed.kind === 'rehearsal'
+            ? REHEARSAL_STAMINA_COST
+            : (fixed.kind === 'broadcast' ? BROADCAST_STAMINA_COST : 0);
+          staminaCost += fixedCost;
+          remainingStamina = Math.max(0, remainingStamina - fixedCost);
+          return;
+        }
+        if (slotId === 'rest-day') {
+          remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + REST_SLOT_RECOVERY);
+          return;
+        }
+        if (slotId === 'meal-party') {
+          remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + MEAL_PARTY_RECOVERY);
+          return;
+        }
+        if (!slotId) return;
+        if (autoRestMemberIds.has(member.id)
+          && (autoRestReleaseIndex === null || index < autoRestReleaseIndex)) return;
+        const item = WEEKLY_SCHEDULE_ITEMS.find(row => row.id === slotId);
         if (!item) return;
-        const slotEffect = entry.slotEffect;
-        if (entry.slotId === 'individual-lesson') {
+        const slotEffect = getWeekSlotPeriod(index) === 0 ? MORNING_SLOT_MULTIPLIER : 1;
+        if (slotId === 'individual-lesson') {
           if (member.id !== individualMember?.id) return;
-          memberLevels += applyMemberLesson(member, entry.slotId, 1, weeklySchedule.individualStat, slotEffect).levels;
-          staminaCost += INDIVIDUAL_LESSON_STAMINA_COST * item.staminaCost * slotEffect;
+          memberLevels += applyMemberLesson(member, slotId, 1, weeklySchedule.individualStat, slotEffect).levels;
+          const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
+          staminaCost += cost;
+          remainingStamina = Math.max(0, remainingStamina - cost);
           return;
         }
         // グループ練習のみの項目は、参加者2名未満では成立しない（経験値も体力消費も発生しない）
-        if (item.groupOnly && !groupOnlyEnabled) return;
+        if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
         // グループレッスンは全員が受講。特別強化の対象は対象4能力（歌唱・ダンス・体力・回復力）だけの強化倍率
         const multiplier = isFocus ? specialMultiplier : 1;
-        memberLevels += applyMemberLesson(member, entry.slotId, multiplier, null, slotEffect).levels;
-        // リテラシー講義は「残体力の5%」だけを消費する
-        const cost = item.staminaRatio
-          ? Math.max(1, Math.round((member.staminaValue ?? MAX_STAMINA_VALUE) * item.staminaRatio))
-          : GROUP_LESSON_STAMINA_COST * item.staminaCost * slotEffect;
+        memberLevels += applyMemberLesson(member, slotId, multiplier, null, slotEffect).levels;
+        const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
         staminaCost += cost;
+        remainingStamina = Math.max(0, remainingStamina - cost);
       });
-      // テレビ出演枠（リハーサル＋出演）でも体力を消費する
-      staminaCost += fixedStaminaCost;
       // 特別強化の追加消費は「1週間あたり1回」だけ加算する（14枠化で高額になりすぎないように）
       if (isFocus) {
         // メンタルケアで特別強化時の追加消費を抑える
@@ -601,6 +750,7 @@ function applyWeeklySchedule() {
     }
 
     // 体力値の自然回復（休養を指示されたメンバーは大きな倍率、ケガ中は追加回復）
+    const isResting = isManuallyResting || staysAutoResting;
     let recovery = getMemberWeeklyRecovery(member, isResting);
     // 休養枠と食事会による追加回復
     recovery += restSlotCount * REST_SLOT_RECOVERY;
@@ -611,16 +761,17 @@ function applyWeeklySchedule() {
 
   // 内訳（レッスン種別ごとの枠数）
   const countByLabel = new Map();
-  weeklySchedule.slots.forEach(slotId => {
+  weeklySchedule.slots.forEach((slotId, index) => {
     if (!slotId) return;
+    if (fixedSlots.has(index)) return;
     const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId);
     // 参加者が揃わず未実施になったグループ練習（連携）は内訳に含めない
-    if (item && item.groupOnly && skippedGroupOnly) return;
+    if (item && item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
     const label = itemIdLabel(slotId);
     countByLabel.set(label, (countByLabel.get(label) || 0) + 1);
   });
   // テレビ出演で固定された枠も内訳に含める
-  getWeekFixedSlots().forEach(slot => {
+  fixedSlots.forEach(slot => {
     countByLabel.set(slot.label, (countByLabel.get(slot.label) || 0) + 1);
   });
 
@@ -785,10 +936,12 @@ function applyOfficeAction(actionId) {
 
 // 週間スケジュールを確定して1週間進める
 function confirmWeeklySchedule() {
-  if (hasLiveWithinWeek()) return;
+  if (hasLiveWithinWeek() && !getEditableSpecialLiveEventsForWeek().length) return;
   if (!validateWeeklySchedule()) return;
   // 確定した内容は次週の初期値として覚えておく
   rememberWeeklySchedule(weeklySchedule);
+  // リハーサル直前の枠が通し練習/連携なら歌番組に「準備済み」を立てる
+  markMusicPreparations();
   applyWeeklySchedule();
   advanceOneWeek();
 }

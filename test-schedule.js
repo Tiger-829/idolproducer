@@ -85,17 +85,18 @@ const coexist = run(`
   const promoBefore = nextLivePromotionPoints;
   const goodsBefore = merchandiseProducts;
   const fundsBefore = funds;
-  const staminaBefore2 = idolRoster.filter(m => m.isSelected).map(m => m.staminaValue);
   // 週間スケジュールを適用した直後のログ（週を進める前に読む）
   applyWeeklySchedule();
   const log = document.getElementById('log-box').textContent;
   const fundsAfterSchedule = funds;
+  // 訓練＝ログにレッスン等が入っていること（能力UPの発生は確率的なため判定に使わない）
+  const trained = /(レッスン|練習|連携|トレーニング|講義)/.test(log);
   advanceOneWeek();
   JSON.stringify({
     promo: nextLivePromotionPoints - promoBefore,
     goods: merchandiseProducts - goodsBefore,
     fundsPaid: fundsBefore - fundsAfterSchedule,
-    trained: idolRoster.filter(m => m.isSelected).some((m, i) => m.staminaValue < staminaBefore2[i]),
+    trained,
     log,
     date: gameDate
   })
@@ -106,7 +107,7 @@ check('members still train in the office-work week', coexistResult.trained === t
 check('the office task is executed in the same week', coexistResult.goods === 1 && coexistResult.fundsPaid === 500000,
   JSON.stringify({ goods: coexistResult.goods, fundsPaid: coexistResult.fundsPaid }));
 check('the weekly log contains both training and office work',
-  /能力UP/.test(coexistResult.log) && /事務作業/.test(coexistResult.log), coexistResult.log.slice(0, 200));
+  /(レッスン|練習|連携|トレーニング|講義)/.test(coexistResult.log) && /事務作業/.test(coexistResult.log), coexistResult.log.slice(0, 200));
 check('live promotion can be combined with lessons too', run(`
   selectOfficeAction('live-promotion');
   const promoBefore2 = nextLivePromotionPoints;
@@ -133,6 +134,27 @@ run('advanceOneWeek();');
 check('broadcast is processed when the week is skipped', run('scheduledPerformances.length') === 0);
 const logs = run('document.getElementById("log-box").textContent');
 check('broadcast log appears', logs.includes('Song Station'), logs.slice(0, 200));
+console.log('\n--- 3c. External live events allow scheduling with fixed slots ---');
+run(`
+  const d = new Date(gameDate + 'T12:00:00'); d.setDate(d.getDate() + 3);
+  specialLiveEvents = [{
+    id: 'test-festival', type: 'festival', name: 'テストフェス',
+    venue: VENUE_DATA[0].name, liveDate: toDateKey(d), completed: false
+  }];
+`);
+  run('renderWeeklyActionPanel();');
+  const externalLivePanel = run('document.getElementById("weekly-action-panel").innerHTML');
+  const externalFixedSlots = JSON.parse(run('JSON.stringify([...getWeekFixedSlots().entries()].map(([index, slot]) => ({ index, kind: slot.kind, slotId: slot.slotId })))'));
+  const eventDayBase = run('getWeekDayIndexForOffset(3) * WEEK_PERIOD_LABELS.length');
+  check('external live week exposes the schedule editor', externalLivePanel.includes('confirmWeeklySchedule()') && !externalLivePanel.includes('イベントまで進行'));
+  check('the prior day and event morning are rehearsal slots', [eventDayBase - 2, eventDayBase - 1, eventDayBase].every(index =>
+    externalFixedSlots.some(slot => slot.index === index && slot.kind === 'rehearsal')));
+  check('the event afternoon is fixed', externalFixedSlots.some(slot => slot.index === eventDayBase + 1 && slot.slotId === 'external-live'));
+  check('the following day is fixed as a full rest day', [eventDayBase + 2, eventDayBase + 3].every(index =>
+    externalFixedSlots.some(slot => slot.index === index && slot.slotId === 'rest-day')));
+  run('setWeeklyScheduleSlot(8, "rest-day"); confirmWeeklySchedule();');
+  check('the editable external live schedule advances to its event date', run('specialLiveEvents[0].completed') === true);
+  check('the external live appears in the log', run('document.getElementById("log-box").textContent.includes("テストフェス")') === true);
 console.log('\n--- 4. Live weeks still block the weekly schedule ---');
 run(`
   const d = new Date(gameDate + 'T12:00:00'); d.setDate(d.getDate() + 2);
@@ -146,6 +168,7 @@ check('a week with a live is detected', run('hasLiveWithinWeek()') === true);
 run('renderWeeklyActionPanel();');
 const livePanel = run('document.getElementById("weekly-action-panel").innerHTML');
 check('live week shows the live-week screen', livePanel.includes('イベントまで進行') && !livePanel.includes('confirmWeeklySchedule()'));
+check('live-week message shows a valid date and its venue', !livePanel.includes('Invalid Date') && livePanel.includes('公演: 原宿体育館'));
 const dateBeforeConfirm = run('gameDate');
 run('confirmWeeklySchedule();');
 check('confirmWeeklySchedule does nothing on a live week', run('gameDate') === dateBeforeConfirm);
@@ -333,6 +356,126 @@ const withRecorder = (body) => run(`
   })();
   __result;
 `);
+console.log('\n--- Auto-rest members return after reaching the stamina target ---');
+const autoRestReturn = JSON.parse(withRecorder(`
+  const savedSchedule = weeklySchedule;
+  const savedPerformances = scheduledPerformances;
+  const savedSpecialLives = specialLiveEvents;
+  const savedRecoveryDone = weeklyRecoveryDone;
+  const savedLogHistory = logHistory.slice();
+  const savedLog = document.getElementById('log-box').textContent;
+  const savedMembers = idolRoster.map(member => ({
+    id: member.id,
+    staminaValue: member.staminaValue,
+    injury: member.injury,
+    stats: { ...member.stats },
+    statExp: { ...member.statExp }
+  }));
+  try {
+    const target = idolRoster.find(member => !member.injury);
+    scheduledPerformances = [];
+    specialLiveEvents = [];
+    weeklySchedule = cloneWeeklySchedule(weeklySchedule);
+    weeklySchedule.slots = Array(WEEK_SLOT_COUNT).fill('');
+    weeklySchedule.slots[0] = 'rest-day';
+    weeklySchedule.slots[1] = 'dance-lesson';
+    weeklySchedule.restDayMembers = [target.id];
+    weeklySchedule.autoRestMemberIds = [target.id];
+    weeklySchedule.focusMemberIds = [];
+    target.staminaValue = AUTO_REST_STAMINA_TARGET - 5;
+    window.__stamina = [];
+    applyWeeklySchedule();
+    return JSON.stringify({
+      spent: window.__stamina.find(entry => entry.id === target.id)?.amount || 0,
+      autoResting: weeklySchedule.autoRestMemberIds.includes(target.id),
+      listedAsResting: weeklySchedule.restDayMembers.includes(target.id)
+    });
+  } finally {
+    weeklySchedule = savedSchedule;
+    scheduledPerformances = savedPerformances;
+    specialLiveEvents = savedSpecialLives;
+    weeklyRecoveryDone = savedRecoveryDone;
+    logHistory = savedLogHistory;
+    document.getElementById('log-box').textContent = savedLog;
+    savedMembers.forEach(saved => {
+      const member = idolRoster.find(entry => entry.id === saved.id);
+      member.staminaValue = saved.staminaValue;
+      member.injury = saved.injury;
+      member.stats = saved.stats;
+      member.statExp = saved.statExp;
+    });
+  }
+`));
+check('a member resumes training after a scheduled rest slot reaches 80', autoRestReturn.spent > 0
+  && autoRestReturn.autoResting === false && autoRestReturn.listedAsResting === false, JSON.stringify(autoRestReturn));
+console.log('\n--- 9. Lesson fatigue uses the stamina before each session ---');
+const expectedFatigueRatios = {
+  'full-run-through': 0.70,
+  coordination: 0.65,
+  'individual-lesson': 0.60,
+  'dance-lesson': 0.45,
+  'vocal-lesson': 0.40,
+  'strength-training': 0.15,
+  'endurance-training': 0.15,
+  literacy: 0.05
+};
+check('lesson menus use the requested fatigue percentages', run(`
+  (() => {
+    const expected = ${JSON.stringify(expectedFatigueRatios)};
+    return Object.entries(expected).every(([id, ratio]) =>
+      WEEKLY_SCHEDULE_ITEMS.find(item => item.id === id)?.staminaRatio === ratio);
+  })()
+`) === true);
+const repeatedDanceCost = JSON.parse(run(`
+  (() => {
+    const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === 'dance-lesson');
+    const first = getLessonStaminaCost(item, 100);
+    const second = getLessonStaminaCost(item, 100 - first);
+    return JSON.stringify([first, second]);
+  })()
+`));
+check('a later session uses the stamina left by earlier sessions',
+  repeatedDanceCost[0] === 45 && repeatedDanceCost[1] === 25, JSON.stringify(repeatedDanceCost));
+check('morning fatigue applies the morning slot factor',
+  run(`getLessonStaminaCost(WEEKLY_SCHEDULE_ITEMS.find(item => item.id === 'dance-lesson'), 100, MORNING_SLOT_MULTIPLIER)`) === 36);
+check('the schedule panel explains the fatigue basis',
+  run('renderWeeklyScheduleControls()').includes('疲労 70%（実行直前の体力）'));
+const repeatedDanceSpend = JSON.parse(withRecorder(`
+  const savedSchedule = weeklySchedule;
+  const savedPerformances = scheduledPerformances;
+  const savedSpecialLives = specialLiveEvents;
+  const savedMembers = idolRoster.map(member => ({
+    id: member.id,
+    staminaValue: member.staminaValue,
+    injury: member.injury
+  }));
+  try {
+    const target = idolRoster.find(member => !member.injury);
+    scheduledPerformances = [];
+    specialLiveEvents = [];
+    weeklySchedule = cloneWeeklySchedule(weeklySchedule);
+    weeklySchedule.slots = Array(WEEK_SLOT_COUNT).fill('');
+    weeklySchedule.slots[1] = 'dance-lesson';
+    weeklySchedule.slots[3] = 'dance-lesson';
+    weeklySchedule.restDayMembers = [];
+    weeklySchedule.focusMemberIds = [];
+    target.staminaValue = 100;
+    window.__stamina = [];
+    applyWeeklySchedule();
+    return JSON.stringify(window.__stamina.find(entry => entry.id === target.id)?.amount);
+  } finally {
+    weeklySchedule = savedSchedule;
+    scheduledPerformances = savedPerformances;
+    specialLiveEvents = savedSpecialLives;
+    savedMembers.forEach(saved => {
+      const member = idolRoster.find(entry => entry.id === saved.id);
+      member.staminaValue = saved.staminaValue;
+      member.injury = saved.injury;
+    });
+  }
+`));
+check('weekly execution charges two dance sessions from sequential remaining stamina', repeatedDanceSpend === 70,
+  String(repeatedDanceSpend));
 check('the boost targets are exactly the four stats', run(
   'JSON.stringify(SPECIAL_TRAINING_STATS) === JSON.stringify(["vocal", "dance", "stamina", "recovery"])'
 ) === true);
@@ -378,10 +521,13 @@ const danceWeek = JSON.parse(withRecorder(`
   const selected = idolRoster.filter(m => m.isSelected && !m.injury);
   const focus = selected[0];
   const other = selected[1];
+  focus.staminaValue = 100;
+  other.staminaValue = 100;
   weeklySchedule.slots = Array(14).fill('');
   // 枠1（午後）を使う。午前枠は午後枠の8割のため、倍率の検証には午後を使う
   weeklySchedule.slots[1] = 'dance-lesson';
   weeklySchedule.restDayMembers = [];
+  weeklySchedule.autoRestMemberIds = [];
   weeklySchedule.focusMemberIds = [focus.id];
   // ライブ経験値が混ざらないよう、直前まで破棄してから計測する
   window.__exp = [];
@@ -419,9 +565,11 @@ const individualWeek = JSON.parse(withRecorder(`
   advanceOneWeek();
   const selected = idolRoster.filter(m => m.isSelected && !m.injury);
   const target = selected[0];
+  target.staminaValue = 100;
   weeklySchedule.slots = Array(14).fill('');
   weeklySchedule.slots[0] = 'individual-lesson';
   weeklySchedule.restDayMembers = [];
+  weeklySchedule.autoRestMemberIds = [];
   weeklySchedule.focusMemberIds = [];
   weeklySchedule.individualMemberId = target.id;
   weeklySchedule.individualStat = 'recovery';
@@ -445,9 +593,11 @@ const staminaWeek = JSON.parse(withRecorder(`
   advanceOneWeek();
   const selected = idolRoster.filter(m => m.isSelected && !m.injury);
   const focus = selected[0];
+  focus.staminaValue = 100;
   weeklySchedule.slots = Array(14).fill('');
   weeklySchedule.slots[1] = 'endurance-training';
   weeklySchedule.restDayMembers = [];
+  weeklySchedule.autoRestMemberIds = [];
   weeklySchedule.focusMemberIds = [focus.id];
   window.__exp = [];
   window.__stamina = [];
@@ -469,9 +619,11 @@ const runFocusWeek = (slotId) => withRecorder(`
   advanceOneWeek();
   const selected = idolRoster.filter(m => m.isSelected && !m.injury);
   const focus = selected[0];
+  focus.staminaValue = 100;
   weeklySchedule.slots = Array(14).fill('');
   weeklySchedule.slots[0] = '${slotId}';
   weeklySchedule.restDayMembers = [];
+  weeklySchedule.autoRestMemberIds = [];
   const pass = withFocus => {
     weeklySchedule.focusMemberIds = withFocus ? [focus.id] : [];
     window.__exp = [];
@@ -592,7 +744,6 @@ check('ordinary logs play no effect', run(`
 const DRAFT_SKIP_ROULETTE = 'draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = "picking"; renderDraftPickStep();';
 check('rival picks are recorded in the pick history', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     ${DRAFT_SKIP_ROULETTE}
     draftState.round = 2;
@@ -608,13 +759,11 @@ check('rival picks are recorded in the pick history', run(`
       && round2Rivals === rivalTeams
       && rows === Math.min(12, log.length)
       && rivals.every(e => e.memberName);
-    closeDraftModal();
     return ok;
   })()
 `) === true);
 check('the history records the player and the lottery result too', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -634,13 +783,11 @@ check('the history records the player and the lottery result too', run(`
     const ok = viaLottery.length === 1
       && viaLottery[0].teamName === winnerName
       && mine.length === (winner.isPlayer ? 1 : 0);
-    closeDraftModal();
     return ok;
   })()
 `) === true);
 check('losing the lottery keeps the same pick slot', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -658,14 +805,12 @@ check('losing the lottery keeps the same pick slot', run(`
     const canPickAgain = draftState.phase === 'picking'
       && document.querySelectorAll('.draft-candidate').length > 0;
     const explained = document.querySelector('.draft-status').textContent.includes('\u304f\u3058\u843d\u9078');
-    closeDraftModal();
     return !winnerIsPlayer && sameRound && canPickAgain && explained
       && draftState === null || (!winnerIsPlayer && sameRound && canPickAgain && explained);
   })()
 `) === true);
 check('winning the lottery still advances to the next round', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -679,7 +824,6 @@ check('winning the lottery still advances to the next round', run(`
     Math.random = original;
     const advanced = draftState.round === 2;
     const signed = draftState.acquired.length === 1;
-    closeDraftModal();
     return advanced && signed;
   })()
 `) === true);
@@ -740,7 +884,6 @@ check('sorting keeps the pool order so picks still target the right member', run
 `) === true);
 check('the acquired list starts empty and fills after each pick', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const empty = document.querySelector('.draft-acquired-list').classList.contains('is-empty');
@@ -748,7 +891,6 @@ check('the acquired list starts empty and fills after each pick', run(`
     resolveDraftPick(0);
     const tags = document.querySelectorAll('.draft-acquired-tags span').length;
     const head = document.querySelector('.draft-acquired-head').textContent;
-    closeDraftModal();
     return empty && tags === 1 && head.includes('1');
   })()
 `) === true);
@@ -788,7 +930,6 @@ check('the candidate list can be paged', run(`
 `) === true);
 check('the draft ends after any number of picks', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 2;
@@ -797,13 +938,11 @@ check('the draft ends after any number of picks', run(`
     const stillPicking = draftState.phase === 'picking';
     finishDraft();
     const doneText = document.getElementById('draft-intro').textContent;
-    closeDraftModal();
     return afterOne === 1 && stillPicking && doneText.includes('1名');
   })()
 `) === true);
 check('the lottery order starts from this round team', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const order = buildDraftLotteryOrder();
@@ -814,7 +953,6 @@ check('the lottery order starts from this round team', run(`
 `) === true);
 check('a conflict opens the lottery and the player draws a chosen ticket', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     // 1巡目の回転パネル → くじを引く（重複を確実にする）
     const originalRandom = Math.random;
@@ -833,13 +971,11 @@ check('a conflict opens the lottery and the player draws a chosen ticket', run(`
     const decided = draftState.lottery.done && !!draftState.lottery.winner;
     const winnerRow = !!document.querySelector('.draft-lottery-row.is-winner');
     resolveDraftLottery();
-    closeDraftModal();
     return enteredLottery && rows > 0 && buttons > 0 && turnShown && decided && winnerRow;
   })()
 `) === true);
 check('round 1 confirms every rival pick before the roulette', run(`
   (() => {
-    closeDraftModal();
     openDraftPractice();
     const phase = draftState.phase;
     const rivalTeams = draftState.pickOrder.filter(t => !t.isPlayer).length;
@@ -847,7 +983,6 @@ check('round 1 confirms every rival pick before the roulette', run(`
     const chips = document.querySelectorAll('.draft-roulette-chip').length;
     const teamCount = draftState.pickOrder.length;
     const revealed = !!document.querySelector('.draft-reveal-name');
-    closeDraftModal();
     return phase === 'roulette' && round1 === rivalTeams && chips === teamCount && revealed;
   })()
 `) === true);
@@ -886,7 +1021,6 @@ check('the draft practice never touches the real roster or league', run(`
       else break;
     }
     const acquired = draftState ? draftState.acquired.length : 0;
-    closeDraftModal();
     return acquired > 0
       && idolRoster.length === rosterBefore
       && leagueTeams.length === leagueBefore
@@ -1133,6 +1267,73 @@ check('a broadcast lands on the afternoon of its actual air date', run(`
   })()
 `) === true);
 
+// ---- 歌番組リハーサル前の準備（裏効果：通し練習/連携なら楽曲経験値が5倍） ----
+const musicPrep = JSON.parse(run(`
+  (() => {
+    const out = {};
+    ['dance-lesson', 'full-run-through', 'coordination'].forEach(prep => {
+      const air = new Date(gameDate + 'T12:00:00');
+      air.setDate(air.getDate() + 5);
+      const song = ensureScheduledSong(1, 2, productionSchedule['1-2']);
+      scheduledPerformances = [{ id: 'prep-' + prep, name: 'CTV', isSpecial: false, songId: song.id, airDate: toDateKey(air) }];
+      ensureWeeklySchedule();
+      weeklySchedule.slots = DEFAULT_WEEK_SLOTS.slice();
+      const rehearsalIndex = [...getWeekFixedSlots().entries()].find(([, s]) => s.kind === 'rehearsal')[0];
+      weeklySchedule.slots[rehearsalIndex - 1] = prep;
+      markMusicPreparations();
+      const before = song.experience || 0;
+      processScheduledPerformances(toDateKey(air));
+      out[prep] = (song.experience || 0) - before;
+    });
+    scheduledPerformances = [];
+    return JSON.stringify({ out, base: REGULAR_PROGRAM_SONG_EXPERIENCE, times: MUSIC_PREP_BONUS_MULTIPLIER });
+  })()
+`));
+check('a full run-through or coordination before the rehearsal multiplies the song experience by five',
+  musicPrep.out['full-run-through'] === musicPrep.base * musicPrep.times
+  && musicPrep.out.coordination === musicPrep.base * musicPrep.times,
+  JSON.stringify(musicPrep.out));
+check('any other lesson in that slot keeps the normal experience',
+  musicPrep.out['dance-lesson'] === musicPrep.base,
+  `${musicPrep.out['dance-lesson']} vs ${musicPrep.base}`);
+check('the hidden bonus is not documented in the help', run(`
+  !/リハーサル[^。]*5倍/.test(renderHelpContent())
+`) === true);
+
+// ---- 選抜画面の並び替え（6項目） ----
+check('the selection screen offers six sort criteria', run(`
+  (() => {
+    pendingSelectionEvent = null;
+    openSelectionSetup();
+    const names = [...document.querySelectorAll('#selection-modal .draft-sort-btn')]
+      .map(b => b.textContent.replace(/（.*/, ''));
+    const ok = names.length === 6
+      && ['総評', 'アイドル力', '身長', '年齢', '歌唱力', 'ダンス'].every(n => names.includes(n));
+    cancelSelection();
+    return ok;
+  })()
+`) === true);
+check('each selection sort criterion orders the list both ways', run(`
+  (() => {
+    pendingSelectionEvent = null;
+    openSelectionSetup();
+    const results = {};
+    SELECTION_SORT_KEYS.forEach(key => {
+      const readValues = () => [...document.querySelectorAll('#selection-modal .selection-member')]
+        .map(el => key.get(idolRoster.find(m => m.id === Number(el.dataset.memberId))));
+      setSelectionSort(key.id);
+      const desc = readValues();
+      setSelectionSort(key.id);
+      const asc = readValues();
+      results[key.id] = desc.every((v, i) => i === 0 || desc[i - 1] >= v)
+        && asc.every((v, i) => i === 0 || asc[i - 1] <= v);
+    });
+    cancelSelection();
+    return Object.values(results).every(Boolean);
+  })()
+`) === true);
+
+// ---- 結果表示 ----
 console.log('\n================ RESULT ================');
 const failed = results.filter(r => !r.ok);
 console.log(`PASS ${results.length - failed.length} / ${results.length}`);

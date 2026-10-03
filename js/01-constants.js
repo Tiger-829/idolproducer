@@ -612,23 +612,22 @@ const FULL_RUN_THROUGH_WEEKLY_LIMIT = 2;
 // 午前枠は午後枠の8割（体力回復量・レッスン効果のどちらも）
 const MORNING_SLOT_MULTIPLIER = 0.8;
 
-// 1枠あたりの体力消費の基準値
+// 練習1枠ごとの体力消費率（実行直前の残体力に対する割合）
 // 消費量は「通し >= 連携 > 個別 > ダンス > 歌唱 >> 筋力 >= 持久力 >>> リテラシー」
-// リテラシーだけは「残体力の5%」を動的が決める
 
 const WEEKLY_SCHEDULE_ITEMS = [
-  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaCost: 1.0, effect: 'ダンス（＋運動能力・体力）' },
-  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaCost: 0.8, effect: '歌唱力（＋体力）' },
-  { id: 'literacy', name: 'リテラシー講義', expStat: 'crisis', secondaryExp: { sns: 1.0 }, staminaCost: 0, staminaRatio: 0.05, effect: '危機回避力・SNS運用' },
-  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7, individual: true, effect: '対象1名を集中育成' },
-  { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: { recovery: 0.5 }, staminaCost: 0.45, effect: '運動能力（＋回復力）' },
-  { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: { recovery: 0.5 }, staminaCost: 0.45, effect: '体力（＋回復力）' },
-  { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaCost: 1.2, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
-  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaCost: 1.1, groupOnly: true, effect: '連携力' },
-  { id: 'meal-party', name: '食事会', social: true, cost: 1000000, staminaCost: 0 },
-  { id: 'rest-day', name: '休養', rest: true, staminaCost: 0 },
-  // テレビ出演（歌番組など）の放送日午前に固定される枠。プルダウンからは選べない
-  { id: 'rehearsal', name: 'リハーサル', fixed: true, staminaCost: 0 }
+  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaRatio: 0.45, effect: 'ダンス（＋運動能力・体力）' },
+  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaRatio: 0.40, effect: '歌唱力（＋体力）' },
+  { id: 'literacy', name: 'リテラシー講義', expStat: 'crisis', secondaryExp: { sns: 1.0 }, staminaRatio: 0.05, effect: '危機回避力・SNS運用' },
+  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaRatio: 0.60, individual: true, effect: '対象1名を集中育成' },
+  { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: { recovery: 0.5 }, staminaRatio: 0.15, effect: '運動能力（＋回復力）' },
+  { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: { recovery: 0.5 }, staminaRatio: 0.15, effect: '体力（＋回復力）' },
+  { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaRatio: 0.70, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
+  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaRatio: 0.65, groupOnly: true, effect: '連携力' },
+  { id: 'meal-party', name: '食事会', social: true, cost: 1000000 },
+  { id: 'rest-day', name: '休養', rest: true },
+  // テレビ出演・外部ライブの固定リハーサル枠。プルダウンからは選べない
+  { id: 'rehearsal', name: 'リハーサル', fixed: true }
 ];
 // 食事会（社会性イベント。1回あたり100万円）
 const MEAL_PARTY_COST = 1000000;
@@ -706,10 +705,6 @@ const INJURY_ILLNESS_WEEKS = 1;
 const INJURY_ACCIDENT_WEEKS_RANGE = [2, 3];
 // ケガと体調不良の確率比（ケガを選ぶ確率）
 const INJURY_ACCIDENT_RATE = 0.5;
-// 14枠化に伴う体力消費の再調整（1枠あたりの基準消費）
-// 項目ごとの差分は WEEKLY_SCHEDULE_ITEMS の staminaCost で表す
-const GROUP_LESSON_STAMINA_COST = 6;
-const INDIVIDUAL_LESSON_STAMINA_COST = 8;
 // テレビ出演で固定される枠の体力消費（リハーサル1回／出演1回あたり）
 const REHEARSAL_STAMINA_COST = 4;
 const BROADCAST_STAMINA_COST = 3;

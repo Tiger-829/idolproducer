@@ -137,12 +137,14 @@ function renderWeeklyActionPanel() {
 
   // ライブがある週だけ週間スケジュールは組めない
   const nextLiveDate = findWeekLiveStop(currentDate);
-  if (nextLiveDate) {
-    const liveDate = getGameDateObject(nextLiveDate);
+  const editableSpecialLiveEvents = getEditableSpecialLiveEventsForWeek(currentDate);
+  if (nextLiveDate && !editableSpecialLiveEvents.length) {
+    const liveDateKey = toDateKey(nextLiveDate);
+    const liveDate = getGameDateObject(liveDateKey);
     const liveLabel = liveDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
     // ライブの内容を具体的に伝える（会場・公演日）
     const liveEntries = getScheduledLiveEntries().filter(entry =>
-      !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === nextLiveDate
+      !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === liveDateKey
     );
     const liveDetail = liveEntries.length
       ? liveEntries.map(entry => {
@@ -165,6 +167,10 @@ function renderWeeklyActionPanel() {
 
   // ライブ以外は週間スケジュールを組める（今週のイベントは注記として表示する）
   const notes = getWeeklyEventNoteEvents(events);
+  const externalLiveNotes = editableSpecialLiveEvents.map(event =>
+    `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
+  );
+  notes.push(...externalLiveNotes);
   panel.innerHTML = `
     <h2 class="page-title">今週のスケジュール</h2>
     ${notes.length
@@ -240,7 +246,7 @@ function renderWeeklyScheduleControls() {
         <div class="week-cell is-fixed">
           <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
           <select aria-label="${escapeHtml(dayLabel)}曜${escapeHtml(periodLabel)}の予定" disabled
-            title="テレビ出演で固定された枠です">${`<option value="" selected>${escapeHtml(fixed.label)}</option>`}</select>
+            title="${escapeHtml(fixed.description || 'テレビ出演で固定された枠です')}">${`<option value="" selected>${escapeHtml(fixed.label)}</option>`}</select>
         </div>`;
       }
       return `
@@ -329,7 +335,10 @@ function renderWeeklyScheduleControls() {
       const atLimit = item.weeklyLimit && used >= item.weeklyLimit;
       const limitText = item.weeklyLimit ? ` / 1週間${item.weeklyLimit}枠まで（現在${used}枠）` : '';
       const groupText = item.groupOnly ? '（グループ練習のみ。参加者2名未満なら未実施）' : '';
-      return `<div class="schedule-note${atLimit ? ' warn' : ''}">${escapeHtml(`${item.name}: ${item.effect}${groupText}${limitText}`)}</div>`;
+      const fatigueText = Number.isFinite(item.staminaRatio)
+        ? ` / 疲労 ${Math.round(item.staminaRatio * 100)}%（実行直前の体力）`
+        : '';
+      return `<div class="schedule-note${atLimit ? ' warn' : ''}">${escapeHtml(`${item.name}: ${item.effect}${fatigueText}${groupText}${limitText}`)}</div>`;
     })
     .join('');
 

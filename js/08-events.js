@@ -862,7 +862,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
   // テレビ出演・年末の大型イベントは、週をまたいで通過した日も含めて処理する
   processScheduledPerformances(reachDate);
   processYearEndEvents(reachDate);
-  processSpecialLiveEvents();
+  processSpecialLiveEvents(reachDate);
 }
 
 // 年末の大型イベント（赤白 12/31 ／ 日本CD大賞 12/30）
@@ -903,16 +903,16 @@ function executeKohaku() {
   }
 }
 
-function processSpecialLiveEvents() {
+function processSpecialLiveEvents(reachDate = gameDate) {
   specialLiveEvents.forEach(event => {
-    if (event.completed || event.liveDate !== gameDate) return;
+    if (event.completed || event.liveDate !== reachDate) return;
     const venue = VENUE_DATA.find(item => item.name === event.venue);
     if (!venue) return;
 
     const capacity = CAPACITY_MAP[venue.cap];
     const eventMultiplier = (event.type === 'festival' ? 1.4 : 1.2) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
     const audience = Math.min(capacity, Math.floor(
-      getLiveAudienceDemand(venue, getGameDateObject()) * eventMultiplier
+      getLiveAudienceDemand(venue, getGameDateObject(reachDate)) * eventMultiplier
     ));
     const ticketRevenue = audience * 8000;
     const merchandiseSales = sellMerchandiseAtLive();
@@ -1299,19 +1299,21 @@ function processScheduledPerformances(reachDate = null) {
       return;
     }
 
+    // リハーサル直前の枠で通し練習/連携した場合は楽曲経験値が5倍になる（裏効果）
+    const prepMultiplier = performance.prepared ? MUSIC_PREP_BONUS_MULTIPLIER : 1;
     if (performance.isSpecial) {
       // 大型特番は定例番組の何倍もの人気度が得られる
       const multiplier = performance.popularityMultiplier || 4;
       const gain = Math.round(REGULAR_PROGRAM_POPULARITY * multiplier * (0.6 + summary.overall / 100));
       adjustTargetPopularity(gain);
-      if (song) addSongExperience(song, performance.songExperience ?? 30);
+      if (song) addSongExperience(song, (performance.songExperience ?? 30) * prepMultiplier);
       const fee = performance.appearanceFee || 3000000;
       funds += fee;
       logs.push(`【大型特番】${performance.name}で「${song ? song.title : '楽曲'}」を披露（人気 +${gain} / 出演料 ${formatMoney(fee)}）。`);
     } else {
       const gain = Math.round(REGULAR_PROGRAM_POPULARITY * (0.6 + summary.overall / 100));
       adjustTargetPopularity(gain);
-      if (song) addSongExperience(song, REGULAR_PROGRAM_SONG_EXPERIENCE);
+      if (song) addSongExperience(song, REGULAR_PROGRAM_SONG_EXPERIENCE * prepMultiplier);
       const fee = REGULAR_PROGRAM_APPEARANCE_FEE;
       funds += fee;
       logs.push(`【テレビ出演】${performance.name}で「${song ? song.title : '楽曲'}」を披露（人気 +${gain} / 出演料 ${formatMoney(fee)}）。`);

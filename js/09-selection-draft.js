@@ -105,6 +105,40 @@ function cancelSelection() {
   updateUI();
 }
 
+// 選抜画面の並び替え項目（6項目）
+const SELECTION_SORT_KEYS = [
+  { id: 'overall', name: '総評', get: member => calculateSingleOverall(member.stats) },
+  { id: 'idolPower', name: 'アイドル力', get: member => calculateIdolPower(member.stats) },
+  { id: 'height', name: '身長', get: member => member.height ?? 0 },
+  { id: 'age', name: '年齢', get: member => member.age ?? 0 },
+  { id: 'vocal', name: '歌唱力', get: member => member.stats.vocal || 0 },
+  { id: 'dance', name: 'ダンス', get: member => member.stats.dance || 0 }
+];
+
+// 選抜画面を並び替える（同じ項目を再押すと昇順／降順が反転する）
+function setSelectionSort(sortKey) {
+  if (!pendingSelectionEvent) return;
+  if (!SELECTION_SORT_KEYS.some(key => key.id === sortKey)) return;
+  if (pendingSelectionEvent.sortKey === sortKey) {
+    pendingSelectionEvent.sortDesc = pendingSelectionEvent.sortDesc === false;
+  } else {
+    pendingSelectionEvent.sortKey = sortKey;
+    pendingSelectionEvent.sortDesc = true;
+  }
+  renderSelectionModal();
+}
+
+// 選抜画面を項目順に並べる（元の並びは崩さない）
+function sortSelectionMembers(members) {
+  const key = SELECTION_SORT_KEYS.find(entry => entry.id === pendingSelectionEvent?.sortKey);
+  if (!key) return members;
+  const dir = pendingSelectionEvent.sortDesc === false ? 1 : -1;
+  return [...members].sort((a, b) => {
+    const diff = (key.get(a) - key.get(b)) * dir;
+    return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
+  });
+}
+
 function renderSelectionModal() {
   const event = pendingSelectionEvent;
   if (!event) return;
@@ -131,12 +165,12 @@ function renderSelectionModal() {
       </div>`
     : '';
 
-  const memberRows = idolRoster.map(member => {
+  const memberRows = sortSelectionMembers(idolRoster).map(member => {
     const overall = calculateSingleOverall(member.stats);
     const rInfo = getRankData(overall);
     const selected = ids.has(member.id);
     return `
-      <button type="button" class="selection-member${selected ? ' selected' : ''}"
+      <button type="button" class="selection-member${selected ? ' selected' : ''}" data-member-id="${member.id}"
         onclick="toggleSelectionMember(${member.id})">
         <span class="selection-check">${selected ? '✓' : ''}</span>
         <span class="selection-name">${escapeHtml(formatMemberDisplayName(member))}${member.isCenter ? '<i class="selection-crown">C</i>' : ''}</span>
@@ -147,6 +181,16 @@ function renderSelectionModal() {
   }).join('');
 
   const confirmDisabled = ids.size < MIN_SELECTION_SIZE ? 'disabled' : '';
+  const activeSortKey = event.sortKey || '';
+  const sortBar = `
+    <div class="draft-sort-bar">
+      <span class="draft-sort-label">並び替え</span>
+      ${SELECTION_SORT_KEYS.map(key => {
+        const active = activeSortKey === key.id;
+        const arrow = active ? (event.sortDesc === false ? '（昇順）' : '（降順）') : '';
+        return `<button type="button" class="draft-sort-btn${active ? ' active' : ''}" onclick="setSelectionSort('${key.id}')">${escapeHtml(key.name)}${arrow}</button>`;
+      }).join('')}
+    </div>`;
   document.getElementById('selection-modal').innerHTML = `
     <div class="modal-content">
       <h3 class="page-title" style="margin-top:0;">${escapeHtml(title)}</h3>
@@ -157,6 +201,7 @@ function renderSelectionModal() {
         選抜 <strong>${ids.size}</strong> / ${idolRoster.length}名
         <span class="selection-summary-center">センター: <strong>${escapeHtml(centerMember ? formatMemberDisplayName(centerMember) : '未選択')}</strong></span>
       </div>
+      ${sortBar}
       <div class="selection-grid">${memberRows}</div>
       ${centerRow}
       <div class="actions" style="flex-direction:row; gap:6px; margin-top:12px;">
@@ -509,13 +554,17 @@ function startDraftLotteryChoice() {
     openDraftModal();
     return;
   }
+  // 開いた候補者をプールから外す（この指名枠を確定させる）
+  const pool = getDraftPool();
+  const index = pool.findIndex(entry => entry.id === member.id);
+  if (index >= 0) pool.splice(index, 1);
+
   // 他チームと重複しなければそのまま獲得
   if (!rollDraftTopConflict()) {
-    const index = getDraftPool().findIndex(entry => entry.id === member.id);
-    if (index >= 0) {
-      resolveDraftPick(index);
-      return;
-    }
+    draftSignMember(member);
+    recordDraftPickLog(state, state.playerTeam, member, false);
+    advanceDraftRound();
+    return;
   }
   // 重複する場合はくじ引きモードへ
   state.phase = 'lottery';
