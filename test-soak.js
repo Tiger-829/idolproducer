@@ -61,6 +61,34 @@ try {
       run('advanceOneWeek();');
     } else {
       stats.scheduleWeeks++;
+      // 休養日の規定に足りていなければ、プレイヤーが休養枠を足して進める（ルールどおり）
+      run(`
+        if (!isRestRequirementAchievable()) {
+          // 固定枠で満たせない週はそのまま進行させる
+        } else {
+          const rest = getWeekRestBreakdown();
+          if (rest.fullRestDays < REQUIRED_FULL_REST_DAYS) {
+            for (let day = 0; day < WEEK_DAY_LABELS.length; day++) {
+              const a = day * 2, b = day * 2 + 1;
+              if (!getWeekFixedSlots().has(a) && !getWeekFixedSlots().has(b)) {
+                weeklySchedule.slots[a] = 'rest-day';
+                weeklySchedule.slots[b] = 'rest-day';
+                break;
+              }
+            }
+          }
+          const after = getWeekRestBreakdown();
+          let guard = 0;
+          while (after.extraSlots < REQUIRED_EXTRA_REST_SLOTS && guard++ < 14) {
+            const idx = weeklySchedule.slots.findIndex((id, i) =>
+              id !== 'rest-day' && id !== 'meal-party' && !getWeekFixedSlots().has(i));
+            if (idx < 0) break;
+            weeklySchedule.slots[idx] = 'rest-day';
+            renderWeeklyActionPanel();
+            break;
+          }
+        }
+      `);
       run('confirmWeeklySchedule();');
     }
     const after = run('scheduledPerformances.length');

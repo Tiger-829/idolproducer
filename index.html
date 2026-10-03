@@ -33,7 +33,10 @@
   <h1>日本一のアイドルプロデューサーになろう</h1>
 
   <div class="header-info">
-    <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
+    <div class="header-date">
+      <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
+      <div class="header-fans">グループファン <strong id="txt-header-fans">--</strong> 人</div>
+    </div>
     <span id="active-slot-label">セーブ枠</span>
   </div>
 
@@ -46,6 +49,7 @@
         <div>
           <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
           <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
+          <div style="font-size:10px; color:#888;">アイドル力 <strong id="txt-team-idol-power">--</strong>（表現5能力＋体調2能力の平均）</div>
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
           <span id="team-overall-score" class="overall-score">--</span>
@@ -55,8 +59,7 @@
       <div class="avg-grid" id="team-avg-grid"></div>
     </div>
     <div class="team-fans-card team-fans-card-stack">
-      <span>グループ推定ファン数</span>
-      <span><strong class="team-fans-count" id="txt-group-fans">--</strong> 人</span>
+      <span>グループ推定ファン数の内訳</span>
       <div class="team-fans-tiers" id="txt-group-fan-tiers">--</div>
     </div>
     <div class="team-fans-card">
@@ -186,6 +189,15 @@
 </div>
 
 <div class="modal-overlay" id="selection-modal"></div>
+
+<!-- 月次収支報告（月の最終日に停止して表示） -->
+<div class="modal-overlay" id="monthly-report-modal">
+  <div class="modal-content" style="max-width: 560px;">
+    <h3 class="page-title" style="margin:0 0 8px;" id="monthly-report-title">月間収支報告</h3>
+    <div id="monthly-report-body"></div>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="closeMonthlyReportModal()">確認する</button>
+  </div>
+</div>
 
 <!-- 楽曲ごとの発売後1年間の累積売上推移 -->
 <div class="modal-overlay" id="song-detail-modal">

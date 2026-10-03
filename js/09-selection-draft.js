@@ -87,6 +87,8 @@ function confirmSelection() {
   // 発表で確定した場合は、次作の発表まで変更不可になる
   if (isRelease) {
     lockSelection(pendingSelectionEvent.year, pendingSelectionEvent.month, pendingSelectionEvent.releaseType);
+    // 発表済みのセンターを記録する（個別レッスンの候補順に使う）
+    lastAnnouncedCenterId = centerId;
   }
   pendingSelectionEvent = null;
   document.getElementById('selection-modal').style.display = 'none';
@@ -408,8 +410,125 @@ const DRAFT_TOP_OVERLAP_RATE = 0.45;
 // くじ引きで各チームが獲得できる確率（順位が下がるほど低下）
 const DRAFT_LOTTERY_FIRST_CHANCE = 0.6;
 const DRAFT_LOTTERY_CHANCE_STEP = 0.4;
+// 回転パネルの回転回数（見た目だけ。実際の結果は先に確定している）
+const DRAFT_ROULETTE_SPINS = 14;
+// 回転パネルに並べるチーム名（所属グループ名）
 
 let draftState = null;
+
+// ==========================================
+// 1巡目：全チームの指名確定 → 回転パネル → くじ引き
+// ==========================================
+// 回転パネルに並べるグループ名（ドラフト参加チーム）
+function getDraftRouletteNames() {
+  const state = draftState;
+  if (!state) return [];
+  return (state.pickOrder || []).map(team => team.name);
+}
+
+// 1巡目の候補者を1名決めておく（回転パネルで開ける氏名を先に確定する）
+function prepareFirstRoundCandidate() {
+  const state = draftState;
+  if (!state) return null;
+  const pool = getDraftPool();
+  if (!pool.length) return null;
+  // 総評の高い順に並べ、その上からランダムに候補者を1名決める
+  const ranked = [...pool].sort(
+    (a, b) => calculateSingleOverall(b.stats) - calculateSingleOverall(a.stats)
+  );
+  const top = ranked.slice(0, Math.min(10, ranked.length));
+  const picked = top[Math.floor(Math.random() * top.length)];
+  state.firstRoundMember = picked;
+  return picked;
+}
+
+// 1巡目の開始：全チームの指名を先に確定させ、回転パネルへ進む
+function startFirstRoundSequence() {
+  const state = draftState;
+  if (!state || state.round !== 1 || state.firstRoundResolved) return;
+  // 先に他チーム全ての1巡目の指名を確定させる
+  recordRivalPicks(state);
+  state.firstRoundResolved = true;
+  prepareFirstRoundCandidate();
+  state.phase = state.firstRoundMember ? 'roulette' : 'picking';
+}
+
+// 回転パネル：参加グループの名前を並べる
+function renderDraftRouletteStep() {
+  const state = draftState;
+  const names = getDraftRouletteNames();
+  const member = state.firstRoundMember;
+  const rivalPicks = (state.pickLog || []).filter(entry => !entry.isPlayer);
+    '1巡目の指名です。他グループも同時に指名を終えました。指名が重複するかどうかはくじで決めます。';
+
+  document.getElementById('draft-standings').innerHTML = renderDraftStandings();
+  document.getElementById('draft-body').innerHTML = `
+    <div class="draft-roulette">
+      <div class="draft-roulette-label">１巡目　指名パネル</div>
+      <div class="draft-roulette-window${state.spinning ? ' is-spinning' : ''}">
+        ${names.map(name => `<span class="draft-roulette-chip${state.spinning ? '' : ' is-open'}">${escapeHtml(name)}</span>`).join('')}
+      </div>
+      ${state.spinning ? `
+        <div class="draft-note">パネルが回転しています…</div>
+      ` : `
+        <div class="draft-reveal">
+          <div class="draft-reveal-label">開いた候補者</div>
+          <div class="draft-reveal-name">${escapeHtml(member ? member.name : '---')}</div>
+          ${member ? `<div class="draft-reveal-meta">${member.age}歳 / ${formatHeight(member.height)} / 総評${calculateSingleOverall(member.stats)}</div>` : ''}
+        </div>
+        <div class="draft-note">他の${rivalPicks.length}件の指名は既に確定しています。この候補者が他チームと重複したら、くじを引き続けます。</div>
+        <button class="main-btn" type="button" onclick="startDraftLotteryChoice()">くじを引く</button>
+      `}
+    </div>`;
+  document.getElementById('draft-actions').innerHTML = state.spinning
+    ? '<div class="draft-progress">パネル回転中…</div>'
+    : '<button class="main-btn" type="button" onclick="spinDraftRoulette()">パネルを回す</button>';
+}
+
+// 回転パネルを回してから氏名がオープンされる
+function spinDraftRoulette() {
+  const state = draftState;
+  if (!state || state.phase !== 'roulette' || state.spinning) return;
+  state.spinning = true;
+  renderDraftRouletteStep();
+  // 表示の後、回転を止めて氏名をオープンする
+  setTimeout(() => {
+    if (!draftState || draftState.phase !== 'roulette') return;
+    draftState.spinning = false;
+    renderDraftRouletteStep();
+  }, 1200);
+}
+
+// くじを引く段階へ進む（重複しなかった場合はそのまま指名）
+function startDraftLotteryChoice() {
+  const state = draftState;
+  if (!state || state.phase !== 'roulette') return;
+  const member = state.firstRoundMember;
+  if (!member) {
+    state.phase = 'picking';
+    openDraftModal();
+    return;
+  }
+  // 他チームと重複しなければそのまま獲得
+  if (!rollDraftTopConflict()) {
+    const index = getDraftPool().findIndex(entry => entry.id === member.id);
+    if (index >= 0) {
+      resolveDraftPick(index);
+      return;
+    }
+  }
+  // 重複する場合はくじ引きモードへ
+  state.phase = 'lottery';
+  state.lottery = {
+    member,
+    order: buildDraftLotteryOrder(),
+    index: 0,
+    done: false,
+    winner: null,
+    keepRound: true
+  };
+  openDraftModal();
+}
 
 function getPlayerTeamOverall() {
   return calculateTeamAverages().overall;
@@ -528,8 +647,11 @@ function openDraftModal() {
     state.phase === 'done' ? `ドラフト会議 结果（${roundLabel}）` : `ドラフト会議（${roundLabel}）`;
   const notice = document.getElementById('draft-notice');
   if (notice) notice.textContent = state.isPractice ? '疑似体験：獲得した候補者は実際の名簿に入りません。' : '';
+  // 1巡目は「全チームの指名確定 → 回転パネル」の順に進める
+  startFirstRoundSequence();
 
-  if (state.phase === 'picking') renderDraftPickStep();
+  if (state.phase === 'roulette') renderDraftRouletteStep();
+  else if (state.phase === 'picking') renderDraftPickStep();
   else if (state.phase === 'lottery') renderDraftLotteryStep();
   else renderDraftDoneStep();
 
@@ -849,14 +971,19 @@ function renderDraftLotteryStep() {
   const rows = lottery.order.map((team, index) => {
     let label;
     if (index < lottery.index) label = '引き済み';
-    else if (index === lottery.index && !lottery.done) label = '引き中';
+    else if (index === lottery.index && !lottery.done) label = 'このくじ';
     else if (lottery.done && lottery.winner === team) label = '獲得';
     else label = '待ち';
+    // 「くじを選んで引く」形式：未引きのくじはどれでも選べる
+    const pickable = !lottery.done && index >= lottery.index;
     return `
       <div class="draft-lottery-row${index === lottery.index && !lottery.done ? ' is-turn' : ''}${lottery.done && lottery.winner === team ? ' is-winner' : ''}">
         <span class="draft-lottery-no">${index + 1}</span>
         <span class="draft-lottery-name">${escapeHtml(team.name)}${team.isPlayer ? '（自グループ）' : ''}</span>
         <span class="draft-lottery-state">${label}</span>
+        ${pickable
+          ? `<button type="button" class="draft-lottery-btn" onclick="chooseDraftLottery(${index})">このくじを引く</button>`
+          : ''}
       </div>`;
   }).join('');
 
@@ -871,7 +998,24 @@ function renderDraftLotteryStep() {
       </div>` : ''}`;
   document.getElementById('draft-actions').innerHTML = lottery.done
     ? '<button class="main-btn" type="button" onclick="resolveDraftLottery()">結果を確認する</button>'
-    : '<button class="main-btn" type="button" onclick="advanceDraftLottery()">下のチームを引く</button>';
+    : '<div class="draft-progress">くじを選んで引いてください</div>';
+}
+
+// 選んだくじを引く（「くじを選んで引く」形式）
+// 選んだ位置より手前のくじは回り済みとして扱う（下位のチームほど確率が高い）
+function chooseDraftLottery(lotteryIndex) {
+  const state = draftState;
+  if (!state || state.phase !== 'lottery' || state.lottery.done) return;
+  const lottery = state.lottery;
+  const index = Number(lotteryIndex);
+  if (!Number.isInteger(index) || index < lottery.index || index >= lottery.order.length) return;
+  lottery.index = index;
+  const chance = Math.max(0.1, DRAFT_LOTTERY_FIRST_CHANCE - index * DRAFT_LOTTERY_CHANCE_STEP * 0.35);
+  if (Math.random() < chance) {
+    lottery.done = true;
+    lottery.winner = lottery.order[index];
+  }
+  renderDraftLotteryStep();
 }
 
 // くじ引きを1チームだけ進める（順位が下がるほど確率が下がる）

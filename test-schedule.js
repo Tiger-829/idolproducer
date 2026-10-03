@@ -46,9 +46,12 @@ check('afternoon slot holds the TV appearance', Boolean(broadcast) && broadcast.
 check('the preceding morning slot holds the rehearsal', Boolean(rehearsal) && rehearsal.index % 2 === 0, fixedInfo);
 check('rehearsal is exactly one slot before the appearance', Boolean(broadcast && rehearsal) && broadcast.index === rehearsal.index + 1);
 
+// 休養日の規定（全日1日＋半休2枠）を満たすよう、レッスン枠を使う
 run('weeklySchedule.slots[1] = "dance-lesson";');
 run('setWeeklyScheduleSlot(1, "dance-lesson");');
 check('fixed slots cannot be changed', run('weeklySchedule.slots[1]') === 'dance-lesson', run('weeklySchedule.slots[1]'));
+// 休養日の規定（全日1日＋半休2枠）を満たすよう、この週は既定の休養配置に戻す
+run('weeklySchedule.slots = DEFAULT_WEEK_SLOTS.slice(); ensureWeeklySchedule();');
 run('renderWeeklyActionPanel();');
 const panelHtml = run('document.getElementById("weekly-action-panel").innerHTML');
 check('the weekly schedule UI is shown on a broadcast week', panelHtml.includes('confirmWeeklySchedule()'));
@@ -376,7 +379,8 @@ const danceWeek = JSON.parse(withRecorder(`
   const focus = selected[0];
   const other = selected[1];
   weeklySchedule.slots = Array(14).fill('');
-  weeklySchedule.slots[0] = 'dance-lesson';
+  // 枠1（午後）を使う。午前枠は午後枠の8割のため、倍率の検証には午後を使う
+  weeklySchedule.slots[1] = 'dance-lesson';
   weeklySchedule.restDayMembers = [];
   weeklySchedule.focusMemberIds = [focus.id];
   // ライブ経験値が混ざらないよう、直前まで破棄してから計測する
@@ -442,7 +446,7 @@ const staminaWeek = JSON.parse(withRecorder(`
   const selected = idolRoster.filter(m => m.isSelected && !m.injury);
   const focus = selected[0];
   weeklySchedule.slots = Array(14).fill('');
-  weeklySchedule.slots[0] = 'endurance-training';
+  weeklySchedule.slots[1] = 'endurance-training';
   weeklySchedule.restDayMembers = [];
   weeklySchedule.focusMemberIds = [focus.id];
   window.__exp = [];
@@ -475,8 +479,9 @@ const runFocusWeek = (slotId) => withRecorder(`
     applyWeeklySchedule();
     const sum = list => list.reduce((total, entry) => total + entry.amount, 0);
     return {
+      crisis: sum(window.__exp.filter(e => e.statId === 'crisis')),
+      sns: sum(window.__exp.filter(e => e.statId === 'sns')),
       academics: sum(window.__exp.filter(e => e.statId === 'academics')),
-      talk: sum(window.__exp.filter(e => e.statId === 'talk')),
       spent: sum(window.__stamina.filter(e => e.id === focus.id)),
       log: (logHistory[0] && logHistory[0].text) || document.getElementById('log-box').textContent
     };
@@ -485,10 +490,14 @@ const runFocusWeek = (slotId) => withRecorder(`
 `);
 const literacyWeek = JSON.parse(runFocusWeek('literacy'));
 const danceFocusWeek = JSON.parse(runFocusWeek('dance-lesson'));
-check('学力 / トーク are not multiplied', literacyWeek.withF.academics > 0
-  && literacyWeek.withF.academics === literacyWeek.withoutF.academics
-  && literacyWeek.withF.talk === literacyWeek.withoutF.talk,
+// リテラシー講義は「危機回避力＋SNS運用」を伸ばす（特別強化の対象4能力ではないので倍率は掛からない）
+check('リテラシー講義 raises crisis + sns', literacyWeek.withF.crisis > 0
+  && literacyWeek.withF.sns > 0
+  && literacyWeek.withF.crisis === literacyWeek.withoutF.crisis
+  && literacyWeek.withF.sns === literacyWeek.withoutF.sns,
   JSON.stringify(literacyWeek.withF));
+check('リテラシー講義 no longer raises academics', literacyWeek.withF.academics === 0,
+  JSON.stringify(literacyWeek.withF.academics));
 check('a week with no target lesson costs no extra stamina',
   literacyWeek.withF.spent === literacyWeek.withoutF.spent,
   `${literacyWeek.withF.spent} vs ${literacyWeek.withoutF.spent}`);
@@ -579,21 +588,26 @@ check('ordinary logs play no effect', run(`
 `) === true);
 
 // ---- ドラフト：他チームの指名履歴・落選時の再指名 ----
+// 1巡目は「回転パネル」を先に通すため、指名パネルを出すヘルパーを用意する
+const DRAFT_SKIP_ROULETTE = 'draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = "picking"; renderDraftPickStep();';
 check('rival picks are recorded in the pick history', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
-    const empty = document.querySelector('.draft-picklog').classList.contains('is-empty');
+    ${DRAFT_SKIP_ROULETTE}
     draftState.round = 2;
     resolveDraftPick(0);
     const log = draftState.pickLog;
+    // 1巡目は先に他チームの指名を確定しているため、履歴に残っている
     const rivals = log.filter(entry => !entry.isPlayer);
     const rivalTeams = draftState.pickOrder.filter(t => !t.isPlayer).length;
+    const round1Rivals = rivals.filter(entry => entry.round === 1).length;
+    const round2Rivals = rivals.filter(entry => entry.round === 2).length;
     const rows = document.querySelectorAll('.draft-picklog-row').length;
-    const ok = empty
-      && rivals.length === rivalTeams
-      && rows === log.length
-      && rivals.every(e => e.memberName && e.round === 2);
+    const ok = round1Rivals === rivalTeams
+      && round2Rivals === rivalTeams
+      && rows === Math.min(12, log.length)
+      && rivals.every(e => e.memberName);
     closeDraftModal();
     return ok;
   })()
@@ -602,6 +616,7 @@ check('the history records the player and the lottery result too', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
     const original = Math.random;
     Math.random = () => 0;                 // 1 巡目の重複を確定
@@ -627,6 +642,7 @@ check('losing the lottery keeps the same pick slot', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
     const roundBefore = draftState.round;
     const original = Math.random;
@@ -651,6 +667,7 @@ check('winning the lottery still advances to the next round', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
     const original = Math.random;
     Math.random = () => 0;
@@ -671,6 +688,7 @@ check('winning the lottery still advances to the next round', run(`
 check('the pick panel offers exactly five sort criteria', run(`
   (() => {
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const labels = [...document.querySelectorAll('.draft-sort-btn')].map(b => b.textContent);
     return DRAFT_SORT_KEYS.length === 5
       && labels.length === 5
@@ -724,6 +742,7 @@ check('the acquired list starts empty and fills after each pick', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const empty = document.querySelector('.draft-acquired-list').classList.contains('is-empty');
     draftState.round = 2;
     resolveDraftPick(0);
@@ -738,6 +757,7 @@ check('the acquired list starts empty and fills after each pick', run(`
 check('the draft opens straight into the pick panel', run(`
   (() => {
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     return draftState.phase === 'picking'
       && !document.getElementById('draft-count-picker')
       && document.querySelectorAll('.draft-candidate').length > 0
@@ -770,6 +790,7 @@ check('the draft ends after any number of picks', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 2;
     resolveDraftPick(0);
     const afterOne = draftState.acquired.length;
@@ -784,30 +805,50 @@ check('the lottery order starts from this round team', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const order = buildDraftLotteryOrder();
     const covered = order.length === draftState.pickOrder.length
       && order.every(team => draftState.pickOrder.includes(team));
     return order[0].isPlayer === true && covered;
   })()
 `) === true);
-check('a conflict opens the lottery and rotates the draws', run(`
+check('a conflict opens the lottery and the player draws a chosen ticket', run(`
   (() => {
     closeDraftModal();
     openDraftPractice();
+    // 1巡目の回転パネル → くじを引く（重複を確実にする）
     const originalRandom = Math.random;
+    draftState.spinning = false;
     Math.random = () => 0;
-    resolveDraftPick(0);
+    startDraftLotteryChoice();
     Math.random = originalRandom;
     const enteredLottery = draftState.phase === 'lottery';
     const rows = document.querySelectorAll('.draft-lottery-row').length;
+    const buttons = document.querySelectorAll('.draft-lottery-btn').length;
     const turnShown = !!document.querySelector('.draft-lottery-row.is-turn');
-    let guard = 0;
-    while (!draftState.lottery.done && guard++ < 30) advanceDraftLottery();
+    // 「くじを選んで引く」：選べるくじが複数ある
+    Math.random = () => 0;
+    chooseDraftLottery(draftState.lottery.order.length - 1);
+    Math.random = originalRandom;
     const decided = draftState.lottery.done && !!draftState.lottery.winner;
     const winnerRow = !!document.querySelector('.draft-lottery-row.is-winner');
     resolveDraftLottery();
     closeDraftModal();
-    return enteredLottery && rows > 0 && turnShown && decided && winnerRow;
+    return enteredLottery && rows > 0 && buttons > 0 && turnShown && decided && winnerRow;
+  })()
+`) === true);
+check('round 1 confirms every rival pick before the roulette', run(`
+  (() => {
+    closeDraftModal();
+    openDraftPractice();
+    const phase = draftState.phase;
+    const rivalTeams = draftState.pickOrder.filter(t => !t.isPlayer).length;
+    const round1 = draftState.pickLog.filter(e => !e.isPlayer && e.round === 1).length;
+    const chips = document.querySelectorAll('.draft-roulette-chip').length;
+    const teamCount = draftState.pickOrder.length;
+    const revealed = !!document.querySelector('.draft-reveal-name');
+    closeDraftModal();
+    return phase === 'roulette' && round1 === rivalTeams && chips === teamCount && revealed;
   })()
 `) === true);
 
@@ -826,6 +867,7 @@ check('the log keeps a history with the newest first', run(`
 check('the draft practice opens with a clear practice label', run(`
   (() => {
     openDraftPractice();
+    draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const title = document.getElementById('draft-title').textContent;
     const notice = document.getElementById('draft-notice').textContent;
     const shown = document.getElementById('draft-modal').style.display;

@@ -18,6 +18,11 @@ function getPlanEventType(benefitId) {
   return PLAN_EVENT_TYPES.find(type => type.id === benefitId) || null;
 }
 
+// プリセットでCD発売が確定している月か（2月・6月）
+function isPresetReleaseMonth(month) {
+  return PRESET_RELEASE_MONTHS.includes(Number(month));
+}
+
 function getPlanMonthCalendarDate(month, day) {
   return toDateKey(new Date(getPlanMonthCalendarYear(month), month - 1, day, 12));
 }
@@ -723,10 +728,10 @@ function openDecisionModal(title, y, sM, eM) {
         <span style="font-weight:bold;">${m}月</span>
         <button class="plan-booth-btn" type="button" onclick="openPlanCalendar()">📅 カレンダーで日程を選ぶ</button>
         ${rivalMonthSchedule.length ? `<div style="margin-top:4px; color:#777;">他グループ予定: ${escapeHtml(rivalMonthSchedule.join(' / '))}</div>` : ''}
-        <label class="weekly-member-target" for="sel-rel-${m}" style="margin-top:6px;">リリース
-          <select id="sel-rel-${m}" onchange="updateReleaseBenefitOptions(${m})">
-            <option value="none" ${draft.release !== 'single' && draft.release !== 'album' ? 'selected' : ''}>リリースなし</option>
-            <option value="single" ${draft.release === 'single' ? 'selected' : ''}>シングル発売</option>
+        <label class="weekly-member-target" for="sel-rel-${m}" style="margin-top:6px;">リリース${isPresetReleaseMonth(m) ? '<small style="margin-left:4px; color:#b5651d;">（プリセットで確定）</small>' : ''}
+          <select id="sel-rel-${m}" onchange="updateReleaseBenefitOptions(${m})" ${isPresetReleaseMonth(m) ? 'disabled' : ''}>
+            <option value="none" ${!isPresetReleaseMonth(m) && draft.release !== 'single' && draft.release !== 'album' ? 'selected' : ''}>リリースなし</option>
+            <option value="single" ${isPresetReleaseMonth(m) || draft.release === 'single' ? 'selected' : ''}>シングル発売</option>
             <option value="album" ${draft.release === 'album' ? 'selected' : ''}>アルバム発売</option>
           </select>
         </label>
@@ -1055,7 +1060,10 @@ function validatePlanLiveSlots(month, slots) {
 
 function saveDecisionPlan() {
   for (let m = planStartM; m <= planEndM; m++) {
-    const release = document.getElementById(`sel-rel-${m}`).value;
+    // 2月・6月はプリセットで発売が確定している（変更できない）
+    const release = isPresetReleaseMonth(m)
+      ? PRESET_RELEASE_TYPE
+      : document.getElementById(`sel-rel-${m}`).value;
     const songName = document.getElementById(`song-name-${m}`).value.trim();
     const planKey = `${planYearTarget}-${m}`;
     const previousPlan = productionSchedule[planKey] || {};

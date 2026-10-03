@@ -346,6 +346,7 @@ function rollMonthlyTieUps() {
 }
 
 // 月末の精算（CD売上8割＋タイアップの臨時収入を入金し、会費と給与を引く）
+// 臨時支出（食事会・グッズ開発・CD特典など）もここでまとめて処理する
 function settleMonthlyIncome() {
   // CD売上収入は前月までに積んだ分を入金してクリアする
   const cdRevenue = monthlyCdRevenue;
@@ -354,6 +355,7 @@ function settleMonthlyIncome() {
   if (cdRevenue > 0) {
     funds += cdRevenue;
     yearlyStats.cdRevenue = (yearlyStats.cdRevenue || 0) + cdRevenue;
+    recordMonthlyIncome('CD売上収入', cdRevenue);
     setLog(`【月末精算】CD売上収入（売上の${Math.round(CD_REVENUE_MONTHLY_SHARE * 100)}%相当） ${formatMoney(cdRevenue)} を入金しました。`);
   }
   // タイアップは当月の臨時収入として引く
@@ -363,11 +365,15 @@ function settleMonthlyIncome() {
   if (tieUps.length) {
     funds += tieUpRevenue;
     yearlyStats.tieUpRevenue = (yearlyStats.tieUpRevenue || 0) + tieUpRevenue;
+    tieUps.forEach(item => recordMonthlyIncome(`${item.tieUp.name}（臨時収入）`, item.revenue));
     const detail = tieUps.map(item => `${item.tieUp.name} ${formatMoney(item.revenue)}`).join(' / ');
     setLog(`【タイアップ】${detail} （臨時収入 ${formatMoney(tieUpRevenue)}）`);
   }
   const fanClubIncome = applyFanClubMonthlyIncome();
-  if (fanClubIncome > 0) setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}を入金しました。`);
+  if (fanClubIncome > 0) {
+    recordMonthlyIncome('ファンクラブ会費', fanClubIncome);
+    setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}を入金しました。`);
+  }
   // 月末にメンバーとマネージャーの給与を月割りで引き落とす
   const salary = applyMonthlySalary();
   if (salary.total > 0) {
@@ -384,16 +390,134 @@ function applyMonthlySalary() {
   if (total <= 0) return { memberSalary: 0, managerSalary: 0, total: 0 };
   funds -= total;
   yearlyStats.salary = (yearlyStats.salary || 0) + total;
+  if (memberSalary > 0) recordMonthlyExpense('メンバー給与', memberSalary);
+  if (managerSalary > 0) recordMonthlyExpense('マネージャー給与', managerSalary);
   return { memberSalary, managerSalary, total };
 }
 
 function openPendingModal() {
+  // 月次収支報告がたまっていれば先に出す（月の最終日で停止して確認させる）
+  if (pendingMonthlyReport) return openPendingMonthlyReport();
   if (pendingSelectionEvent) return openSelectionModal();
   if (pendingCrisisResponse) return openCrisisResponseModal();
   if (pendingFanClubEvent) return openFanClubModal();
   if (pendingRandomEvent) return openRandomEventModal();
   if (pendingEquipmentEvent) return openEquipmentEventModal();
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
+}
+
+// ==========================================
+// 当月の収支明細（月次収支報告用）
+// ==========================================
+// 収入を積む（当月の明細に記録する）
+function recordMonthlyIncome(label, amount) {
+  const value = Math.round(Number(amount) || 0);
+  if (!value) return 0;
+  if (!monthlyLedger || !Array.isArray(monthlyLedger.income)) monthlyLedger = createMonthlyLedger();
+  monthlyLedger.income.push({ label, amount: value });
+  return value;
+}
+
+// 支出を積む（当月の明細に記録する）
+function recordMonthlyExpense(label, amount) {
+  const value = Math.round(Number(amount) || 0);
+  if (!value) return 0;
+  if (!monthlyLedger || !Array.isArray(monthlyLedger.expense)) monthlyLedger = createMonthlyLedger();
+  monthlyLedger.expense.push({ label, amount: value });
+  return value;
+}
+
+// 収入・支出の合計
+function sumMonthlyLedger(list) {
+  return (list || []).reduce((total, entry) => total + (entry.amount || 0), 0);
+}
+
+// ==========================================
+// 月次収支報告（月の最終日で停止して表示）
+// ==========================================
+// 「月の最終日」（曜日問わず）で月末処理が走ったか
+function isMonthEndDate(date = getGameDateObject()) {
+  return date.getDate() === getDaysInMonth(date.getFullYear(), date.getMonth() + 1);
+}
+
+// 月次収支報告の画面を表示する
+function showMonthlyReportModal(report) {
+  const modal = document.getElementById('monthly-report-modal');
+  const body = document.getElementById('monthly-report-body');
+  const title = document.getElementById('monthly-report-title');
+  if (!modal || !body || !report) return;
+  title.textContent = `${report.year}年${report.month}月 収支報告`;
+
+  const incomeTotal = sumMonthlyLedger(report.income);
+  const expenseTotal = sumMonthlyLedger(report.expense);
+  const balance = incomeTotal - expenseTotal;
+  // 収入と支出を並べて1行ずつ表示する（長いときは省略して末尾のみ見せる）
+  const rows = Math.max(report.income.length, report.expense.length);
+  const MAX_ROWS = 8;
+  const start = Math.max(0, rows - MAX_ROWS);
+  const bodyRows = [];
+  for (let i = start; i < rows; i++) {
+    const inc = report.income[i];
+    const exp = report.expense[i];
+    bodyRows.push(`
+      <tr>
+        <td>${inc ? escapeHtml(inc.label) : ''}</td>
+        <td class="num income">${inc ? formatMoney(inc.amount) : ''}</td>
+        <td>${exp ? escapeHtml(exp.label) : ''}</td>
+        <td class="num expense">${exp ? `-${formatMoney(exp.amount)}` : ''}</td>
+      </tr>`);
+  }
+  const omitted = start > 0
+    ? `<tr class="omitted"><td colspan="4">…ほか ${start} 件</td></tr>`
+    : '';
+  const emptyRow = rows === 0
+    ? '<tr><td colspan="4" style="text-align:center; color:#888;">この月の収支はありません</td></tr>'
+    : '';
+
+  body.innerHTML = `
+    <table class="monthly-report-table">
+      <thead><tr><th>収入</th><th class="num">金額</th><th>支出</th><th class="num">金額</th></tr></thead>
+      <tbody>${emptyRow}${omitted}${bodyRows.join('')}</tbody>
+      <tfoot>
+        <tr>
+          <th>計</th>
+          <th class="num income">${formatMoney(incomeTotal)}</th>
+          <th>計</th>
+          <th class="num expense">-${formatMoney(expenseTotal)}</th>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="monthly-report-balance ${balance >= 0 ? 'is-profit' : 'is-loss'}">
+      収支 ${balance >= 0 ? '+' : '-'}${formatMoney(Math.abs(balance))}
+      <small>（${balance >= 0 ? '黒字' : '赤字'}）</small>
+    </p>`;
+  modal.style.display = 'flex';
+}
+
+function closeMonthlyReportModal() {
+  const modal = document.getElementById('monthly-report-modal');
+  if (modal) modal.style.display = 'none';
+  pendingMonthlyReport = null;
+}
+
+// 月末の精算：明細を確定し、収支報告を表示待ちにする
+function finalizeMonthlyLedger(year, month) {
+  const report = {
+    year,
+    month,
+    income: (monthlyLedger?.income || []).slice(),
+    expense: (monthlyLedger?.expense || []).slice()
+  };
+  monthlyLedger = createMonthlyLedger();
+  pendingMonthlyReport = report;
+  return report;
+}
+
+// 月次収支報告を「開いていなければ開く」
+function openPendingMonthlyReport() {
+  if (!pendingMonthlyReport) return false;
+  showMonthlyReportModal(pendingMonthlyReport);
+  return true;
 }
 
 // 階層ごとの参加率を加重した率（0〜1）
@@ -556,7 +680,10 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     song.firstWeekSales = sales;
     song.salesHistory = [{ weekKey: gameDate, sales }];
     const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
-    if (benefit) funds -= benefit.cost;
+    if (benefit) {
+      funds -= benefit.cost;
+      recordMonthlyExpense(`CD特典（${benefit.name}）`, benefit.cost);
+    }
     const benefitSales = benefit ? recordReleaseBenefitSales(benefit.id) : null;
     plan.releaseCompleted = true;
     const benefitText = benefit
@@ -723,9 +850,14 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
   // ライブ後に詳細収支を表で提示する
   if (liveFinanceRows.length) showLiveFinanceModal(liveFinanceRows);
 
-  if (isLastWednesdayOfMonth()) {
+  // 月末は「曜日問わず月の最終日」で処理する
+  // 週をまとめて進めるため、到達日（reachDate）が月の最終日かを判定する
+  const reachedDate = getGameDateObject(reachDate);
+  if (isMonthEndDate(reachedDate)) {
     // CD売上収入（8割）とタイアップの臨時収入を入金し、会費と給与を処理する
     settleMonthlyIncome();
+    // 臨時支出まで含めた当月の収支を確定し、報告を表示待ちにする
+    finalizeMonthlyLedger(reachedDate.getFullYear(), reachedDate.getMonth() + 1);
   }
   // テレビ出演・年末の大型イベントは、週をまたいで通過した日も含めて処理する
   processScheduledPerformances(reachDate);

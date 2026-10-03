@@ -40,6 +40,25 @@ function calculateSingleOverall(stats) {
   return Math.round(sum / Object.keys(stats).length);
 }
 
+// ==========================================
+// アイドル力（表現5能力＋体調2能力の平均）
+// ==========================================
+// アイドル力を構成する7能力（表現：スタイル・ファッション・歌唱・ダンス・連携／体調：回復力・運動能力）
+function calculateIdolPower(stats) {
+  const source = stats || {};
+  const total = IDOL_POWER_STATS.reduce((sum, statId) => sum + (source[statId] || 0), 0);
+  return Math.round(total / IDOL_POWER_STATS.length);
+}
+
+// 選抜チームのアイドル力（平均）
+function calculateTeamIdolPower() {
+  const active = idolRoster.filter(m => m.isSelected);
+  const targets = active.length > 0 ? active : idolRoster;
+  if (!targets.length) return 0;
+  const total = targets.reduce((sum, m) => sum + calculateIdolPower(m.stats), 0);
+  return Math.round(total / targets.length);
+}
+
 // 個人推定ファン数（開始時のグループ合計がおよそ5万fanになるよう較正直している）
 function calculateMemberFans(member) {
   const stats = member.stats || {};

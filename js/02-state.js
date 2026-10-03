@@ -22,6 +22,15 @@ let nextLivePromotionPoints = 0;
 // 月末に入金するCD売上収入（売上の8割）とタイアップの臨時収入
 let monthlyCdRevenue = 0;
 let monthlyTieUpRevenue = 0;
+// 明細を初期化する（収入／支出）。他ファイルより先に実行されるため、ここに定義する
+function createMonthlyLedger() {
+  return { income: [], expense: [] };
+}
+
+// 当月の収支明細（月末の報告で表示する）。臨時支出も月末にまとめて処理する
+let monthlyLedger = createMonthlyLedger();
+// 表示待ちの月次収支報告（月の最終日で停止して画面に出す）
+let pendingMonthlyReport = null;
 // 販促効果が乗っている作品（販促効果は1作のみ）
 let promoSongId = '';
 let crisisCheckWeekKey = '';
@@ -36,6 +45,8 @@ let armedRandomEvents = [];   // [{ eventId, targetDate }]
 let pendingSelectionEvent = null;
 // 選抜のロック（発表時に確定。スキャンダル等が発生するまで変更不可）
 let selectionLock = null;
+// 直近の選抜発表で選ばれたセンター（個別レッスンの候補順に使う）
+let lastAnnouncedCenterId = null;
 const MIN_SELECTION_SIZE = 3;
 const SENBATSU_LEAD_DAYS = 70;
 let pendingFanClubEvent = null;
@@ -70,12 +81,53 @@ let weeklySchedule = null;
 let yearEndAwardProcessed = false;
 let yearEndKohakuProcessed = false;
 
+// 初期のライブ予定（5〜7月のランダムな土日2days）
+function buildInitialLivePlan() {
+  const year = calendarYear || (new Date().getFullYear() + 1);
+  // 5〜7月のいずれか1ヶ月を選ぶ
+  const month = INITIAL_LIVE_MONTH_MIN
+    + Math.floor(Math.random() * (INITIAL_LIVE_MONTH_MAX - INITIAL_LIVE_MONTH_MIN + 1));
+  const lastDay = new Date(year, month, 0, 12).getDate();
+  // その月の「土→日」の連続ペアをすべて列挙してランダムに選ぶ
+  const weekendPairs = [];
+  for (let day = 1; day < lastDay; day++) {
+    const first = new Date(year, month - 1, day, 12);
+    const second = new Date(year, month - 1, day + 1, 12);
+    if (first.getDay() === 6 && second.getDay() === 0) {
+      weekendPairs.push({ liveDate: toDateKey(first), secondDate: toDateKey(second) });
+    }
+  }
+  const pair = weekendPairs.length
+    ? weekendPairs[Math.floor(Math.random() * weekendPairs.length)]
+    : { liveDate: toDateKey(getLastWednesday(year, month - 1)), secondDate: '' };
+  return {
+    month,
+    liveVenue: INITIAL_LIVE_VENUE,
+    liveName: INITIAL_LIVE_VENUE,
+    liveDate: pair.liveDate,
+    liveDates: pair.secondDate ? [pair.secondDate] : []
+  };
+}
+
 let idolRoster = [];
-let productionSchedule = {
-  "1-2": { release: "single", liveVenue: null },
-  "1-5": { release: "none",   liveVenue: "原宿体育館" },
-  "1-6": { release: "single", liveVenue: null }
-};
+// 初期の半年計画（2月・6月のCD発売は確定。ライブは5〜7月のランダム土日2days）
+function createInitialProductionSchedule() {
+  const live = buildInitialLivePlan();
+  const schedule = {};
+  // 発売とライブは別々の月に置く（2月・6月の発売は必ず確定させる）
+  schedule[`1-${PRESET_RELEASE_MONTHS[0]}`] = { release: PRESET_RELEASE_TYPE, liveVenue: null };
+  schedule[`1-${PRESET_RELEASE_MONTHS[1]}`] = { release: PRESET_RELEASE_TYPE, liveVenue: null };
+  schedule[`1-${live.month}`] = {
+    release: 'none',
+    liveVenue: live.liveVenue,
+    liveName: live.liveName,
+    liveDate: live.liveDate,
+    liveDates: live.liveDates
+  };
+  return schedule;
+}
+
+let productionSchedule = createInitialProductionSchedule();
 
 let yearlyStats = { sales: 0, audience: 0 };
 // 生涯累計売上（年を跨いでも積み上がり、ファン成長に使う）

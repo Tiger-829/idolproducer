@@ -32,7 +32,8 @@ function updateUI() {
     selectionButton.style.opacity = locked ? '0.6' : '1';
   }
   const groupFans = calculateGroupFans();
-  const fansEl = document.getElementById('txt-group-fans');
+  // ファン数はヘッダー（年月日表示の下）に固定して、どの画面からでも参照できるようにする
+  const fansEl = document.getElementById('txt-header-fans');
   fansEl.textContent = formatFanCount(groupFans);
   // 6桁以上は見単位が省略されるため、正確な人数をツールチップに出す
   fansEl.title = groupFans >= 100000 ? `${groupFans.toLocaleString()}人` : '';
@@ -74,6 +75,9 @@ function updateUI() {
 
   const summary = calculateTeamAverages();
   document.getElementById('txt-center-name').textContent = summary.centerName;
+  // アイドル力は体力値と総評の間に置く
+  const idolPowerEl = document.getElementById('txt-team-idol-power');
+  if (idolPowerEl) idolPowerEl.textContent = calculateTeamIdolPower();
   document.getElementById('team-overall-score').textContent = summary.overall;
   
   const badge = document.getElementById('team-rank-badge');
@@ -113,8 +117,9 @@ function updateUI() {
     currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
     merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
     nextLivePromotionPoints, monthlyCdRevenue, monthlyTieUpRevenue, promoSongId,
+    monthlyLedger, pendingMonthlyReport,
     crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
-    pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent, armedRandomEvents, pendingSelectionEvent, selectionLock,
+    pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent, armedRandomEvents, pendingSelectionEvent, selectionLock, lastAnnouncedCenterId,
     fanClub, fanClubFoundedYear, pendingFanClubEvent,
     industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
     pendingEquipmentEvent, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
@@ -244,6 +249,7 @@ function renderRosterList() {
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
             <span style="font-size:10px; color:${staminaColor};">体力値 ${staminaValue}</span>
+            <span style="font-size:10px; color:#666;">アイドル力:${calculateIdolPower(m.stats)}</span>
             <span style="font-size:10px; color:#666;">総評:${overall}</span>
             <span class="rank-badge" style="color:${rInfo.color}; background:${rInfo.bg}; border:1px solid ${rInfo.color}; width:16px; height:16px; line-height:16px; font-size:10px;">
               ${rInfo.rank}

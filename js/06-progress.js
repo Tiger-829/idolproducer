@@ -68,7 +68,11 @@ function findNextScheduledLiveDate(startDate, endDate) {
   };
   getScheduledLiveEntries().forEach(entry => {
     if (entry.completed) return;
-    consider(entry.date);
+    // 1公演=1日の設定なので、すべての公演日を対象にする
+    // （2daysライブの2日目などが「翌日開催のライブ」として選ばれる）
+    getLiveEntryShowDates(entry).forEach(dateKey => {
+      consider(getGameDateObject(dateKey));
+    });
   });
   specialLiveEvents.forEach(event => {
     if (event.completed) return;

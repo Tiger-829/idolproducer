@@ -138,11 +138,24 @@ function renderWeeklyActionPanel() {
   // ライブがある週だけ週間スケジュールは組めない
   const nextLiveDate = findWeekLiveStop(currentDate);
   if (nextLiveDate) {
-    const liveLabel = getGameDateObject(nextLiveDate).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+    const liveDate = getGameDateObject(nextLiveDate);
+    const liveLabel = liveDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
+    // ライブの内容を具体的に伝える（会場・公演日）
+    const liveEntries = getScheduledLiveEntries().filter(entry =>
+      !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === nextLiveDate
+    );
+    const liveDetail = liveEntries.length
+      ? liveEntries.map(entry => {
+        const days = getLiveEntryShowDates(entry);
+        const suffix = days.length > 1 ? `（${days.length}公演：${days.map(key => `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日`).join('・')}）` : '';
+        return `${entry.liveVenue}${suffix}`;
+      }).join(' / ')
+      : '';
     panel.innerHTML = `
       <h2 class="page-title">今週の行動</h2>
       <div class="weekly-event-note"><strong>ライブ週</strong><ul>
         <li>${escapeHtml(`${liveLabel}にライブがあるため、週間スケジュールは組めません。`)}</li>
+        ${liveDetail ? `<li>${escapeHtml(`公演: ${liveDetail}`)}</li>` : ''}
         ${renderWeeklyEventItems(events)}
       </ul></div>
       <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">イベントまで進行</button>
@@ -179,10 +192,11 @@ function renderWeeklyScheduleControls() {
   const focusLimit = getSpecialTrainingTargetLimit();
   const specialMultiplier = getSpecialTrainingMultiplier();
   const specialStatNames = getSpecialTrainingStatNames();
-  const memberOptions = idolRoster
-    .filter(member => !member.injury)
-    .map(member => `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`)
-    .join('');
+  // 個別レッスンの対象：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
+  const individualOptions = getIndividualLessonMemberOptions();
+  const memberOptions = individualOptions.map(member =>
+    `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
+  ).join('');
 
   // 残体力が低いメンバーにはマネージャーが休養日を打診する
   const fatiguedMembers = members.filter(member =>
@@ -213,6 +227,10 @@ function renderWeeklyScheduleControls() {
 
   const weekRows = WEEK_DAY_LABELS.map((dayLabel, dayIndex) => {
     const morningIndex = dayIndex * WEEK_PERIOD_LABELS.length;
+    // 何日の予定かを明記する（起点の水曜の翌日が木曜）
+    const dayDate = getGameDateObject();
+    dayDate.setDate(dayDate.getDate() + dayIndex + 1);
+    const dayText = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`;
     const cells = WEEK_PERIOD_LABELS.map((periodLabel, periodIndex) => {
       const index = morningIndex + periodIndex;
       const fixed = fixedSlots.get(index);
@@ -236,7 +254,7 @@ function renderWeeklyScheduleControls() {
     const isRestDay = isWeekRestDay(dayIndex);
     return `
       <div class="week-row${isRestDay ? ' is-rest-day' : ''}">
-        <span class="week-day-label">${escapeHtml(dayLabel)}${isRestDay ? '<small>休</small>' : ''}</span>
+        <span class="week-day-label">${escapeHtml(dayLabel)}${isRestDay ? '<small>休</small>' : ''}<em class="week-day-date">${escapeHtml(dayText)}</em></span>
         ${cells}
       </div>`;
   }).join('');
@@ -245,10 +263,15 @@ function renderWeeklyScheduleControls() {
     const isResting = restDayIds.has(member.id);
     const lowStamina = member.staminaValue < STAMINA_WARNING_THRESHOLD;
     const injured = Boolean(member.injury);
+    const isAutoRest = (weeklySchedule.autoRestMemberIds || []).includes(member.id);
+    // 「[氏名]([怪我/体調不良]回復まで〇日)」の形式で可視化する
+    const label = member.injury
+      ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
+      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}${isAutoRest ? ` / 自動休養中（${AUTO_REST_STAMINA_TARGET}まで）` : ''}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
         onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
-        ${escapeHtml(formatMemberDisplayName(member))}${member.injury ? `（${member.injury.type}）` : ` <small>${member.staminaValue}</small>`}
+        ${escapeHtml(label)}
       </button>
     `;
   }).join('');
@@ -284,10 +307,10 @@ function renderWeeklyScheduleControls() {
   const officeToggles = OFFICE_ACTIONS.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
     const atLimit = action.id === 'goods-development' && merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS;
+    // 項目のあとの小説明（short）は表示しない
     return `
       <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
-        onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}
-        title="${escapeHtml(action.detail)}">${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ` <small>${escapeHtml(action.short)}</small>`}</button>`;
+        onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}>${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ''}</button>`;
   }).join('');
 
   // テレビ出演の週は、固定枠の内容と休暇が使えないことを明示する
@@ -351,10 +374,9 @@ function renderWeeklyScheduleControls() {
       <div class="schedule-block-title">今週の事務作業 <small>レッスンと同じ週に実行（未選択なら行わない）</small></div>
       <div class="rest-toggle-grid">
         <button type="button" class="rest-toggle office${selectedOfficeAction ? '' : ' active'}"
-          onclick="selectOfficeAction('')" title="事務作業を行いません">何もしない</button>
+          onclick="selectOfficeAction('')">何もしない</button>
         ${officeToggles}
       </div>
-      <div class="schedule-note">${escapeHtml(selectedOfficeAction ? selectedOfficeAction.detail : '事務作業は行いません。週のレッスンと一緒に実行したいものを選んでください。')}</div>
       ${selectedOfficeAction && selectedOfficeAction.id === 'single-promotion'
         ? `<div class="schedule-note">${escapeHtml(describeSinglePromotionStatus())}</div>`
         : ''}
@@ -362,6 +384,26 @@ function renderWeeklyScheduleControls() {
 
     <button class="main-btn" style="width:100%;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
   `;
+}
+
+// 個別レッスンの対象順：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
+function getIndividualLessonMemberOptions() {
+  const available = idolRoster.filter(member => !member.injury);
+  if (!available.length) return [];
+  // 直近の選抜発表で選ばれたセンターを先頭にする
+  const centerId = (pendingSelectionEvent && pendingSelectionEvent.centerId)
+    || lastAnnouncedCenterId
+    || idolRoster.find(member => member.isCenter)?.id
+    || null;
+  const center = available.find(member => member.id === centerId);
+  // 先頭はセンター、以降は残体力の低い順（体力の同じ人は名前順で安定させる）
+  const rest = available
+    .filter(member => member.id !== centerId)
+    .sort((a, b) => {
+      const diff = (a.staminaValue ?? MAX_STAMINA_VALUE) - (b.staminaValue ?? MAX_STAMINA_VALUE);
+      return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
+    });
+  return center ? [center, ...rest] : rest;
 }
 
 function renderGameCalendar() {

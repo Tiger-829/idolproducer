@@ -375,6 +375,22 @@ const MEMBER_STAT_GROUPS = [
   { label: '体調',   ids: ['recovery', 'athletics'] },
   { label: '応対力', ids: ['talk', 'sns', 'variety', 'academics', 'crisis'] }
 ];
+// 「表現」5能力＋「体調」2能力＝7能力をアイドル力として定義する
+const IDOL_POWER_STATS = MEMBER_STAT_GROUPS
+  .filter(group => group.label === '表現' || group.label === '体調')
+  .reduce((list, group) => list.concat(group.ids), []);
+
+// スタイル（身長連動）とファッションの下限値
+// スタイルは身長に比例し、身長が伸びたときだけ上がる（下がらない）
+const MEMBER_STYLE_MIN = 55;
+const MEMBER_STYLE_PER_CM = 1.5;
+// ファッションは初期値が高く、下限も60
+const MEMBER_FASHION_MIN = 60;
+// 14〜17歳は確率で身長が年1%伸びる（伸びた分だけスタイルも上がる）
+const HEIGHT_GROWTH_AGE_MIN = 14;
+const HEIGHT_GROWTH_AGE_MAX = 17;
+const HEIGHT_GROWTH_CHANCE = 0.5;
+const HEIGHT_GROWTH_RATE = 0.01;
 
 // 全37会場データ
 const VENUE_DATA = [
@@ -593,15 +609,22 @@ function getWeekSlotLabel(slotIndex) {
 // 通し練習は疲労が大きいため、1週間で2枠までに制限する
 const FULL_RUN_THROUGH_WEEKLY_LIMIT = 2;
 
+// 午前枠は午後枠の8割（体力回復量・レッスン効果のどちらも）
+const MORNING_SLOT_MULTIPLIER = 0.8;
+
+// 1枠あたりの体力消費の基準値
+// 消費量は「通し >= 連携 > 個別 > ダンス > 歌唱 >> 筋力 >= 持久力 >>> リテラシー」
+// リテラシーだけは「残体力の5%」を動的が決める
+
 const WEEKLY_SCHEDULE_ITEMS = [
-  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaCost: 1.0 },
-  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaCost: 0.8 },
-  { id: 'literacy', name: 'リテラシー講義', expStat: 'academics', secondaryExp: { talk: 0.3 }, staminaCost: 0.7 },
-  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7, individual: true },
-  { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: {}, staminaCost: 1.1, effect: '運動能力' },
-  { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: {}, staminaCost: 1.0, effect: '体力' },
+  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaCost: 1.0, effect: 'ダンス（＋運動能力・体力）' },
+  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaCost: 0.8, effect: '歌唱力（＋体力）' },
+  { id: 'literacy', name: 'リテラシー講義', expStat: 'crisis', secondaryExp: { sns: 1.0 }, staminaCost: 0, staminaRatio: 0.05, effect: '危機回避力・SNS運用' },
+  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaCost: 0.7, individual: true, effect: '対象1名を集中育成' },
+  { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: { recovery: 0.5 }, staminaCost: 0.45, effect: '運動能力（＋回復力）' },
+  { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: { recovery: 0.5 }, staminaCost: 0.45, effect: '体力（＋回復力）' },
   { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaCost: 1.2, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
-  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaCost: 0.9, groupOnly: true, effect: '連携力' },
+  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaCost: 1.1, groupOnly: true, effect: '連携力' },
   { id: 'meal-party', name: '食事会', social: true, cost: 1000000, staminaCost: 0 },
   { id: 'rest-day', name: '休養', rest: true, staminaCost: 0 },
   // テレビ出演（歌番組など）の放送日午前に固定される枠。プルダウンからは選べない
@@ -624,6 +647,11 @@ const OFFICE_ACTIONS = [
 ];
 // 1週間の休暇（14枠すべてを休養にして、大きな回復を得る）
 const FULL_VACATION_RECOVERY = 45;
+// 休養日の規定（1週間＝全日1日＋半休2枠）。足りないとスケジュールを実行できない
+const REQUIRED_FULL_REST_DAYS = 1;
+const REQUIRED_EXTRA_REST_SLOTS = 2;
+// 休養日の設定画面：この体力値まで自動休養（回復後はスケジュール通りに参加）
+const AUTO_REST_STAMINA_TARGET = 80;
 // 初期状態の枠の並び（休養を1日フル＋2枠に確保し、残りをレッスンで埋める）
 const DEFAULT_WEEK_SLOTS = [
   'rest-day', 'rest-day', 'dance-lesson', 'vocal-lesson',
@@ -679,6 +707,7 @@ const INJURY_ACCIDENT_WEEKS_RANGE = [2, 3];
 // ケガと体調不良の確率比（ケガを選ぶ確率）
 const INJURY_ACCIDENT_RATE = 0.5;
 // 14枠化に伴う体力消費の再調整（1枠あたりの基準消費）
+// 項目ごとの差分は WEEKLY_SCHEDULE_ITEMS の staminaCost で表す
 const GROUP_LESSON_STAMINA_COST = 6;
 const INDIVIDUAL_LESSON_STAMINA_COST = 8;
 // テレビ出演で固定される枠の体力消費（リハーサル1回／出演1回あたり）
@@ -702,6 +731,20 @@ let weeklyRecoveryDone = false;
 let lastLiveDate = '';
 
 const INITIAL_FUNDS = 100000000;
+// プリセットでCD発売が確定している月（この月のリリース種別は変更できない）
+const PRESET_RELEASE_MONTHS = [2, 6];
+const PRESET_RELEASE_TYPE = 'single';
+// 初期状態のライブを置く月（5〜7月のいずれかからランダムに選ぶ）
+const INITIAL_LIVE_MONTH_MIN = 5;
+const INITIAL_LIVE_MONTH_MAX = 7;
+// 初期状態のライブ日数（土日2days）
+const INITIAL_LIVE_SHOW_DAYS = 2;
+// 初期ライブの会場（常設の定期公演会場）
+const INITIAL_LIVE_VENUE = '原宿体育館';
+// 発売済み楽曲の累積売上が毎週少しずつ増え続ける割合（微小値。発売後もずっと増加する）
+const RELEASED_SONG_WEEKLY_PERSIST_RATE = 0.0006;
+// 比較グラフで並べる直近の楽曲数
+const SALES_COMPARE_SONG_COUNT = 5;
 const SONG_TITLES = ['ひかりの約束', 'キミ色サイン', '青空レター', '恋するステップ', '未来へのメロディ', '星屑のリボン', 'まっすぐな夢', '花咲く頃に'];
 // 新世代グループの名前素材（前半語 × 後半語の組み合わせで既存と重複しない名前を引く）
 const RIVAL_NAME_HEADS = [
