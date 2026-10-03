@@ -1238,6 +1238,37 @@ check('a fresh game starts with no remembered schedule', run(`
   })()
 `) === true);
 
+check('the default weekly preset has the requested 14-slot composition', run(`
+  (() => {
+    const counts = DEFAULT_WEEK_SLOTS.reduce((result, slotId) => {
+      result[slotId] = (result[slotId] || 0) + 1;
+      return result;
+    }, {});
+    const expected = {
+      'rest-day': 4,
+      'vocal-lesson': 2,
+      'dance-lesson': 2,
+      literacy: 1,
+      'individual-lesson': 1,
+      'full-run-through': 1,
+      coordination: 1,
+      'strength-training': 1,
+      'endurance-training': 1
+    };
+    return DEFAULT_WEEK_SLOTS.length === WEEK_SLOT_COUNT
+      && JSON.stringify(counts) === JSON.stringify(expected);
+  })()
+`) === true);
+check('the default preset satisfies the weekly rest requirement', run(`
+  (() => {
+    const savedSchedule = weeklySchedule;
+    weeklySchedule = createEmptyWeeklySchedule();
+    const meetsRequirement = validateWeeklySchedule();
+    weeklySchedule = savedSchedule;
+    return meetsRequirement;
+  })()
+`) === true);
+
 // ---- 歌番組が挟まった週の前後でスケジュールを引き継ぐ ----
 check('the week before a music show is kept as the draft source', run(`
   (() => {
