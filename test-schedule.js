@@ -1263,9 +1263,10 @@ check('the default preset satisfies the weekly rest requirement', run(`
   (() => {
     const savedSchedule = weeklySchedule;
     weeklySchedule = createEmptyWeeklySchedule();
-    const meetsRequirement = validateWeeklySchedule();
+    const rest = getWeekRestBreakdown();
     weeklySchedule = savedSchedule;
-    return meetsRequirement;
+    return rest.fullRestDays >= REQUIRED_FULL_REST_DAYS
+      && rest.extraSlots >= REQUIRED_EXTRA_REST_SLOTS;
   })()
 `) === true);
 

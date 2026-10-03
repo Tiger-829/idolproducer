@@ -653,10 +653,10 @@ const REQUIRED_EXTRA_REST_SLOTS = 2;
 const AUTO_REST_STAMINA_TARGET = 80;
 // 初期スケジュールのプリセット（休養4枠＋指定レッスン10枠）
 const DEFAULT_WEEK_SLOTS = [
-  'rest-day', 'rest-day', 'rest-day', 'vocal-lesson',
-  'rest-day', 'vocal-lesson', 'dance-lesson', 'dance-lesson',
-  'literacy', 'individual-lesson', 'full-run-through', 'coordination',
-  'strength-training', 'endurance-training'
+  'rest-day', 'rest-day', 'vocal-lesson', 'dance-lesson',
+  'vocal-lesson', 'dance-lesson', 'literacy', 'rest-day',
+  'individual-lesson', 'full-run-through', 'coordination', 'strength-training',
+  'endurance-training', 'rest-day'
 ];
 // 特別強化（1名集中）の倍率を掛けられる4能力（歌唱・ダンス・体力・回復力）
 // ※ 頭脳系（学力・トーク・SNS・バラエティ・危機回避）や運動能力・連携力・スタイルは等倍のまま
