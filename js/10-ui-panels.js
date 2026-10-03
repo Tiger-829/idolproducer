@@ -135,7 +135,7 @@ function renderWeeklyActionPanel() {
   const events = getCurrentWeekEvents();
   const currentDate = getGameDateObject();
 
-  // ライブがある週だけ週間スケジュールは組めない
+  // 自グループ設定ライブのある週はスケジュールを組めない
   const nextLiveDate = findWeekLiveStop(currentDate);
   const editableSpecialLiveEvents = getEditableSpecialLiveEventsForWeek(currentDate);
   if (nextLiveDate && !editableSpecialLiveEvents.length) {
@@ -161,6 +161,22 @@ function renderWeeklyActionPanel() {
         ${renderWeeklyEventItems(events)}
       </ul></div>
       <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">イベントまで進行</button>
+    `;
+    return;
+  }
+
+  if (currentDate.getDay() !== 3) {
+    const nextWednesday = getNextWednesday(currentDate);
+    const dateLabel = nextWednesday.toLocaleDateString('ja-JP', {
+      month: 'long', day: 'numeric', weekday: 'short'
+    });
+    panel.innerHTML = `
+      <h2 class="page-title">今週の行動</h2>
+      <div class="weekly-event-note"><strong>水曜日まで進行</strong><ul>
+        <li>${escapeHtml(`${dateLabel}に週間スケジュールを設定できます。`)}</li>
+        ${renderWeeklyEventItems(events)}
+      </ul></div>
+      <button class="main-btn" style="width:100%;" onclick="advanceOneWeek()">水曜日まで進行</button>
     `;
     return;
   }
@@ -204,12 +220,12 @@ function renderWeeklyScheduleControls() {
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
   ).join('');
 
-  // 残体力が低いメンバーにはマネージャーが休養日を打診する
+  // 体力が低いメンバーを表示する（休養に設定するかはユーザーが選ぶ）
   const fatiguedMembers = members.filter(member =>
     !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
   );
   const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">マネージャーから休養打診: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
+    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
     : '';
 
   const lessonStatOptions = INDIVIDUAL_LESSON_STATS
@@ -273,7 +289,7 @@ function renderWeeklyScheduleControls() {
     // 「[氏名]([怪我/体調不良]回復まで〇日)」の形式で可視化する
     const label = member.injury
       ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
-      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}${isAutoRest ? ` / 自動休養中（${AUTO_REST_STAMINA_TARGET}まで）` : ''}）`;
+      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}${isAutoRest ? ` / 体力${AUTO_REST_STAMINA_TARGET}まで休養` : ''}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
         onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
@@ -374,7 +390,7 @@ function renderWeeklyScheduleControls() {
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">休養日の設定 <small>枠を消費せず体力値を回復</small></div>
+      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${AUTO_REST_STAMINA_TARGET}で練習に復帰</small></div>
       ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>

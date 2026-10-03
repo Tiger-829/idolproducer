@@ -20,7 +20,7 @@ const RANDOM_EVENTS = [
     text: '有名雑誌からの取材・表紙掲載の打診が届きました。',
     choices: [
       { label: '有名雑誌の特集ページに出稿する', detail: '資金 -${cost} / 人気 +4', apply: ctx => { funds -= ctx.cost; adjustAllPopularity(4); } },
-      { label: 'webメディアに回す', detail: '費用は安く効果は薄', apply: ctx => { funds -= Math.round(ctx.cost * 0.2); adjustAllPopularity(1); } }
+      { label: 'webメディアに回す', detail: '費用は安く効果は薄い', apply: ctx => { funds -= Math.round(ctx.cost * 0.2); adjustAllPopularity(1); } }
     ]
   },
   {
@@ -667,9 +667,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const promoMultiplier = 1 + promoAlpha;
     const qualitySales = quality * base * multiplier * songMultiplier * promoMultiplier;
     const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
-    // 初週売上は RELEASE_FIRST_WEEK_TUNING 倍に下方修正する
-    const sales = Math.floor((qualitySales * 0.6 + fanDemand * 0.4) * RELEASE_FIRST_WEEK_TUNING)
-      + Math.floor(Math.random() * 30000);
+    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
 
     addGroupSales(sales);
     // CD売上の8割が月ごとに収入として計上される
@@ -906,15 +904,19 @@ function executeKohaku() {
 }
 
 function processSpecialLiveEvents(reachDate = gameDate) {
+  const startDate = getGameDateObject();
+  const limitDate = getGameDateObject(reachDate);
   specialLiveEvents.forEach(event => {
-    if (event.completed || event.liveDate !== reachDate) return;
+    if (event.completed || !event.liveDate) return;
+    const liveDate = getGameDateObject(event.liveDate);
+    if (liveDate > limitDate || (liveDate < startDate && event.liveDate !== gameDate)) return;
     const venue = VENUE_DATA.find(item => item.name === event.venue);
     if (!venue) return;
 
     const capacity = CAPACITY_MAP[venue.cap];
     const eventMultiplier = (event.type === 'festival' ? 1.4 : 1.2) + (Math.max(0, officeUpgrades.liveProduction - 1) * 0.05);
     const audience = Math.min(capacity, Math.floor(
-      getLiveAudienceDemand(venue, getGameDateObject(reachDate)) * eventMultiplier
+      getLiveAudienceDemand(venue, liveDate) * eventMultiplier
     ));
     const ticketRevenue = audience * 8000;
     const merchandiseSales = sellMerchandiseAtLive();

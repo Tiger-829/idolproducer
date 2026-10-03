@@ -134,6 +134,22 @@ run('advanceOneWeek();');
 check('broadcast is processed when the week is skipped', run('scheduledPerformances.length') === 0);
 const logs = run('document.getElementById("log-box").textContent');
 check('broadcast log appears', logs.includes('Song Station'), logs.slice(0, 200));
+check('a rival live does not interrupt Wednesday schedule cadence', run(`
+  (() => {
+    const originalBookings = rivalLiveBookings;
+    const date = getGameDateObject();
+    date.setDate(date.getDate() + 3);
+    rivalLiveBookings = [{
+      groupId: 'rival_1', groupName: 'テスト競合', venue: VENUE_DATA[0].name,
+      liveDate: toDateKey(date), venueDates: [toDateKey(date)]
+    }];
+    renderWeeklyActionPanel();
+    const panel = document.getElementById('weekly-action-panel').innerHTML;
+    const allowsSchedule = !hasLiveWithinWeek() && panel.includes('confirmWeeklySchedule()');
+    rivalLiveBookings = originalBookings;
+    return allowsSchedule;
+  })()
+`) === true);
 console.log('\n--- 3c. External live events allow scheduling with fixed slots ---');
 run(`
   const d = new Date(gameDate + 'T12:00:00'); d.setDate(d.getDate() + 3);
@@ -153,9 +169,12 @@ run(`
   check('the following day is fixed as a full rest day', [eventDayBase + 2, eventDayBase + 3].every(index =>
     externalFixedSlots.some(slot => slot.index === index && slot.slotId === 'rest-day')));
   run('setWeeklyScheduleSlot(8, "rest-day"); confirmWeeklySchedule();');
-  check('the editable external live schedule advances to its event date', run('specialLiveEvents[0].completed') === true);
+  check('the editable external live schedule advances to Wednesday and processes the event',
+    run('specialLiveEvents[0].completed && new Date(gameDate + "T12:00:00").getDay() === 3') === true);
   check('the external live appears in the log', run('document.getElementById("log-box").textContent.includes("テストフェス")') === true);
-console.log('\n--- 4. Live weeks still block the weekly schedule ---');
+  check('an external live does not interrupt Wednesday schedule cadence',
+    run('new Date(gameDate + "T12:00:00").getDay() === 3') === true);
+  console.log('\n--- 4. Live weeks still block the weekly schedule ---');
 run(`
   const d = new Date(gameDate + 'T12:00:00'); d.setDate(d.getDate() + 2);
   const key = currentYear + '-' + currentMonth;
@@ -172,6 +191,47 @@ check('live-week message shows a valid date and its venue', !livePanel.includes(
 const dateBeforeConfirm = run('gameDate');
 run('confirmWeeklySchedule();');
 check('confirmWeeklySchedule does nothing on a live week', run('gameDate') === dateBeforeConfirm);
+check('weekly schedule cannot be confirmed on a non-Wednesday date', run(`
+  (() => {
+    const originalDate = gameDate;
+    const originalSchedule = weeklySchedule;
+    const planKey = currentYear + '-' + currentMonth;
+    const originalPlan = productionSchedule[planKey];
+    delete productionSchedule[planKey];
+    const date = getGameDateObject();
+    date.setDate(date.getDate() + 1);
+    gameDate = toDateKey(date);
+    syncGameCalendar();
+    weeklySchedule = null;
+    ensureWeeklySchedule();
+    const before = gameDate;
+    confirmWeeklySchedule();
+    const blocked = gameDate === before;
+    gameDate = originalDate;
+    syncGameCalendar();
+    weeklySchedule = originalSchedule;
+    if (originalPlan) productionSchedule[planKey] = originalPlan;
+    return blocked;
+  })()
+`) === true);
+check('non-Wednesday action panel offers progress to Wednesday, not schedule setup', run(`
+  (() => {
+    const originalDate = gameDate;
+    const planKey = currentYear + '-' + currentMonth;
+    const originalPlan = productionSchedule[planKey];
+    delete productionSchedule[planKey];
+    const date = getGameDateObject();
+    date.setDate(date.getDate() + 1);
+    gameDate = toDateKey(date);
+    syncGameCalendar();
+    renderWeeklyActionPanel();
+    const html = document.getElementById('weekly-action-panel').innerHTML;
+    gameDate = originalDate;
+    syncGameCalendar();
+    if (originalPlan) productionSchedule[planKey] = originalPlan;
+    return html.includes('水曜日まで進行') && !html.includes('confirmWeeklySchedule()');
+  })()
+`) === true);
 console.log('\n--- 5. Equipment upgrade proposal as a random event ---');
 run('officeUpgrades.lessons = 1; pendingRandomEvent = buildRandomEvent("equipment-upgrade");');
 const equipmentEvent = run('JSON.stringify(pendingRandomEvent ? { id: pendingRandomEvent.id, name: pendingRandomEvent.name, context: pendingRandomEvent.context } : null)');
@@ -356,7 +416,7 @@ const withRecorder = (body) => run(`
   })();
   __result;
 `);
-console.log('\n--- Auto-rest members return after reaching the stamina target ---');
+console.log('\n--- User-selected rest members return after reaching the stamina target ---');
 const autoRestReturn = JSON.parse(withRecorder(`
   const savedSchedule = weeklySchedule;
   const savedPerformances = scheduledPerformances;
@@ -372,23 +432,29 @@ const autoRestReturn = JSON.parse(withRecorder(`
     statExp: { ...member.statExp }
   }));
   try {
-    const target = idolRoster.find(member => !member.injury);
+    const target = idolRoster.find(member => member.isSelected && !member.injury);
+    const otherLowStaminaMember = idolRoster.find(member => member.id !== target.id && !member.injury);
     scheduledPerformances = [];
     specialLiveEvents = [];
     weeklySchedule = cloneWeeklySchedule(weeklySchedule);
     weeklySchedule.slots = Array(WEEK_SLOT_COUNT).fill('');
     weeklySchedule.slots[0] = 'rest-day';
     weeklySchedule.slots[1] = 'dance-lesson';
-    weeklySchedule.restDayMembers = [target.id];
-    weeklySchedule.autoRestMemberIds = [target.id];
+    weeklySchedule.restDayMembers = [];
+    weeklySchedule.autoRestMemberIds = [];
     weeklySchedule.focusMemberIds = [];
     target.staminaValue = AUTO_REST_STAMINA_TARGET - 5;
+    otherLowStaminaMember.staminaValue = AUTO_REST_STAMINA_TARGET - 5;
+    toggleRestDayMember(target.id);
+    const onlyUserSelectedForRest = weeklySchedule.autoRestMemberIds.length === 1
+      && weeklySchedule.autoRestMemberIds[0] === target.id;
     window.__stamina = [];
     applyWeeklySchedule();
     return JSON.stringify({
       spent: window.__stamina.find(entry => entry.id === target.id)?.amount || 0,
       autoResting: weeklySchedule.autoRestMemberIds.includes(target.id),
-      listedAsResting: weeklySchedule.restDayMembers.includes(target.id)
+      listedAsResting: weeklySchedule.restDayMembers.includes(target.id),
+      onlyUserSelectedForRest
     });
   } finally {
     weeklySchedule = savedSchedule;
@@ -406,6 +472,8 @@ const autoRestReturn = JSON.parse(withRecorder(`
     });
   }
 `));
+check('only a user-selected low-stamina member enters recovery rest',
+  autoRestReturn.onlyUserSelectedForRest === true, JSON.stringify(autoRestReturn));
 check('a member resumes training after a scheduled rest slot reaches 80', autoRestReturn.spent > 0
   && autoRestReturn.autoResting === false && autoRestReturn.listedAsResting === false, JSON.stringify(autoRestReturn));
 console.log('\n--- 9. Lesson fatigue uses the stamina before each session ---');
@@ -1246,6 +1314,44 @@ check('a music-show week still reserves its own fixed slots', run(`
 check('the week runs from Thursday to the following Wednesday', run(`
   JSON.stringify(WEEK_DAY_LABELS) === JSON.stringify(['木','金','土','日','月','火','水'])
 `) === true);
+check('a paused midweek date keeps the Wednesday week anchor for weekday slots', run(`
+  (() => {
+    const originalDate = gameDate;
+    const originalPerformances = scheduledPerformances;
+    const pausedDate = getGameDateObject();
+    pausedDate.setDate(pausedDate.getDate() + 3);
+    gameDate = toDateKey(pausedDate);
+    scheduledPerformances = [{
+      id: 'paused-weekday-check', name: 'Mコン', airDate: gameDate, songId: null, isSpecial: false
+    }];
+    const broadcast = [...getWeekFixedSlots().values()].find(slot => slot.kind === 'broadcast');
+    const actual = ['日','月','火','水','木','金','土'];
+    const isCorrect = Boolean(broadcast)
+      && getWeekSlotLabel(broadcast.index) === actual[pausedDate.getDay()] + '曜午後';
+    gameDate = originalDate;
+    scheduledPerformances = originalPerformances;
+    syncGameCalendar();
+    return isCorrect;
+  })()
+`) === true);
+check('an unprocessed live on the current date still blocks weekly scheduling', run(`
+  (() => {
+    const key = \`\${currentYear}-\${currentMonth}\`;
+    const originalPlan = productionSchedule[key];
+    const originalSchedule = weeklySchedule;
+    productionSchedule[key] = {
+      liveVenue: VENUE_DATA[0].name, liveName: 'テストライブ', liveDate: gameDate
+    };
+    renderWeeklyActionPanel();
+    const panel = document.getElementById('weekly-action-panel').innerHTML;
+    const blocks = hasLiveWithinWeek() && panel.includes('イベントまで進行')
+      && !panel.includes('confirmWeeklySchedule()');
+    if (originalPlan) productionSchedule[key] = originalPlan;
+    else delete productionSchedule[key];
+    weeklySchedule = originalSchedule;
+    return blocks;
+  })()
+`) === true);
 check('each slot label matches the actual weekday it represents', run(`
   (() => {
     const start = getGameDateObject();
@@ -1282,22 +1388,32 @@ check('a broadcast lands on the afternoon of its actual air date', run(`
 // ---- 歌番組リハーサル前の準備（裏効果：通し練習/連携なら楽曲経験値が5倍） ----
 const musicPrep = JSON.parse(run(`
   (() => {
+    const originalDate = gameDate;
+    gameDate = toDateKey(getNextWednesday(getGameDateObject()));
+    syncGameCalendar();
     const out = {};
+    const totalSongExperience = song => song.experience
+      + Array.from({ length: song.level - 1 }, (_, index) => getSongLevelExpRequired(index + 1))
+        .reduce((total, required) => total + required, 0);
     ['dance-lesson', 'full-run-through', 'coordination'].forEach(prep => {
       const air = new Date(gameDate + 'T12:00:00');
       air.setDate(air.getDate() + 5);
       const song = ensureScheduledSong(1, 2, productionSchedule['1-2']);
+      song.experience = 0;
+      song.level = 1;
       scheduledPerformances = [{ id: 'prep-' + prep, name: 'CTV', isSpecial: false, songId: song.id, airDate: toDateKey(air) }];
       ensureWeeklySchedule();
       weeklySchedule.slots = DEFAULT_WEEK_SLOTS.slice();
       const rehearsalIndex = [...getWeekFixedSlots().entries()].find(([, s]) => s.kind === 'rehearsal')[0];
       weeklySchedule.slots[rehearsalIndex - 1] = prep;
       markMusicPreparations();
-      const before = song.experience || 0;
+      const before = totalSongExperience(song);
       processScheduledPerformances(toDateKey(air));
-      out[prep] = (song.experience || 0) - before;
+      out[prep] = totalSongExperience(song) - before;
     });
     scheduledPerformances = [];
+    gameDate = originalDate;
+    syncGameCalendar();
     return JSON.stringify({ out, base: REGULAR_PROGRAM_SONG_EXPERIENCE, times: MUSIC_PREP_BONUS_MULTIPLIER });
   })()
 `));

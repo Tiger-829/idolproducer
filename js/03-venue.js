@@ -311,6 +311,13 @@ function getNextWednesday(date) {
   return nextDate;
 }
 
+function getWeekAnchorDate(date = getGameDateObject()) {
+  const anchor = new Date(date);
+  const daysSinceWednesday = (anchor.getDay() - 3 + 7) % 7;
+  anchor.setDate(anchor.getDate() - daysSinceWednesday);
+  return anchor;
+}
+
 function getLastWednesday(year, monthIndex) {
   const date = new Date(year, monthIndex + 1, 0, 12);
   const daysSinceWednesday = (date.getDay() - 3 + 7) % 7;

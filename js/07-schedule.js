@@ -11,25 +11,6 @@ let lastWeekSchedule = null;
 // 歌番組の翌週はその前の週のスケジュールを仮組として呼び出すために保持する。
 let savedCleanWeekSchedule = null;
 
-// 事務所が自動で休養にするメンバー（体力80回復まで。回復後はスケジュール通りに参加）
-function getAutoRestMemberIds() {
-  return idolRoster
-    .filter(member => !member.injury)
-    .filter(member => (member.staminaValue ?? MAX_STAMINA_VALUE) < AUTO_REST_STAMINA_TARGET)
-    .map(member => member.id);
-}
-
-// 自動休養を休養日の設定へ反映する（手動で外した人は自動では戻さない）
-function syncAutoRestMembers() {
-  ensureWeeklySchedule();
-  const list = weeklySchedule.restDayMembers;
-  weeklySchedule.autoRestMemberIds = getAutoRestMemberIds();
-  weeklySchedule.autoRestMemberIds.forEach(id => {
-    if (!list.includes(id)) list.push(id);
-  });
-  return list;
-}
-
 function createEmptyWeeklySchedule() {
   // 1週間は14枠（7日×午前/午後）で固定。休養を1日フル＋2枠あけて、残りをレッスンで埋める
   const slots = [...DEFAULT_WEEK_SLOTS];
@@ -37,16 +18,14 @@ function createEmptyWeeklySchedule() {
   slots.length = WEEK_SLOT_COUNT;
   const availableMembers = idolRoster.filter(member => member.isSelected && !member.injury);
   const defaultMember = availableMembers[0]?.id ?? idolRoster.find(member => !member.injury)?.id ?? '';
-  // 体力80を切るメンバーは事務所が自動で休養にする
-  const autoRest = getAutoRestMemberIds();
   return {
     slots,
     vacation: false,
     individualMemberId: defaultMember,
     individualStat: 'vocal',
     focusMemberIds: [defaultMember].filter(Boolean),
-    restDayMembers: [...autoRest],
-    autoRestMemberIds: autoRest,
+    restDayMembers: [],
+    autoRestMemberIds: [],
     officeAction: ''
   };
 }
@@ -134,7 +113,7 @@ function getWeekDayIndexForOffset(offsetDays) {
 // 今週のテレビ出演（歌番組・大型特番）を週枠に固定する
 // 放送日の「午後」＝出演、その直前の「午前」＝リハーサル として埋め込む
 function getWeekFixedSlots() {
-  const startDate = getGameDateObject();
+  const startDate = getWeekAnchorDate();
   const fixedSlots = new Map();
   const addFixed = (slot, date) => {
     const existing = fixedSlots.get(slot.index);
@@ -290,6 +269,13 @@ function createScheduleFromLastWeek() {
   base.focusMemberIds = source.focusMemberIds.filter(id =>
     idolRoster.some(member => member.id === id)
   );
+  const recoveryRestIds = (source.autoRestMemberIds || []).filter(id => {
+    const member = idolRoster.find(entry => entry.id === id);
+    return member && !member.injury
+      && (member.staminaValue ?? MAX_STAMINA_VALUE) < AUTO_REST_STAMINA_TARGET;
+  });
+  base.restDayMembers = recoveryRestIds;
+  base.autoRestMemberIds = recoveryRestIds;
   base.officeAction = source.officeAction || '';
   return base;
 }
@@ -324,21 +310,23 @@ function toggleFocusMember(memberId) {
   renderWeeklyActionPanel();
 }
 
-// 休養日の対象メンバーをトグルする
-// 事務所が自動休養させている人（体力80未満）は外せない
+// 休養日の対象メンバーをユーザーがトグルする
 function toggleRestDayMember(memberId) {
   ensureWeeklySchedule();
   const list = weeklySchedule.restDayMembers;
   const index = list.indexOf(memberId);
   if (index >= 0) {
-    if ((weeklySchedule.autoRestMemberIds || []).includes(memberId)) {
-      const member = idolRoster.find(entry => entry.id === memberId);
-      setLog(`【休養日】${member ? member.name : '当該メンバー'}は体力が${AUTO_REST_STAMINA_TARGET}まで回復するまで自動で休養です。`);
-      renderWeeklyActionPanel();
-      return;
-    }
     list.splice(index, 1);
-  } else list.push(memberId);
+    weeklySchedule.autoRestMemberIds = (weeklySchedule.autoRestMemberIds || [])
+      .filter(id => id !== memberId);
+  } else {
+    list.push(memberId);
+    const member = idolRoster.find(entry => entry.id === memberId);
+    if (member && !member.injury
+      && (member.staminaValue ?? MAX_STAMINA_VALUE) < AUTO_REST_STAMINA_TARGET) {
+      weeklySchedule.autoRestMemberIds.push(memberId);
+    }
+  }
   renderWeeklyActionPanel();
 }
 
@@ -936,7 +924,11 @@ function applyOfficeAction(actionId) {
 
 // 週間スケジュールを確定して1週間進める
 function confirmWeeklySchedule() {
-  if (hasLiveWithinWeek() && !getEditableSpecialLiveEventsForWeek().length) return;
+  if (getGameDateObject().getDay() !== 3) {
+    setLog('【週間スケジュール】スケジュール設定は水曜日に行えます。');
+    return;
+  }
+  if (hasLiveWithinWeek()) return;
   if (!validateWeeklySchedule()) return;
   // 確定した内容は次週の初期値として覚えておく
   rememberWeeklySchedule(weeklySchedule);
@@ -949,7 +941,7 @@ function confirmWeeklySchedule() {
 function advanceOneWeek() {
   const currentDate = getGameDateObject();
   const nextWednesday = getNextWednesday(currentDate);
-  const nextLiveDate = findNextScheduledLiveDate(currentDate, nextWednesday);
+  const nextLiveDate = findNextGroupLiveDate(currentDate, nextWednesday);
   const nextDate = nextLiveDate || nextWednesday;
   const wasWednesday = currentDate.getDay() === 3;
   const previousMonth = currentMonth;

@@ -47,57 +47,41 @@ function hasUpcomingSpecialBroadcastOffer() {
   return pendingPerformanceOffers.some(offer => offer.isSpecial);
 }
 
-// 今週のうちにライブがあるか（週間スケジュールを組めない週の判定用）
+// 今週に自グループ設定ライブがあるか（ある場合は週間スケジュールを組めない）
 function hasLiveWithinWeek(date = getGameDateObject()) {
   return Boolean(findWeekLiveStop(date));
 }
 
-// 今週のライブ日（なければ null）。ライブがある週だけ時間が止まる
+// 今週の自グループ設定ライブ日（なければ null）
 function findWeekLiveStop(date = getGameDateObject()) {
-  return findNextScheduledLiveDate(date, getNextWednesday(date));
-}
-
-// 最も近い開催日に自グループの予定がなく、外部出演だけがある週はスケジュール可能
-function getEditableSpecialLiveEventsForWeek(date = getGameDateObject()) {
-  const stopDate = findWeekLiveStop(date);
-  if (!stopDate) return [];
-  const dateKey = toDateKey(stopDate);
-  const hasGroupLive = getScheduledLiveEntries().some(entry =>
+  const dateKey = toDateKey(date);
+  const liveIsToday = getScheduledLiveEntries().some(entry =>
     !entry.completed && getLiveEntryShowDates(entry).includes(dateKey)
   );
-  const hasRivalLive = rivalLiveBookings.some(booking =>
-    (booking.venueDates || [booking.liveDate]).includes(dateKey)
-  );
-  if (hasGroupLive || hasRivalLive) return [];
-  return specialLiveEvents.filter(event => !event.completed && event.liveDate === dateKey);
+  if (liveIsToday) return new Date(date);
+  return findNextGroupLiveDate(date, getNextWednesday(date));
 }
 
-// 指定期間の次に開催されるライブ日を探す（自分のライブ・出演決定済みイベント・競合公演）
-function findNextScheduledLiveDate(startDate, endDate) {
+// 外部ライブはスケジュールを止めず、今週の予定として注記する
+function getEditableSpecialLiveEventsForWeek(date = getGameDateObject()) {
+  const weekEnd = getNextWednesday(date);
+  return specialLiveEvents.filter(event => {
+    if (event.completed || !event.liveDate) return false;
+    const liveDate = getGameDateObject(event.liveDate);
+    return liveDate > date && liveDate <= weekEnd;
+  });
+}
+
+function findNextGroupLiveDate(startDate, endDate) {
   let nextLiveDate = null;
-  const consider = candidate => {
-    if (!candidate) return;
-    if (candidate > startDate && candidate <= endDate && (!nextLiveDate || candidate < nextLiveDate)) {
-      nextLiveDate = candidate;
-    }
-  };
   getScheduledLiveEntries().forEach(entry => {
     if (entry.completed) return;
-    // 1公演=1日の設定なので、すべての公演日を対象にする
-    // （2daysライブの2日目などが「翌日開催のライブ」として選ばれる）
     getLiveEntryShowDates(entry).forEach(dateKey => {
-      consider(getGameDateObject(dateKey));
-    });
-  });
-  specialLiveEvents.forEach(event => {
-    if (event.completed) return;
-    consider(getGameDateObject(event.liveDate));
-  });
-  // テレビ出演（定例番組・大型特番）や年末の大型イベント（赤白・大賞）は
-  // 週間スケジュールの固定枠として処理するため、週を止めない
-  rivalLiveBookings.forEach(booking => {
-    (booking.venueDates || [booking.liveDate]).forEach(dateKey => {
-      consider(getGameDateObject(dateKey));
+      const candidate = getGameDateObject(dateKey);
+      if (candidate > startDate && candidate <= endDate
+        && (!nextLiveDate || candidate < nextLiveDate)) {
+        nextLiveDate = candidate;
+      }
     });
   });
   return nextLiveDate;
