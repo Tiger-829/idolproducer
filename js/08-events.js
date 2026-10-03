@@ -64,7 +64,7 @@ const RANDOM_EVENTS = [
     name: '慈善イベントへの出席',
     text: '慈善行事への参加打診が届きました。',
     choices: [
-      { label: '主旨参加する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +4', apply: ctx => { funds -= Math.round(ctx.cost * 0.6); adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 4); } },
+      { label: '参加する', detail: '資金 -${cost} / 人気 +3 / 危機回避力 +4', apply: ctx => { funds -= Math.round(ctx.cost * 0.6); adjustAllPopularity(3); groupCrisis = Math.min(100, groupCrisis + 4); } },
       { label: '不参加', detail: '効果なし', apply: () => {} }
     ]
   },
@@ -667,7 +667,9 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const promoMultiplier = 1 + promoAlpha;
     const qualitySales = quality * base * multiplier * songMultiplier * promoMultiplier;
     const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
-    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
+    // 初週売上は RELEASE_FIRST_WEEK_TUNING 倍に下方修正する
+    const sales = Math.floor((qualitySales * 0.6 + fanDemand * 0.4) * RELEASE_FIRST_WEEK_TUNING)
+      + Math.floor(Math.random() * 30000);
 
     addGroupSales(sales);
     // CD売上の8割が月ごとに収入として計上される
@@ -1124,9 +1126,40 @@ function ensureScheduledSong(year, month, plan) {
   return song;
 }
 
+// 楽曲レベルを1上げるのに必要な経験値（メンバーと同じ「経験点制」にする）
+// 必要経験値 = SONG_LEVEL_EXP_BASE × SONG_LEVEL_EXP_GROWTH ^ (Lv-1)
+function getSongLevelExpRequired(level) {
+  const base = Math.max(0, (level || 1) - 1);
+  return Math.round(SONG_LEVEL_EXP_BASE * Math.pow(SONG_LEVEL_EXP_GROWTH, base));
+}
+
+// 経験値を積んで楽曲レベルを上げる（Lv.MAX_SONG_LEVELで経験値は消費しない）
 function addSongExperience(song, amount) {
-  song.experience = (song.experience || 0) + amount;
-  song.level = Math.min(20, 1 + Math.floor(song.experience / 12));
+  if (!song || !Number.isFinite(amount) || amount <= 0) return 0;
+  if (!Number.isFinite(song.experience)) song.experience = 0;
+  if (!Number.isFinite(song.level)) song.level = 1;
+  if (song.level >= MAX_SONG_LEVEL) return 0;
+  song.experience += amount;
+  let gained = 0;
+  let level = song.level;
+  while (level < MAX_SONG_LEVEL) {
+    const required = getSongLevelExpRequired(level);
+    if (song.experience < required) break;
+    song.experience -= required;
+    level += 1;
+    gained += 1;
+  }
+  if (level >= MAX_SONG_LEVEL) song.experience = 0;
+  if (gained > 0) song.level = level;
+  return gained;
+}
+
+// 楽曲レベルの次Lvまでの進捗率（0〜1）
+function getSongLevelExpProgress(song) {
+  if (!song || !Number.isFinite(song.level)) return 0;
+  if (song.level >= MAX_SONG_LEVEL) return 1;
+  const current = song.experience || 0;
+  return Math.min(1, current / getSongLevelExpRequired(song.level));
 }
 
 // 楽曲1枚あたりの単価（シングル／アルバム）

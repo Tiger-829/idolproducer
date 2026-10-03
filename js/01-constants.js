@@ -740,6 +740,12 @@ const INITIAL_LIVE_VENUE = '原宿体育館';
 const RELEASED_SONG_WEEKLY_PERSIST_RATE = 0.0006;
 // 比較グラフで並べる直近の楽曲数
 const SALES_COMPARE_SONG_COUNT = 5;
+// 楽曲レベルの経験点制（メンバーと同じ必要経験値の伸び）
+const MAX_SONG_LEVEL = 20;
+const SONG_LEVEL_EXP_BASE = 24;
+const SONG_LEVEL_EXP_GROWTH = 1.12;
+// 初週売上の下方修正係数（1未満で控えめに卖的）
+const RELEASE_FIRST_WEEK_TUNING = 0.92;
 const SONG_TITLES = ['ひかりの約束', 'キミ色サイン', '青空レター', '恋するステップ', '未来へのメロディ', '星屑のリボン', 'まっすぐな夢', '花咲く頃に'];
 // 新世代グループの名前素材（前半語 × 後半語の組み合わせで既存と重複しない名前を引く）
 const RIVAL_NAME_HEADS = [

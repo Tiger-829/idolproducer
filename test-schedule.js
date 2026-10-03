@@ -744,6 +744,7 @@ check('ordinary logs play no effect', run(`
 const DRAFT_SKIP_ROULETTE = 'draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = "picking"; renderDraftPickStep();';
 check('rival picks are recorded in the pick history', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     ${DRAFT_SKIP_ROULETTE}
     draftState.round = 2;
@@ -764,6 +765,7 @@ check('rival picks are recorded in the pick history', run(`
 `) === true);
 check('the history records the player and the lottery result too', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -788,6 +790,7 @@ check('the history records the player and the lottery result too', run(`
 `) === true);
 check('losing the lottery keeps the same pick slot', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -811,6 +814,7 @@ check('losing the lottery keeps the same pick slot', run(`
 `) === true);
 check('winning the lottery still advances to the next round', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 1;
@@ -831,6 +835,7 @@ check('winning the lottery still advances to the next round', run(`
 // ---- ドラフト：指名済みリスト・名指しパネルの並び替え ----
 check('the pick panel offers exactly five sort criteria', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const labels = [...document.querySelectorAll('.draft-sort-btn')].map(b => b.textContent);
@@ -884,6 +889,7 @@ check('sorting keeps the pool order so picks still target the right member', run
 `) === true);
 check('the acquired list starts empty and fills after each pick', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const empty = document.querySelector('.draft-acquired-list').classList.contains('is-empty');
@@ -898,6 +904,7 @@ check('the acquired list starts empty and fills after each pick', run(`
 // ---- ドラフト：任意人数の指名パンル・きじ引き ----
 check('the draft opens straight into the pick panel', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     return draftState.phase === 'picking'
@@ -930,6 +937,7 @@ check('the candidate list can be paged', run(`
 `) === true);
 check('the draft ends after any number of picks', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     draftState.round = 2;
@@ -943,6 +951,7 @@ check('the draft ends after any number of picks', run(`
 `) === true);
 check('the lottery order starts from this round team', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const order = buildDraftLotteryOrder();
@@ -953,6 +962,7 @@ check('the lottery order starts from this round team', run(`
 `) === true);
 check('a conflict opens the lottery and the player draws a chosen ticket', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     // 1巡目の回転パネル → くじを引く（重複を確実にする）
     const originalRandom = Math.random;
@@ -976,6 +986,7 @@ check('a conflict opens the lottery and the player draws a chosen ticket', run(`
 `) === true);
 check('round 1 confirms every rival pick before the roulette', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     const phase = draftState.phase;
     const rivalTeams = draftState.pickOrder.filter(t => !t.isPlayer).length;
@@ -1001,6 +1012,7 @@ check('the log keeps a history with the newest first', run(`
 `) === true);
 check('the draft practice opens with a clear practice label', run(`
   (() => {
+    closeDraftModal();
     openDraftPractice();
     draftState.round = 2; draftState.firstRoundResolved = true; draftState.phase = 'picking'; renderDraftPickStep();
     const title = document.getElementById('draft-title').textContent;
