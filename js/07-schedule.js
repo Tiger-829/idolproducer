@@ -998,16 +998,16 @@ function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
   return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
 }
 
+// ==========================================
+// 07-schedule.js : スケジュール入力バリデーション
+// ==========================================
 function validateWeeklySchedule() {
   ensureWeeklySchedule();
 
-  if (weeklySchedule.vacation && getWeekFixedSlots().size) {
-    weeklySchedule.vacation = false;
-    setLog('【週間スケジュール】テレビ出演があるため、1週間の休暇を解除しました。');
-  }
-
+  // 完全休暇モードなら無条件通過
   if (weeklySchedule.vacation) return true;
 
+  // 1. スロット枠の上限チェック（通し練習は週2枠まで等）
   if (typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' && Array.isArray(WEEKLY_SCHEDULE_ITEMS)) {
     const overLimit = WEEKLY_SCHEDULE_ITEMS
       .filter(item => item.weeklyLimit)
@@ -1015,18 +1015,12 @@ function validateWeeklySchedule() {
       .find(entry => entry.used > entry.item.weeklyLimit);
 
     if (overLimit) {
-      alert(`【設定エラー】「${overLimit.item.name}」は1週間に${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。枠を減らしてください。`);
+      alert(`「${overLimit.item.name}」は1週間に${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。`);
       return false;
     }
   }
 
-  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
-  const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
-  if (weeklySchedule.officeAction === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts < maxProd && devCost > funds) {
-    alert(`グッズの開発費 ${formatMoney(devCost)} が資金を超えています。`);
-    return false;
-  }
-
+  // 2. 休養規定チェック（全日1日＋半休2枠）
   const rest = getWeekRestBreakdown();
   const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
   const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
@@ -1034,28 +1028,19 @@ function validateWeeklySchedule() {
   if (typeof isRestRequirementAchievable === 'function' && isRestRequirementAchievable()) {
     const restShort = [];
     if (rest.fullRestDays < reqFull) {
-      restShort.push(`・1日フル休養（午前・午後とも休養の日）：現在 ${rest.fullRestDays}日 / 必要 ${reqFull}日`);
+      restShort.push(`1日フル休養（現在${rest.fullRestDays}日 / 必要${reqFull}日）`);
     }
     if (rest.extraSlots < reqExtra) {
-      restShort.push(`・半休枠（午前または午後の休養）：現在 ${rest.extraSlots}枠 / 必要 ${reqExtra}枠`);
+      restShort.push(`半休枠（現在${rest.extraSlots}枠 / 必要${reqExtra}枠）`);
     }
-
     if (restShort.length > 0) {
-      alert(`【休養不足】スケジュールを実行できません。\n\n${restShort.join('\n')}\n\n※スロットから「休養」を設定してください。`);
+      alert(`スケジュールを実行できません。休養が不足しています。\n不足: ${restShort.join(' / ')}\n\n※空き枠に「休養」を設定してください。`);
       return false;
     }
   }
 
-  const mealCount = getWeekMealPartyCount();
-  const mealCost = mealCount * (typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000);
-  if (mealCost > funds) {
-    alert(`【資金不足】食事会の経費（${formatMoney(mealCost)}）が所持金を超えています。食事会を減らしてください。`);
-    return false;
-  }
-
   return true;
 }
-
 function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
   const releaseMap = new Map();
   const targetStamina = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
