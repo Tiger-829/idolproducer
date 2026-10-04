@@ -1553,29 +1553,97 @@
   }
 
   /* ==========================================
-     2. その他のタブ（グループ、編成、資金、順位、記録）
-        一律でシンプルに左右2分割にする
+     2. グループタブ（独自の2分割構造）
      ========================================== */
-  #page-group,
-  #page-formation,
-  #page-funds,
-  #page-ranking,
+  #page-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-group .team-summary-card {
+    grid-column: 1 / 2 !important;
+  }
+  #page-group .team-fans-card:nth-of-type(2) {
+    grid-column: 2 / 3 !important;
+  }
+  #page-group .team-fans-card:nth-of-type(3) {
+    grid-column: 2 / 3 !important;
+  }
+  #page-group > div:last-of-type {
+    grid-column: span 2 !important;
+  }
+
+  /* ==========================================
+     3. 編成タブ（独自の2分割構造）
+     ========================================== */
+  #page-formation {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-formation .roster-card:nth-of-type(1) {
+    grid-column: 1 / 2 !important;
+  }
+  #page-formation .roster-card:nth-of-type(2) {
+    grid-column: 2 / 3 !important;
+  }
+
+  /* ==========================================
+     4. 資金タブ（独自の2分割構造）
+     ========================================== */
+  #page-funds {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-funds > .page-title:first-of-type {
+    grid-column: span 2 !important;
+  }
+  #page-funds .funds-card {
+    grid-column: 1 / 2 !important;
+  }
+  #page-funds .fund-stat-grid:nth-of-type(1) {
+    grid-column: 2 / 3 !important;
+  }
+  #page-funds > h2.page-title:nth-of-type(2),
+  #page-funds .fund-stat-grid:nth-of-type(2),
+  #page-funds .office-maintenance-note {
+    grid-column: span 2 !important;
+  }
+
+  /* ==========================================
+     5. 業界順位タブ
+     ========================================== */
+  #page-ranking {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  #page-ranking .ranking-list {
+    width: 100% !important;
+  }
+
+  /* ==========================================
+     6. 記録タブ（独自の2分割構造）
+     ========================================== */
   #page-records {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
     align-items: start !important;
   }
-
-  /* 各タブのタイトルや横幅いっぱいに広げたい大枠要素の指定 */
-  #page-group > div:last-of-type,
-  #page-formation .roster-card,
-  #page-funds > .page-title,
-  #page-funds .office-maintenance-note#salary-note,
-  #page-ranking > .page-title, 
-  #page-ranking > .ranking-note,
-  #page-ranking > .ranking-list,
-  #page-records > .page-title,
+  #page-records > .page-title {
+    grid-column: span 2 !important;
+  }
+  #page-records .records-block:nth-of-type(1) {
+    grid-column: 1 / 2 !important;
+  }
+  #page-records .records-block:nth-of-type(2) {
+    grid-column: 2 / 3 !important;
+  }
   #page-records .records-block:nth-of-type(3),
   #page-records .records-help {
     grid-column: span 2 !important;
