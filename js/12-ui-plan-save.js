@@ -123,9 +123,9 @@ function renderLiveSlotHtml(month, index, slot) {
       <details class="seat-settings">
         <summary>席種・チケット価格</summary>
         <div class="seat-settings-grid">
-          ${SEAT_TYPES.map(seat => {[cite: 1]
+          ${SEAT_TYPES.map(seat => {
             const price = seatPrices[seat.id] ?? getStandardSeatPrice(slotVenue, seat.id);
-            const availability = seat.optional[cite: 1]
+            const availability = seat.optional
               ? `<label class="seat-availability"><input type="checkbox" id="seat-option-${month}-${index}-${seat.id}" ${seatOptions[seat.id] ? 'checked' : ''}>設置する</label>`
               : '';
             return `<div class="seat-price-field" id="seat-row-${month}-${index}-${seat.id}"><label for="seat-price-${month}-${index}-${seat.id}">${seat.name}（円）</label><input type="number" id="seat-price-${month}-${index}-${seat.id}" min="0" step="500" value="${price}">${availability}</div>`;
