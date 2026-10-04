@@ -1489,113 +1489,48 @@
     .draft-acquired { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 10px; color: #555; }
     .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }
 
-/* ==========================================
-   タブレット・PCなどの横長画面（幅768px以上）でのワイド画面最適化
-   ========================================== */
-
+/* タブレット・PCなどの横長画面（幅768px以上）のとき */
 @media screen and (min-width: 768px) {
-  /* 1. ページ全体のベース設定 */
+  /* スマホ用の中央寄せを解除し、全体を画面いっぱいに広げる */
   html, body {
-    width: 100% !important;
-    min-height: 100vh !important;
-    background-color: var(--bg) !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: flex-start !important;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    background-color: var(--panel);
   }
 
-  /* 2. タイトル画面：画面全体に広げつつ、中身をワイドに美しく配置 */
-  main.title-screen,
-  .title-screen {
+  /* 親ラッパーをワイド画面用に展開 */
+  .app-wrapper {
+    width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* タイトル画面やゲームコンテナのスマホ幅制限を解除して画面いっぱいに */
+  .title-screen,
+  .game-container {
     width: 100% !important;
-    max-width: 1400px !important; /* 広すぎず狭すぎない美しいワイド幅に設定 */
+    max-width: none !important;
     min-height: 100vh !important;
     box-sizing: border-box !important;
     padding: 40px 60px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 32px !important;
-    background: var(--panel) !important;
-    margin: 0 auto !important;
-    box-shadow: 0 0 30px rgba(0,0,0,0.04);
   }
 
-  .title-heading {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /* セーブ枠3つを横幅いっぱいにダイナミックに広げる */
+  /* セーブスロットの3分割横並び */
   .save-slots {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 28px !important;
+    gap: 32px !important;
     width: 100% !important;
     max-width: 100% !important;
   }
 
-  .save-slot {
-    width: 100% !important;
-    padding: 28px !important;
-  }
-
-  .title-actions {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /* 3. ゲーム画面コンテナ：横長画面いっぱいのワイド表示 */
-  .game-container {
-    width: 100% !important;
-    max-width: 1400px !important;
-    min-height: 100vh !important;
-    padding: 36px 48px !important;
-    box-sizing: border-box !important;
-    margin: 0 auto !important;
-    gap: 24px !important;
-    box-shadow: 0 0 30px rgba(0,0,0,0.04);
-  }
-
-  /* 4. 各タブ（事務所など）の2分割レイアウトをワイドに展開 */
+  /* 事務所タブなどの2分割レイアウト */
   #page-office {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 28px !important;
-    align-items: start !important;
-  }
-  #page-office > *:nth-child(1),
-  #page-office > *:nth-child(2),
-  #page-office > *:nth-child(3) {
-    grid-column: 1 / 2 !important;
-  }
-  #page-office > *:nth-child(4),
-  #page-office > *:nth-child(5) {
-    grid-column: 2 / 3 !important;
-  }
-  #page-office > .actions,
-  #page-office > #log-box {
-    grid-column: span 2 !important;
-  }
-
-  /* グループ・資金などの他タブも同様に2カラムで広く使う */
-  #page-group, #page-formation, #page-funds, #page-ranking, #page-records {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 28px !important;
-    align-items: start !important;
-  }
-  
-  /* タイトルや横幅いっぱいに見せたい主要パーツは2カラムぶち抜きにする */
-  #page-group > div:last-of-type,
-  .roster-card,
-  #page-funds > .page-title,
-  .office-maintenance-note#salary-note,
-  #page-ranking > .page-title, 
-  #page-ranking > .ranking-note,
-  #page-ranking > .ranking-list,
-  #page-records > .page-title,
-  .records-block:nth-of-type(3),
-  .records-help {
-    grid-column: span 2 !important;
+    gap: 32px !important;
   }
 }
