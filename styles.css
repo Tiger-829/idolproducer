@@ -1579,3 +1579,97 @@
     padding: 4px;
   }
 }
+
+/* ==========================================
+   タブレット・PCなどの横長画面でのレスポンシブ対応
+   ========================================== */
+
+@media screen and (min-width: 768px) and (orientation: landscape) {
+  /* ゲーム全体の最大幅を広げる */
+  .game-container {
+    max-width: 1200px;
+  }
+
+  /* --- タイトル画面（セーブスロットを3分割で横並びにする） --- */
+  .title-screen {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  
+  .save-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3つのスロットを横に等間隔で配置 */
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  /* --- 1. 事務所タブ --- */
+  #page-office {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  #calendar-visual { grid-column: 1 / 2; grid-row: 1; }
+  .office-facilities:nth-of-type(1), .office-facilities:nth-of-type(2) { grid-column: 1 / 2; }
+  #weekly-action-panel { grid-column: 2 / 3; grid-row: 1; }
+  .office-facilities:nth-of-type(3) { grid-column: 2 / 3; }
+  .actions { grid-column: span 2; }
+
+  /* --- 2. グループタブ --- */
+  #page-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .team-summary-card { grid-column: 1 / 2; }
+  .team-fans-card-stack { grid-column: 2 / 3; }
+  .team-fans-card { grid-column: 2 / 3; }
+  #page-group > div:last-of-type { grid-column: span 2; }
+
+  /* --- 3. 編成タブ --- */
+  #page-formation {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .roster-card { grid-column: span 2; }
+
+  /* --- 4. 資金タブ --- */
+  #page-funds {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  #page-funds > .page-title { grid-column: span 2; }
+  .funds-card { grid-column: 1 / 2; }
+  #page-funds > .fund-stat-grid:nth-of-type(1) { grid-column: 2 / 3; }
+  #page-funds > .fund-stat-grid:nth-of-type(2) { grid-column: 2 / 3; }
+  .office-maintenance-note#salary-note { grid-column: span 2; }
+
+  /* --- 5. 業界順位タブ --- */
+  #page-ranking {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  #page-ranking > .page-title, #page-ranking > .ranking-note { grid-column: span 2; }
+  .ranking-list { grid-column: span 2; }
+
+  /* --- 6. 記録タブ --- */
+  #page-records {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  #page-records > .page-title { grid-column: span 2; }
+  #page-records > .records-block:nth-of-type(1) { grid-column: 1 / 2; }
+  #page-records > .records-block:nth-of-type(2) { grid-column: 2 / 3; }
+  #page-records > .records-block:nth-of-type(3) { grid-column: span 2; }
+  .records-help { grid-column: span 2; }
+}
