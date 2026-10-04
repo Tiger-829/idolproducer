@@ -1080,6 +1080,11 @@ function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
   return releaseMap;
 }
 
+// ==========================================
+// 07-schedule.js : 個別レッスンスロット実行・休養計算
+// ==========================================
+
+// スケジュール内の「個別レッスン」および各スロットの実行処理抜粋
 function applyWeeklySchedule() {
   ensureWeeklySchedule();
 
@@ -1087,9 +1092,11 @@ function applyWeeklySchedule() {
   const restingMemberIds = new Set(weeklySchedule.restDayMembers || []);
   const fixedSlots = getWeekFixedSlots();
 
+  // 事務作業の適用
   const officeMessage = applyOfficeAction(weeklySchedule.officeAction);
 
-  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
+  // 1週間の完全休暇モード
+  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 45;
   if (weeklySchedule.vacation) {
     participants.forEach(member => {
       if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, fullVacationRec);
@@ -1098,40 +1105,11 @@ function applyWeeklySchedule() {
     return { levelUps: 0, injuries: [] };
   }
 
+  // 手動休養メンバーが体力80に達して復帰するスロットインデックスを算出
   const releaseSlots = calculateRestReleaseSlots(restingMemberIds, fixedSlots);
   const fullyRecoveredMembers = [];
 
   const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
-  const groupOnlySlots = weeklySchedule.slots
-    .map((slotId, index) => ({ slotId, index }))
-    .filter(entry => !fixedSlots.has(entry.index) && itemsList.some(item => item.id === entry.slotId && item.groupOnly));
-
-  const groupOnlyAvailableSlots = new Set(groupOnlySlots
-    .filter(entry => participants.filter(member => {
-      if (!member || member.injury) return false;
-      if (!restingMemberIds.has(member.id)) return true;
-      const releaseIdx = releaseSlots.get(member.id);
-      return releaseIdx !== -1 && releaseIdx <= entry.index;
-    }).length >= 2)
-    .map(entry => entry.index));
-
-  const skippedGroupOnly = groupOnlySlots.some(entry => !groupOnlyAvailableSlots.has(entry.index));
-
-  const mealCount = getWeekMealPartyCount();
-  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
-  if (mealCount > 0) {
-    funds -= mealCount * mealCostSingle;
-    if (typeof recordMonthlyExpense === 'function') {
-      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle);
-    }
-    if (typeof adjustTargetPopularity === 'function' && typeof MEAL_PARTY_POPULARITY_GAIN !== 'undefined') {
-      adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
-    }
-    if (typeof groupCrisis !== 'undefined' && typeof MEAL_PARTY_CRISIS_GAIN !== 'undefined') {
-      groupCrisis = Math.min(100, groupCrisis + MEAL_PARTY_CRISIS_GAIN);
-    }
-  }
-
   let levelUps = 0;
   const injuries = [];
 
@@ -1139,11 +1117,9 @@ function applyWeeklySchedule() {
   const targetStat = weeklySchedule.individualStat || 'vocal';
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
-  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 10;
-  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 15;
+  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 8;
+  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 10;
   const morningMultiplier = typeof MORNING_SLOT_MULTIPLIER !== 'undefined' ? MORNING_SLOT_MULTIPLIER : 0.8;
-  const rehCost = typeof REHEARSAL_STAMINA_COST !== 'undefined' ? REHEARSAL_STAMINA_COST : 8;
-  const bcastCost = typeof BROADCAST_STAMINA_COST !== 'undefined' ? BROADCAST_STAMINA_COST : 12;
 
   participants.forEach(member => {
     if (!member || member.injury) return;
@@ -1157,6 +1133,7 @@ function applyWeeklySchedule() {
 
     weeklySchedule.slots.forEach((slotId, index) => {
       const fixed = fixedSlots.get(index);
+      // 休養指定中かつ復帰スロットに達していない場合はスキップ（休養中）
       const isCurrentlyResting = isRestDesignated && (releaseIndex === -1 || index < releaseIndex);
 
       if (fixed) {
@@ -1165,8 +1142,7 @@ function applyWeeklySchedule() {
           return;
         }
         if (isCurrentlyResting) return;
-
-        const fixedCost = fixed.kind === 'rehearsal' ? rehCost : (fixed.kind === 'broadcast' ? bcastCost : 0);
+        const fixedCost = fixed.kind === 'rehearsal' ? 4 : (fixed.kind === 'broadcast' ? 3 : 0);
         staminaCost += fixedCost;
         remainingStamina = Math.max(0, remainingStamina - fixedCost);
         return;
@@ -1188,26 +1164,30 @@ function applyWeeklySchedule() {
       const periodIndex = (typeof getWeekSlotPeriod === 'function') ? getWeekSlotPeriod(index) : (index % 2);
       const slotEffect = periodIndex === 0 ? morningMultiplier : 1;
 
-      // 個別レッスン枠：選ばれた1名が10.1倍、他全員は休養回復
+      // ==========================================
+      // 【要求仕様】個別レッスン枠の処理
+      // ==========================================
       if (slotId === 'individual-lesson') {
         if (member.id === targetMemberId) {
+          // ① 選ばれたメンバー：指定能力に 10.1倍 の経験値
           const baseExp = getWeeklyLessonExperience() * slotEffect;
           const gainedExp = Math.round(baseExp * SPECIAL_INDIVIDUAL_MULTIPLIER);
           if (typeof addMemberStatExp === 'function') {
             memberLevels += addMemberStatExp(member, targetStat, gainedExp);
           }
+          // 体力消費
           const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
           staminaCost += cost;
           remainingStamina = Math.max(0, remainingStamina - cost);
         } else {
+          // ② 選ばれなかったメンバー：午前/午後に応じた休養回復
           const recoveryAmount = Math.round(restSlotRec * slotEffect);
           remainingStamina = Math.min(maxStamina, remainingStamina + recoveryAmount);
         }
         return;
       }
 
-      if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
-
+      // 通常グループレッスン
       memberLevels += applyMemberLesson(member, slotId, 1, null, slotEffect).levels;
       const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
       staminaCost += cost;
@@ -1216,78 +1196,32 @@ function applyWeeklySchedule() {
 
     levelUps += memberLevels;
 
+    // 体力消費とケガ判定
     if (staminaCost > 0) {
       if (typeof consumeMemberStamina === 'function') consumeMemberStamina(member, staminaCost);
       if (typeof rollMemberInjury === 'function' && rollMemberInjury(member, 0)) {
-        const type = member.injury?.type || 'ケガ';
-        const formattedWeeks = (typeof formatInjuryWeeks === 'function') ? formatInjuryWeeks(member.injury) : '';
-        injuries.push(`${member.name}（${type}・${formattedWeeks}）`);
+        injuries.push(`${member.name}（${member.injury?.type || 'ケガ'}）`);
       }
     }
 
+    // 週末の自然回復
     const stayedRestingAllWeek = isRestDesignated && releaseIndex === -1;
     let recovery = (typeof getMemberWeeklyRecovery === 'function') ? getMemberWeeklyRecovery(member, stayedRestingAllWeek) : 20;
-    const restSlotCount = weeklySchedule.slots.filter(s => s === 'rest-day').length;
-    recovery += restSlotCount * restSlotRec;
-    recovery += mealCount * mealRec;
     if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, recovery);
 
+    // 体力80に達したメンバーは休養指定リストから解除
     if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
       fullyRecoveredMembers.push(member.id);
     }
   });
 
+  // 回復完了メンバーを休養対象から除外（次回に引き継がない）
   weeklySchedule.restDayMembers = weeklySchedule.restDayMembers.filter(
     id => !fullyRecoveredMembers.includes(id)
   );
 
-  const countByLabel = new Map();
-  weeklySchedule.slots.forEach((slotId, index) => {
-    if (!slotId || fixedSlots.has(index)) return;
-    const item = itemsList.find(entry => entry.id === slotId);
-    if (item && item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
-    const label = itemIdLabel(slotId);
-    countByLabel.set(label, (countByLabel.get(label) || 0) + 1);
-  });
-  fixedSlots.forEach(slot => {
-    countByLabel.set(slot.label, (countByLabel.get(slot.label) || 0) + 1);
-  });
-
-  const parts = [];
-  const breakdown = [...countByLabel.entries()].map(([label, count]) => `${label}${count > 1 ? `×${count}` : ''}`);
-  if (breakdown.length) parts.push(`実施: ${breakdown.join(' / ')}`);
-
-  const currentRestNames = (weeklySchedule.restDayMembers || [])
-    .map(id => participants.find(m => m.id === id)?.name)
-    .filter(Boolean);
-  if (currentRestNames.length) parts.push(`継続休養: ${currentRestNames.join('、')}`);
-
-  if (fullyRecoveredMembers.length) {
-    const recoveredNames = fullyRecoveredMembers
-      .map(id => participants.find(m => m.id === id)?.name)
-      .filter(Boolean);
-    parts.push(`復帰完了: ${recoveredNames.join('、')}`);
-  }
-
-  const targetMember = participants.find(m => m.id === targetMemberId);
-  const statusKeysList = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
-  const targetStatName = statusKeysList.find(k => k.id === targetStat)?.name || targetStat;
-  const individualLessonCount = weeklySchedule.slots.filter(s => s === 'individual-lesson').length;
-  if (individualLessonCount > 0 && targetMember) {
-    parts.push(`個別レッスン: ${targetMember.name}（${targetStatName} 10.1倍 / 他メンバー休養）`);
-  }
-
-  if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * mealCostSingle)}）`);
-  if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
-  if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
-  if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
-  if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
-
-  setLog(`【週間スケジュール】${parts.join(' / ')}`);
-  weeklyRecoveryDone = true;
   return { levelUps, injuries };
 }
-
 function itemIdLabel(itemId) {
   if (itemId === 'individual-lesson') {
     const statusKeysList = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
