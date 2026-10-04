@@ -399,29 +399,80 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   // ==========================================
   const summaryBox = document.getElementById('prev-plan-summary');
   if (summaryBox) {
-    // もし今が後半（7月スタートなど）であれば、同年の上半期（1〜6月）を振り返る
-    if (startM === 7) {
-      let prevReleaseCount = 0;
-      let prevLiveCount = 0;
-      for (let m = 1; m <= 6; m++) {
-        const pKey = `${yearTarget}-${m}`;
-        if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
-          const p = productionSchedule[pKey];
-          if (p.release && p.release !== 'none') prevReleaseCount++;
-          const lEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(p) : [];
-          if (lEntries.length > 0) prevLiveCount += lEntries.length;
+    let prevStart = startM === 7 ? 1 : 7;
+    let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
+    
+    let prevReleaseCount = 0;
+    let liveDetails = []; // ライブの日付や会場名を格納する配列
+
+    for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
+      const pKey = `${prevYear}-${m}`;
+      if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
+        const p = productionSchedule[pKey];
+        
+        // CD発売のカウント
+        if (p.release && p.release !== 'none') {
+          prevReleaseCount++;
         }
+        
+        // 1. 各月のエントリやスロットからライブ情報を安全に抽出する
+        let entries = [];
+        if (typeof getMonthLiveEntries === 'function') {
+          entries = getMonthLiveEntries(p);
+        }
+        
+        //もしgetMonthLiveEntriesで取れず、単体でライブ情報を持っている場合のフォールバック
+        if ((!entries || entries.length === 0) && (p.liveVenue || p.liveDate)) {
+          entries = [{
+            liveName: p.liveName || p.liveVenue,
+            liveDate: p.liveDate,
+            liveDates: p.liveDates || []
+          }];
+        }
+
+        // 2. 取得したライブ情報から日付をそれぞれ拾う
+        entries.forEach(e => {
+          // 日付（YYYY-MM-DD形式など）があればリストに追加
+          let dates = [];
+          if (e.liveDate) dates.push(e.liveDate);
+          if (Array.isArray(e.liveDates)) {
+            dates = dates.concat(e.liveDates);
+          }
+          
+          if (dates.length > 0 || e.liveName || e.liveVenue) {
+            liveDetails.push({
+              month: m,
+              name: e.liveName || e.liveVenue || 'ライブ公演',
+              dates: dates
+            });
+          }
+        });
       }
+    }
+
+    // 3. 画面に表示するHTMLを組み立てる
+    if (prevReleaseCount > 0 || liveDetails.length > 0) {
+      let liveHtml = '';
+      if (liveDetails.length > 0) {
+        liveHtml = `<br><strong>【ライブ予定一覧】</strong><br>` + liveDetails.map(l => {
+          let dateStr = l.dates.length > 0 ? l.dates.join(', ') : '日程未定';
+          // "YYYY-MM-DD" を "M月D日" っぽく見やすく整形する簡易処理
+          dateStr = dateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1月$2日');
+          return `・${l.month}月: ${l.name} (${dateStr})`;
+        }).join('<br>');
+      } else {
+        liveHtml = `<br>ライブ予定: なし`;
+      }
+
       summaryBox.innerHTML = `
-        <strong>【直近の半期の振り返り（${yearTarget}年上半期：1〜6月）】</strong><br>
-        CD発売数: ${prevReleaseCount}枚 / ライブ開催予定: ${prevLiveCount}件
+        <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7せない・12月'}）】</strong><br>
+        CD発売数: ${prevReleaseCount}枚
+        ${liveHtml}
       `;
     } else {
-      // 1月スタート等の場合
-      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画です！`;
+      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
     }
   }
-
   const container = document.getElementById('plan-rows');
   if (!container) return;
   container.innerHTML = '';
