@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : UI描画（タブ＆スケジュール強制復元完全版）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版
 // ==========================================
 
 const PAGE_TABS = [
@@ -14,7 +14,7 @@ const PAGE_TABS = [
 const DEFAULT_PAGE = 'office';
 let currentPageTab = DEFAULT_PAGE;
 
-// アイコンSVGフォールバック
+// アイコンSVG安全フォールバック
 function safeGetIconSvg(iconName) {
   if (typeof getIconSvg === 'function') {
     try {
@@ -35,7 +35,7 @@ function safeGetIconSvg(iconName) {
   return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
-// タブナビゲーションの強制描画
+// タブナビゲーション描画・同期
 function renderPageNav(activePage) {
   const target = PAGE_TABS.some(tab => tab.id === activePage)
     ? activePage
@@ -78,6 +78,7 @@ function switchPage(page) {
   }
 }
 
+// 業界順位集計
 function getRivalTeamPower(team) {
   const base = team?.basePower || 0;
   const growth = (team?.sales || 0) / 200000;
@@ -162,10 +163,6 @@ function renderRankingPanel() {
 }
 
 // 事務所アクションパネル（スケジュールUI表示スイッチ）
-// ==========================================
-// 10-ui-panels.js : スケジュール設定UI（完全防護・エラー可視化版）
-// ==========================================
-
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -178,24 +175,32 @@ function renderWeeklyActionPanel() {
     const events = (typeof getCurrentWeekEvents === 'function') ? getCurrentWeekEvents() : [];
     const currentDate = (typeof getGameDateObject === 'function') ? getGameDateObject() : new Date();
 
-    // 1. ライブ週の判定
     const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
     const editableSpecialLiveEvents = (typeof getEditableSpecialLiveEventsForWeek === 'function') ? getEditableSpecialLiveEventsForWeek(currentDate) : [];
 
+    // 1. ライブ週の判定
     if (nextLiveDate && !editableSpecialLiveEvents.length) {
       const liveDateKey = (typeof toDateKey === 'function') ? toDateKey(nextLiveDate) : '';
       const liveDate = (typeof getGameDateObject === 'function') ? getGameDateObject(liveDateKey) : new Date();
       const liveLabel = liveDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
-      
+      const liveEntries = (typeof getScheduledLiveEntries === 'function') ? getScheduledLiveEntries().filter(entry =>
+        entry && !entry.completed && typeof getLiveEntryDate === 'function' && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === liveDateKey
+      ) : [];
+      const liveDetail = liveEntries.length
+        ? liveEntries.map(entry => {
+          const days = (typeof getLiveEntryShowDates === 'function') ? getLiveEntryShowDates(entry) : [];
+          const suffix = days.length > 1 ? `（${days.length}公演：${days.map(key => `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日`).join('・')}）` : '';
+          return `${entry.liveVenue}${suffix}`;
+        }).join(' / ')
+        : '';
+
       panel.innerHTML = `
         <h2 class="page-title">今週の行動</h2>
-        <div class="weekly-event-note">
-          <strong>ライブ週</strong>
-          <ul>
-            <li>${escapeHtml(`${liveLabel}に自主ライブがあるため、週間スケジュールは組めません。`)}</li>
-            ${renderWeeklyEventItems(events)}
-          </ul>
-        </div>
+        <div class="weekly-event-note"><strong>ライブ週</strong><ul>
+          <li>${escapeHtml(`${liveLabel}にライブがあるため、週間スケジュールは組めません。`)}</li>
+          ${liveDetail ? `<li>${escapeHtml(`公演: ${liveDetail}`)}</li>` : ''}
+          ${renderWeeklyEventItems(events)}
+        </ul></div>
         <button class="main-btn" style="width:100%; margin-top:8px;" onclick="advanceOneWeek()">イベントまで進行</button>
       `;
       return;
@@ -210,24 +215,22 @@ function renderWeeklyActionPanel() {
 
       panel.innerHTML = `
         <h2 class="page-title">今週の行動</h2>
-        <div class="weekly-event-note">
-          <strong>水曜日まで進行</strong>
-          <ul>
-            <li>現在は${currentDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}です。</li>
-            <li>次のスケジュール設定日（${dateLabel}）まで進めます。</li>
-            ${renderWeeklyEventItems(events)}
-          </ul>
-        </div>
-        <button class="main-btn" style="width:100%; margin-top:8px;" onclick="advanceOneWeek()">水曜日まで進行する</button>
+        <div class="weekly-event-note"><strong>水曜日まで進行</strong><ul>
+          <li>現在は${currentDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}です。</li>
+          <li>次のスケジュール設定日（${dateLabel}）まで進めます。</li>
+          ${renderWeeklyEventItems(events)}
+        </ul></div>
+        <button class="main-btn" style="width:100%; margin-top:8px;" onclick="advanceOneWeek()">水曜日まで進行</button>
       `;
       return;
     }
 
     // 3. 水曜日の場合：14枠スケジュール設定UIを出力
     const notes = getWeeklyEventNoteEvents(events);
-    editableSpecialLiveEvents.forEach(event => {
-      notes.push(`${event.name}（${event.liveDate} / ${event.venue}）: 固定予定あり`);
-    });
+    const externalLiveNotes = editableSpecialLiveEvents.map(event =>
+      `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
+    );
+    notes.push(...externalLiveNotes);
 
     panel.innerHTML = `
       <h2 class="page-title">今週のスケジュール</h2>
@@ -245,8 +248,16 @@ function renderWeeklyActionPanel() {
   }
 }
 
+function getWeeklyEventNoteEvents(events) {
+  return (events || []).filter(event => !String(event).startsWith('他グループのライブ'));
+}
+
+function renderWeeklyEventItems(events) {
+  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
+}
+
+// スケジュール設定UIコントロール（14枠・個別レッスン10.1倍・休養日設定完全版）
 function renderWeeklyScheduleControls() {
-  // 必須変数のフォールバック保護
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = {
       slots: new Array(14).fill(''),
@@ -259,39 +270,39 @@ function renderWeeklyScheduleControls() {
   }
 
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
-  const members = roster.filter(m => m && m.isSelected);
+  const members = roster.filter(member => member && member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
 
-  // 個別レッスン選択肢
-  const individualOptions = (typeof getIndividualLessonMemberOptions === 'function') 
-    ? getIndividualLessonMemberOptions() 
-    : members;
-
-  const memberOptions = individualOptions.map(m =>
-    `<option value="${m.id}" ${m.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
-    `${escapeHtml(`${formatMemberDisplayName ? formatMemberDisplayName(m) : m.name}（${m.age \vert{}\vert{} 18}歳 / 体力${m.staminaValue ?? 100}）`)}</option>`
+  const individualOptions = getIndividualLessonMemberOptions();
+  const memberOptions = individualOptions.map(member =>
+    `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
+    `${escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.age \vert{}\vert{} 18}歳 / 体力${member.staminaValue ?? 100}）`)}</option>`
   ).join('');
 
-  const validStats = (typeof INDIVIDUAL_LESSON_STATS !== 'undefined') ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance', 'stamina', 'recovery'];
-  const statusKeys = (typeof STATUS_KEYS !== 'undefined') ? STATUS_KEYS : [
+  const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance', 'stamina', 'recovery'];
+  const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [
     { id: 'vocal', name: '歌唱力' }, { id: 'dance', name: 'ダンス' }, { id: 'stamina', name: '体力' }, { id: 'recovery', name: '回復力' }
   ];
 
   const lessonStatOptions = validStats.map(statId => {
-    const stat = statusKeys.find(k => k.id === statId);
+    const stat = statusKeys.find(key => key.id === statId);
     return `<option value="${statId}" ${statId === weeklySchedule.individualStat ? 'selected' : ''}>${stat ? escapeHtml(stat.name) : statId}</option>`;
   }).join('');
 
-  const selectedStatName = statusKeys.find(k => k.id === weeklySchedule.individualStat)?.name || '歌唱力';
+  const selectedStatName = statusKeys.find(key => key.id === weeklySchedule.individualStat)?.name || '歌唱力';
   const selectedMember = roster.find(m => m && m.id === weeklySchedule.individualMemberId);
   const selectedMemberName = selectedMember ? (typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(selectedMember) : selectedMember.name) : '未選択';
 
-  // 14枠グリッド用定義
-  const dayLabels = (typeof WEEK_DAY_LABELS !== 'undefined') ? WEEK_DAY_LABELS : ['木', '金', '土', '日', '月', '火', '水'];
-  const periodLabels = (typeof WEEK_PERIOD_LABELS !== 'undefined') ? WEEK_PERIOD_LABELS : ['午前', '午後'];
-  const fixedSlots = (typeof getWeekFixedSlots === 'function') ? getWeekFixedSlots() : new Map();
+  const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
+  const fatiguedMembers = members.filter(member =>
+    !member.injury && (member.staminaValue ?? 100) < warnThreshold
+  );
+  const restSuggestion = fatiguedMembers.length
+    ? `<div class="schedule-note warn">体力が低いメンバー: ${fatiguedMembers.map(member => escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（体力${member.staminaValue ?? 100}）`)).join('、')}</div>`
+    : '';
 
-  const itemsList = (typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined') ? WEEKLY_SCHEDULE_ITEMS : [
+  const fixedSlots = typeof getWeekFixedSlots === 'function' ? getWeekFixedSlots() : new Map();
+  const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [
     { id: 'vocal', name: 'ボーカルレッスン' },
     { id: 'dance', name: 'ダンスレッスン' },
     { id: 'individual-lesson', name: '個別レッスン' },
@@ -301,12 +312,15 @@ function renderWeeklyScheduleControls() {
 
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed).map(item => {
-      const isSelected = slotId === item.id;
-      return `<option value="${item.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
+      const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
+      if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
+      return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
     })
   ).join('');
 
-  const curGameDate = (typeof getGameDateObject === 'function') ? getGameDateObject() : new Date();
+  const dayLabels = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS : ['木', '金', '土', '日', '月', '火', '水'];
+  const periodLabels = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS : ['午前', '午後'];
+  const curGameDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
 
   const weekRows = dayLabels.map((dayLabel, dayIndex) => {
     const morningIndex = dayIndex * periodLabels.length;
@@ -321,86 +335,106 @@ function renderWeeklyScheduleControls() {
 
       if (fixed) {
         return `
-          <div class="week-cell is-fixed">
-            <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
-            <select disabled title="${escapeHtml(fixed.description || '固定枠')}">
-              <option selected>${escapeHtml(fixed.label || '固定予定')}</option>
-            </select>
-          </div>
-        `;
+        <div class="week-cell is-fixed">
+          <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
+          <select aria-label="${escapeHtml(dayLabel)}曜${escapeHtml(periodLabel)}の予定" disabled
+            title="${escapeHtml(fixed.description || 'テレビ出演等で固定された枠です')}">
+            <option value="" selected>${escapeHtml(fixed.label || '固定予定')}</option>
+          </select>
+        </div>`;
       }
-
       return `
         <div class="week-cell">
           <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
-          <select onchange="setWeeklyScheduleSlot(${index}, this.value)" ${weeklySchedule.vacation ? 'disabled' : ''}>
+          <select aria-label="${escapeHtml(dayLabel)}曜${escapeHtml(periodLabel)}の予定"
+            onchange="setWeeklyScheduleSlot(${index}, this.value)"
+            ${weeklySchedule.vacation ? 'disabled' : ''}>
             ${itemOptions(slotId)}
           </select>
-        </div>
-      `;
+        </div>`;
     }).join('');
 
-    const isRest = (typeof isWeekRestDay === 'function') ? isWeekRestDay(dayIndex) : false;
+    const isRestDay = typeof isWeekRestDay === 'function' ? isWeekRestDay(dayIndex) : false;
 
     return `
-      <div class="week-row${isRest ? ' is-rest-day' : ''}">
-        <span class="week-day-label">
-          ${escapeHtml(dayLabel)}${isRest ? '<small>休</small>' : ''}
-          <em class="week-day-date">${escapeHtml(dayText)}</em>
-        </span>
+      <div class="week-row${isRestDay ? ' is-rest-day' : ''}">
+        <span class="week-day-label">${escapeHtml(dayLabel)}${isRestDay ? '<small>休</small>' : ''}<em class="week-day-date">${escapeHtml(dayText)}</em></span>
         ${cells}
-      </div>
-    `;
+      </div>`;
   }).join('');
 
-  // 休養トグル
-  const restDayToggles = members.map(m => {
-    const isResting = restDayIds.has(m.id);
-    const lowStamina = (m.staminaValue ?? 100) < 40;
-    const label = `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(m) : m.name}（体力${m.staminaValue ?? 100}）`;
+  const restDayToggles = members.map(member => {
+    const isResting = restDayIds.has(member.id);
+    const lowStamina = (member.staminaValue ?? 100) < warnThreshold;
+    const injured = Boolean(member.injury);
+    const label = member.injury
+      ? `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.injury.type}）`
+      : `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（体力${member.staminaValue ?? 100}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
-        onclick="toggleRestDayMember(${m.id})">
+        onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
         ${escapeHtml(label)}
       </button>
     `;
   }).join('');
 
-  // 事務作業
-  const officeActions = (typeof OFFICE_ACTIONS !== 'undefined') ? OFFICE_ACTIONS : [
+  const lessonExp = typeof getWeeklyLessonExperience === 'function' ? getWeeklyLessonExperience() : 30;
+  const restBreakdown = typeof getWeekRestBreakdown === 'function' ? getWeekRestBreakdown() : { fullRestDays: 0, extraSlots: 0 };
+  const mealCount = typeof getWeekMealPartyCount === 'function' ? getWeekMealPartyCount() : 0;
+  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
+  const mealCost = mealCount * mealCostSingle;
+  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
+  const lessonCount = typeof getWeekLessonCount === 'function' ? getWeekLessonCount() : 0;
+
+  const vacationNote = weeklySchedule.vacation
+    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません。'
+    : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
+
+  const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [
     { id: 'single-promotion', name: 'シングル販促' },
     { id: 'live-promotion', name: 'ライブ広報' },
     { id: 'goods-development', name: 'グッズ開発' }
   ];
-  const selectedAction = weeklySchedule.officeAction || '';
+  const selectedOfficeAction = officeActions.find(action => action.id === weeklySchedule.officeAction) || null;
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
   const officeToggles = officeActions.map(action => {
-    const isSelected = selectedAction === action.id;
+    const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
+    const atLimit = action.id === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd;
     return `
       <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
-        onclick="selectOfficeAction('${action.id}')">
-        ${escapeHtml(action.name)}
-      </button>
-    `;
+        onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}>${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ''}</button>`;
   }).join('');
 
-  const mult = (typeof SPECIAL_INDIVIDUAL_MULTIPLIER !== 'undefined') ? SPECIAL_INDIVIDUAL_MULTIPLIER : 10.1;
-  const autoRestTarget = (typeof AUTO_REST_STAMINA_TARGET !== 'undefined') ? AUTO_REST_STAMINA_TARGET : 80;
+  const broadcastSummaries = typeof getWeekBroadcastSummaries === 'function' ? getWeekBroadcastSummaries() : [];
+  const broadcastNote = broadcastSummaries.length
+    ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
+        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}「${item.names.join('・')}」`)
+      ).join('、')}</div>`
+    : '';
+
+  const mult = typeof SPECIAL_INDIVIDUAL_MULTIPLIER !== 'undefined' ? SPECIAL_INDIVIDUAL_MULTIPLIER : 10.1;
+  const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
 
   return `
     <div class="schedule-block">
       <div class="schedule-block-title">1週間のスケジュール <small>7日×午前/午後で14枠</small></div>
-      <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()">
-        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : '□ 1週間の休暇をとる'}
+      <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()" ${fixedSlots.size ? 'disabled' : ''}>
+        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : `□ 1週間の休暇をとる（体力値+${fullVacationRec}）`}
       </button>
+      ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
+      <div class="schedule-note">${escapeHtml(vacationNote)}</div>
+      <div class="schedule-note">レッスン1回の基礎経験値: 約${lessonExp}</div>
     </div>
 
     <!-- 個別レッスン（特別強化統合） -->
     <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン（特別強化） <small>スロットで「個別レッスン」を設定した枠で実行</small></div>
+      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
       <div class="schedule-note">
-        選択したメンバー1名の指定能力に <strong>${mult}倍</strong> の経験値が入ります。<br>
-        <span style="color:#2e7d32;">※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。</span>
+        選択したメンバー1名の指定能力に <strong>${mult}倍</strong> の経験値が入ります。
+      </div>
+      <div class="schedule-note" style="color: #2e7d32;">
+        ※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。
       </div>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <select style="flex:1;" aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', Number(this.value))">
@@ -417,29 +451,25 @@ function renderWeeklyScheduleControls() {
 
     <div class="schedule-block">
       <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${autoRestTarget}で練習に復帰</small></div>
+      ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
 
     <div class="schedule-block">
       <div class="schedule-block-title">今週の事務作業 <small>レッスンと同じ週に実行（未選択なら行わない）</small></div>
       <div class="rest-toggle-grid">
-        <button type="button" class="rest-toggle office${!selectedAction ? ' active' : ''}" onclick="selectOfficeAction('')">何もしない</button>
+        <button type="button" class="rest-toggle office${selectedOfficeAction ? '' : ' active'}"
+          onclick="selectOfficeAction('')">何もしない</button>
         ${officeToggles}
       </div>
+      ${selectedOfficeAction && selectedOfficeAction.id === 'single-promotion' && typeof describeSinglePromotionStatus === 'function'
+        ? `<div class="schedule-note">${escapeHtml(describeSinglePromotionStatus())}</div>`
+        : ''}
     </div>
 
     <button class="main-btn" style="width:100%; margin-top:12px;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
   `;
 }
-function getWeeklyEventNoteEvents(events) {
-  return (events || []).filter(event => !String(event).startsWith('他グループのライブ'));
-}
-
-function renderWeeklyEventItems(events) {
-  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
-}
-
-// スケジュール設定UI本体（個別レッスン・休養設定）
 
 function getIndividualLessonMemberOptions() {
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
@@ -460,10 +490,11 @@ function getIndividualLessonMemberOptions() {
   return center ? [center, ...rest] : rest;
 }
 
+// カレンダー描画
 function renderGameCalendar() {
-  const date = getGameDateObject();
+  const date = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   const shouldFlip = Boolean(typeof lastRenderedCalendarDate !== 'undefined' && lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
-  lastRenderedCalendarDate = gameDate;
+  lastRenderedCalendarDate = typeof gameDate !== 'undefined' ? gameDate : '';
   const year = date.getFullYear();
   const month = date.getMonth();
   const today = date.getDate();
@@ -518,7 +549,7 @@ function renderGameCalendar() {
       continue;
     }
     const cellDate = new Date(year, month, day, 12);
-    const dateKey = toDateKey(cellDate);
+    const dateKey = typeof toDateKey === 'function' ? toDateKey(cellDate) : '';
     const broadcastName = broadcastDates.get(dateKey);
     const classes = [
       'calendar-day',
@@ -551,6 +582,7 @@ function renderGameCalendar() {
   }
 }
 
+// 事務所設備管理
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -654,6 +686,7 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
+// マネージャー管理
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -797,6 +830,7 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
+// 給与パネル描画
 function renderSalaryPanel() {
   const setText = (id, value) => {
     const element = document.getElementById(id);
