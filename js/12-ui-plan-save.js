@@ -938,3 +938,19 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   migrateLegacySave();
   renderSaveSlots();
 }
+function migrateLegacySave() {
+  const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
+  if (!legacySave) return;
+  const slotOneKey = saveSlotKey(1);
+  if (localStorage.getItem(slotOneKey)) {
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+    return;
+  }
+  try {
+    JSON.parse(legacySave);
+    localStorage.setItem(slotOneKey, legacySave);
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+  } catch (error) {
+    console.error(error);
+  }
+}
