@@ -1515,20 +1515,24 @@
     padding: 40px 60px !important;
   }
 
-  /* --- [超重要] hidden属性がついている非表示パネルは確実に隠す --- */
-  .page-panel[hidden],
-  .title-screen[hidden],
-  .game-container[hidden] {
+  /* ==========================================
+     【超重要】hidden属性がついた要素は絶対に隠す（最強の優先度）
+     ========================================== */
+  [hidden] {
     display: none !important;
   }
 
-  /* --- タイトル画面のセーブ枠3分割 --- */
-  .save-slots {
+  /* --- タイトル画面のセーブ枠3分割（スコープをタイトル内に限定） --- */
+  .title-screen:not([hidden]) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 32px !important;
+  }
+  .title-screen .save-slots {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 32px !important;
     width: 100% !important;
-    max-width: 100% !important;
   }
 
   /* ==========================================
@@ -1560,7 +1564,7 @@
   }
 
   /* ==========================================
-     2. グループタブ（独自の2分割構造）
+     2. グループタブ（2分割）
      ========================================== */
   #page-group:not([hidden]) {
     display: grid !important;
@@ -1571,9 +1575,7 @@
   #page-group .team-summary-card {
     grid-column: 1 / 2 !important;
   }
-  #page-group .team-fans-card:nth-of-type(2) {
-    grid-column: 2 / 3 !important;
-  }
+  #page-group .team-fans-card:nth-of-type(2),
   #page-group .team-fans-card:nth-of-type(3) {
     grid-column: 2 / 3 !important;
   }
@@ -1582,7 +1584,7 @@
   }
 
   /* ==========================================
-     3. 編成タブ（独自の2分割構造）
+     3. 編成タブ（2分割）
      ========================================== */
   #page-formation:not([hidden]) {
     display: grid !important;
@@ -1598,7 +1600,7 @@
   }
 
   /* ==========================================
-     4. 資金タブ（独自の2分割構造）
+     4. 資金タブ（2分割）
      ========================================== */
   #page-funds:not([hidden]) {
     display: grid !important;
@@ -1629,12 +1631,9 @@
     flex-direction: column !important;
     gap: 16px !important;
   }
-  #page-ranking .ranking-list {
-    width: 100% !important;
-  }
 
   /* ==========================================
-     6. 記録タブ（独自の2分割構造）
+     6. 記録タブ（2分割）
      ========================================== */
   #page-records:not([hidden]) {
     display: grid !important;
