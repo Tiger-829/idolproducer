@@ -1493,33 +1493,51 @@
    タブレット・PCなどの横長画面（幅768px以上）でのレスポンシブ対応【決定版】
    ========================================== */
 
+/* ==========================================
+   タブレット・PCなどの横長画面（幅768px以上）でのレスポンシブ対応【ワイド画面版】
+   ========================================== */
+
 @media screen and (min-width: 768px) {
-  /* ゲーム全体の最大幅を広げる */
-  .game-container {
-    max-width: 1100px;
-    margin: 0 auto;
+  /* 1. スマホ用の縦長コンテナ制限を完全に解除し、画面全体をワイドに使う */
+  html, body {
+    justify-content: stretch !important;
   }
 
-  /* --- タイトル画面（3分割で横並びにする） --- */
+  .game-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-height: 100vh;
+    padding: 24px 32px !important;
+    box-shadow: none !important;
+    gap: 20px !important;
+  }
+
+  /* --- タイトル画面（画面全体に広げ、セーブスロットを3分割で横並び） --- */
   .title-screen {
     width: 100% !important;
-    max-width: 1100px !important;
-    margin: 0 auto;
-    padding: 28px 24px;
+    max-width: 100% !important;
+    min-height: 100vh;
+    padding: 32px 40px !important;
+    gap: 24px !important;
+    background: var(--panel);
   }
   
   .save-slots {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important; /* スロット1, 2, 3を横に3等分 */
-    gap: 16px !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* スロット1, 2, 3を横に等間隔で3分割配置 */
+    gap: 24px !important;
     align-items: stretch !important;
   }
 
-  /* --- 1. 事務所タブ（手書きレイアウトの再現） --- */
+  .save-slot {
+    padding: 20px !important;
+  }
+
+  /* --- 1. 事務所タブ（手書きレイアウトをワイドに展開） --- */
   #page-office {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   #page-office > *:nth-child(1),
@@ -1540,7 +1558,7 @@
   #page-group {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   .team-summary-card { grid-column: 1 / 2; }
@@ -1555,7 +1573,7 @@
   #page-formation {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   .roster-card {
@@ -1566,7 +1584,7 @@
   #page-funds {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   #page-funds > .page-title { grid-column: span 2 !important; }
@@ -1577,7 +1595,7 @@
   #page-ranking {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   #page-ranking > .page-title, 
@@ -1590,7 +1608,7 @@
   #page-records {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 16px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
   #page-records > .page-title { grid-column: span 2 !important; }
