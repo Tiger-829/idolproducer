@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : UI描画（順位・事務所・マネージャー・給与）
+// 10-ui-panels.js : UI描画（順位・事務所・マネージャー・給与）完全版
 // ==========================================
 
 const PAGE_TABS = [
@@ -189,7 +189,7 @@ function renderWeeklyEventItems(events) {
 }
 
 /**
- * 週間スケジュール設定UI（個別レッスンと特別強化が完全統合された版）
+ * 週間スケジュール設定UI（特別強化統合・完全版）
  */
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
