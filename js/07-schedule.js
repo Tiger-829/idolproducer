@@ -138,44 +138,81 @@ function processLiveEvents(fromDate, toDate) {
 // 6. 自主ライブ（通常・ツアー・周年）
 // ==========================================
 // ==========================================
-// 07-schedule.js : 自主ライブ（細分化収支集計完全版）
 // ==========================================
+// 07-schedule.js : 自前ライブ諸経費計算（新計算式）
+// ==========================================
+
+/**
+ * 自前ライブの諸経費（基本＋配信追加費用）を計算
+ * @param {string} cap - 会場キャパシティ ('SS', 'S', 'A', 'B', 'C', 'D')
+ * @param {number} totalDays - 総公演日数 (d)
+ * @param {number} streamDays - 配信実施日数 (d_stream)
+ * @returns {{ baseCost: number, streamCost: number, totalCost: number }} (単位: 円)
+ */
+function calculateLiveExpenses(cap, totalDays, streamDays) {
+  const d = Math.max(1, Number(totalDays) || 1);
+  const dStream = Math.max(0, Number(streamDays) || 0);
+  const isDome = (cap === 'SS' || cap === 'S');
+
+  // ドームクラス (SS, S): 4800万*d + 14000万 (+ 1200万*d_stream)
+  // それ以外 (A, B, C, D): 2300万*d + 7600万 (+ 800万*d_stream)
+  const baseManYen = isDome ? (4800 * d + 14000) : (2300 * d + 7600);
+  const streamManYen = isDome ? (1200 * dStream) : (800 * dStream);
+
+  const baseCost = baseManYen * 10000;
+  const streamCost = streamManYen * 10000;
+
+  return {
+    baseCost,
+    streamCost,
+    totalCost: baseCost + streamCost
+  };
+}
+
+// 6. 自主ライブ（各日程ごとの配信判定＋新経費での収支計算）
 function processPlayerLives(fromDate, toDate) {
-  const scheduled = getScheduledLiveEntries(); //[cite: 14]
+  const scheduled = getScheduledLiveEntries();[cite: 14]
 
   scheduled.forEach(entry => {
-    if (entry.completed) return; //[cite: 14]
+    if (entry.completed) return;[cite: 14]
 
-    const showDates = getLiveEntryShowDates(entry); //[cite: 14]
+    const showDates = getLiveEntryShowDates(entry);[cite: 14]
     if (!showDates || !showDates.length) return;
 
     const finalDateStr = showDates[showDates.length - 1];
-    const finalDateObj = getGameDateObject(finalDateStr); //[cite: 14]
+    const finalDateObj = getGameDateObject(finalDateStr);[cite: 14]
 
-    // 最終公演日（千秋楽／単独公演日）に到達した瞬間に全日程分を精算
+    // 最終公演日に到達した瞬間に全日程分を精算
     if (finalDateObj > fromDate && finalDateObj <= toDate) {
-      const v = VENUE_DATA.find(item => item.name === entry.liveVenue); //[cite: 12]
+      const v = VENUE_DATA.find(item => item.name === entry.liveVenue);[cite: 12]
       if (!v) return;
 
       const totalShowCount = showDates.length;
       const isMultiDay = totalShowCount > 1;
+      const isDome = (v.cap === 'SS' || v.cap === 'S');[cite: 12]
 
-      // 基礎定数の取得
-      const streamTicketPrice = typeof STREAM_TICKET_PRICE !== 'undefined' ? STREAM_TICKET_PRICE : 5000; //[cite: 4]
-      const streamCostPerShow = typeof STREAM_PRODUCTION_COST !== 'undefined' ? STREAM_PRODUCTION_COST : 100000000; // 配信設備・制作費（1公演1億円）[cite: 4]
-      const totalVenueCost = getVenueRentalFee(v, totalShowCount, showDates); // 会場使用料[cite: 14]
+      // 配信実施日程リスト（設定がない場合は千秋楽のみ配信とする安全フォールバック）
+      const streamDateSet = new Set(
+        Array.isArray(entry.streamDates)
+          ? entry.streamDates
+          : [finalDateStr]
+      );
+      const streamDaysCount = showDates.filter(d => streamDateSet.has(d)).length;
 
-      // 有効な席種リストを取得
-      const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions); //[cite: 4]
-      const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, (officeUpgrades.liveProduction || 1) - 1) * 0.05); //[cite: 4]
-      const priceFactor = getPriceDemandFactor(v, entry); //[cite: 4]
+      // 新計算式による諸経費（基本）と配信追加費用を算出
+      const expenses = calculateLiveExpenses(v.cap, totalShowCount, streamDaysCount);
+      const streamTicketPrice = typeof STREAM_TICKET_PRICE !== 'undefined' ? STREAM_TICKET_PRICE : 5000;[cite: 4]
 
-      // 席種ごとの細分化集計マップ（初期化）
+      const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);[cite: 4]
+      const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, (officeUpgrades.liveProduction || 1) - 1) * 0.05);[cite: 4]
+      const priceFactor = getPriceDemandFactor(v, entry);[cite: 4]
+
+      // 席種ごとの細分化集計マップ
       const seatBreakdownMap = new Map();
       seatCapacities.forEach(seat => {
         seatBreakdownMap.set(seat.id, {
           name: seat.name,
-          unitPrice: getEffectiveSeatPrice(v, entry, seat), //[cite: 4]
+          unitPrice: getEffectiveSeatPrice(v, entry, seat),[cite: 4]
           capacityPerShow: seat.capacity,
           totalCapacity: seat.capacity * totalShowCount,
           soldCount: 0,
@@ -188,14 +225,15 @@ function processPlayerLives(fromDate, toDate) {
       let grandTotalStreamBuyers = 0;
       let grandTotalStreamRevenue = 0;
 
-      // 各公演日ごとの動員・席種別売上を集計
+      // 日程ごとの動員・配信売上集計
       showDates.forEach((dateKey, index) => {
-        const dObj = getGameDateObject(dateKey); //[cite: 14]
+        const dObj = getGameDateObject(dateKey);[cite: 14]
         const isFinale = (index === showDates.length - 1 && isMultiDay);
-        const finaleRate = typeof LIVE_FINALE_RATE !== 'undefined' ? LIVE_FINALE_RATE : 0.9; //[cite: 4]
+        const finaleRate = typeof LIVE_FINALE_RATE !== 'undefined' ? LIVE_FINALE_RATE : 0.9;[cite: 4]
         
-        let demand = Math.floor(getLiveAudienceDemand(v, dObj, isFinale ? finaleRate : null, priceFactor) * livePromotionMultiplier); //[cite: 4]
+        let demand = Math.floor(getLiveAudienceDemand(v, dObj, isFinale ? finaleRate : null, priceFactor) * livePromotionMultiplier);[cite: 4]
 
+        // 会場チケット集計
         seatCapacities.forEach(seat => {
           const sold = Math.min(seat.capacity, demand);
           demand -= sold;
@@ -206,71 +244,74 @@ function processPlayerLives(fromDate, toDate) {
             data.totalSales += sold * data.unitPrice;
           }
           grandTotalAudience += sold;
-          grandTotalTicketRevenue += sold * getEffectiveSeatPrice(v, entry, seat); //[cite: 4]
+          grandTotalTicketRevenue += sold * getEffectiveSeatPrice(v, entry, seat);[cite: 4]
         });
 
-        // 配信チケット集計（公演日ごと）
-        const dayStreamBuyers = getStreamTicketBuyers(dObj); //[cite: 4]
-        grandTotalStreamBuyers += dayStreamBuyers;
-        grandTotalStreamRevenue += dayStreamBuyers * streamTicketPrice;
+        // 配信チケット集計（この日程が「配信あり」の場合のみ売上発生）
+        if (streamDateSet.has(dateKey)) {
+          const dayStreamBuyers = getStreamTicketBuyers(dObj);[cite: 4]
+          grandTotalStreamBuyers += dayStreamBuyers;
+          grandTotalStreamRevenue += dayStreamBuyers * streamTicketPrice;
+        }
       });
 
-      // グッズ売上集計（公演期間全体）
-      const goods = sellMerchandiseAtLive(); //[cite: 4]
-      const totalStreamCost = streamCostPerShow * totalShowCount; // 配信設備費合計
+      // グッズ売上集計
+      const goods = sellMerchandiseAtLive();[cite: 4]
       const grossRevenue = grandTotalTicketRevenue + goods.revenue + grandTotalStreamRevenue;
-      const profit = grossRevenue - totalVenueCost - totalStreamCost;
+      const profit = grossRevenue - expenses.totalCost;
 
       // 資金・年間統計へ反映
-      funds += profit; //[cite: 4]
-      yearlyStats.audience += grandTotalAudience; //[cite: 4]
-      yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue; //[cite: 4]
-      yearlyStats.streamCost = (yearlyStats.streamCost || 0) + totalStreamCost; //[cite: 4]
+      funds += profit;[cite: 4]
+      yearlyStats.audience += grandTotalAudience;[cite: 4]
+      yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue;[cite: 4]
+      yearlyStats.streamCost = (yearlyStats.streamCost || 0) + expenses.streamCost;
 
       // 経験値・体力消費の適用
-      applyLiveExperience(v, grandTotalAudience, totalShowCount); //[cite: 1]
-      applyLiveStaminaCost(v, isMultiDay, false); //[cite: 1]
+      applyLiveExperience(v, grandTotalAudience, totalShowCount);[cite: 1]
+      applyLiveStaminaCost(v, isMultiDay, false);[cite: 1]
 
       entry.completed = true;
-      markLiveEntryCompleted(entry); //[cite: 14]
+      markLiveEntryCompleted(entry);[cite: 14]
       nextLivePromotionPoints = 0;
 
-      // 細分化した席種別配列を生成（キャパが0の無効席は除外）
       const seatDetails = [...seatBreakdownMap.values()].filter(s => s.totalCapacity > 0);
 
       // 細分化ライブ収支レポートオブジェクト
       const liveDetailedReport = {
         liveName: entry.liveName || v.name,
         venueName: v.name,
-        venueCap: v.cap, //[cite: 12]
+        venueCap: v.cap,[cite: 12]
         showCount: totalShowCount,
         showDates: showDates,
         isMultiDay: isMultiDay,
-        // 細分化項目
-        seatDetails: seatDetails,          // 席種別の枚数・単価・売上
-        totalAudience: grandTotalAudience, // 総動員数
-        ticketRevenue: grandTotalTicketRevenue, // チケット総売上
-        merchandiseRevenue: goods.revenue, // グッズ売上
-        merchandiseSold: goods.unitsSold,  // グッズ販売個数
-        streamBuyers: grandTotalStreamBuyers,   // 配信チケット販売枚数
-        streamRevenue: grandTotalStreamRevenue, // 配信チケット売上
-        venueCost: totalVenueCost,         // 会場使用料
-        streamCost: totalStreamCost,       // 配信設備費（制作費）
-        grossRevenue: grossRevenue,        // 売上合計
-        profit: profit                     // 最終収支（純利益）
+        seatDetails: seatDetails,
+        totalAudience: grandTotalAudience,
+        ticketRevenue: grandTotalTicketRevenue,
+        merchandiseRevenue: goods.revenue,
+        merchandiseSold: goods.unitsSold,
+        // 配信情報（実施日程・人数・売上・追加費用）
+        streamDaysCount: streamDaysCount,
+        streamDates: [...streamDateSet],
+        streamBuyers: grandTotalStreamBuyers,
+        streamRevenue: grandTotalStreamRevenue,
+        streamCostPerDay: isDome ? 12000000 : 8000000,
+        streamCost: expenses.streamCost,
+        // 諸経費
+        baseCost: expenses.baseCost,
+        grossRevenue: grossRevenue,
+        totalCost: expenses.totalCost,
+        profit: profit
       };
 
-      // キューに積む
       pendingReports.push({
         type: "live-detail",
         report: liveDetailedReport
       });
 
-      setLog(`【ライブ千秋楽】${liveDetailedReport.liveName}（${v.name} / 全${totalShowCount}公演 動員 ${grandTotalAudience.toLocaleString()}人 / 収支 ${profit >= 0 ? '+' : ''}${formatMoney(profit)}）`);
+      setLog(`【ライブ千秋楽】${liveDetailedReport.liveName}（${v.name} / 全${totalShowCount}公演[配信${streamDaysCount}日] 動員 ${grandTotalAudience.toLocaleString()}人 / 収支 ${profit >= 0 ? '+' : ''}${formatMoney(profit)}）`);
     }
   });
 }
-
 // openPendingModal 内で "live-detail" を処理
 function openPendingModal() {
   if (pendingReports && pendingReports.length > 0) {
