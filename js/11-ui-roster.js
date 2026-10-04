@@ -54,15 +54,15 @@ function updateUI() {
     tierEl.innerHTML = `
       <div class="fan-share-bar" role="img" aria-label="${segs.map(s => `${s.name}${pct(s.share)}%`).join('、')}">
         ${segs.map(s => `<i class="fan-share-seg fan-share-${s.key}" style="width:${pct(s.share)}%"
-          title="${s.name} ${pct(s.share)}%（${formatFanCount(s.count)}）"></i>`).join('')}
+          title="${s.name} ${pct(s.share)}\%（${formatFanCount(s.count)}）"></i>`).join('')}
       </div>
       <div class="fan-share-legend">
-        ${segs.map(s => `<span class="fan-share-legend-item"><i class="fan-share-dot fan-share-${s.key}"></i>${s.name} ${pct(s.share)}%</span>`).join('')}
+        ${segs.map(s => `<span class="fan-share-legend-item"><i class="fan-share-dot fan-share-${s.key}"></i>${s.name}${pct(s.share)}%</span>`).join('')}
       </div>
       <div class="fan-share-note">ライブ参加 ${(liveRate * 100).toFixed(1)}%（参加者 ${formatFanCount(getParticipatingFans('live'))}）</div>
     `;
     tierEl.title = segs.map(s =>
-      `${s.name}：${pct(s.share)}%（${s.count.toLocaleString()}人）\n　ライブ参加率 ${(s.rate * 100).toFixed(1)}% ／ イベント参加率 ${(FAN_TIER_PARTICIPATION.event[s.key] * 100).toFixed(1)}%`
+      `${s.name}：${pct(s.share)}%（${s.count.toLocaleString()}人）\n ライブ参加率 ${(s.rate * 100).toFixed(1)}% ／ イベント参加率 ${(FAN_TIER_PARTICIPATION.event[s.key] * 100).toFixed(1)}%`
     ).join('\n');
   }
   document.getElementById('txt-group-crisis').textContent = groupCrisis;
@@ -127,6 +127,7 @@ function updateUI() {
     songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
     rivalLiveBookings, managers, managerMarketCandidates, groupFansAtYearStart, previousYearGroupFansAtYearStart,
     yearEndAwardProcessed, yearEndKohakuProcessed, lastLiveDate,
+    weeklySchedule, // 週間スケジュール状態（手動休養設定等）も合わせて保存
     savedAt: Date.now()
   }));
 }
@@ -168,14 +169,13 @@ function formatMemberDisplayName(member) {
   const name = String(member?.name || '');
   const reading = String(member?.reading || '');
   if (!reading) return name;
-  // 苗字を除いた「名」部分にひらがなが含まれるか
   const spaceIndex = name.indexOf(' ');
   const givenName = spaceIndex >= 0 ? name.slice(spaceIndex + 1) : name;
   const hasKanaInName = /[\u3041-\u3096\u309D-\u309F]/.test(givenName);
   return hasKanaInName ? name : `${name}（${reading}）`;
 }
 
-// 常時表示のメンバー名一覧（タブの開閉なしで参照できる）
+// 常時表示のメンバー名一覧（手動休養中の表示に対応）
 function renderRosterNameBar() {
   const bar = document.getElementById('roster-namebar-ui');
   if (!bar) return;
@@ -189,21 +189,29 @@ function renderRosterNameBar() {
     if (a.isCenter !== b.isCenter) return a.isCenter ? -1 : 1;
     return a.name.localeCompare(b.name, 'ja');
   });
+
+  const restingIds = new Set(weeklySchedule?.restDayMembers || []);
+
   bar.innerHTML = ordered.map(member => {
     const staminaValue = member.staminaValue ?? MAX_STAMINA_VALUE;
     const lowStamina = staminaValue < STAMINA_WARNING_THRESHOLD;
+    const isResting = restingIds.has(member.id);
     const injuryMark = member.injury ? ` ${member.injury.type} ${formatInjuryWeeks(member.injury)}` : '';
+    const restMark = isResting && !member.injury ? ' [休養中]' : '';
+
     const classes = [
       'roster-namebar-item',
       member.isSelected ? 'selected' : '',
       member.isCenter ? 'center' : '',
-      lowStamina ? 'low' : ''
+      lowStamina ? 'low' : '',
+      isResting ? 'resting' : ''
     ].filter(Boolean).join(' ');
+
     return `
       <span class="${classes}">
         ${member.isCenter ? '<span class="roster-namebar-crown">C</span>' : ''}
         ${escapeHtml(member.name)}
-        <span class="roster-namebar-meta">${member.age}歳・体力${staminaValue}${escapeHtml(injuryMark)}</span>
+        <span class="roster-namebar-meta">${member.age}歳・体力${staminaValue}${escapeHtml(injuryMark)}${escapeHtml(restMark)}</span>
       </span>
     `;
   }).join('');
@@ -221,6 +229,7 @@ function renderRosterList() {
   const listUI = document.getElementById('roster-list-ui');
   listUI.innerHTML = '';
   const filtered = idolRoster.filter(m => currentRosterTab === 'selected' ? m.isSelected : !m.isSelected);
+  const restingIds = new Set(weeklySchedule?.restDayMembers || []);
 
   filtered.forEach(m => {
     const overall = calculateSingleOverall(m.stats);
@@ -228,13 +237,20 @@ function renderRosterList() {
     const staminaValue = m.staminaValue ?? MAX_STAMINA_VALUE;
     const staminaColor = staminaValue < STAMINA_WARNING_THRESHOLD ? '#c0392b' : (staminaValue < 60 ? '#e08e0b' : '#2e7d32');
     const liveFatigue = m.liveFatigue || 0;
+    const isResting = restingIds.has(m.id);
+
     const injuryTag = m.injury
       ? `<span style="color:#c0392b; font-size:9px;">[${escapeHtml(m.injury.type)} ${escapeHtml(formatInjuryWeeks(m.injury))}]</span>`
       : '';
+    const restTag = isResting && !m.injury
+      ? `<span style="color:#2980b9; font-size:9px;">[休養指定中]</span>`
+      : '';
+
     const topStat = [...STATUS_KEYS]
       .filter(status => status.id !== 'popularity')
       .sort((a, b) => (m.stats[b.id] || 0) - (m.stats[a.id] || 0))[0];
     const abilitiesShown = shownAbilityMemberIds.has(m.id);
+
     listUI.innerHTML += `
       <details class="member-details">
         <summary class="member-row member-summary">
@@ -243,6 +259,7 @@ function renderRosterList() {
               <span class="member-name-toggle">${escapeHtml(formatMemberDisplayName(m))}</span>
               ${m.isCenter ? '<span style="color:#ff1493; font-size:9px;">[CENTER]</span>' : ''}
               ${injuryTag}
+              ${restTag}
               <span class="member-basic-info">(${m.age}歳/${formatHeight(m.height)}/在籍${m.yearsActive}年・誕生日 ${m.birthdayMonth}月${m.birthdayDay}日)</span>
             </div>
             <span class="member-fan-count">個人推定ファン ${calculateMemberFans(m).toLocaleString()}人 / 年収 ${formatMoney(getMemberAnnualSalary(m))}</span>
@@ -263,7 +280,7 @@ function renderRosterList() {
           <span>人気 ${m.stats.popularity || 0}</span>
           <span>週あたり回復 +${getMemberWeeklyRecovery(m, false)}${liveFatigue > 0 ? ` <small style="color:#c0392b;">（ライブ疲労で鈍化中）</small>` : ''}</span>
           ${liveFatigue > 0
-            ? `<span>ライブ疲労 <strong style="color:#c0392b;">${liveFatigue}</strong> / ${MAX_LIVE_FATIGUE} <small style="color:#777;">（回復力 -${Math.round(getLiveFatigueRecoveryPenalty(m) * 100)}% / 毎週-${LIVE_FATIGUE_WEEKLY_DECAY}）</small></span>`
+            ? `<span>ライブ疲労 <strong style="color:#c0392b;">${liveFatigue}</strong> /${MAX_LIVE_FATIGUE} <small style="color:#777;">（回復力 -${Math.round(getLiveFatigueRecoveryPenalty(m) * 100)}\% / 毎週-${LIVE_FATIGUE_WEEKLY_DECAY}）</small></span>`
             : ''}
           <span>${topStat ? `得意: ${topStat.name}` : ''}</span>
         </div>
@@ -285,8 +302,7 @@ function renderRosterList() {
                   return `
                     <div class="member-stat">
                       <span>${status.name}</span>
-                      <strong>${value}</strong>
-                      ${progress > 0 && value < 100
+                      <strong>${value}</strong>${progress > 0 && value < 100
                         ? `<i class="stat-exp-bar"><b style="width:${Math.round(progress * 100)}%"></b></i>`
                         : ''}
                     </div>
@@ -303,19 +319,16 @@ function renderRosterList() {
 }
 
 function setLog(msg) {
-  // 記録タブで過去の出来事を追溯できるよう、履歴にも残す（新しい順）
   if (!Array.isArray(logHistory)) logHistory = [];
   logHistory.unshift({ date: gameDate, text: String(msg) });
   if (logHistory.length > LOG_HISTORY_LIMIT) logHistory.length = LOG_HISTORY_LIMIT;
   document.getElementById('log-box').textContent = msg;
   renderLogList();
-  // テレビ関連の放送であれば画面演出を出す
   playTvEffectFromLog(msg);
 }
 
 // 半年計画モーダル
 let planYearTarget = 1, planStartM = 7, planEndM = 12;
-// 計画画面を開いている間だけ使う編集用ドラフト（月ごとのブースと同じ値を参照する）
 let planReleaseDates = {};      // 月 → 発売日
 let planEventDrafts = {};       // 月 → [{ id, date, benefitId, completed }]
 let planBoothDraft = {};        // 月 → { release, songName, releaseBenefit, slots }
