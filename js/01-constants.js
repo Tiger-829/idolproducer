@@ -567,7 +567,7 @@ const MANAGER_HIRE_LIMIT = 5;
 const MANAGER_YEARLY_BASE = 300000;
 const MANAGER_YEARLY_PER_LEVEL = 15000;
 // マネージャー市場
-const MANAGER_MARKET_CANDIDATE_COUNT = 5;   // 市场上的求人人数
+const MANAGER_MARKET_CANDIDATE_COUNT = 5;   // 求人人数
 const MANAGER_AGE_MIN = 25;                 // 候補者の年齢下限
 const MANAGER_AGE_MAX = 35;                 // 候補者の年齢上限
 const MANAGER_RESIGN_AGE_MIN = 40;          // 任意退職する年齢の下限
