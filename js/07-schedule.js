@@ -1,62 +1,533 @@
 // ==========================================
-// 週間スケジュールと週進行
-// ==========================================
-// ==========================================
-// 週間スケジュール（グループレッスン／休養日／特別強化）
+// 07-schedule.js : 日次ループ駆動型 進行エンジン完全版
 // ==========================================
 
-// 直前週に確定したスケジュール（次週の初期値に使う）
 let lastWeekSchedule = null;
-// 歌番組（テレビ出演）で枠が潰されていない週のスケジュール。
-// 歌番組の翌週はその前の週のスケジュールを仮組として呼び出すために保持する。
 let savedCleanWeekSchedule = null;
 
+// 特別個別レッスン（特別強化統合）の固定倍率
+const SPECIAL_INDIVIDUAL_MULTIPLIER = 10.1;
+const MUSIC_PREP_BONUS_MULTIPLIER = 5;
+const MUSIC_PREP_ITEMS = ['full-run-through', 'coordination'];
+
+// モーダル・レポート待機キュー
+let pendingReports = [];
+
+// ==========================================
+// 1. スケジュール確定
+// ==========================================
+function confirmWeeklySchedule() {
+  try {
+    const today = getGameDateObject();
+    if (today.getDay() !== 3) {
+      alert("水曜日のみスケジュールを設定・確定できます。");
+      return;
+    }
+    if (!validateWeeklySchedule()) {
+      return;
+    }
+
+    rememberWeeklySchedule(weeklySchedule);
+    markMusicPreparations();
+    applyWeeklySchedule();
+
+    // 新進行エンジン：次の停止地点まで自動進行
+    advanceUntilNextSchedulePoint();
+  } catch (error) {
+    console.error("【進行エラー】", error);
+    alert(`進行中にエラーが発生しました:\n${error.message}`);
+  }
+}
+
+// 画面側の「水曜日まで進行」「イベントまで進行」ボタンからの共通エントリーポイント
+function advanceOneWeek() {
+  try {
+    advanceUntilNextSchedulePoint();
+  } catch (error) {
+    console.error("【進行エラー】", error);
+    alert(`進行中にエラーが発生しました:\n${error.message}`);
+  }
+}
+
+// ==========================================
+// 2. 次の停止地点まで進行（メインループ）
+// ==========================================
+function advanceUntilNextSchedulePoint() {
+  let currentDate = getGameDateObject();
+  let loopSafety = 0; // 無限ループ保護（最大60日）
+
+  while (loopSafety++ < 60) {
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    // 1日分の世界進行
+    processDailyFlow(currentDate, nextDate);
+
+    currentDate = nextDate;
+    gameDate = toDateKey(currentDate);
+    syncGameCalendar();
+
+    // 停止条件（月末、自主ライブ終了、水曜日）に達したか判定
+    if (shouldStopProgress(currentDate)) {
+      break;
+    }
+  }
+
+  // 停止後のUI更新＆保留モーダル表示
+  resetWeeklySchedule();
+  updateWeeklyGroupFans();
+  updateUI();
+  openPendingModal();
+}
+
+// ==========================================
+// 3. 停止判定
+// ==========================================
+function shouldStopProgress(date) {
+  // ① 月末（最終日）に到達した場合：月次決算モーダルのため停止
+  if (isMonthEnd(date)) {
+    return true;
+  }
+  // ② 自主ライブの千秋楽（最終公演日）を迎えた場合：ライブ収支報告のため停止
+  if (hasFinishedPlayerLive(date)) {
+    return true;
+  }
+  // ③ 次の編成・スケジュール設定日（水曜日）に到達した場合：編成のため停止
+  if (date.getDay() === 3) {
+    return true;
+  }
+  return false;
+}
+
+// ==========================================
+// 4. 日次進行（1日単位のイベント処理）
+// ==========================================
+function processDailyFlow(fromDate, toDate) {
+  const toDateStr = toDateKey(toDate);
+  const wasWednesday = toDate.getDay() === 3;
+
+  // ① 年齢・誕生日処理
+  processBirthdays(fromDate, toDate);
+
+  // ② 計画・CDリリース・CD関連イベント
+  processPlanEvents(toDateStr);
+  processReleaseEvents(toDateStr);
+
+  // ③ ライブイベント（自主ライブ＆イベント出演）
+  processLiveEvents(fromDate, toDate);
+
+  // ④ テレビ出演・大型特番の消化
+  if (typeof processScheduledPerformances === 'function') {
+    processScheduledPerformances(toDateStr);
+  }
+
+  // ⑤ 週次更新（水曜日をまたいだ場合のみ発火する週次サイクル）
+  if (wasWednesday) {
+    processWeeklyCycle(toDate);
+  }
+
+  // ⑥ 年末特番（赤白・CD大賞）
+  if (typeof processYearEndEvents === 'function') {
+    processYearEndEvents(toDateStr);
+  }
+
+  // ⑦ 月末決算
+  processMonthlyClosing(fromDate, toDate);
+}
+
+// ==========================================
+// 5. ライブ共通処理
+// ==========================================
+function processLiveEvents(fromDate, toDate) {
+  processPlayerLives(fromDate, toDate);
+  processEventLives(fromDate, toDate);
+}
+
+// ==========================================
+// 6. 自主ライブ（通常・ツアー・周年）
+// ==========================================
+function processPlayerLives(fromDate, toDate) {
+  const scheduled = getScheduledLiveEntries();
+
+  scheduled.forEach(entry => {
+    if (entry.completed) return;
+
+    // このライブの全公演日を抽出
+    const showDates = getLiveEntryShowDates(entry);
+    const finalDateStr = showDates[showDates.length - 1];
+    const finalDateObj = getGameDateObject(finalDateStr);
+
+    // 本日の日付がこのライブの最終日と一致するか判定
+    if (finalDateObj > fromDate && finalDateObj <= toDate) {
+      const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
+      if (!v) return;
+
+      const totalShowCount = showDates.length;
+      const isMultiDay = totalShowCount > 1;
+
+      // 収支・動員計算
+      const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);
+      const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, (officeUpgrades.liveProduction || 1) - 1) * 0.05);
+      const priceFactor = getPriceDemandFactor(v, entry);
+
+      let totalAudience = 0;
+      let totalTicketRevenue = 0;
+
+      // 全日程分の動員とチケット代を集計
+      showDates.forEach(dateKey => {
+        const dObj = getGameDateObject(dateKey);
+        let demand = Math.floor(getLiveAudienceDemand(v, dObj, null, priceFactor) * livePromotionMultiplier);
+        seatCapacities.forEach(seat => {
+          const sold = Math.min(seat.capacity, demand);
+          totalAudience += sold;
+          demand -= sold;
+          totalTicketRevenue += sold * getEffectiveSeatPrice(v, entry, seat);
+        });
+      });
+
+      // グッズ売上・配信売上
+      const goods = sellMerchandiseAtLive();
+      const streamBuyers = getStreamTicketBuyers(finalDateObj);
+      const streamRevenue = streamBuyers * STREAM_TICKET_PRICE;
+      const streamCost = STREAM_PRODUCTION_COST * totalShowCount;
+      const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
+      const grossRevenue = totalTicketRevenue + goods.revenue + streamRevenue;
+      const profit = grossRevenue - venueCost - streamCost;
+
+      // 資金・実績へ計上
+      funds += profit;
+      yearlyStats.audience += totalAudience;
+      yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
+      yearlyStats.streamCost = (yearlyStats.streamCost || 0) + streamCost;
+
+      // 経験値付与（最終公演完了時に全員へ付与）
+      const liveExp = applyLiveExperience(v, totalAudience, totalShowCount);
+      applyLiveStaminaCost(v, isMultiDay, false);
+
+      entry.completed = true;
+      markLiveEntryCompleted(entry);
+      nextLivePromotionPoints = 0;
+
+      // 詳細収支レポートをキューに蓄積
+      const report = {
+        venueName: v.name,
+        liveName: entry.liveName || v.name,
+        showCount: totalShowCount,
+        audience: totalAudience,
+        ticketRevenue: totalTicketRevenue,
+        merchandise: goods.revenue,
+        streamRevenue,
+        streamCost,
+        venueCost,
+        profit,
+        liveExp
+      };
+
+      pendingReports.push({ type: "live", report });
+      setLog(`【ライブ完走】${entry.liveName || v.name}（全${totalShowCount}公演 / 動員 ${totalAudience.toLocaleString()}人 / 収支 ${profit >= 0 ? '+' : ''}${formatMoney(profit)}）`);
+    }
+  });
+}
+
+// ==========================================
+// 7. イベントライブ（フェス・特番・外部招待）
+// ==========================================
+function processEventLives(fromDate, toDate) {
+  if (!Array.isArray(specialLiveEvents)) return;
+
+  specialLiveEvents
+    .filter(event => {
+      if (event.completed || !event.liveDate) return false;
+      const liveDate = getGameDateObject(event.liveDate);
+      return liveDate > fromDate && liveDate <= toDate;
+    })
+    .forEach(event => {
+      const venue = VENUE_DATA.find(item => item.name === event.venue);
+      const capacity = venue ? CAPACITY_MAP[venue.cap] : 20000;
+      const multiplier = (event.type === 'festival' ? 1.4 : 1.2);
+      const audience = Math.min(capacity, Math.floor(getLiveAudienceDemand(venue, getGameDateObject(event.liveDate)) * multiplier));
+
+      // フェス等は自主興行ではないため会場費・チケット収支は発生せず、出演料・知名度・人気が還元される
+      adjustTargetPopularity(2);
+      groupCrisis = Math.min(100, groupCrisis + 1);
+
+      // 新規ファン獲得
+      const fanGain = Math.floor(calculateGroupFans() * 0.003);
+      fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + fanGain);
+
+      yearlyStats.audience += audience;
+      event.completed = true;
+
+      setLog(`【イベント出演】${event.name}（${event.venue} / 動員 ${audience.toLocaleString()}人 / 人気+2 / ファン+${fanGain.toLocaleString()}人）`);
+    });
+}
+
+// ==========================================
+// 8. 月末決算
+// ==========================================
+function processMonthlyClosing(fromDate, toDate) {
+  if (!isMonthEnd(toDate)) return;
+
+  // 月末の給与・FC会費・CD売上精算
+  settleMonthlyIncome();
+
+  // 当月収支明細を締め切り、レポートを作成してキューへ
+  const report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
+  pendingReports.push({ type: "monthly", report });
+}
+
+// ==========================================
+// 9. 月末判定
+// ==========================================
+function isMonthEnd(date) {
+  const next = new Date(date);
+  next.setDate(date.getDate() + 1);
+  return next.getMonth() !== date.getMonth();
+}
+
+// ==========================================
+// 10. 自主ライブ終了判定
+// ==========================================
+function hasFinishedPlayerLive(date) {
+  const dateKey = toDateKey(date);
+  return getScheduledLiveEntries().some(entry => {
+    if (!entry.completed) return false;
+    const showDates = getLiveEntryShowDates(entry);
+    return showDates[showDates.length - 1] === dateKey;
+  });
+}
+
+// ==========================================
+// 11. レポート・モーダル表示（キュー消化）
+// ==========================================
+function openPendingModal() {
+  // ① イベント発生・危機管理・選抜などの緊急モーダルを優先
+  if (pendingSelectionEvent) return openSelectionModal();
+  if (pendingCrisisResponse) return openCrisisResponseModal();
+  if (pendingFanClubEvent) return openFanClubModal();
+  if (pendingRandomEvent) return openRandomEventModal();
+  if (pendingEquipmentEvent) return openEquipmentEventModal();
+  if (pendingPerformanceOffers.length) return openMusicOfferModal();
+
+  // ② 進行中に積まれたキュー（月末決算・ライブ結果）を順番に表示
+  if (!pendingReports || !pendingReports.length) return;
+
+  const item = pendingReports.shift();
+  switch (item.type) {
+    case "monthly":
+      showMonthlyReportModal(item.report);
+      break;
+    case "live":
+      showSingleLiveResultModal(item.report);
+      break;
+  }
+}
+
+// ライブ完了時の詳細収支モーダル
+function showSingleLiveResultModal(report) {
+  const rows = [{
+    date: gameDate,
+    venueName: report.venueName,
+    liveName: report.liveName,
+    isFinale: true,
+    audience: report.audience,
+    ticketRevenue: report.ticketRevenue,
+    merchandise: report.merchandise,
+    streamBuyers: Math.round(report.streamRevenue / STREAM_TICKET_PRICE),
+    streamRevenue: report.streamRevenue,
+    streamCost: report.streamCost,
+    revenue: report.ticketRevenue + report.merchandise + report.streamRevenue,
+    venueCost: report.venueCost,
+    profit: report.profit
+  }];
+  showLiveFinanceModal(rows);
+}
+
+// ==========================================
+// サブフロー・ヘルパー処理
+// ==========================================
+
+function processBirthdays(fromDate, toDate) {
+  if (typeof processMemberBirthdays === 'function') {
+    processMemberBirthdays(fromDate, toDate);
+  }
+  if (typeof syncMemberAges === 'function') {
+    syncMemberAges(toDate);
+  }
+}
+
+function processReleaseEvents(reachDateStr) {
+  const planKey = `${currentYear}-${currentMonth}`;
+  const plan = productionSchedule ? productionSchedule[planKey] : null;
+  const summary = calculateTeamAverages();
+
+  if (plan && isPlanReleaseDue(plan, reachDateStr)) {
+    const isSingle = (plan.release === 'single');
+    const song = ensureScheduledSong(currentYear, currentMonth, plan);
+    const quality = ((summary.averages?.popularity || 0) * 0.6) + ((summary.averages?.vocal || 0) * 0.2) + ((summary.averages?.dance || 0) * 0.2);
+    const multiplier = 1.0 + (summary.overall / 100);
+    const base = isSingle ? 5000 : 7500;
+    const songMultiplier = 1 + (((song.level || 1) - 1) * 0.02);
+    const promoAlpha = (song.promoCount || 0) * RELEASE_PROMO_ALPHA_STEP;
+    const promoMultiplier = 1 + promoAlpha;
+    const qualitySales = quality * base * multiplier * songMultiplier * promoMultiplier;
+    const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
+    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
+
+    addGroupSales(sales);
+    addMonthlyCdRevenue(sales * getSongUnitPrice(song));
+    song.totalSales = (song.totalSales || 0) + sales;
+    song.released = true;
+    song.releaseDateKey = gameDate;
+    song.releasePromoAlpha = promoAlpha;
+    song.firstWeekSales = sales;
+    song.salesHistory = [{ weekKey: gameDate, sales }];
+
+    const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
+    if (benefit) {
+      funds -= benefit.cost;
+      recordMonthlyExpense(`CD特典（${benefit.name}）`, benefit.cost);
+      recordReleaseBenefitSales(benefit.id);
+    }
+    plan.releaseCompleted = true;
+
+    scheduleInfoMedia('release', {
+      releaseType: plan.release,
+      songTitle: song.title,
+      sales,
+      songId: song.id,
+      releaseNth: songs.filter(s => s.releaseType === plan.release).length,
+      releaseDate: formatPlanDayLabel(gameDate),
+      centerText: getCurrentCenterText()
+    });
+
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}『${song.title}』発売！ 売上: ${sales.toLocaleString()}枚！`);
+  }
+}
+
+function processWeeklyCycle(toDate) {
+  totalWeeksElapsed++;
+
+  // 危機・ランダムイベント
+  rollWeeklyCrisisEvent();
+  rollRandomEvent();
+  rollEquipmentDowngradeEvent();
+  checkFanClubYearlyEvent();
+  checkSpecialBroadcastOffers();
+
+  // マネージャー・怪我・疲労回復
+  try { processManagerResignations(); } catch (e) {}
+  try { refreshManagerMarket(); } catch (e) {}
+  processMemberInjuries();
+  decayLiveFatigue();
+  syncPlayerTeamStats();
+
+  // ライバル競合シミュレーション
+  if (Array.isArray(leagueTeams)) {
+    leagueTeams.forEach(team => {
+      if (!team || team.id === 'player') return;
+      const monthPrefix = `${calendarYear}-${String(currentMonth).padStart(2, '0')}-`;
+      const rBookings = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+      const showCount = rBookings.filter(booking =>
+        booking.groupId === team.id && (booking.venueDates || [booking.liveDate]).some(key => key && key.startsWith(monthPrefix))
+      ).length;
+      const power = getRivalTeamPower(team);
+      team.sales = (team.sales || 0) + Math.floor(power * 550 + Math.random() * 7000 + showCount * 6000);
+      team.audience = (team.audience || 0) + Math.floor(power * 220 + Math.random() * 3000 + showCount * 2500);
+      team.showCount = (team.showCount || 0) + showCount;
+    });
+  }
+
+  // 楽曲練習・選抜発表・オファー
+  const summary = calculateTeamAverages();
+  checkSenbatsuTrigger();
+  checkMusicProgramOffers();
+  resolveIndustryOffer();
+  trainSongs(summary);
+  recordAllSongSalesHistory();
+
+  // 設備維持費
+  maintainOfficeFacilities();
+
+  // ドラフト会議判定
+  if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
+    startDraftMeeting();
+  }
+
+  // 年次繰り越し
+  checkYearlyTransition();
+}
+
+function checkYearlyTransition() {
+  const d = getGameDateObject();
+  const actualYear = d.getFullYear();
+  if (calendarYear && actualYear !== calendarYear) {
+    yearlyStats = { sales: 0, audience: 0 };
+    if (Array.isArray(leagueTeams)) {
+      leagueTeams.forEach(team => { if (team) { team.sales = 0; team.audience = 0; team.showCount = 0; } });
+    }
+    previousYearGroupFansAtYearStart = groupFansAtYearStart || calculateGroupFans();
+    groupFansAtYearStart = calculateGroupFans();
+    yearEndAwardProcessed = false;
+    yearEndKohakuProcessed = false;
+
+    // 半年計画策定モーダル
+    if (currentMonth === 1) openDecisionModal("当年7月〜12月の計画策定", currentYear, 7, 12);
+    else if (currentMonth === 7) openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
+  }
+}
+
+// ==========================================
+// スケジュール設定・適用ロジック（個別レッスン統合版）
+// ==========================================
 function createEmptyWeeklySchedule() {
-  // 1週間は14枠（7日×午前/午後）で固定。休養を1日フル＋2枠あけて、残りをレッスンで埋める
-  const slots = [...DEFAULT_WEEK_SLOTS];
-  while (slots.length < WEEK_SLOT_COUNT) slots.push('');
-  slots.length = WEEK_SLOT_COUNT;
-  const availableMembers = idolRoster.filter(member => member.isSelected && !member.injury);
-  const defaultMember = availableMembers[0]?.id ?? idolRoster.find(member => !member.injury)?.id ?? '';
+  const defaultSlots = typeof DEFAULT_WEEK_SLOTS !== 'undefined' ? DEFAULT_WEEK_SLOTS : [];
+  const slotCount = typeof WEEK_SLOT_COUNT !== 'undefined' ? WEEK_SLOT_COUNT : 14;
+  const slots = [...defaultSlots];
+  while (slots.length < slotCount) slots.push('');
+  slots.length = slotCount;
+
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const availableMembers = roster.filter(member => member && member.isSelected && !member.injury);
+  const defaultMember = availableMembers[0]?.id ?? roster.find(member => member && !member.injury)?.id ?? '';
+
   return {
     slots,
     vacation: false,
     individualMemberId: defaultMember,
     individualStat: 'vocal',
-    focusMemberIds: [defaultMember].filter(Boolean),
     restDayMembers: [],
-    autoRestMemberIds: [],
     officeAction: ''
   };
 }
 
 function ensureWeeklySchedule() {
+  const slotCount = typeof WEEK_SLOT_COUNT !== 'undefined' ? WEEK_SLOT_COUNT : 14;
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = getDraftSourceSchedule() ? createScheduleFromLastWeek() : createEmptyWeeklySchedule();
   } else {
-    // 旧セーブ（可変長の枠）を14枠へ移行する
-    const slots = weeklySchedule.slots.slice(0, WEEK_SLOT_COUNT);
-    while (slots.length < WEEK_SLOT_COUNT) slots.push('');
+    const slots = weeklySchedule.slots.slice(0, slotCount);
+    while (slots.length < slotCount) slots.push('');
     weeklySchedule.slots = slots;
     weeklySchedule.vacation = Boolean(weeklySchedule.vacation);
     if (!Array.isArray(weeklySchedule.restDayMembers)) weeklySchedule.restDayMembers = [];
-    if (!Array.isArray(weeklySchedule.autoRestMemberIds)) weeklySchedule.autoRestMemberIds = [];
-    if (!Array.isArray(weeklySchedule.focusMemberIds)) {
-      // 旧セーブ（focusMemberId 単一）を複数人対応へ移行する
-      weeklySchedule.focusMemberIds = weeklySchedule.focusMemberId ? [weeklySchedule.focusMemberId] : [];
-    }
+
+    delete weeklySchedule.focusMemberIds;
     delete weeklySchedule.focusMemberId;
-    if (!INDIVIDUAL_LESSON_STATS.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
-    // 事務作業は「未選択 or 定義済みの1件」のみ認める
-    if (!OFFICE_ACTIONS.some(action => action.id === weeklySchedule.officeAction)) weeklySchedule.officeAction = '';
-    // 強化人数の上限はマネージャー側で管理するため、ここではトリムしない
+    delete weeklySchedule.autoRestMemberIds;
+
+    const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance'];
+    if (!validStats.includes(weeklySchedule.individualStat)) weeklySchedule.individualStat = 'vocal';
+
+    const actions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [];
+    if (!actions.some(action => action.id === weeklySchedule.officeAction)) weeklySchedule.officeAction = '';
   }
+
   getWeekFixedSlots().forEach((slot, index) => {
-    if (index >= 0 && index < WEEK_SLOT_COUNT) weeklySchedule.slots[index] = slot.slotId || slot.kind;
+    if (index >= 0 && index < slotCount) weeklySchedule.slots[index] = slot.slotId || slot.kind;
   });
 }
 
-// 1週間の休暇を切り替える（オンなら14枠すべてが休養になる。テレビ出演枠がある週は不可）
 function toggleWeekVacation() {
   ensureWeeklySchedule();
   if (getWeekFixedSlots().size) {
@@ -67,13 +538,12 @@ function toggleWeekVacation() {
   renderWeeklyActionPanel();
 }
 
-// 枠に内容（itemId）を割り当てる（休暇中・テレビ出演で固定された枠は変更できない）
 function setWeeklyScheduleSlot(index, itemId) {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return;
   if (index < 0 || index >= weeklySchedule.slots.length) return;
   if (getWeekFixedSlots().has(index)) return;
-  // 週の上限がある項目は、超過分をここで弾く（明示して黙って無視しない）
+
   const blocked = getWeeklyLimitBlocker(itemId, index);
   if (blocked) {
     setLog(`【週間スケジュール】${blocked.message}`);
@@ -84,8 +554,8 @@ function setWeeklyScheduleSlot(index, itemId) {
   renderWeeklyActionPanel();
 }
 
-// 週の上限を超える項目を弾く理由（なければnull）
 function getWeeklyLimitBlocker(itemId, excludeIndex = -1) {
+  if (typeof WEEKLY_SCHEDULE_ITEMS === 'undefined') return null;
   const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId);
   if (!item || !item.weeklyLimit) return null;
   const used = countWeekSlots(itemId, excludeIndex);
@@ -97,24 +567,16 @@ function getWeeklyLimitBlocker(itemId, excludeIndex = -1) {
   };
 }
 
-// 特定の項目の今週の枠数（excludeIndex の枠は数えない）
 function countWeekSlots(itemId, excludeIndex = -1) {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) return 0;
   return weeklySchedule.slots.filter((slotId, index) => slotId === itemId && index !== excludeIndex).length;
 }
 
-// 週の起点（水曜）から offsetDays 日後が、週グリッドの何番目の曜目に当たるかを求める
-// WEEK_DAY_LABELS は「木曜起点」で並んでいるため、
-// offset 1（木曜）= index 0 / offset 7（水曜）= index 6 となる。
-function getWeekDayIndexForOffset(offsetDays) {
-  return (((offsetDays - 1) % WEEK_DAY_LABELS.length) + WEEK_DAY_LABELS.length) % WEEK_DAY_LABELS.length;
-}
-
-// 今週のテレビ出演（歌番組・大型特番）を週枠に固定する
-// 放送日の「午後」＝出演、その直前の「午前」＝リハーサル として埋め込む
 function getWeekFixedSlots() {
-  const startDate = getWeekAnchorDate();
   const fixedSlots = new Map();
+  if (typeof getWeekAnchorDate !== 'function') return fixedSlots;
+  const startDate = getWeekAnchorDate();
+
   const addFixed = (slot, date) => {
     const existing = fixedSlots.get(slot.index);
     if (!existing) {
@@ -127,13 +589,18 @@ function getWeekFixedSlots() {
       names: existing.names.concat(slot.names)
     });
   };
-  scheduledPerformances.forEach(performance => {
-    if (!performance.airDate) return;
+
+  const pList = Array.isArray(scheduledPerformances) ? scheduledPerformances : [];
+  pList.forEach(performance => {
+    if (!performance || !performance.airDate) return;
     const airDate = getGameDateObject(performance.airDate);
     const offsetDays = Math.round((airDate - startDate) / 86400000);
-    // 起点の翌日から週の最終日（次の水曜の1日前）までを枠に埋め込む
-    if (offsetDays < 1 || offsetDays > WEEK_DAY_LABELS.length - 1) return;
-    const dayBase = getWeekDayIndexForOffset(offsetDays) * WEEK_PERIOD_LABELS.length;
+    const dayLabelsLen = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS.length : 7;
+    const periodLabelsLen = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS.length : 2;
+
+    if (offsetDays < 1 || offsetDays > dayLabelsLen - 1) return;
+
+    const dayBase = (((offsetDays - 1) % dayLabelsLen + dayLabelsLen) % dayLabelsLen) * periodLabelsLen;
     addFixed({
       index: dayBase + 1,
       kind: 'broadcast',
@@ -149,12 +616,18 @@ function getWeekFixedSlots() {
       performanceId: performance.id
     }, performance.airDate);
   });
-  specialLiveEvents.forEach(event => {
-    if (event.completed || !event.liveDate) return;
+
+  const sList = Array.isArray(specialLiveEvents) ? specialLiveEvents : [];
+  sList.forEach(event => {
+    if (!event || event.completed || !event.liveDate) return;
     const liveDate = getGameDateObject(event.liveDate);
     const offsetDays = Math.round((liveDate - startDate) / 86400000);
-    if (offsetDays < 1 || offsetDays > WEEK_DAY_LABELS.length) return;
-    const liveBase = getWeekDayIndexForOffset(offsetDays) * WEEK_PERIOD_LABELS.length;
+    const dayLabelsLen = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS.length : 7;
+    const periodLabelsLen = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS.length : 2;
+
+    if (offsetDays < 1 || offsetDays > dayLabelsLen) return;
+
+    const liveBase = (((offsetDays - 1) % dayLabelsLen + dayLabelsLen) % dayLabelsLen) * periodLabelsLen;
     [liveBase - 2, liveBase - 1, liveBase].forEach(index => {
       addFixed({
         index,
@@ -184,10 +657,10 @@ function getWeekFixedSlots() {
       }, event.liveDate);
     });
   });
+
   return fixedSlots;
 }
 
-// 今週のテレビ出演一覧（画面への説明用）
 function getWeekBroadcastSummaries() {
   return [...getWeekFixedSlots().values()]
     .filter(slot => slot.kind === 'broadcast')
@@ -195,16 +668,6 @@ function getWeekBroadcastSummaries() {
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
-// テレビ出演の枠数（リハーサル／出演の内訳）
-function getWeekBroadcastCounts() {
-  const counts = { rehearsal: 0, broadcast: 0 };
-  getWeekFixedSlots().forEach(slot => {
-    if (slot.kind in counts) counts[slot.kind] += 1;
-  });
-  return counts;
-}
-
-// スケジュールを複製する（参照を共有しないため）
 function cloneWeeklySchedule(schedule) {
   if (!schedule) return null;
   return {
@@ -212,76 +675,69 @@ function cloneWeeklySchedule(schedule) {
     vacation: Boolean(schedule.vacation),
     individualMemberId: schedule.individualMemberId || '',
     individualStat: schedule.individualStat || 'vocal',
-    focusMemberIds: Array.isArray(schedule.focusMemberIds) ? schedule.focusMemberIds.slice() : [],
     restDayMembers: Array.isArray(schedule.restDayMembers) ? schedule.restDayMembers.slice() : [],
-    autoRestMemberIds: Array.isArray(schedule.autoRestMemberIds) ? schedule.autoRestMemberIds.slice() : [],
     officeAction: schedule.officeAction || ''
   };
 }
 
-// テレビ出演の固定枠（リハーサル／出演）で埋まった枠か
-// WEEKLY_SCHEDULE_ITEMS に無い枠（例：放送枠）も固定枠として扱う
 function isFixedSlotId(slotId) {
   if (!slotId) return false;
+  if (typeof WEEKLY_SCHEDULE_ITEMS === 'undefined') return false;
   const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId);
   return !item || item.fixed;
 }
 
-// スケジュールに歌番組の固定枠が混ざっているか
 function hasFixedSlotInSchedule(schedule) {
   return Boolean(schedule && Array.isArray(schedule.slots) && schedule.slots.some(isFixedSlotId));
 }
 
-// 確定した週のスケジュールを「直前週」として保存する
 function rememberWeeklySchedule(schedule) {
   lastWeekSchedule = cloneWeeklySchedule(schedule);
-  // 歌番組で枠が潰されていない週は保存版としても残す（歌番組の翌週の仮組に使う）
-  if (!hasFixedSlotInSchedule(schedule)) savedCleanWeekSchedule = cloneWeeklySchedule(schedule);
+  if (!hasFixedSlotInSchedule(schedule)) {
+    savedCleanWeekSchedule = cloneWeeklySchedule(schedule);
+  }
 }
 
-// 歌番組の翌週に使う仮組の素になるスケジュール
-// 直前週が歌番組の週なら、挟まる前の週（保存版）を呼び出す
-// 保存版が無い場合は直前週から固定枠だけを落として使う
 function getDraftSourceSchedule() {
-  if (hasFixedSlotInSchedule(lastWeekSchedule) && savedCleanWeekSchedule) return savedCleanWeekSchedule;
+  if (hasFixedSlotInSchedule(lastWeekSchedule) && savedCleanWeekSchedule) {
+    return savedCleanWeekSchedule;
+  }
   return lastWeekSchedule;
 }
 
-// 直前週のスケジュールから下書きを作る
-// テレビ出演などの固定枠は前の週から引き継がない（今週の予定で作り直す）
 function createScheduleFromLastWeek() {
   const base = createEmptyWeeklySchedule();
   const source = getDraftSourceSchedule();
   if (!source) return base;
-  // 前の週の固定枠は残さず「空き」にする（今週の固定枠で上書きするため）
+
+  const slotCount = typeof WEEK_SLOT_COUNT !== 'undefined' ? WEEK_SLOT_COUNT : 14;
   const slots = source.slots.map(slotId => (isFixedSlotId(slotId) ? '' : slotId || ''));
-  while (slots.length < WEEK_SLOT_COUNT) slots.push('');
-  slots.length = WEEK_SLOT_COUNT;
-  // 固定枠（リハーサル／テレビ出演）を今週の予定で上書きする
+  while (slots.length < slotCount) slots.push('');
+  slots.length = slotCount;
+
   getWeekFixedSlots().forEach((slot, index) => {
     if (index >= 0 && index < slots.length) slots[index] = slot.slotId || slot.kind;
   });
+
   base.slots = slots;
   base.vacation = source.vacation;
   base.individualMemberId = source.individualMemberId || base.individualMemberId;
   base.individualStat = source.individualStat || base.individualStat;
-  // 特別強化の対象は、在籍するメンバーだけを残す
-  base.focusMemberIds = source.focusMemberIds.filter(id =>
-    idolRoster.some(member => member.id === id)
-  );
-  const recoveryRestIds = (source.autoRestMemberIds || []).filter(id => {
-    const member = idolRoster.find(entry => entry.id === id);
-    return member && !member.injury
-      && (member.staminaValue ?? MAX_STAMINA_VALUE) < AUTO_REST_STAMINA_TARGET;
+
+  const targetStamina = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+
+  base.restDayMembers = (source.restDayMembers || []).filter(id => {
+    const member = roster.find(entry => entry.id === id);
+    if (!member || member.injury) return false;
+    const stamina = member.staminaValue ?? (typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100);
+    return stamina < targetStamina;
   });
-  base.restDayMembers = recoveryRestIds;
-  base.autoRestMemberIds = recoveryRestIds;
+
   base.officeAction = source.officeAction || '';
   return base;
 }
 
-// 週が変わったら下書きを作り直す
-// 直前週に確定したスケジュールがあれば、それを初期値として引き継ぐ
 function resetWeeklySchedule() {
   weeklySchedule = getDraftSourceSchedule() ? createScheduleFromLastWeek() : null;
   weeklyRecoveryDone = false;
@@ -293,62 +749,29 @@ function setWeeklyScheduleField(field, value) {
   renderWeeklyActionPanel();
 }
 
-// 特別強化の対象メンバーをトグルする（人数はスケジュール管理力で制限）
-function toggleFocusMember(memberId) {
-  ensureWeeklySchedule();
-  const list = weeklySchedule.focusMemberIds;
-  const index = list.indexOf(memberId);
-  if (index >= 0) {
-    list.splice(index, 1);
-  } else {
-    if (list.length >= getSpecialTrainingTargetLimit()) {
-      setLog(`【特別強化】同時に強化できるのは${getSpecialTrainingTargetLimit()}名までです。`);
-      return;
-    }
-    list.push(memberId);
-  }
-  renderWeeklyActionPanel();
-}
-
-// 休養日の対象メンバーをユーザーがトグルする
 function toggleRestDayMember(memberId) {
   ensureWeeklySchedule();
   const list = weeklySchedule.restDayMembers;
   const index = list.indexOf(memberId);
   if (index >= 0) {
     list.splice(index, 1);
-    weeklySchedule.autoRestMemberIds = (weeklySchedule.autoRestMemberIds || [])
-      .filter(id => id !== memberId);
   } else {
     list.push(memberId);
-    const member = idolRoster.find(entry => entry.id === memberId);
-    if (member && !member.injury
-      && (member.staminaValue ?? MAX_STAMINA_VALUE) < AUTO_REST_STAMINA_TARGET) {
-      weeklySchedule.autoRestMemberIds.push(memberId);
-    }
   }
   renderWeeklyActionPanel();
 }
 
-// その週にグループレッスン（特別強化の対象になるレッスン）が組まれているか
-function hasScheduledLessons() {
-  if (!weeklySchedule || weeklySchedule.vacation) return false;
-  const fixed = getWeekFixedSlots();
-  return weeklySchedule.slots.some((slotId, index) =>
-    !fixed.has(index) && slotId && slotId !== 'rest-day' && slotId !== 'meal-party'
-  );
-}
-
-// 休養が「1日フル（午前午後とも）＋余り何枠」に分かっているか
-// ※「空き」は休養に数えません（体力回復が得られないため、「休養」を選ぶ必要があります）
 function getWeekRestBreakdown() {
   ensureWeeklySchedule();
   const isRest = value => value === 'rest-day';
   let fullRestDays = 0;
   let restSlots = 0;
-  for (let day = 0; day < WEEK_DAY_LABELS.length; day++) {
-    const morning = weeklySchedule.slots[day * WEEK_PERIOD_LABELS.length];
-    const afternoon = weeklySchedule.slots[day * WEEK_PERIOD_LABELS.length + 1];
+  const dayCount = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS.length : 7;
+  const periodCount = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS.length : 2;
+
+  for (let day = 0; day < dayCount; day++) {
+    const morning = weeklySchedule.slots[day * periodCount];
+    const afternoon = weeklySchedule.slots[day * periodCount + 1];
     if (isRest(morning) && isRest(afternoon)) {
       fullRestDays += 1;
       restSlots += 2;
@@ -359,45 +782,45 @@ function getWeekRestBreakdown() {
   return { fullRestDays, restSlots, extraSlots: Math.max(0, restSlots - fullRestDays * 2) };
 }
 
-// 指定した曜日が「1日フル休養」（午前も午後も休養）か
 function isWeekRestDay(dayIndex) {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return true;
-  const base = dayIndex * WEEK_PERIOD_LABELS.length;
+  const periodCount = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS.length : 2;
+  const base = dayIndex * periodCount;
   const isRest = value => value === 'rest-day';
   return isRest(weeklySchedule.slots[base]) && isRest(weeklySchedule.slots[base + 1]);
 }
 
-// 休養日の規定を「変更可能な枠」で満たせるか
-// テレビ出演などの固定枠が休養枠を潰した場合、プレイヤーが改善できないので判定対象外にする
 function isRestRequirementAchievable() {
   ensureWeeklySchedule();
   const fixed = getWeekFixedSlots();
   let freeSlots = 0;
   let daysWithBothFree = 0;
-  for (let day = 0; day < WEEK_DAY_LABELS.length; day++) {
+  const dayCount = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS.length : 7;
+  const periodCount = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS.length : 2;
+
+  for (let day = 0; day < dayCount; day++) {
     let bothFree = true;
-    for (let period = 0; period < WEEK_PERIOD_LABELS.length; period++) {
-      const index = day * WEEK_PERIOD_LABELS.length + period;
+    for (let period = 0; period < periodCount; period++) {
+      const index = day * periodCount + period;
       if (fixed.has(index)) { bothFree = false; continue; }
       freeSlots += 1;
     }
     if (bothFree) daysWithBothFree += 1;
   }
-  // 1日フル休養には午前午後とも空いている日が、半休2枠には計4枠以上の空きが必要
-  if (daysWithBothFree < REQUIRED_FULL_REST_DAYS) return false;
-  if (freeSlots < REQUIRED_FULL_REST_DAYS * 2 + REQUIRED_EXTRA_REST_SLOTS) return false;
+  const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
+  const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
+  if (daysWithBothFree < reqFull) return false;
+  if (freeSlots < reqFull * 2 + reqExtra) return false;
   return true;
 }
 
-// 食事会が今週何回組まれているか
 function getWeekMealPartyCount() {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return 0;
   return weeklySchedule.slots.filter(slotId => slotId === 'meal-party').length;
 }
 
-// レッスン（特別強化の対象）が今週何枠あるか
 function getWeekLessonCount() {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return 0;
@@ -407,61 +830,13 @@ function getWeekLessonCount() {
   ).length;
 }
 
-// グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
 function getWeeklyLessonExperience() {
-  const lessonLevel = officeUpgrades.lessons || 0;
+  const lessonLevel = (typeof officeUpgrades !== 'undefined' && officeUpgrades?.lessons) ? officeUpgrades.lessons : 0;
   const lessonMultiplier = 1 + lessonLevel * 0.12;
-  return Math.round(LESSON_BASE_EXP * lessonMultiplier);
+  const baseExp = typeof LESSON_BASE_EXP !== 'undefined' ? LESSON_BASE_EXP : 30;
+  return Math.round(baseExp * lessonMultiplier);
 }
 
-// 特別強化の対象4能力（歌唱・ダンス・体力・回復力）の表示名
-function getSpecialTrainingStatNames() {
-  return SPECIAL_TRAINING_STATS
-    .map(statId => STATUS_KEYS.find(key => key.id === statId)?.name || statId);
-}
-
-// 特別強化の倍率を掛けられる能力か（対象4能力だけ。倍率1なら全部等倍）
-function getSpecialTrainingStatMultiplier(statId, multiplier) {
-  if (!statId || !(multiplier > 1)) return 1;
-  return SPECIAL_TRAINING_STATS.includes(statId) ? multiplier : 1;
-}
-
-// レッスン項目が経験値を配る能力（主効果＋派生）
-function getLessonItemStatIds(item) {
-  return [item.expStat].concat(Object.keys(item.secondaryExp || {})).filter(Boolean);
-}
-
-// 特別強化の倍率が掛かるレッスン項目か（対象4能力を鍛える枠）
-// 休養・食事会・テレビ出演の固定枠・個別レッスンは対象外
-function isSpecialTrainingLessonItem(item) {
-  if (!item || item.rest || item.fixed || item.social || item.individual) return false;
-  return getLessonItemStatIds(item).some(statId => SPECIAL_TRAINING_STATS.includes(statId));
-}
-
-// 特別強化の倍率が掛かるレッスン項目の一覧（UIの補足表示用）
-function getSpecialTrainingLessonItems() {
-  return WEEKLY_SCHEDULE_ITEMS.filter(isSpecialTrainingLessonItem);
-}
-
-// 今週のレッスンに「特別強化の倍率」が掛かる枠があるか
-// 対象4能力を鍛えるレッスンがない週は、強化しても何も得られないため強化扱いしない
-function hasSpecialTrainingLessons() {
-  if (!weeklySchedule || weeklySchedule.vacation) return false;
-  return weeklySchedule.slots.some(slotId =>
-    isSpecialTrainingLessonItem(WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId))
-  );
-}
-
-// ==========================================
-// 歌番組リハーサル前の準備（裏効果）
-// ==========================================
-// リハーサルの直前の枠（1つ前）が「通し練習」か「連携」なら、
-// その歌番組が楽曲経験値に与える影響が5倍になる（ヘルプには記載しない）
-const MUSIC_PREP_BONUS_MULTIPLIER = 5;
-const MUSIC_PREP_ITEMS = ['full-run-through', 'coordination'];
-
-// 歌番組（・大型特番）のリハーサル直前の枠がリハーサル準備に当たるかを判定する
-// 出演IDごとにリハーサル準備に当たったかどうかを返す
 function collectMusicPreparationFlags() {
   const flags = {};
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) return flags;
@@ -473,35 +848,35 @@ function collectMusicPreparationFlags() {
   return flags;
 }
 
-
-// リハーサル準備に当たった歌番組に「準備済み」フラグを立てる（裏効果の反映）
 function markMusicPreparations() {
   const flags = collectMusicPreparationFlags();
+  const pList = Array.isArray(scheduledPerformances) ? scheduledPerformances : [];
   Object.keys(flags).forEach(performanceId => {
-    const performance = scheduledPerformances.find(item => item.id === performanceId);
+    const performance = pList.find(item => item.id === performanceId);
     if (performance) performance.prepared = flags[performanceId];
   });
 }
 
-// 1人のメンバーに週次レッスン効果をかける
-// multiplier は特別強化の倍率。SPECIAL_TRAINING_STATS の能力にだけ掛かる
-// slotEffect は枠の午前／午後による効果（午前は午後枠の8割）
 function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null, slotEffect = 1) {
   if (!member || member.injury) return { exp: 0, levels: 0 };
+  if (typeof WEEKLY_SCHEDULE_ITEMS === 'undefined') return { exp: 0, levels: 0 };
   const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId);
   if (!item || item.rest) return { exp: 0, levels: 0 };
 
   const baseExp = getWeeklyLessonExperience() * slotEffect;
-  // 能力ごとに倍率を決める（歌唱・ダンス・体力・回復力以外は等倍）
-  const statExp = statId => Math.round(baseExp * getSpecialTrainingStatMultiplier(statId, multiplier));
   const primaryStat = itemId === 'individual-lesson'
-    ? (INDIVIDUAL_LESSON_STATS.includes(individualStat) ? individualStat : 'vocal')
+    ? (typeof INDIVIDUAL_LESSON_STATS !== 'undefined' && INDIVIDUAL_LESSON_STATS.includes(individualStat) ? individualStat : 'vocal')
     : item.expStat;
-  const exp = primaryStat ? statExp(primaryStat) : 0;
+
+  const exp = primaryStat ? Math.round(baseExp * multiplier) : 0;
   let levels = 0;
-  if (primaryStat) levels += addMemberStatExp(member, primaryStat, exp);
+  if (primaryStat && typeof addMemberStatExp === 'function') {
+    levels += addMemberStatExp(member, primaryStat, exp);
+  }
   Object.entries(item.secondaryExp || {}).forEach(([secondaryStat, ratio]) => {
-    levels += addMemberStatExp(member, secondaryStat, statExp(secondaryStat) * ratio);
+    if (typeof addMemberStatExp === 'function') {
+      levels += addMemberStatExp(member, secondaryStat, Math.round(baseExp * ratio));
+    }
   });
   return { exp, levels };
 }
@@ -511,254 +886,272 @@ function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
   return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
 }
 
-// 週間スケジュールの実行前チェック（食事会の経費など）
 function validateWeeklySchedule() {
   ensureWeeklySchedule();
-  // テレビ出演があるのに休暇が選択されていたら解除する（出演は取り消せない）
+
   if (weeklySchedule.vacation && getWeekFixedSlots().size) {
     weeklySchedule.vacation = false;
     setLog('【週間スケジュール】テレビ出演があるため、1週間の休暇を解除しました。');
   }
-  // 週の上限を超えた項目がないか（セーブ読み込み直後の最終防衛線）
-  const overLimit = WEEKLY_SCHEDULE_ITEMS
-    .filter(item => item.weeklyLimit)
-    .map(item => ({ item, used: countWeekSlots(item.id) }))
-    .find(entry => entry.used > entry.item.weeklyLimit);
-  if (overLimit) {
-    alert(`「${overLimit.item.name}」は1週間で${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。枠を減らすか、別の内容に変更してください。`);
-    return false;
-  }
-  // グッズ開発は開発費が資金を超えないよう、足りなくなる前に確認する
-  if (weeklySchedule.officeAction === 'goods-development' && merchandiseProducts < MAX_MERCHANDISE_PRODUCTS
-    && GOODS_DEVELOPMENT_COST > funds) {
-    alert(`グッズの開発費 ${formatMoney(GOODS_DEVELOPMENT_COST)} が資金（${formatMoney(funds)}）を超えています。事務作業を変更するか、資金を増やしてください。`);
-    return false;
-  }
+
   if (weeklySchedule.vacation) return true;
-  // 休養日の規定（1日フル＋半休2枠）を満たさない場合はスケジュールを実行できない
-  const rest = getWeekRestBreakdown();
-  if (!isRestRequirementAchievable()) {
-    // テレビ出演の固定枠で休養枠が消えている場合は、プレイヤーが改善できないため止めない
-  } else {
-    const restShort = [];
-    if (rest.fullRestDays < REQUIRED_FULL_REST_DAYS) restShort.push(`休養1日フル（現在${rest.fullRestDays}日）`);
-    if (rest.extraSlots < REQUIRED_EXTRA_REST_SLOTS) restShort.push(`半休${REQUIRED_EXTRA_REST_SLOTS}枠（現在${rest.extraSlots}枠）`);
-    if (restShort.length) {
-      alert(`このスケジュールは実行できません。休養日の設定を見直してください。\n不足: ${restShort.join(' / ')}`);
+
+  if (typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' && Array.isArray(WEEKLY_SCHEDULE_ITEMS)) {
+    const overLimit = WEEKLY_SCHEDULE_ITEMS
+      .filter(item => item.weeklyLimit)
+      .map(item => ({ item, used: countWeekSlots(item.id) }))
+      .find(entry => entry.used > entry.item.weeklyLimit);
+
+    if (overLimit) {
+      alert(`【設定エラー】「${overLimit.item.name}」は1週間に${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。枠を減らしてください。`);
       return false;
     }
   }
-  const mealCost = getWeekMealPartyCount() * MEAL_PARTY_COST;
-  if (mealCost > funds) {
-    alert(`食事会の経費 ${formatMoney(mealCost)} が資金（${formatMoney(funds)}）を超えています。食事会の枠を減らすか、資金を増やしてください。`);
+
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
+  const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
+  if (weeklySchedule.officeAction === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts < maxProd && devCost > funds) {
+    alert(`グッズの開発費 ${formatMoney(devCost)} が資金を超えています。`);
     return false;
   }
+
+  const rest = getWeekRestBreakdown();
+  const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
+  const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
+
+  if (typeof isRestRequirementAchievable === 'function' && isRestRequirementAchievable()) {
+    const restShort = [];
+    if (rest.fullRestDays < reqFull) {
+      restShort.push(`・1日フル休養（午前・午後とも休養の日）：現在 ${rest.fullRestDays}日 / 必要 ${reqFull}日`);
+    }
+    if (rest.extraSlots < reqExtra) {
+      restShort.push(`・半休枠（午前または午後の休養）：現在 ${rest.extraSlots}枠 / 必要 ${reqExtra}枠`);
+    }
+
+    if (restShort.length > 0) {
+      alert(`【休養不足】スケジュールを実行できません。\n\n${restShort.join('\n')}\n\n※スロットから「休養」を設定してください。`);
+      return false;
+    }
+  }
+
+  const mealCount = getWeekMealPartyCount();
+  const mealCost = mealCount * (typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000);
+  if (mealCost > funds) {
+    alert(`【資金不足】食事会の経費（${formatMoney(mealCost)}）が所持金を超えています。食事会を減らしてください。`);
+    return false;
+  }
+
   return true;
 }
 
-// 週間スケジュールを適用する（経験値・体力値の消費／回復・ケガ判定）
-function getAutoRestReleaseSlots(autoRestMemberIds, fixedSlots) {
-  const releaseSlots = new Map();
-  idolRoster.forEach(member => {
-    if (!autoRestMemberIds.has(member.id)) return;
-    let stamina = member.staminaValue ?? MAX_STAMINA_VALUE;
-    if (stamina >= AUTO_REST_STAMINA_TARGET) {
-      releaseSlots.set(member.id, -1);
+function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
+  const releaseMap = new Map();
+  const targetStamina = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+  const slotRecovery = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 10;
+  const mealRecovery = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 15;
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+
+  (restingMemberIds || []).forEach(memberId => {
+    const member = roster.find(m => m.id === memberId);
+    if (!member) return;
+
+    let stamina = member.staminaValue ?? (typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100);
+    if (stamina >= targetStamina) {
+      releaseMap.set(memberId, 0);
       return;
     }
-    for (let index = 0; index < weeklySchedule.slots.length; index++) {
-      const slotId = weeklySchedule.slots[index];
-      const fixed = fixedSlots.get(index);
+
+    let recoveredSlotIndex = -1;
+    for (let i = 0; i < (weeklySchedule.slots || []).length; i++) {
+      const fixed = fixedSlots.get(i);
+      const slotId = weeklySchedule.slots[i];
+
       if ((fixed && fixed.kind === 'rest-day') || (!fixed && slotId === 'rest-day')) {
-        stamina = Math.min(MAX_STAMINA_VALUE, stamina + REST_SLOT_RECOVERY);
+        stamina += slotRecovery;
       } else if (!fixed && slotId === 'meal-party') {
-        stamina = Math.min(MAX_STAMINA_VALUE, stamina + MEAL_PARTY_RECOVERY);
+        stamina += mealRecovery;
       }
-      if (stamina >= AUTO_REST_STAMINA_TARGET) {
-        releaseSlots.set(member.id, index);
-        return;
+
+      if (stamina >= targetStamina) {
+        recoveredSlotIndex = i + 1;
+        break;
       }
     }
-    releaseSlots.set(member.id, null);
+    releaseMap.set(memberId, recoveredSlotIndex);
   });
-  return releaseSlots;
+
+  return releaseMap;
 }
 
 function applyWeeklySchedule() {
   ensureWeeklySchedule();
-  // 練習には選抜外のメンバーも参加する（事務所は所属員全員を育成する）
-  const participants = idolRoster;
-  const selectedMembers = idolRoster.filter(member => member.isSelected);
-  const scheduledRestDayMemberIds = new Set(weeklySchedule.restDayMembers || []);
-  const autoRestMemberIds = new Set(weeklySchedule.autoRestMemberIds || []);
-  const manualRestDayMemberIds = new Set([...scheduledRestDayMemberIds]
-    .filter(memberId => !autoRestMemberIds.has(memberId)));
-  const individualMember = idolRoster.find(member => member.id === weeklySchedule.individualMemberId);
-  const focusIds = new Set(weeklySchedule.focusMemberIds || []);
-  const focusMembers = participants.filter(member => focusIds.has(member.id));
-  // マネージャーの能力は特別強化にだけ効く
-  const specialMultiplier = getSpecialTrainingMultiplier();
-  const staminaReduction = getSpecialTrainingStaminaReduction();
-  const riskReduction = getSpecialTrainingRiskReduction();
-  // 事務作業はメンバーのレッスンと同じ週に実行する（選択されていなければ何もしない）
+
+  const participants = Array.isArray(idolRoster) ? idolRoster : [];
+  const restingMemberIds = new Set(weeklySchedule.restDayMembers || []);
+  const fixedSlots = getWeekFixedSlots();
+
   const officeMessage = applyOfficeAction(weeklySchedule.officeAction);
 
-  // 1週間の休暇：14枠すべて休養になる。レッスンも出費もケガも発生しない（事務作業は残る）
+  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
   if (weeklySchedule.vacation) {
-    idolRoster.forEach(member => recoverMemberStamina(member, FULL_VACATION_RECOVERY));
-    setLog(`【1週間の休暇】全員がしっかり休養しました（体力値 +${FULL_VACATION_RECOVERY}）${officeMessage ? ` / ${officeMessage}` : ''}。`);
+    participants.forEach(member => {
+      if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, fullVacationRec);
+    });
+    setLog(`【1週間の休暇】全員がしっかり休養しました（体力値 +${fullVacationRec}）${officeMessage ? ` / ${officeMessage}` : ''}。`);
     return { levelUps: 0, injuries: [] };
   }
 
-  // 枠インデックス（午前／午後）を控えておき、午前は午後枠の8割効果にする
-  const fixedSlots = getWeekFixedSlots();
-  const autoRestReleaseSlots = getAutoRestReleaseSlots(autoRestMemberIds, fixedSlots);
-  const releasedAutoRestMemberIds = new Set([...autoRestReleaseSlots.entries()]
-    .filter(([, releaseIndex]) => releaseIndex !== null)
-    .map(([memberId]) => memberId));
-  weeklySchedule.autoRestMemberIds = (weeklySchedule.autoRestMemberIds || [])
-    .filter(memberId => !releasedAutoRestMemberIds.has(memberId));
-  weeklySchedule.restDayMembers = (weeklySchedule.restDayMembers || [])
-    .filter(memberId => !releasedAutoRestMemberIds.has(memberId));
-  const lessonSlotIds = weeklySchedule.slots
-    .map((slotId, index) => ({
-      slotId,
-      index,
-      slotEffect: getWeekSlotPeriod(index) === 0 ? MORNING_SLOT_MULTIPLIER : 1
-    }))
-    .filter(entry => !fixedSlots.has(entry.index)
-      && entry.slotId && entry.slotId !== 'rest-day' && entry.slotId !== 'meal-party');
-  const restSlotCount = weeklySchedule.slots.filter(slotId => slotId === 'rest-day').length;
-  // 特別強化は「対象4能力（歌唱・ダンス・体力・回復力）を鍛えるレッスン」がある週だけ効く
-  const specialTrainingActive = hasSpecialTrainingLessons();
-  const activeFocusMembers = specialTrainingActive ? focusMembers : [];
-  // グループ練習のみ項目（連携）の今週の枠数
-  const groupOnlySlots = lessonSlotIds.filter(entry =>
-    WEEKLY_SCHEDULE_ITEMS.some(item => item.id === entry.slotId && item.groupOnly)
-  );
-  // 連携はグループ練習のみ：実際に参加できるメンバーが2名未満なら成立しない
+  const releaseSlots = calculateRestReleaseSlots(restingMemberIds, fixedSlots);
+  const fullyRecoveredMembers = [];
+
+  const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
+  const groupOnlySlots = weeklySchedule.slots
+    .map((slotId, index) => ({ slotId, index }))
+    .filter(entry => !fixedSlots.has(entry.index) && itemsList.some(item => item.id === entry.slotId && item.groupOnly));
+
   const groupOnlyAvailableSlots = new Set(groupOnlySlots
     .filter(entry => participants.filter(member => {
-      if (manualRestDayMemberIds.has(member.id) || member.injury) return false;
-      if (!autoRestMemberIds.has(member.id)) return true;
-      const releaseIndex = autoRestReleaseSlots.get(member.id);
-      return releaseIndex !== null && releaseIndex <= entry.index;
+      if (!member || member.injury) return false;
+      if (!restingMemberIds.has(member.id)) return true;
+      const releaseIdx = releaseSlots.get(member.id);
+      return releaseIdx !== -1 && releaseIdx <= entry.index;
     }).length >= 2)
     .map(entry => entry.index));
+
   const skippedGroupOnly = groupOnlySlots.some(entry => !groupOnlyAvailableSlots.has(entry.index));
 
-  // 食事会：100万円/回。人気とグループ危機回避力をわずかに伸ばし、体力も回復する
   const mealCount = getWeekMealPartyCount();
+  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
   if (mealCount > 0) {
-    funds -= mealCount * MEAL_PARTY_COST;
-    // 臨時支出として当月の収支明細に積む（月末に一括で報告する）
-    recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * MEAL_PARTY_COST);
-    adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
-    groupCrisis = Math.min(100, groupCrisis + MEAL_PARTY_CRISIS_GAIN);
+    funds -= mealCount * mealCostSingle;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle);
+    }
+    if (typeof adjustTargetPopularity === 'function' && typeof MEAL_PARTY_POPULARITY_GAIN !== 'undefined') {
+      adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
+    }
+    if (typeof groupCrisis !== 'undefined' && typeof MEAL_PARTY_CRISIS_GAIN !== 'undefined') {
+      groupCrisis = Math.min(100, groupCrisis + MEAL_PARTY_CRISIS_GAIN);
+    }
   }
 
   let levelUps = 0;
   const injuries = [];
-  const restNames = (weeklySchedule.restDayMembers || [])
-    .map(id => idolRoster.find(member => member.id === id)?.name)
-    .filter(Boolean);
+
+  const targetMemberId = weeklySchedule.individualMemberId;
+  const targetStat = weeklySchedule.individualStat || 'vocal';
+  const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
+  const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 10;
+  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 15;
+  const morningMultiplier = typeof MORNING_SLOT_MULTIPLIER !== 'undefined' ? MORNING_SLOT_MULTIPLIER : 0.8;
+  const rehCost = typeof REHEARSAL_STAMINA_COST !== 'undefined' ? REHEARSAL_STAMINA_COST : 8;
+  const bcastCost = typeof BROADCAST_STAMINA_COST !== 'undefined' ? BROADCAST_STAMINA_COST : 12;
 
   participants.forEach(member => {
-    const isManuallyResting = manualRestDayMemberIds.has(member.id);
-    const autoRestReleaseIndex = autoRestReleaseSlots.get(member.id);
-    const staysAutoResting = autoRestMemberIds.has(member.id) && autoRestReleaseIndex === null;
-    const isFocus = focusIds.has(member.id) && specialTrainingActive;
+    if (!member || member.injury) return;
+
+    const isRestDesignated = restingMemberIds.has(member.id);
+    const releaseIndex = releaseSlots.get(member.id) ?? 0;
+
     let staminaCost = 0;
-    let remainingStamina = member.staminaValue ?? MAX_STAMINA_VALUE;
+    let remainingStamina = member.staminaValue ?? maxStamina;
     let memberLevels = 0;
 
-    if (!isManuallyResting && !member.injury) {
-      weeklySchedule.slots.forEach((slotId, index) => {
-        const fixed = fixedSlots.get(index);
-        if (fixed) {
-          if (fixed.kind === 'rest-day') {
-            remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + REST_SLOT_RECOVERY);
-            return;
+    weeklySchedule.slots.forEach((slotId, index) => {
+      const fixed = fixedSlots.get(index);
+      const isCurrentlyResting = isRestDesignated && (releaseIndex === -1 || index < releaseIndex);
+
+      if (fixed) {
+        if (fixed.kind === 'rest-day') {
+          remainingStamina = Math.min(maxStamina, remainingStamina + restSlotRec);
+          return;
+        }
+        if (isCurrentlyResting) return;
+
+        const fixedCost = fixed.kind === 'rehearsal' ? rehCost : (fixed.kind === 'broadcast' ? bcastCost : 0);
+        staminaCost += fixedCost;
+        remainingStamina = Math.max(0, remainingStamina - fixedCost);
+        return;
+      }
+
+      if (slotId === 'rest-day') {
+        remainingStamina = Math.min(maxStamina, remainingStamina + restSlotRec);
+        return;
+      }
+      if (slotId === 'meal-party') {
+        remainingStamina = Math.min(maxStamina, remainingStamina + mealRec);
+        return;
+      }
+      if (!slotId || isCurrentlyResting) return;
+
+      const item = itemsList.find(row => row.id === slotId);
+      if (!item) return;
+
+      const periodIndex = (typeof getWeekSlotPeriod === 'function') ? getWeekSlotPeriod(index) : (index % 2);
+      const slotEffect = periodIndex === 0 ? morningMultiplier : 1;
+
+      // 個別レッスン枠：選ばれた1名が10.1倍、他全員は休養回復
+      if (slotId === 'individual-lesson') {
+        if (member.id === targetMemberId) {
+          const baseExp = getWeeklyLessonExperience() * slotEffect;
+          const gainedExp = Math.round(baseExp * SPECIAL_INDIVIDUAL_MULTIPLIER);
+          if (typeof addMemberStatExp === 'function') {
+            memberLevels += addMemberStatExp(member, targetStat, gainedExp);
           }
-          if (autoRestMemberIds.has(member.id)
-            && (autoRestReleaseIndex === null || index < autoRestReleaseIndex)) return;
-          const fixedCost = fixed.kind === 'rehearsal'
-            ? REHEARSAL_STAMINA_COST
-            : (fixed.kind === 'broadcast' ? BROADCAST_STAMINA_COST : 0);
-          staminaCost += fixedCost;
-          remainingStamina = Math.max(0, remainingStamina - fixedCost);
-          return;
-        }
-        if (slotId === 'rest-day') {
-          remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + REST_SLOT_RECOVERY);
-          return;
-        }
-        if (slotId === 'meal-party') {
-          remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + MEAL_PARTY_RECOVERY);
-          return;
-        }
-        if (!slotId) return;
-        if (autoRestMemberIds.has(member.id)
-          && (autoRestReleaseIndex === null || index < autoRestReleaseIndex)) return;
-        const item = WEEKLY_SCHEDULE_ITEMS.find(row => row.id === slotId);
-        if (!item) return;
-        const slotEffect = getWeekSlotPeriod(index) === 0 ? MORNING_SLOT_MULTIPLIER : 1;
-        if (slotId === 'individual-lesson') {
-          if (member.id !== individualMember?.id) return;
-          memberLevels += applyMemberLesson(member, slotId, 1, weeklySchedule.individualStat, slotEffect).levels;
           const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
           staminaCost += cost;
           remainingStamina = Math.max(0, remainingStamina - cost);
-          return;
+        } else {
+          const recoveryAmount = Math.round(restSlotRec * slotEffect);
+          remainingStamina = Math.min(maxStamina, remainingStamina + recoveryAmount);
         }
-        // グループ練習のみの項目は、参加者2名未満では成立しない（経験値も体力消費も発生しない）
-        if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
-        // グループレッスンは全員が受講。特別強化の対象は対象4能力（歌唱・ダンス・体力・回復力）だけの強化倍率
-        const multiplier = isFocus ? specialMultiplier : 1;
-        memberLevels += applyMemberLesson(member, slotId, multiplier, null, slotEffect).levels;
-        const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
-        staminaCost += cost;
-        remainingStamina = Math.max(0, remainingStamina - cost);
-      });
-      // 特別強化の追加消費は「1週間あたり1回」だけ加算する（14枠化で高額になりすぎないように）
-      if (isFocus) {
-        // メンタルケアで特別強化時の追加消費を抑える
-        staminaCost += SPECIAL_TRAINING_EXTRA_COST * (1 - staminaReduction);
+        return;
       }
-    }
+
+      if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
+
+      memberLevels += applyMemberLesson(member, slotId, 1, null, slotEffect).levels;
+      const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
+      staminaCost += cost;
+      remainingStamina = Math.max(0, remainingStamina - cost);
+    });
 
     levelUps += memberLevels;
 
     if (staminaCost > 0) {
-      consumeMemberStamina(member, staminaCost);
-      // リスクマネジメントで特別強化中のケガ・体調不良を抑える
-      if (rollMemberInjury(member, isFocus ? riskReduction : 0)) {
-        injuries.push(`${member.name}（${member.injury.type}・${formatInjuryWeeks(member.injury)}）`);
+      if (typeof consumeMemberStamina === 'function') consumeMemberStamina(member, staminaCost);
+      if (typeof rollMemberInjury === 'function' && rollMemberInjury(member, 0)) {
+        const type = member.injury?.type || 'ケガ';
+        const formattedWeeks = (typeof formatInjuryWeeks === 'function') ? formatInjuryWeeks(member.injury) : '';
+        injuries.push(`${member.name}（${type}・${formattedWeeks}）`);
       }
     }
 
-    // 体力値の自然回復（休養を指示されたメンバーは大きな倍率、ケガ中は追加回復）
-    const isResting = isManuallyResting || staysAutoResting;
-    let recovery = getMemberWeeklyRecovery(member, isResting);
-    // 休養枠と食事会による追加回復
-    recovery += restSlotCount * REST_SLOT_RECOVERY;
-    recovery += mealCount * MEAL_PARTY_RECOVERY;
-    recoverMemberStamina(member, recovery);
-    if (member.injury) recoverMemberStamina(member, Math.round(recovery * 0.5));
+    const stayedRestingAllWeek = isRestDesignated && releaseIndex === -1;
+    let recovery = (typeof getMemberWeeklyRecovery === 'function') ? getMemberWeeklyRecovery(member, stayedRestingAllWeek) : 20;
+    const restSlotCount = weeklySchedule.slots.filter(s => s === 'rest-day').length;
+    recovery += restSlotCount * restSlotRec;
+    recovery += mealCount * mealRec;
+    if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, recovery);
+
+    if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
+      fullyRecoveredMembers.push(member.id);
+    }
   });
 
-  // 内訳（レッスン種別ごとの枠数）
+  weeklySchedule.restDayMembers = weeklySchedule.restDayMembers.filter(
+    id => !fullyRecoveredMembers.includes(id)
+  );
+
   const countByLabel = new Map();
   weeklySchedule.slots.forEach((slotId, index) => {
-    if (!slotId) return;
-    if (fixedSlots.has(index)) return;
-    const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === slotId);
-    // 参加者が揃わず未実施になったグループ練習（連携）は内訳に含めない
+    if (!slotId || fixedSlots.has(index)) return;
+    const item = itemsList.find(entry => entry.id === slotId);
     if (item && item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
     const label = itemIdLabel(slotId);
     countByLabel.set(label, (countByLabel.get(label) || 0) + 1);
   });
-  // テレビ出演で固定された枠も内訳に含める
   fixedSlots.forEach(slot => {
     countByLabel.set(slot.label, (countByLabel.get(slot.label) || 0) + 1);
   });
@@ -766,263 +1159,173 @@ function applyWeeklySchedule() {
   const parts = [];
   const breakdown = [...countByLabel.entries()].map(([label, count]) => `${label}${count > 1 ? `×${count}` : ''}`);
   if (breakdown.length) parts.push(`実施: ${breakdown.join(' / ')}`);
-  if (restNames.length) parts.push(`休養: ${restNames.join('、')}`);
-  if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * MEAL_PARTY_COST)}）`);
-  if (activeFocusMembers.length) {
-    const rounded = Math.round(specialMultiplier * 10) / 10;
-    parts.push(`特別強化: ${activeFocusMembers.map(member => member.name).join('、')}（${rounded}倍 / ${getSpecialTrainingStatNames().join('・')}）`);
+
+  const currentRestNames = (weeklySchedule.restDayMembers || [])
+    .map(id => participants.find(m => m.id === id)?.name)
+    .filter(Boolean);
+  if (currentRestNames.length) parts.push(`継続休養: ${currentRestNames.join('、')}`);
+
+  if (fullyRecoveredMembers.length) {
+    const recoveredNames = fullyRecoveredMembers
+      .map(id => participants.find(m => m.id === id)?.name)
+      .filter(Boolean);
+    parts.push(`復帰完了: ${recoveredNames.join('、')}`);
   }
+
+  const targetMember = participants.find(m => m.id === targetMemberId);
+  const statusKeysList = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
+  const targetStatName = statusKeysList.find(k => k.id === targetStat)?.name || targetStat;
+  const individualLessonCount = weeklySchedule.slots.filter(s => s === 'individual-lesson').length;
+  if (individualLessonCount > 0 && targetMember) {
+    parts.push(`個別レッスン: ${targetMember.name}（${targetStatName} 10.1倍 / 他メンバー休養）`);
+  }
+
+  if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * mealCostSingle)}）`);
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
-  if (skippedGroupOnly) parts.push('連携: 参加者が2名未満のため未実施');
+  if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
   if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
   if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
-  if (!breakdown.length && !restNames.length && !officeMessage) parts.push('何もない1週間でした');
 
   setLog(`【週間スケジュール】${parts.join(' / ')}`);
-  // この週の自然回復はスケジュール側で適用済み（ライブ側で重複させない）
   weeklyRecoveryDone = true;
   return { levelUps, injuries };
 }
 
 function itemIdLabel(itemId) {
   if (itemId === 'individual-lesson') {
-    const statName = STATUS_KEYS.find(key => key.id === weeklySchedule?.individualStat)?.name || '歌唱力';
+    const statusKeysList = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
+    const statName = statusKeysList.find(key => key.id === weeklySchedule?.individualStat)?.name || '歌唱力';
     return `個別レッスン（${statName}）`;
   }
-  return WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId)?.name || itemId;
+  const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
+  return itemsList.find(entry => entry.id === itemId)?.name || itemId;
 }
 
-// 今週の事務作業を選ぶ（同じ項目を再押すと解除する）
 function selectOfficeAction(actionId) {
   ensureWeeklySchedule();
-  if (actionId && !OFFICE_ACTIONS.some(action => action.id === actionId)) return;
+  const actions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [];
+  if (actionId && !actions.some(action => action.id === actionId)) return;
   weeklySchedule.officeAction = weeklySchedule.officeAction === actionId ? '' : actionId;
   renderWeeklyActionPanel();
 }
 
-// シングル販促を1回実行する（発売前は回数n、発売後は減衰する売上を積む）
+// 等比減衰販促モデル式: Σ(w=1→k) { (S / 20) * 10^(1 - w) }
+function getPromotionCumulativeSalesByFormula(baseSales, k) {
+  if (baseSales <= 0 || k <= 0) return 0;
+  let cumulative = 0;
+  for (let w = 1; w <= k; w++) {
+    const weeklySales = (baseSales / 20) * Math.pow(0.1, w - 1);
+    if (weeklySales < 0.5) break;
+    cumulative += weeklySales;
+  }
+  return Math.round(cumulative);
+}
+
 function applySinglePromotion(song) {
   if (!song) return { addedSales: 0, cumulativeSales: 0, weeks: 0, mode: 'none' };
   claimPromotionSong(song);
   song.promoCount = (song.promoCount || 0) + 1;
 
-// 発売前：発売時の売上倍率だけを高める（α = n×0.005） the sales multiplier at release time (α = n×0.005)
+  const alphaStep = typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005;
   if (!song.released) {
-    const alpha = song.promoCount * RELEASE_PROMO_ALPHA_STEP;
+    const alpha = song.promoCount * alphaStep;
     song.releasePromoAlpha = alpha;
-    return { addedSales: 0, cumulativeSales: 0, weeks: 0, mode: 'pre-release', alpha };
+    return { addedSales: 0, cumulativeSales: 0, weeks: song.promoCount, mode: 'pre-release', alpha };
   }
 
-  // 発売後：週ごとに減衰する売上を積む（発売週のみ8／通常10／過去作100）
   if (!Number.isFinite(song.promoBase) || song.promoBase <= 0) {
     song.promoBase = getSongPromoBaseSales(song);
   }
-  if (!Array.isArray(song.promoDivisors)) song.promoDivisors = [];
-  song.promoDivisors.push(getSongPromoDivisor(song));
-  const cumulativeSales = getPromotionCumulativeSales(song.promoBase, song.promoDivisors);
+
+  const k = song.promoCount;
+  const cumulativeSales = getPromotionCumulativeSalesByFormula(song.promoBase, k);
   const addedSales = Math.max(0, cumulativeSales - (song.promoSales || 0));
+
   song.promoSales = cumulativeSales;
   song.totalSales = (song.totalSales || 0) + addedSales;
-  addGroupSales(addedSales);
-  // CD sales are recognized as revenue at 80% per month
-  addMonthlyCdRevenue(addedSales * getSongUnitPrice(song));
-  return { addedSales, cumulativeSales, weeks: song.promoDivisors.length, mode: 'post-release' };
+  if (typeof addGroupSales === 'function') addGroupSales(addedSales);
+  if (typeof addMonthlyCdRevenue === 'function' && typeof getSongUnitPrice === 'function') {
+    addMonthlyCdRevenue(addedSales * getSongUnitPrice(song));
+  }
+
+  return { addedSales, cumulativeSales, weeks: k, mode: 'post-release' };
 }
 
-// 販促効果は1作のみに乗る（対象を切り替えると前の作品の販促はリセット）
 function claimPromotionSong(song) {
-  if (promoSongId === song.id) return;
-  if (promoSongId) {
-    const previous = songs.find(item => item.id === promoSongId);
-    if (previous) {
-      previous.promoBase = 0;
-      previous.promoWeeks = 0;
-      previous.promoDivisors = [];
-      previous.promoSales = 0;
-      previous.promoCount = 0;
-      previous.releasePromoAlpha = 0;
-    }
+  if (typeof promoSongId !== 'undefined') {
+    promoSongId = song.id;
   }
-  promoSongId = song.id;
 }
 
-// その曲の初回週売上S（シングル1.5倍／アルバム2倍） (single ×1.5 / album ×2)
 function getSongPromoBaseSales(song) {
-  const ratio = song?.releaseType === 'album' ? ALBUM_PROMO_FAN_RATIO : SINGLE_PROMO_FAN_RATIO;
-  return Math.round(calculateGroupFans() * ratio);
+  const sRatio = typeof SINGLE_PROMO_FAN_RATIO !== 'undefined' ? SINGLE_PROMO_FAN_RATIO : 1.5;
+  const aRatio = typeof ALBUM_PROMO_FAN_RATIO !== 'undefined' ? ALBUM_PROMO_FAN_RATIO : 2.0;
+  const ratio = song?.releaseType === 'album' ? aRatio : sRatio;
+  const fans = typeof calculateGroupFans === 'function' ? calculateGroupFans() : 50000;
+  return Math.round(fans * ratio);
 }
 
-// その曲は過去作か。過去作なら減衰率は100に跳ね上がる
-function isPastWorkSong(song) {
-  if (!song || !song.released) return false;
-  const latest = findLatestReleasedSong();
-  return Boolean(latest) && latest.id !== song.id;
-}
-
-// 今週の販促の減衰率（発売週のみ8／通常10／過去作100）
-function getSongPromoDivisor(song) {
-  if (isPastWorkSong(song)) return PROMO_DIVISOR_PAST_WORK;
-  if (song.releaseDateKey) {
-    const releasedDays = Math.round((getGameDateObject() - getGameDateObject(song.releaseDateKey)) / 86400000);
-    if (releasedDays >= 0 && releasedDays < 7) return PROMO_DIVISOR_RELEASE_WEEK;
-  }
-  return PROMO_DIVISOR_NORMAL;
-}
-
-// シングル販促を選んだときは、対象曲と次週の取り分を自動表示する
 function describeSinglePromotionStatus() {
+  if (typeof getSinglePromotionTarget !== 'function') return '';
   const target = getSinglePromotionTarget();
   if (!target) return '対象の楽曲がまだありません（PV中の人気Upで代替します）。';
   const song = target.song;
   const label = target.isUpcoming ? '次作' : '今作';
+  const alphaStep = typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005;
+
   if (!song.released) {
     const count = song.promoCount || 0;
-    return `対象: ${label}「${song.title}」／ 発売前の販促${count}回 → 発売時の売上が${formatMultiplier(1 + count * RELEASE_PROMO_ALPHA_STEP)}倍になります。`;
+    return `対象: ${label}「${song.title}」／ 発売前の販促${count}回 → 発売時の売上が${formatMultiplier(1 + count * alphaStep)}倍になります。`;
   }
-  const divisors = Array.isArray(song.promoDivisors) ? song.promoDivisors : [];
-  const nextDivisor = getSongPromoDivisor(song);
-  const nextDivisors = divisors.concat(nextDivisor);
-  const nextSales = getPromotionCumulativeSales(song.promoBase, nextDivisors) - (song.promoSales || 0);
-  return `対象: ${label}「${song.title}」／ 減衰率${nextDivisor}で次週+${Math.max(0, nextSales).toLocaleString()}枚（累計${(song.promoSales || 0).toLocaleString()}枚）。`;
+
+  const nextK = (song.promoCount || 0) + 1;
+  const currentBase = (Number.isFinite(song.promoBase) && song.promoBase > 0)
+    ? song.promoBase
+    : getSongPromoBaseSales(song);
+  const nextCumulative = getPromotionCumulativeSalesByFormula(currentBase, nextK);
+  const nextAdded = Math.max(0, nextCumulative - (song.promoSales || 0));
+
+  return `対象: ${label}「${song.title}」／ 発売後販促${nextK}週目（減衰比率0.1）で次週+${nextAdded.toLocaleString()}枚（累計${(song.promoSales || 0).toLocaleString()}枚）。`;
 }
 
-// 1.0を「1.00倍」の形に整える
 function formatMultiplier(value) {
   return (Math.round(value * 1000) / 1000).toFixed(2).replace(/\.?0+$/, '');
 }
+
 function applyOfficeAction(actionId) {
   if (actionId === 'single-promotion') {
+    if (typeof getSinglePromotionTarget !== 'function') return '';
     const target = getSinglePromotionTarget();
     if (!target) {
-      // まだ楽曲も次作も無いときは、選抜メンバーの人気で代用する
-      idolRoster.filter(idol => idol.isSelected).forEach(idol => {
-        idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
-      });
-      return 'シングル販促（楽曲が未発表のため選抜メンバーの人気をUp）';
+      if (Array.isArray(idolRoster)) {
+        idolRoster.filter(idol => idol && idol.isSelected).forEach(idol => {
+          if (idol.stats) idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
+        });
+      }
+      return 'シングル販促（楽曲未発表のため選抜メンバーの人気Up）';
     }
     const result = applySinglePromotion(target.song);
-    addSongExperience(target.song, 3);
+    if (typeof addSongExperience === 'function') addSongExperience(target.song, 3);
     const label = target.isUpcoming ? '次作' : '今作';
     return `シングル販促・${label}「${target.song.title}」（+${result.addedSales.toLocaleString()}枚 / 累計${result.cumulativeSales.toLocaleString()}枚）`;
   }
   if (actionId === 'live-promotion') {
-    nextLivePromotionPoints++;
+    if (typeof nextLivePromotionPoints !== 'undefined') nextLivePromotionPoints++;
     return `ライブ広報（次回ライブの集客効果 累計+${nextLivePromotionPoints}）`;
   }
   if (actionId === 'goods-development') {
-    if (merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS) {
-      return `グッズ開発（上限${MAX_MERCHANDISE_PRODUCTS}種のため未実施）`;
+    const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
+    const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
+    const devStock = typeof GOODS_DEVELOPMENT_STOCK !== 'undefined' ? GOODS_DEVELOPMENT_STOCK : 1000;
+
+    if (typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd) {
+      return `グッズ開発（上限${maxProd}種のため未実施）`;
     }
-    merchandiseProducts++;
-    merchandiseStock += GOODS_DEVELOPMENT_STOCK;
-    funds -= GOODS_DEVELOPMENT_COST;
-    recordMonthlyExpense('グッズ開発', GOODS_DEVELOPMENT_COST);
-    return `グッズ開発（全${merchandiseProducts}種 / 在庫${merchandiseStock.toLocaleString()}個 / -${formatMoney(GOODS_DEVELOPMENT_COST)}）`;
+    if (typeof merchandiseProducts !== 'undefined') merchandiseProducts++;
+    if (typeof merchandiseStock !== 'undefined') merchandiseStock += devStock;
+    funds -= devCost;
+    if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('グッズ開発', devCost);
+    return `グッズ開発（全${merchandiseProducts}種 / 在庫${merchandiseStock.toLocaleString()}個 / -${formatMoney(devCost)}）`;
   }
   return '';
-}
-
-// 週間スケジュールを確定して1週間進める
-function confirmWeeklySchedule() {
-  if (getGameDateObject().getDay() !== 3) {
-    setLog('【週間スケジュール】スケジュール設定は水曜日に行えます。');
-    return;
-  }
-  if (hasLiveWithinWeek()) return;
-  if (!validateWeeklySchedule()) return;
-  // 確定した内容は次週の初期値として覚えておく
-  rememberWeeklySchedule(weeklySchedule);
-  // リハーサル直前の枠が通し練習/連携なら歌番組に「準備済み」を立てる
-  markMusicPreparations();
-  applyWeeklySchedule();
-  advanceOneWeek();
-}
-
-function advanceOneWeek() {
-  const currentDate = getGameDateObject();
-  const nextWednesday = getNextWednesday(currentDate);
-  const nextLiveDate = findNextGroupLiveDate(currentDate, nextWednesday);
-  const nextDate = nextLiveDate || nextWednesday;
-  const wasWednesday = currentDate.getDay() === 3;
-  const previousMonth = currentMonth;
-  const previousYear = currentYear;
-
-  processMemberBirthdays(currentDate, nextDate);
-  syncMemberAges(nextDate);
-  if (wasWednesday) {
-    totalWeeksElapsed++;
-    rollWeeklyCrisisEvent();
-    rollRandomEvent();
-    rollEquipmentDowngradeEvent();
-    checkFanClubYearlyEvent();
-    checkSpecialBroadcastOffers();
-    processManagerResignations();
-    refreshManagerMarket();
-    processMemberInjuries();
-    // ライブ疲労は毎週少しずつ解ける
-    decayLiveFatigue();
-    syncPlayerTeamStats();
-    leagueTeams.forEach(team => {
-      if (team.id === 'player') return;
-      // 公演規模は開催頻度によって変動する
-      const monthPrefix = `${calendarYear}-${String(currentMonth).padStart(2, '0')}-`;
-      const showCount = rivalLiveBookings.filter(booking =>
-        booking.groupId === team.id && (booking.venueDates || [booking.liveDate]).some(key => key.startsWith(monthPrefix))
-      ).length;
-      const power = getRivalTeamPower(team);
-      team.sales += Math.floor(power * 550 + Math.random() * 7000 + showCount * 6000);
-      team.audience += Math.floor(power * 220 + Math.random() * 3000 + showCount * 2500);
-      team.showCount = (team.showCount || 0) + showCount;
-    });
-
-    // 危機対応は選択肢を提示し、プレイヤーの判断で処理する
-    if (crisisEventWeekKey === getCurrentWeekKey()) {
-      pendingCrisisResponse = { type: crisisEventType, weekKey: crisisEventWeekKey };
-      setLog(crisisEventType === 'information-leak'
-        ? '【情報漏洩】内部情報が外部に流出しました。対応方針を決めましょう。'
-        : '【SNSスキャンダル】SNS上の騒動が広がっています。対応方針を決めましょう。');
-    }
-
-    const summary = calculateTeamAverages();
-    checkSenbatsuTrigger();
-    checkMusicProgramOffers();
-    resolveIndustryOffer();
-    trainSongs(summary);
-    // CD累積売上の推移を週次で記録する（記録タブのグラフ用）
-    recordAllSongSalesHistory();
-    if (isLastWednesdayOfMonth(currentDate) && officeUpgrades.snsTraining > 1) {
-      const snsGain = officeUpgrades.snsTraining - 1;
-      idolRoster.filter(member => member.isSelected).forEach(member => {
-        member.stats.sns = Math.min(100, (member.stats.sns || 0) + snsGain);
-      });
-    }
-  }
-
-  // 発売・CD関連イベントは「移動先の日付将达到した時点」で処理する
-  processMonthlyReleaseAndLive(toDateKey(nextDate));
-  processPlanEvents(toDateKey(nextDate));
-  if (wasWednesday) maintainOfficeFacilities();
-  if (wasWednesday && totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) startDraftMeeting();
-
-  gameDate = toDateKey(nextDate);
-  syncGameCalendar();
-  resetWeeklySchedule();
-  // ファン数を毎週更新（売上が伸びれば増え、止まれば緩やかに減る）
-  updateWeeklyGroupFans();
-  if (currentYear > previousYear) {
-    yearlyStats = { sales: 0, audience: 0 };
-    leagueTeams.forEach(team => { team.sales = 0; team.audience = 0; team.showCount = 0; });
-    // 1月頭のファン数を記録して、次年のメンバー年収に使う
-    previousYearGroupFansAtYearStart = groupFansAtYearStart || calculateGroupFans();
-    groupFansAtYearStart = calculateGroupFans();
-    yearEndAwardProcessed = false;
-    yearEndKohakuProcessed = false;
-  }
-  if (currentMonth !== previousMonth && (currentMonth === 1 || currentMonth === 7)) {
-    if (currentMonth === 1) openDecisionModal("当年7月〜12月の計画策定", currentYear, 7, 12);
-    else openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
-  }
-
-  updateUI();
-  openPendingModal();
 }
