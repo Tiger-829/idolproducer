@@ -5,7 +5,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>日本一のアイドル事務所を作ろう</title>
   
   <link rel="manifest" href="./manifest.json?v=3">
@@ -15,144 +15,6 @@
   <meta name="apple-mobile-web-app-title" content="アイドル育成">
 
   <link rel="stylesheet" href="./styles.css?v=3">
-
-  <!-- タブレット横向き・ワイド画面対応レスポンシブスタイル（記録タブ最適化版） -->
-  <style>
-    /* ベースコンテナ設定 */
-    .game-container {
-      width: 100%;
-      max-width: 600px;
-      margin: 0 auto;
-      box-sizing: border-box;
-    }
-
-    /* 記録タブ（スマホ・タブレット共通）：横に分割せず、縦1列で独立スクロールさせる */
-    #page-records.records-scroll-panel {
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 20px !important;
-      width: 100% !important;
-      max-width: 800px !important; /* 横に広がりすぎて間延びするのを防止 */
-      margin: 0 auto !important;
-      max-height: calc(100vh - 140px) !important; /* 画面下端までの領域を確保 */
-      overflow-y: auto !important;                /* 縦スクロールを強制有効化 */
-      overflow-x: hidden !important;
-      padding: 16px 20px 60px !important;        /* 下部に余裕を持たせる */
-      box-sizing: border-box !important;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* 記録タブ内の各ブロックが横・縦に圧縮されるのを完全に防ぐ */
-    #page-records .records-block {
-      width: 100% !important;
-      flex-shrink: 0 !important; /* 縦方向の潰れ防止 */
-      box-sizing: border-box !important;
-    }
-
-    #page-records .records-chart {
-      width: 100% !important;
-      min-height: 180px; /* グラフ描画領域の高さをしっかり確保 */
-    }
-
-    #page-records .records-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #e0e0e0;
-      flex-shrink: 0;
-    }
-
-    #page-records .records-help {
-      width: 100%;
-      flex-shrink: 0;
-      margin-top: 10px;
-    }
-
-    /* タブレット横向き・大画面向けのレイアウト（記録タブ以外を2列化） */
-    @media (min-width: 768px) and (orientation: landscape), (min-width: 1024px) {
-      .game-container {
-        max-width: 1200px;
-        padding: 16px 24px;
-      }
-
-      .header-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 10px 18px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-      }
-
-      .page-nav {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-
-      /* 1. グループ概要タブ */
-      #page-group {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        align-items: start;
-      }
-      #page-group[hidden] {
-        display: none !important;
-      }
-
-      /* 2. 編成タブ */
-      #page-formation {
-        display: grid;
-        grid-template-columns: 360px 1fr;
-        gap: 16px;
-        align-items: start;
-      }
-      #page-formation[hidden] {
-        display: none !important;
-      }
-      #page-formation .roster-card:first-child {
-        position: sticky;
-        top: 16px;
-      }
-
-      /* 3. 事務所タブ */
-      #page-office {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 16px;
-        align-items: start;
-      }
-      #page-office[hidden] {
-        display: none !important;
-      }
-      #page-office .actions {
-        grid-column: span 2;
-        margin-top: 12px;
-      }
-
-      /* 4. 資金タブ */
-      #page-funds .fund-stat-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-      }
-
-      /* モーダル表示調整 */
-      .modal-content {
-        max-height: 85vh;
-        overflow-y: auto;
-      }
-      .plan-calendar-modal .modal-content,
-      #plan-calendar-modal .modal-content {
-        max-width: 840px !important;
-      }
-    }
-  </style>
 </head>
 <body>
 
@@ -173,7 +35,7 @@
   <div class="header-info">
     <div class="header-date">
       <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
-      <div class="header-fans">グループファン <strong id="txt-header-fans">--</strong> </div>
+      <div class="header-fans">グループファン <strong id="txt-header-fans">--</strong> 人</div>
     </div>
     <span id="active-slot-label">セーブ枠</span>
   </div>
@@ -294,11 +156,14 @@
     <div class="ranking-list" id="ranking-list"></div>
   </section>
 
-  <section class="page-panel records-scroll-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
-    <div class="records-header">
-      <h2 class="page-title">最新の記録</h2>
+  <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
+    <h2 class="page-title">最新の記録</h2>
+    <div class="records-log-head">
+      <span class="records-log-label">出来事ログ</span>
       <button class="ghost-btn small" type="button" onclick="openDraftPractice()">ドラフト疑似体験</button>
     </div>
+    <div id="log-box">ゲームを開始しました。5月の原宿体育館ライブに向けてレッスンを重ねましょう。</div>
+    <div id="tv-fx-layer" class="tv-fx-layer" aria-hidden="true"></div>
 
     <div class="records-block">
       <div class="records-block-title">CD累積売上の推移 <small>直近1年間</small></div>
@@ -324,6 +189,7 @@
 </div>
 
 <div class="modal-overlay" id="selection-modal"></div>
+
 <!-- 月次収支報告（月の最終日に停止して表示） -->
 <div class="modal-overlay" id="monthly-report-modal">
   <div class="modal-content" style="max-width: 560px;">
