@@ -1,9 +1,7 @@
 // ==========================================
 // 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全同期版）
 // ==========================================
-function saveSlotKey(slot) {
-  return `idol_manager_save_slot_${slot}`;
-}
+
 let planYearTarget = 1;
 let planStartM = 1;
 let planEndM = 6;
@@ -792,7 +790,9 @@ function getSaveSlotSummary(slotKey) {
     return { isCorrupt: true };
   }
 }
-
+function saveSlotKey(slot) {
+  return `idol_manager_save_slot_${slot}`;
+}
 function renderSaveSlots() {
   const container = document.getElementById('save-slots');
   if (!container) return;
