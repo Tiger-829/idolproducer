@@ -17,6 +17,9 @@ const PAGE_TABS = [
 // ゲーム開始時に表示するタブ（毎週の行動を決める「事務所」を既定にする）
 const DEFAULT_PAGE = 'office';
 
+// 特別個別レッスン（特別強化統合）の効果倍率
+const SPECIAL_INDIVIDUAL_MULTIPLIER = 10.1;
+
 // タブのボタンを描画し、指定したタブのパネルだけを表示する
 function renderPageNav(activePage = DEFAULT_PAGE) {
   const target = PAGE_TABS.some(tab => tab.id === activePage) ? activePage : DEFAULT_PAGE;
@@ -32,7 +35,7 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
       </button>`;
     }).join('');
   }
-  // パネルの表示も同時に切り替える（ゲーム開始時は既定タブが表示される）
+  // パネルの表示も同時に切り替える
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) panel.hidden = tab.id !== target;
@@ -142,7 +145,6 @@ function renderWeeklyActionPanel() {
     const liveDateKey = toDateKey(nextLiveDate);
     const liveDate = getGameDateObject(liveDateKey);
     const liveLabel = liveDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
-    // ライブの内容を具体的に伝える（会場・公演日）
     const liveEntries = getScheduledLiveEntries().filter(entry =>
       !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === liveDateKey
     );
@@ -181,7 +183,6 @@ function renderWeeklyActionPanel() {
     return;
   }
 
-  // ライブ以外は週間スケジュールを組める（今週のイベントは注記として表示する）
   const notes = getWeeklyEventNoteEvents(events);
   const externalLiveNotes = editableSpecialLiveEvents.map(event =>
     `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
@@ -205,28 +206,17 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(event)}</li>`).join('');
 }
 
-// 週間スケジュールのUI（レッスン枠・特別強化・休養日）
+// 週間スケジュールのUI（レッスン枠・特別個別レッスン・休養日）
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
   const members = idolRoster.filter(member => member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
-  const focusIds = new Set(weeklySchedule.focusMemberIds || []);
-  const focusLimit = getSpecialTrainingTargetLimit();
-  const specialMultiplier = getSpecialTrainingMultiplier();
-  const specialStatNames = getSpecialTrainingStatNames();
+
   // 個別レッスンの対象：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
   const individualOptions = getIndividualLessonMemberOptions();
   const memberOptions = individualOptions.map(member =>
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
   ).join('');
-
-  // 体力が低いメンバーを表示する（休養に設定するかはユーザーが選ぶ）
-  const fatiguedMembers = members.filter(member =>
-    !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
-  );
-  const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
-    : '';
 
   const lessonStatOptions = INDIVIDUAL_LESSON_STATS
     .map(statId => {
@@ -235,12 +225,22 @@ function renderWeeklyScheduleControls() {
     })
     .join('');
 
+  const selectedStatName = STATUS_KEYS.find(key => key.id === weeklySchedule.individualStat)?.name || '指定能力';
+  const selectedMember = idolRoster.find(m => m.id === weeklySchedule.individualMemberId);
+  const selectedMemberName = selectedMember ? formatMemberDisplayName(selectedMember) : '未選択';
+
+  // 体力が低いメンバーを表示する
+  const fatiguedMembers = members.filter(member =>
+    !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
+  );
+  const restSuggestion = fatiguedMembers.length
+    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
+    : '';
+
   // 1週間＝7日×午前/午後＝14枠のグリッド
-  // テレビ出演（歌番組など）は放送日の午後とリハーサルの午前が固定枠になる
   const fixedSlots = getWeekFixedSlots();
   const itemOptions = slotId => ['<option value="">— 空き —</option>']
     .concat(WEEKLY_SCHEDULE_ITEMS.filter(item => !item.fixed).map(item => {
-      // 週の上限に達している項目は選択肢から除外する
       const limit = item.weeklyLimit && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
       if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
       return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
@@ -249,7 +249,6 @@ function renderWeeklyScheduleControls() {
 
   const weekRows = WEEK_DAY_LABELS.map((dayLabel, dayIndex) => {
     const morningIndex = dayIndex * WEEK_PERIOD_LABELS.length;
-    // 何日の予定かを明記する（起点の水曜の翌日が木曜）
     const dayDate = getGameDateObject();
     dayDate.setDate(dayDate.getDate() + dayIndex + 1);
     const dayText = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`;
@@ -281,15 +280,14 @@ function renderWeeklyScheduleControls() {
       </div>`;
   }).join('');
 
+  // 休養トグルボタン
   const restDayToggles = members.map(member => {
     const isResting = restDayIds.has(member.id);
     const lowStamina = member.staminaValue < STAMINA_WARNING_THRESHOLD;
     const injured = Boolean(member.injury);
-    const isAutoRest = (weeklySchedule.autoRestMemberIds || []).includes(member.id);
-    // 「[氏名]([怪我/体調不良]回復まで〇日)」の形式で可視化する
     const label = member.injury
       ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
-      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}${isAutoRest ? ` / 体力${AUTO_REST_STAMINA_TARGET}まで休養` : ''}）`;
+      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
         onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
@@ -298,23 +296,7 @@ function renderWeeklyScheduleControls() {
     `;
   }).join('');
 
-  const focusToggles = members.filter(member => !member.injury).map(member => {
-    const isFocus = focusIds.has(member.id);
-    const atLimit = !isFocus && focusIds.size >= focusLimit;
-    return `
-      <button type="button" class="rest-toggle focus${isFocus ? ' active' : ''}"
-        onclick="toggleFocusMember(${member.id})" ${atLimit ? 'disabled' : ''}
-        title="特別強化（${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍 / ${escapeHtml(specialStatNames.join('・'))}）">
-        ${escapeHtml(formatMemberDisplayName(member))} <small>${member.staminaValue}</small>
-      </button>
-    `;
-  }).join('');
-
   const lessonExp = getWeeklyLessonExperience();
-  const schedTier = getManagerSkillTier('scheduling');
-  const mentalTier = getManagerSkillTier('mentalCare');
-  const riskTier = getManagerSkillTier('riskControl');
-  const leadTier = getManagerSkillTier('leadership');
   const restBreakdown = getWeekRestBreakdown();
   const mealCount = getWeekMealPartyCount();
   const lessonCount = getWeekLessonCount();
@@ -324,18 +306,16 @@ function renderWeeklyScheduleControls() {
     ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
-  // 今週の事務作業は1つだけ選択する（未選択なら行わない）
+  // 今週の事務作業
   const selectedOfficeAction = OFFICE_ACTIONS.find(action => action.id === weeklySchedule.officeAction) || null;
   const officeToggles = OFFICE_ACTIONS.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
     const atLimit = action.id === 'goods-development' && merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS;
-    // 項目のあとの小説明（short）は表示しない
     return `
       <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
         onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}>${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ''}</button>`;
   }).join('');
 
-  // テレビ出演の週は、固定枠の内容と休暇が使えないことを明示する
   const broadcastSummaries = getWeekBroadcastSummaries();
   const broadcastNote = broadcastSummaries.length
     ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
@@ -343,7 +323,6 @@ function renderWeeklyScheduleControls() {
       ).join('、')} — 放送日の午前はリハーサルで固定されます。</div>`
     : '';
 
-  // 追加トレーニング（効果・週の上限・グループ練習のみ）を1行ずつ明示する
   const trainingNotes = WEEKLY_SCHEDULE_ITEMS
     .filter(item => item.effect)
     .map(item => {
@@ -367,26 +346,30 @@ function renderWeeklyScheduleControls() {
       ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
       <div class="schedule-note">${escapeHtml(vacationNote)}</div>
-      <div class="schedule-note">レッスン1回の経験値: 約${lessonExp}（事務所 レッスン設備で変動）</div>
+      <div class="schedule-note">レッスン1回の基礎経験値: 約${lessonExp}（事務所レッスン設備で変動）</div>
       ${trainingNotes}
     </div>
 
+    <!-- 特別個別レッスン（特別強化統合） -->
     <div class="schedule-block">
-      <div class="schedule-block-title">特別強化 <small>対象にチェック（上限${focusLimit}名）</small></div>
-      <div class="schedule-note">対象には <strong>${escapeHtml(specialStatNames.join('・'))}</strong> の経験値がグループレッスンの <strong>${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍</strong> になります。それ以外の能力は等倍のままです。</div>
-      <div class="schedule-note">倍率が掛かるのは${escapeHtml(getSpecialTrainingLessonItems().map(item => item.name).join('・'))}の枠のみ。対象4能力を鍛えるレッスンがない週は、強化しても倍率も体力の追加消費も発生しません。</div>
-      <div class="schedule-note">統率力 ${escapeHtml(leadTier.label)}: 連携の効果 / スケジュール管理力 ${escapeHtml(schedTier.label)}: 強化人数 / メンタルケア ${escapeHtml(mentalTier.label)}: 体力消費抑制・回復 / リスクマネジメント ${escapeHtml(riskTier.label)}: 危機回避力の補正</div>
-      <div class="rest-toggle-grid">${focusToggles || '<div class="schedule-note">強化できるメンバーがいません。</div>'}</div>
-    </div>
-
-    <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン <small>枠を1つ使って対象1名を集中育成</small></div>
-      <select aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', this.value)">
-        ${memberOptions || '<option value="">メンバーなし</option>'}
-      </select>
-      <select aria-label="個別レッスンで鍛える能力" onchange="setWeeklyScheduleField('individualStat', this.value)">
-        ${lessonStatOptions}
-      </select>
+      <div class="schedule-block-title">特別個別レッスン <small>スケジュール内の「個別レッスン」枠で実行</small></div>
+      <div class="schedule-note">
+        対象メンバー1名と鍛えたい能力1つを指定します。「個別レッスン」枠を実行した際、指定能力に <strong>${SPECIAL_INDIVIDUAL_MULTIPLIER}倍</strong> の経験値を獲得します。
+      </div>
+      <div class="schedule-note" style="color: #27ae60;">
+        ※対象外のメンバーは個別レッスン枠に参加せず、<strong>その時間帯（午前/午後）の休養枠として体力を回復</strong>します。
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <select style="flex:1;" aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', this.value)">
+          ${memberOptions || '<option value="">メンバーなし</option>'}
+        </select>
+        <select style="flex:1;" aria-label="個別レッスンで鍛える能力" onchange="setWeeklyScheduleField('individualStat', this.value)">
+          ${lessonStatOptions}
+        </select>
+      </div>
+      <div class="schedule-note" style="margin-top:6px;">
+        現在の設定: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を集中強化
+      </div>
     </div>
 
     <div class="schedule-block">
@@ -415,13 +398,11 @@ function renderWeeklyScheduleControls() {
 function getIndividualLessonMemberOptions() {
   const available = idolRoster.filter(member => !member.injury);
   if (!available.length) return [];
-  // 直近の選抜発表で選ばれたセンターを先頭にする
   const centerId = (pendingSelectionEvent && pendingSelectionEvent.centerId)
     || lastAnnouncedCenterId
     || idolRoster.find(member => member.isCenter)?.id
     || null;
   const center = available.find(member => member.id === centerId);
-  // 先頭はセンター、以降は残体力の低い順（体力の同じ人は名前順で安定させる）
   const rest = available
     .filter(member => member.id !== centerId)
     .sort((a, b) => {
@@ -448,17 +429,14 @@ function renderGameCalendar() {
   specialLiveEvents.forEach(event => {
     if (!event.completed) liveDates.add(event.liveDate);
   });
-  // 競合公演は連日を含むすべての公演日をマークする
   const rivalLiveDates = new Set();
   rivalLiveBookings.forEach(booking => {
     (booking.venueDates || [booking.liveDate]).forEach(dateKey => rivalLiveDates.add(dateKey));
   });
-  // テレビ出演（定例番組／大型特番）の放送日をマークする
   const broadcastDates = new Map();
   scheduledPerformances.forEach(performance => {
     if (performance.airDate) broadcastDates.set(performance.airDate, performance.name);
   });
-  // 計画した発売日とCD関連イベントの日をマークする
   const releaseDates = new Set();
   const planEventDates = new Set();
   Object.entries(productionSchedule).forEach(([key, plan]) => {
@@ -509,8 +487,7 @@ function renderGameCalendar() {
   `;
 }
 
-// 設備はLv.1が初期状態で維持費なし。Lv.2以降はレベルが上がるほど維持費が増える。
-// MaxはLv.10まで。Lv.2以上ならダウングレード（売却）も可能。
+// 設備維持費・アップグレード設定
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -539,7 +516,6 @@ function upgradeOfficeFacility(facilityId) {
   updateUI();
 }
 
-// ダウングレード：Lv.1未満にはできない。設備売却で開発費の50%が戻る。
 function getOfficeDowngradeRefund(facility, level = officeUpgrades[facility.id] ?? 0) {
   if (level <= 1) return 0;
   return Math.round(getOfficeUpgradeCost(facility, level - 1) * 0.5);
@@ -618,7 +594,6 @@ function renderManagerPanel() {
     countLabel.textContent = `${managers.length}名 / 上限${MANAGER_HIRE_LIMIT}名`;
   }
 
-  // 項目別の合計レベルと効果段階
   const tierRows = MANAGER_SKILLS.map(skill => {
     const tier = getManagerSkillTier(skill.id);
     return `
@@ -665,7 +640,6 @@ function renderManagerPanel() {
       `;
     }).join('');
     const age = getManagerAge(manager);
-    // 退職タイミングは本人次第なので、正確な時期は公開しない
     const tenureNote = age < 32 ? '在籍：長期継続の見込み'
       : age < 36 ? '在籍：安定'
       : age < 40 ? '在籍：継続中'
@@ -692,7 +666,7 @@ function renderManagerPanel() {
   }).join('');
 }
 
-// マネージャー市場のパネル（求人は常に表示）
+// マネージャー市場のパネル
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
