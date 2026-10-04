@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : UI描画（nullセーフ＆タブ自動復元完全版）
+// 10-ui-panels.js : UI描画（タブ完全常時表示版）
 // ==========================================
 
 const PAGE_TABS = [
@@ -35,9 +35,11 @@ function safeGetIconSvg(iconName) {
   return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
-// タブのボタンを描画し、指定したタブのパネルだけを表示する
-function renderPageNav(activePage = currentPageTab) {
-  const target = PAGE_TABS.some(tab => tab.id === activePage) ? activePage : DEFAULT_PAGE;
+// タブのボタンを描画し、指定したタブのパネルだけを確実に表示する
+function renderPageNav(activePage) {
+  const target = PAGE_TABS.some(tab => tab.id === activePage) 
+    ? activePage 
+    : (PAGE_TABS.some(tab => tab.id === currentPageTab) ? currentPageTab : DEFAULT_PAGE);
   currentPageTab = target;
 
   const nav = document.getElementById('page-nav');
@@ -53,11 +55,17 @@ function renderPageNav(activePage = currentPageTab) {
     }).join('');
   }
 
+  // すべてのパネルの表示状態を直接制御（hidden属性とstyleの両方を同期）
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
-      panel.hidden = (tab.id !== target);
-      panel.style.display = (tab.id === target) ? '' : 'none';
+      if (tab.id === target) {
+        panel.removeAttribute('hidden');
+        panel.style.display = '';
+      } else {
+        panel.setAttribute('hidden', '');
+        panel.style.display = 'none';
+      }
     }
   });
 }
@@ -636,7 +644,6 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャーパネル（nullセーフ完全保護）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -809,11 +816,4 @@ function renderSalaryPanel() {
     `メンバー年収 = ファン数×8×365 ＋ (当年1月頭 ${Number(startFans).toLocaleString()}人 − 前年1月頭 ${Number(prevFans).toLocaleString()}人)×6。` +
     ` 年間給与のうちグループファン増加分は ${formatMoney(fanGrowth * growthFactor * rosterCount)} です。` +
     ` 給与は毎月末に一括で引き落とされます。`);
-}
-
-// 画面読み込み時に即時ナビゲーションバーを確実に描画
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => renderPageNav(currentPageTab));
-} else {
-  renderPageNav(currentPageTab);
 }
