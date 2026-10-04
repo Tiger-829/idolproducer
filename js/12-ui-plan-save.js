@@ -13,7 +13,7 @@ let planMonthEventDrafts = {};
 
 // プリセット発売月判定（1年目の2月・6月）
 function isPresetReleaseMonth(month) {
-  return planYearTarget === 1 && PRESET_RELEASE_MONTHS.includes(month);[cite: 1]
+  return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
 }
 
 function getPlanCalendarDate(month, day) {
@@ -24,17 +24,19 @@ function getPlanCalendarDate(month, day) {
 function formatPlanDayLabel(dateKey) {
   if (!dateKey) return '';
   const date = getGameDateObject(dateKey);
-  return `${date.getMonth() + 1}/${date.getDate()}(${PLAN_CALENDAR_WEEKDAYS[date.getDay()]})`;
+  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
+  return `${date.getMonth() + 1}/${date.getDate()}(${weekdays[date.getDay()]})`;
 }
 
 function getPlanEventType(benefitId) {
+  if (typeof PLAN_EVENT_TYPES === 'undefined') return null;
   return PLAN_EVENT_TYPES.find(item => item.id === benefitId) || null;
 }
 
 function getPlanMonthEventDrafts(month) {
   if (!Array.isArray(planMonthEventDrafts[month])) {
     const planKey = `${planYearTarget}-${month}`;
-    const plan = productionSchedule[planKey] || {};
+    const plan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     planMonthEventDrafts[month] = Array.isArray(plan.planEvents)
       ? plan.planEvents.map(event => ({ ...event }))
       : [];
@@ -53,24 +55,31 @@ function normalizeLiveDays(days) {
 }
 
 function getStandardSeatPrice(venue, seatId) {
-  if (!venue) return 0;
+  if (!venue || typeof SEAT_PRICE_GROUP === 'undefined' || typeof STANDARD_SEAT_PRICE === 'undefined') return 0;
   const group = SEAT_PRICE_GROUP[seatId];
   const base = STANDARD_SEAT_PRICE[group] || 0;
-  const rate = VENUE_TIER_PRICE_RATE[venue.cap] ?? VENUE_TIER_DEFAULT_PRICE_RATE;
+  const rate = (typeof VENUE_TIER_PRICE_RATE !== 'undefined' && VENUE_TIER_PRICE_RATE[venue.cap]) 
+    ? VENUE_TIER_PRICE_RATE[venue.cap] 
+    : (typeof VENUE_TIER_DEFAULT_PRICE_RATE !== 'undefined' ? VENUE_TIER_DEFAULT_PRICE_RATE : 1.0);
   return Math.round(base * rate);
 }
 
-// 発売日の候補日（水曜日基準）取得
 function getPlanReleaseDefaultWednesday(month) {
   const actualYear = calendarYear + (planYearTarget - currentYear);
-  return toDateKey(getLastWednesday(actualYear, month - 1));
+  if (typeof getLastWednesday === 'function') {
+    return toDateKey(getLastWednesday(actualYear, month - 1));
+  }
+  const d = new Date(actualYear, month, 0, 12);
+  while (d.getDay() !== 3) {
+    d.setDate(d.getDate() - 1);
+  }
+  return toDateKey(d);
 }
 
 // ==========================================
 // 公演日程・配信設定 UI 生成
 // ==========================================
 
-// 公演日1行のHTML生成（日程ごとの配信チェックボックス付き）
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -85,13 +94,14 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
     </div>`;
 }
 
-// ライブスロットごとのHTML生成
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
   const seatPrices = slot.seatPrices || {};
   const seatOptions = slot.seatOptions || {};
-  const slotVenue = VENUE_DATA.find(v => v.name === slot.liveVenue) || null;
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const slotVenue = venues.find(v => v.name === slot.liveVenue) || null;
   const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : (slot.liveDates || []));
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
 
   return `
     <div class="live-slot" data-slot-index="${index}">
@@ -102,7 +112,7 @@ function renderLiveSlotHtml(month, index, slot) {
       <label class="weekly-member-target" for="sel-ven-${month}-${index}">会場
         <select id="sel-ven-${month}-${index}" onchange="applyVenueStandardPrices(${month}, ${index}); updateSeatPlanOptions(${month}, ${index}); updateLiveDateOptions(${month}, ${index}); updateShowDateNote(${month}, ${index})">
           <option value="">ライブなし</option>
-          ${VENUE_DATA.map(v => `<option value="${v.name}" ${slot.liveVenue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
+          ${venues.map(v => `<option value="${v.name}" ${slot.liveVenue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
         </select>
       </label>
       <label class="weekly-member-target" for="live-name-${month}-${index}">ライブ名
@@ -123,7 +133,7 @@ function renderLiveSlotHtml(month, index, slot) {
       <details class="seat-settings">
         <summary>席種・チケット価格</summary>
         <div class="seat-settings-grid">
-          ${SEAT_TYPES.map(seat => {
+          ${seatTypes.map(seat => {
             const price = seatPrices[seat.id] ?? getStandardSeatPrice(slotVenue, seat.id);
             const availability = seat.optional
               ? `<label class="seat-availability"><input type="checkbox" id="seat-option-${month}-${index}-${seat.id}" ${seatOptions[seat.id] ? 'checked' : ''}>設置する</label>`
@@ -136,21 +146,23 @@ function renderLiveSlotHtml(month, index, slot) {
   `;
 }
 
-// 入力UIからライブスロット情報を抽出（配信日配列 streamDates を含む）
 function readLiveSlotInputs(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return [];
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+
   return Array.from(container.querySelectorAll('.live-slot')).map(slotEl => {
     const index = Number(slotEl.dataset.slotIndex);
     const seatPrices = {};
     const seatOptions = {};
-    const slotVenue = VENUE_DATA.find(v => v.name === document.getElementById(`sel-ven-${month}-${index}`)?.value) || null;
+    const slotVenue = venues.find(v => v.name === document.getElementById(`sel-ven-${month}-${index}`)?.value) || null;
 
-    SEAT_TYPES.forEach(seat => {[cite: 1]
+    seatTypes.forEach(seat => {
       const priceInput = document.getElementById(`seat-price-${month}-${index}-${seat.id}`);
       const price = Number.parseInt(priceInput ? priceInput.value : '', 10);
       seatPrices[seat.id] = Number.isFinite(price) && price >= 0 ? price : getStandardSeatPrice(slotVenue, seat.id);
-      if (seat.optional) {[cite: 1]
+      if (seat.optional) {
         const optionInput = document.getElementById(`seat-option-${month}-${index}-${seat.id}`);
         seatOptions[seat.id] = Boolean(optionInput && optionInput.checked);
       }
@@ -183,13 +195,13 @@ function readLiveSlotInputs(month) {
   });
 }
 
-// 諸経費概算メモの更新（新諸経費体系・配信日数を反映）
 function updateShowDateNote(month, index) {
   const note = document.getElementById(`show-date-note-${month}-${index}`);
   if (!note) return;
   const slotEl = document.querySelector(`.live-slot[data-slot-index="${index}"]`);
   const venueSelect = document.getElementById(`sel-ven-${month}-${index}`);
-  const venue = VENUE_DATA.find(item => item.name === (venueSelect ? venueSelect.value : ''));
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const venue = venues.find(item => item.name === (venueSelect ? venueSelect.value : ''));
   if (!venue) {
     note.textContent = '会場を選択してください';
     return;
@@ -211,7 +223,7 @@ function updateShowDateNote(month, index) {
     ? calculateLiveExpenses(venue.cap, dates.length, streamCount)
     : { baseCost: 0, streamCost: 0, totalCost: 0 };
 
-  const leadDays = getLiveBookingLeadDays(venue);
+  const leadDays = typeof getLiveBookingLeadDays === 'function' ? getLiveBookingLeadDays(venue) : 45;
   const now = getGameDateObject();
   let warning = '';
   dates.forEach(dStr => {
@@ -247,11 +259,13 @@ function addLiveSlot(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
   const currentCount = container.querySelectorAll('.live-slot').length;
-  if (currentCount >= MAX_LIVE_VENUES_PER_MONTH) {
-    alert(`1か月あたりの会場は最大${MAX_LIVE_VENUES_PER_MONTH}会場までです。`);
+  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
+  if (currentCount >= maxVenues) {
+    alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
     return;
   }
-  const defaultVenue = VENUE_DATA.find(v => v.cap === 'C') || VENUE_DATA[0];
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const defaultVenue = venues.find(v => v.cap === 'C') || venues[0] || { name: '市民会館', cap: 'C', ease: 1 };
   const newSlot = {
     liveVenue: defaultVenue.name,
     liveName: defaultVenue.name,
@@ -278,8 +292,10 @@ function removeLiveSlot(month, index) {
 
 function applyVenueStandardPrices(month, index) {
   const selVen = document.getElementById(`sel-ven-${month}-${index}`);
-  const venue = VENUE_DATA.find(item => item.name === (selVen ? selVen.value : ''));
-  SEAT_TYPES.forEach(seat => {[cite: 1]
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const venue = venues.find(item => item.name === (selVen ? selVen.value : ''));
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  seatTypes.forEach(seat => {
     const priceInput = document.getElementById(`seat-price-${month}-${index}-${seat.id}`);
     if (priceInput) priceInput.value = getStandardSeatPrice(venue, seat.id);
   });
@@ -287,12 +303,14 @@ function applyVenueStandardPrices(month, index) {
 
 function updateSeatPlanOptions(month, index) {
   const selVen = document.getElementById(`sel-ven-${month}-${index}`);
-  const venue = VENUE_DATA.find(item => item.name === (selVen ? selVen.value : ''));
-  const isDome = Boolean(venue && isStadiumVenue(venue));
-  SEAT_TYPES.forEach(seat => {[cite: 1]
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const venue = venues.find(item => item.name === (selVen ? selVen.value : ''));
+  const isDome = Boolean(venue && typeof isStadiumVenue === 'function' && isStadiumVenue(venue));
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  seatTypes.forEach(seat => {
     const row = document.getElementById(`seat-row-${month}-${index}-${seat.id}`);
     if (!row) return;
-    if (seat.domeOnly) {[cite: 1]
+    if (seat.domeOnly) {
       row.style.display = isDome ? 'flex' : 'none';
     }
   });
@@ -311,12 +329,12 @@ function renderPlanEventsHtml(month) {
   if (!events.length) {
     return '<div class="plan-event-empty" style="font-size:11px; color:#888; margin:4px 0;">予定されているイベントはありません。</div>';
   }
+  const eventTypes = typeof PLAN_EVENT_TYPES !== 'undefined' ? PLAN_EVENT_TYPES : [];
   return events.map((event, index) => {
-    const eventType = getPlanEventType(event.benefitId);
     return `
       <div class="plan-event-row" data-event-index="${index}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
         <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px;">
-          ${PLAN_EVENT_TYPES.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
+          ${eventTypes.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
         </select>
         <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value)" style="font-size:11px;">
         <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
@@ -326,12 +344,14 @@ function renderPlanEventsHtml(month) {
 
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
-  if (drafts.length >= MAX_PLAN_EVENTS_PER_MONTH) {
-    alert(`1か月あたりのイベントは最大${MAX_PLAN_EVENTS_PER_MONTH}件までです。`);
+  const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 4;
+  if (drafts.length >= maxEvents) {
+    alert(`1か月あたりのイベントは最大${maxEvents}件までです。`);
     return;
   }
+  const defaultEventId = typeof DEFAULT_PLAN_EVENT_ID !== 'undefined' ? DEFAULT_PLAN_EVENT_ID : 'handshake';
   drafts.push({
-    benefitId: DEFAULT_PLAN_EVENT_ID,
+    benefitId: defaultEventId,
     date: '',
     completed: false
   });
@@ -376,24 +396,29 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   planStartM = startM;
   planEndM = endM;
   planMonthEventDrafts = {};
-  document.getElementById('modal-title').textContent = title;
+  const titleEl = document.getElementById('modal-title');
+  if (titleEl) titleEl.textContent = title;
   const container = document.getElementById('plan-rows');
+  if (!container) return;
   container.innerHTML = '';
+
+  const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
+  const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
   for (let m = startM; m <= endM; m++) {
     const planKey = `${yearTarget}-${m}`;
-    const existingPlan = productionSchedule[planKey] || {};
+    const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     const isPreset = isPresetReleaseMonth(m);
-    const releaseValue = isPreset ? PRESET_RELEASE_TYPE : (existingPlan.release || 'none');
-    const liveEntries = getMonthLiveEntries(existingPlan);
+    const releaseValue = isPreset ? presetRelType : (existingPlan.release || 'none');
+    const liveEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(existingPlan) : [];
     const liveSlots = liveEntries.length ? liveEntries.map(e => ({
       liveVenue: e.liveVenue,
       liveName: e.liveName,
       liveDate: e.liveDate,
-      liveDates: e.liveDates,
+      liveDates: e.liveDates || [],
       streamDates: e.streamDates || e.liveDates || [],
-      seatPrices: e.seatPrices,
-      seatOptions: e.seatOptions
+      seatPrices: e.seatPrices || {},
+      seatOptions: e.seatOptions || {}
     })) : [{
       liveVenue: '',
       liveName: '',
@@ -428,7 +453,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
           <select id="sel-benefit-${m}">
             <option value="none">特典なし</option>
-            ${CD_BENEFITS.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
+            ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
           </select>
         </label>
       </div>
@@ -454,7 +479,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     });
   }
 
-  document.getElementById('decision-modal').style.display = 'flex';
+  const modal = document.getElementById('decision-modal');
+  if (modal) modal.style.display = 'flex';
 }
 
 function updateReleaseDateOptions(month) {
@@ -475,6 +501,7 @@ function validatePlanLiveSlots(month, liveSlots) {
   const usedVenues = new Set();
   const usedDates = new Set();
   const now = getGameDateObject();
+  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
 
   for (const slot of liveSlots) {
     if (!slot.liveVenue) continue;
@@ -484,8 +511,8 @@ function validatePlanLiveSlots(month, liveSlots) {
     }
     usedVenues.add(slot.liveVenue);
 
-    const venue = VENUE_DATA.find(v => v.name === slot.liveVenue);
-    const leadDays = getLiveBookingLeadDays(venue);
+    const venue = venues.find(v => v.name === slot.liveVenue);
+    const leadDays = typeof getLiveBookingLeadDays === 'function' ? getLiveBookingLeadDays(venue) : 45;
 
     for (const d of slot.liveDates) {
       if (usedDates.has(d)) {
@@ -501,7 +528,7 @@ function validatePlanLiveSlots(month, liveSlots) {
         return false;
       }
 
-      const rivalConflict = findRivalVenueConflict(slot.liveVenue, d);
+      const rivalConflict = (typeof findRivalVenueConflict === 'function') ? findRivalVenueConflict(slot.liveVenue, d) : null;
       if (rivalConflict) {
         alert(`${d}の${slot.liveVenue}は他グループ（${rivalConflict.groupName}）が予約済みです。`);
         return false;
@@ -511,17 +538,19 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
-// 計画保存（新配信日程 streamDates を含めて保存）
 function saveDecisionPlan() {
+  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
+  const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
+
   for (let m = planStartM; m <= planEndM; m++) {
-    const release = isPresetReleaseMonth(m) ? PRESET_RELEASE_TYPE : document.getElementById(`sel-rel-${m}`).value;
+    const release = isPresetReleaseMonth(m) ? presetRelType : document.getElementById(`sel-rel-${m}`).value;
     const songName = document.getElementById(`song-name-${m}`).value.trim();
     const planKey = `${planYearTarget}-${m}`;
-    const previousPlan = productionSchedule[planKey] || {};
-    const liveSlots = readLiveSlotInputs(m).filter(slot => slot.liveVenue).slice(0, MAX_LIVE_VENUES_PER_MONTH);
+    const previousPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
+    const liveSlots = readLiveSlotInputs(m).filter(slot => slot.liveVenue).slice(0, maxVenues);
 
-    if (liveSlots.length > MAX_LIVE_VENUES_PER_MONTH) {
-      alert(`1か月あたりの会場は最大${MAX_LIVE_VENUES_PER_MONTH}会場までです。`);
+    if (liveSlots.length > maxVenues) {
+      alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
       return;
     }
     if (!validatePlanLiveSlots(m, liveSlots)) return;
@@ -552,10 +581,13 @@ function saveDecisionPlan() {
     };
 
     if (primary) plan.liveCompleted = previousPlan.liveCompleted || false;
-    productionSchedule[planKey] = plan;
+    if (typeof productionSchedule !== 'undefined') {
+      productionSchedule[planKey] = plan;
+    }
   }
   closePlanCalendar();
-  document.getElementById('decision-modal').style.display = 'none';
+  const modal = document.getElementById('decision-modal');
+  if (modal) modal.style.display = 'none';
   setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   updateUI();
 }
@@ -584,12 +616,14 @@ function openPlanCalendar() {
   planCalendarMonth = planStartM;
   planCalendarYear = planYearTarget;
   planCalendarSelection = [];
-  document.getElementById('plan-calendar-modal').style.display = 'flex';
+  const modal = document.getElementById('plan-calendar-modal');
+  if (modal) modal.style.display = 'flex';
   renderPlanCalendarGrid();
 }
 
 function closePlanCalendar() {
-  document.getElementById('plan-calendar-modal').style.display = 'none';
+  const modal = document.getElementById('plan-calendar-modal');
+  if (modal) modal.style.display = 'none';
 }
 
 function renderPlanCalendarGrid() {
@@ -597,11 +631,13 @@ function renderPlanCalendarGrid() {
   if (!container) return;
   container.innerHTML = '';
   const actualYear = calendarYear + (planYearTarget - currentYear);
+  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
+  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
-  for (let m = planStartM; m <= endM; m++) {
+  for (let m = planStartM; m <= planEndM; m++) {
     const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
     const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
-    let cells = PLAN_CALENDAR_WEEKDAYS.map(w => `<span class="calendar-weekday">${w}</span>`).join('');
+    let cells = weekdays.map(w => `<span class="calendar-weekday">${w}</span>`).join('');
 
     for (let c = 0; c < 42; c++) {
       const day = c - firstWeekday + 1;
@@ -617,7 +653,7 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      const rivalConflict = rivalLiveBookings.find(booking => 
+      const rivalConflict = rivals.find(booking => 
         (booking.venueDates || [booking.liveDate]).includes(dateKey)
       );
 
@@ -634,7 +670,7 @@ function renderPlanCalendarGrid() {
         isRelease ? 'CD発売' : '',
         isLive ? '自グループライブ' : '',
         isEvent ? 'CD関連イベント' : '',
-        rivalConflict ? `他グループ公演: ${rivalConflict.groupName} (${rivalConflict.venue})` : ''
+        rivalConflict ? `他グループ公演: ${rivalConflict.groupName || ''} (${rivalConflict.venue || ''})` : ''
       ].filter(Boolean).join(' / ');
 
       cells += `<span class="${classes}" ${title ? `title="${escapeHtml(title)}"` : ''} onclick="togglePlanCalendarDate('${dateKey}')">${day}</span>`;
@@ -718,8 +754,10 @@ function applyPlanCalendarMark(kind) {
       }
     } else if (kind === 'event') {
       const drafts = getPlanMonthEventDrafts(m);
-      if (drafts.length < MAX_PLAN_EVENTS_PER_MONTH && !drafts.some(e => e.date === dateKey)) {
-        drafts.push({ benefitId: DEFAULT_PLAN_EVENT_ID, date: dateKey, completed: false });
+      const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 4;
+      const defaultEventId = typeof DEFAULT_PLAN_EVENT_ID !== 'undefined' ? DEFAULT_PLAN_EVENT_ID : 'handshake';
+      if (drafts.length < maxEvents && !drafts.some(e => e.date === dateKey)) {
+        drafts.push({ benefitId: defaultEventId, date: dateKey, completed: false });
         refreshPlanEventsContainer(m);
       }
     } else if (kind === 'clear') {
@@ -773,8 +811,9 @@ function renderSaveSlots() {
   const container = document.getElementById('save-slots');
   if (!container) return;
   container.innerHTML = '';
+  const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
 
-  for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot++) {
+  for (let slot = 1; slot <= slotCount; slot++) {
     const slotKey = saveSlotKey(slot);
     const summary = getSaveSlotSummary(slotKey);
     const isCorrupt = summary?.isCorrupt;
@@ -834,8 +873,10 @@ function deleteSaveSlot(slot) {
 }
 
 function openTitleScreen() {
-  document.getElementById('game-screen').hidden = true;
-  document.getElementById('title-screen').hidden = false;
+  const gScreen = document.getElementById('game-screen');
+  const tScreen = document.getElementById('title-screen');
+  if (gScreen) gScreen.hidden = true;
+  if (tScreen) tScreen.hidden = false;
   renderSaveSlots();
 }
 
@@ -845,37 +886,44 @@ function returnToTitle() {
 }
 
 function initGame(slot, startFresh) {
-  if (!Number.isInteger(slot) || slot < 1 || slot > SAVE_SLOT_COUNT) return;
+  const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
+  if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
   activeSaveSlot = slot;
 
   if (startFresh) {
-    initializeNewGameState();
+    if (typeof initializeNewGameState === 'function') initializeNewGameState();
   } else {
     const raw = localStorage.getItem(saveSlotKey(slot));
     if (raw) {
       try {
         const data = JSON.parse(raw);
-        applySavedGame(data);
+        if (typeof applySavedGame === 'function') applySavedGame(data);
       } catch (e) {
         alert('セーブデータの読み込みに失敗しました。新規開始してください。');
-        initializeNewGameState();
+        if (typeof initializeNewGameState === 'function') initializeNewGameState();
       }
     } else {
-      initializeNewGameState();
+      if (typeof initializeNewGameState === 'function') initializeNewGameState();
     }
   }
 
-  document.getElementById('title-screen').hidden = true;
-  document.getElementById('game-screen').hidden = false;
-  document.getElementById('active-slot-label').textContent = `セーブ枠 ${slot}`;
+  const tScreen = document.getElementById('title-screen');
+  const gScreen = document.getElementById('game-screen');
+  if (tScreen) tScreen.hidden = true;
+  if (gScreen) gScreen.hidden = false;
+
+  const slotLabel = document.getElementById('active-slot-label');
+  if (slotLabel) slotLabel.textContent = `セーブ枠 ${slot}`;
 
   updateUI();
-  renderPageNav(DEFAULT_PAGE);
+  if (typeof renderPageNav === 'function' && typeof DEFAULT_PAGE !== 'undefined') {
+    renderPageNav(DEFAULT_PAGE);
+  }
 
   if (startFresh) {
     openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
   } else {
-    openPendingModal();
+    if (typeof openPendingModal === 'function') openPendingModal();
   }
 }
 
