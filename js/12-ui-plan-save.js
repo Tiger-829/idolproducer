@@ -907,6 +907,21 @@ function initGame(slot, startFresh) {
     }
   }
 
+  // weeklySchedule のプロパティ欠落によるクラッシュを未然に防ぐ初期補正
+  if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
+    weeklySchedule = {
+      slots: new Array(14).fill(''),
+      vacation: false,
+      individualMemberId: '',
+      individualStat: 'vocal',
+      restDayMembers: [],
+      officeAction: ''
+    };
+  } else if (!Array.isArray(weeklySchedule.restDayMembers)) {
+    weeklySchedule.restDayMembers = [];
+  }
+
+  // 1. タイトルを隠し、ゲーム画面を表示
   const tScreen = document.getElementById('title-screen');
   const gScreen = document.getElementById('game-screen');
   if (tScreen) tScreen.hidden = true;
@@ -915,18 +930,29 @@ function initGame(slot, startFresh) {
   const slotLabel = document.getElementById('active-slot-label');
   if (slotLabel) slotLabel.textContent = `セーブ枠 ${slot}`;
 
-  updateUI();
-  if (typeof renderPageNav === 'function' && typeof DEFAULT_PAGE !== 'undefined') {
-    renderPageNav(DEFAULT_PAGE);
+  // 2. 【最重要】何よりも先にタブを生成し、初期タブ（事務所）を開く
+  if (typeof renderPageNav === 'function') {
+    renderPageNav(typeof DEFAULT_PAGE !== 'undefined' ? DEFAULT_PAGE : 'office');
   }
 
+  // 3. UIのデータ描画を実行
+  try {
+    updateUI();
+  } catch (err) {
+    console.error('updateUI error caught:', err);
+  }
+
+  // 4. 新規開始モーダル、または保留モーダルを開く
   if (startFresh) {
-    openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
+    if (typeof openDecisionModal === 'function') {
+      openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
+    }
   } else {
-    if (typeof openPendingModal === 'function') openPendingModal();
+    if (typeof openPendingModal === 'function') {
+      openPendingModal();
+    }
   }
 }
-
 // ==========================================
 // 起動時初期化
 // ==========================================
