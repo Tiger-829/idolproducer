@@ -206,54 +206,61 @@ function renderWeeklyEventItems(events) {
 }
 
 // 週間スケジュールのUI（レッスン枠・特別強化・休養日）
+// ==========================================
+// 10-ui-panels.js : スケジュール設定UIコントロール
+// ==========================================
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
-  const members = idolRoster.filter(member => member.isSelected);
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const members = roster.filter(member => member && member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
-  const focusIds = new Set(weeklySchedule.focusMemberIds || []);
-  const focusLimit = getSpecialTrainingTargetLimit();
-  const specialMultiplier = getSpecialTrainingMultiplier();
-  const specialStatNames = getSpecialTrainingStatNames();
-  // 個別レッスンの対象：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
+
+  // 個別レッスン対象メンバーの選択肢
   const individualOptions = getIndividualLessonMemberOptions();
   const memberOptions = individualOptions.map(member =>
-    `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
+    `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
+    `${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力${member.staminaValue}）`)}</option>`
   ).join('');
 
-  // 体力が低いメンバーを表示する（休養に設定するかはユーザーが選ぶ）
-  const fatiguedMembers = members.filter(member =>
-    !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
-  );
+  // 鍛える能力の選択肢（STATUS_KEYSから該当ステータスを抽出）
+  const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance', 'stamina', 'recovery'];
+  const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
+  const lessonStatOptions = validStats.map(statId => {
+    const stat = statusKeys.find(key => key.id === statId);
+    return `<option value="${statId}" ${statId === weeklySchedule.individualStat ? 'selected' : ''}>${stat ? escapeHtml(stat.name) : statId}</option>`;
+  }).join('');
+
+  const selectedStatName = statusKeys.find(key => key.id === weeklySchedule.individualStat)?.name || '歌唱力';
+  const selectedMember = roster.find(m => m && m.id === weeklySchedule.individualMemberId);
+  const selectedMemberName = selectedMember ? formatMemberDisplayName(selectedMember) : '未選択';
+
+  // 体力低下警告
+  const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 30;
+  const fatiguedMembers = members.filter(m => !m.injury && m.staminaValue < warnThreshold);
   const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
+    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(m => escapeHtml(`${formatMemberDisplayName(m)}（体力${m.staminaValue}）`)).join('、')}</div>`
     : '';
 
-  const lessonStatOptions = INDIVIDUAL_LESSON_STATS
-    .map(statId => {
-      const stat = STATUS_KEYS.find(key => key.id === statId);
-      return `<option value="${statId}" ${statId === weeklySchedule.individualStat ? 'selected' : ''}>${stat ? escapeHtml(stat.name) : statId}</option>`;
-    })
-    .join('');
-
-  // 1週間＝7日×午前/午後＝14枠のグリッド
-  // テレビ出演（歌番組など）は放送日の午後とリハーサルの午前が固定枠になる
+  // 14枠グリッド生成
   const fixedSlots = getWeekFixedSlots();
-  const itemOptions = slotId => ['<option value="">— 空き —</option>']
-    .concat(WEEKLY_SCHEDULE_ITEMS.filter(item => !item.fixed).map(item => {
-      // 週の上限に達している項目は選択肢から除外する
+  const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
+  const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
+    itemsList.filter(item => !item.fixed).map(item => {
       const limit = item.weeklyLimit && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
       if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
       return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
-    }))
-    .join('');
+    })
+  ).join('');
 
-  const weekRows = WEEK_DAY_LABELS.map((dayLabel, dayIndex) => {
-    const morningIndex = dayIndex * WEEK_PERIOD_LABELS.length;
-    // 何日の予定かを明記する（起点の水曜の翌日が木曜）
+  const dayLabels = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS : ['木', '金', '土', '日', '月', '火', '水'];
+  const periodLabels = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS : ['午前', '午後'];
+
+  const weekRows = dayLabels.map((dayLabel, dayIndex) => {
+    const morningIndex = dayIndex * periodLabels.length;
     const dayDate = getGameDateObject();
     dayDate.setDate(dayDate.getDate() + dayIndex + 1);
     const dayText = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`;
-    const cells = WEEK_PERIOD_LABELS.map((periodLabel, periodIndex) => {
+    const cells = periodLabels.map((periodLabel, periodIndex) => {
       const index = morningIndex + periodIndex;
       const fixed = fixedSlots.get(index);
       const slotId = weeklySchedule.slots[index];
@@ -262,7 +269,7 @@ function renderWeeklyScheduleControls() {
         <div class="week-cell is-fixed">
           <span class="week-cell-label">${escapeHtml(periodLabel)}</span>
           <select aria-label="${escapeHtml(dayLabel)}曜${escapeHtml(periodLabel)}の予定" disabled
-            title="${escapeHtml(fixed.description || 'テレビ出演で固定された枠です')}">${`<option value="" selected>${escapeHtml(fixed.label)}</option>`}</select>
+            title="${escapeHtml(fixed.description || 'テレビ出演で固定された枠です')}"><option value="" selected>${escapeHtml(fixed.label)}</option></select>
         </div>`;
       }
       return `
@@ -281,120 +288,75 @@ function renderWeeklyScheduleControls() {
       </div>`;
   }).join('');
 
+  // 休養トグルボタン
   const restDayToggles = members.map(member => {
     const isResting = restDayIds.has(member.id);
-    const lowStamina = member.staminaValue < STAMINA_WARNING_THRESHOLD;
+    const lowStamina = member.staminaValue < warnThreshold;
     const injured = Boolean(member.injury);
-    const isAutoRest = (weeklySchedule.autoRestMemberIds || []).includes(member.id);
-    // 「[氏名]([怪我/体調不良]回復まで〇日)」の形式で可視化する
     const label = member.injury
       ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
-      : `${formatMemberDisplayName(member)}（体力値${member.staminaValue}${isAutoRest ? ` / 体力${AUTO_REST_STAMINA_TARGET}まで休養` : ''}）`;
+      : `${formatMemberDisplayName(member)}（体力${member.staminaValue}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
         onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
         ${escapeHtml(label)}
-      </button>
-    `;
+      </button>`;
   }).join('');
 
-  const focusToggles = members.filter(member => !member.injury).map(member => {
-    const isFocus = focusIds.has(member.id);
-    const atLimit = !isFocus && focusIds.size >= focusLimit;
-    return `
-      <button type="button" class="rest-toggle focus${isFocus ? ' active' : ''}"
-        onclick="toggleFocusMember(${member.id})" ${atLimit ? 'disabled' : ''}
-        title="特別強化（${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍 / ${escapeHtml(specialStatNames.join('・'))}）">
-        ${escapeHtml(formatMemberDisplayName(member))} <small>${member.staminaValue}</small>
-      </button>
-    `;
-  }).join('');
-
-  const lessonExp = getWeeklyLessonExperience();
-  const schedTier = getManagerSkillTier('scheduling');
-  const mentalTier = getManagerSkillTier('mentalCare');
-  const riskTier = getManagerSkillTier('riskControl');
-  const leadTier = getManagerSkillTier('leadership');
-  const restBreakdown = getWeekRestBreakdown();
-  const mealCount = getWeekMealPartyCount();
-  const lessonCount = getWeekLessonCount();
-  const mealCost = mealCount * MEAL_PARTY_COST;
-
-  const vacationNote = weeklySchedule.vacation
-    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
-    : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
-
-  // 今週の事務作業は1つだけ選択する（未選択なら行わない）
-  const selectedOfficeAction = OFFICE_ACTIONS.find(action => action.id === weeklySchedule.officeAction) || null;
-  const officeToggles = OFFICE_ACTIONS.map(action => {
+  // 事務作業ボタン
+  const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [];
+  const selectedOfficeAction = officeActions.find(action => action.id === weeklySchedule.officeAction) || null;
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 5;
+  const officeToggles = officeActions.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
-    const atLimit = action.id === 'goods-development' && merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS;
-    // 項目のあとの小説明（short）は表示しない
+    const atLimit = action.id === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd;
     return `
       <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
         onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}>${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ''}</button>`;
   }).join('');
 
-  // テレビ出演の週は、固定枠の内容と休暇が使えないことを明示する
-  const broadcastSummaries = getWeekBroadcastSummaries();
-  const broadcastNote = broadcastSummaries.length
-    ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
-        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })} ${WEEK_PERIOD_LABELS[1]}「${item.names.join('・')}」`)
-      ).join('、')} — 放送日の午前はリハーサルで固定されます。</div>`
-    : '';
-
-  // 追加トレーニング（効果・週の上限・グループ練習のみ）を1行ずつ明示する
-  const trainingNotes = WEEKLY_SCHEDULE_ITEMS
-    .filter(item => item.effect)
-    .map(item => {
-      const used = countWeekSlots(item.id);
-      const atLimit = item.weeklyLimit && used >= item.weeklyLimit;
-      const limitText = item.weeklyLimit ? ` / 1週間${item.weeklyLimit}枠まで（現在${used}枠）` : '';
-      const groupText = item.groupOnly ? '（グループ練習のみ。参加者2名未満なら未実施）' : '';
-      const fatigueText = Number.isFinite(item.staminaRatio)
-        ? ` / 疲労 ${Math.round(item.staminaRatio * 100)}%（実行直前の体力）`
-        : '';
-      return `<div class="schedule-note${atLimit ? ' warn' : ''}">${escapeHtml(`${item.name}: ${item.effect}${fatigueText}${groupText}${limitText}`)}</div>`;
-    })
-    .join('');
+  const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 45;
 
   return `
     <div class="schedule-block">
       <div class="schedule-block-title">1週間のスケジュール <small>7日×午前/午後で14枠</small></div>
       <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()" ${fixedSlots.size ? 'disabled' : ''}>
-        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : '□ 1週間の休暇をとる（体力値+' + FULL_VACATION_RECOVERY + '）'}
+        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : `□ 1週間の休暇をとる（体力値+${fullVacationRec}）`}
       </button>
-      ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
-      <div class="schedule-note">${escapeHtml(vacationNote)}</div>
-      <div class="schedule-note">レッスン1回の経験値: 約${lessonExp}（事務所 レッスン設備で変動）</div>
-      ${trainingNotes}
     </div>
 
+    <!-- 【統合版】個別レッスン -->
     <div class="schedule-block">
-      <div class="schedule-block-title">特別強化 <small>対象にチェック（上限${focusLimit}名）</small></div>
-      <div class="schedule-note">対象には <strong>${escapeHtml(specialStatNames.join('・'))}</strong> の経験値がグループレッスンの <strong>${escapeHtml(String(Math.round(specialMultiplier * 10) / 10))}倍</strong> になります。それ以外の能力は等倍のままです。</div>
-      <div class="schedule-note">倍率が掛かるのは${escapeHtml(getSpecialTrainingLessonItems().map(item => item.name).join('・'))}の枠のみ。対象4能力を鍛えるレッスンがない週は、強化しても倍率も体力の追加消費も発生しません。</div>
-      <div class="schedule-note">統率力 ${escapeHtml(leadTier.label)}: 連携の効果 / スケジュール管理力 ${escapeHtml(schedTier.label)}: 強化人数 / メンタルケア ${escapeHtml(mentalTier.label)}: 体力消費抑制・回復 / リスクマネジメント ${escapeHtml(riskTier.label)}: 危機回避力の補正</div>
-      <div class="rest-toggle-grid">${focusToggles || '<div class="schedule-note">強化できるメンバーがいません。</div>'}</div>
+      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
+      <div class="schedule-note">
+        選択したメンバー1名の指定能力に <strong>${SPECIAL_INDIVIDUAL_MULTIPLIER}倍</strong> の経験値が入ります。
+      </div>
+      <div class="schedule-note" style="color: #2e7d32;">
+        ※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <select style="flex:1;" aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', Number(this.value))">
+          ${memberOptions || '<option value="">メンバーなし</option>'}
+        </select>
+        <select style="flex:1;" aria-label="個別レッスンで鍛える能力" onchange="setWeeklyScheduleField('individualStat', this.value)">
+          ${lessonStatOptions}
+        </select>
+      </div>
+      <div class="schedule-note" style="margin-top:6px;">
+        設定中: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を10.1倍で強化
+      </div>
     </div>
 
+    <!-- 休養日設定 -->
     <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン <small>枠を1つ使って対象1名を集中育成</small></div>
-      <select aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', this.value)">
-        ${memberOptions || '<option value="">メンバーなし</option>'}
-      </select>
-      <select aria-label="個別レッスンで鍛える能力" onchange="setWeeklyScheduleField('individualStat', this.value)">
-        ${lessonStatOptions}
-      </select>
-    </div>
-
-    <div class="schedule-block">
-      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${AUTO_REST_STAMINA_TARGET}で練習に復帰</small></div>
+      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${autoRestTarget}で練習に復帰</small></div>
       ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
 
+    <!-- 事務作業 -->
     <div class="schedule-block">
       <div class="schedule-block-title">今週の事務作業 <small>レッスンと同じ週に実行（未選択なら行わない）</small></div>
       <div class="rest-toggle-grid">
@@ -410,7 +372,6 @@ function renderWeeklyScheduleControls() {
     <button class="main-btn" style="width:100%;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
   `;
 }
-
 // 個別レッスンの対象順：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
 function getIndividualLessonMemberOptions() {
   const available = idolRoster.filter(member => !member.injury);
