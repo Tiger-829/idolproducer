@@ -1,8 +1,5 @@
 // ==========================================
-// UI描画（順位・事務所・マネージャー・給与）
-// ==========================================
-// ==========================================
-// 6. UI描画 ＆ モーダル操作
+// UI描画（順位・事務所・マネージャー・給与 完全版）
 // ==========================================
 
 const PAGE_TABS = [
@@ -14,13 +11,8 @@ const PAGE_TABS = [
   { id: 'records', label: '記録', icon: 'records' }
 ];
 
-// ゲーム開始時に表示するタブ（毎週の行動を決める「事務所」を既定にする）
 const DEFAULT_PAGE = 'office';
 
-// 特別個別レッスン（特別強化統合）の効果倍率
-const SPECIAL_INDIVIDUAL_MULTIPLIER = 10.1;
-
-// タブのボタンを描画し、指定したタブのパネルだけを表示する
 function renderPageNav(activePage = DEFAULT_PAGE) {
   const target = PAGE_TABS.some(tab => tab.id === activePage) ? activePage : DEFAULT_PAGE;
   const nav = document.getElementById('page-nav');
@@ -35,7 +27,6 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
       </button>`;
     }).join('');
   }
-  // パネルの表示も同時に切り替える
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) panel.hidden = tab.id !== target;
@@ -44,18 +35,15 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
 
 function switchPage(page) {
   renderPageNav(page);
-  // 記録タブを開いたときにグラフと一覧を描画する
   if (page === 'records') renderRecordsPanel();
 }
 
-// 競合チームの現在の影響力（売上に応じて増減する）
 function getRivalTeamPower(team) {
   const base = team.basePower || 0;
   const growth = (team.sales || 0) / 200000;
   return Math.max(10, Math.round(base + growth));
 }
 
-// 自チームの成績を leagueTeams に反映する
 function syncPlayerTeamStats() {
   const pTeam = leagueTeams.find(team => team.id === 'player');
   if (!pTeam) return;
@@ -65,7 +53,6 @@ function syncPlayerTeamStats() {
   pTeam.basePower = getPlayerTeamOverall();
 }
 
-// 今年以来に自チームが開催した公演数
 function countPlayerLiveShows() {
   let count = 0;
   getScheduledLiveEntries().forEach(entry => {
@@ -75,7 +62,6 @@ function countPlayerLiveShows() {
   return count;
 }
 
-// 業界順位の表を作る
 function getLeagueRanking() {
   syncPlayerTeamStats();
   return leagueTeams
@@ -95,14 +81,12 @@ function getLeagueRanking() {
     .map((team, index) => ({ ...team, rank: index + 1 }));
 }
 
-// 自分の順位
 function getPlayerRank() {
   const ranking = getLeagueRanking();
   const me = ranking.find(team => team.isPlayer);
   return me ? { rank: me.rank, total: ranking.length, power: me.power, top: ranking[0] } : null;
 }
 
-// 業界順位の描画
 function renderRankingPanel() {
   const list = document.getElementById('ranking-list');
   const note = document.getElementById('ranking-note');
@@ -138,7 +122,6 @@ function renderWeeklyActionPanel() {
   const events = getCurrentWeekEvents();
   const currentDate = getGameDateObject();
 
-  // 自グループ設定ライブのある週はスケジュールを組めない
   const nextLiveDate = findWeekLiveStop(currentDate);
   const editableSpecialLiveEvents = getEditableSpecialLiveEventsForWeek(currentDate);
   if (nextLiveDate && !editableSpecialLiveEvents.length) {
@@ -197,7 +180,6 @@ function renderWeeklyActionPanel() {
   `;
 }
 
-// ライブ週の表示から重複する競合公演の行を除く
 function getWeeklyEventNoteEvents(events) {
   return events.filter(event => !event.startsWith('他グループのライブ'));
 }
@@ -206,13 +188,13 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(event)}</li>`).join('');
 }
 
-// 週間スケジュールのUI（レッスン枠・特別個別レッスン・休養日）
+// 週間スケジュールのUI（特別強化を個別レッスンに完全統合）
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
   const members = idolRoster.filter(member => member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
 
-  // 個別レッスンの対象：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
+  // 個別レッスンの対象メンバー（センター優先、以降体力順）
   const individualOptions = getIndividualLessonMemberOptions();
   const memberOptions = individualOptions.map(member =>
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
@@ -225,11 +207,10 @@ function renderWeeklyScheduleControls() {
     })
     .join('');
 
-  const selectedStatName = STATUS_KEYS.find(key => key.id === weeklySchedule.individualStat)?.name || '指定能力';
+  const selectedStatName = STATUS_KEYS.find(key => key.id === weeklySchedule.individualStat)?.name || '歌唱力';
   const selectedMember = idolRoster.find(m => m.id === weeklySchedule.individualMemberId);
   const selectedMemberName = selectedMember ? formatMemberDisplayName(selectedMember) : '未選択';
 
-  // 体力が低いメンバーを表示する
   const fatiguedMembers = members.filter(member =>
     !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
   );
@@ -237,7 +218,6 @@ function renderWeeklyScheduleControls() {
     ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
     : '';
 
-  // 1週間＝7日×午前/午後＝14枠のグリッド
   const fixedSlots = getWeekFixedSlots();
   const itemOptions = slotId => ['<option value="">— 空き —</option>']
     .concat(WEEKLY_SCHEDULE_ITEMS.filter(item => !item.fixed).map(item => {
@@ -280,7 +260,6 @@ function renderWeeklyScheduleControls() {
       </div>`;
   }).join('');
 
-  // 休養トグルボタン
   const restDayToggles = members.map(member => {
     const isResting = restDayIds.has(member.id);
     const lowStamina = member.staminaValue < STAMINA_WARNING_THRESHOLD;
@@ -306,7 +285,6 @@ function renderWeeklyScheduleControls() {
     ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
-  // 今週の事務作業
   const selectedOfficeAction = OFFICE_ACTIONS.find(action => action.id === weeklySchedule.officeAction) || null;
   const officeToggles = OFFICE_ACTIONS.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
@@ -350,14 +328,14 @@ function renderWeeklyScheduleControls() {
       ${trainingNotes}
     </div>
 
-    <!-- 特別個別レッスン（特別強化統合） -->
+    <!-- 【統合版】個別レッスン（特別強化統合） -->
     <div class="schedule-block">
-      <div class="schedule-block-title">特別個別レッスン <small>スケジュール内の「個別レッスン」枠で実行</small></div>
+      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
       <div class="schedule-note">
-        対象メンバー1名と鍛えたい能力1つを指定します。「個別レッスン」枠を実行した際、指定能力に <strong>${SPECIAL_INDIVIDUAL_MULTIPLIER}倍</strong> の経験値を獲得します。
+        選択したメンバー1名の指定能力に <strong>10.1倍</strong> の経験値が入ります。
       </div>
-      <div class="schedule-note" style="color: #27ae60;">
-        ※対象外のメンバーは個別レッスン枠に参加せず、<strong>その時間帯（午前/午後）の休養枠として体力を回復</strong>します。
+      <div class="schedule-note" style="color: #2e7d32;">
+        ※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。
       </div>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <select style="flex:1;" aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', this.value)">
@@ -368,7 +346,7 @@ function renderWeeklyScheduleControls() {
         </select>
       </div>
       <div class="schedule-note" style="margin-top:6px;">
-        現在の設定: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を集中強化
+        設定中: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を10.1倍で強化
       </div>
     </div>
 
@@ -394,7 +372,6 @@ function renderWeeklyScheduleControls() {
   `;
 }
 
-// 個別レッスンの対象順：選抜発表済みの最新センターを先頭、そのあとは残体力の低い順
 function getIndividualLessonMemberOptions() {
   const available = idolRoster.filter(member => !member.injury);
   if (!available.length) return [];
@@ -487,7 +464,6 @@ function renderGameCalendar() {
   `;
 }
 
-// 設備維持費・アップグレード設定
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -584,7 +560,6 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャーパネル（レベルアップ・解雇）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -666,7 +641,6 @@ function renderManagerPanel() {
   }).join('');
 }
 
-// マネージャー市場のパネル
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
@@ -705,7 +679,6 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
-// 給与明細パネル（資金画面）
 function renderSalaryPanel() {
   const setText = (id, value) => {
     const element = document.getElementById(id);
