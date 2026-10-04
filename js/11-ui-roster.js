@@ -1,5 +1,5 @@
 // ==========================================
-// 11-ui-roster.js : UI描画（完全防護・連鎖停止防止版）
+// 11-ui-roster.js : UI描画（完全防護版）
 // ==========================================
 
 function updateUI() {
@@ -8,16 +8,16 @@ function updateUI() {
     if (el) el.textContent = text;
   };
 
-  // 1. まず何よりも最優先でタブバーを生成・同期する（後続のエラーでタブが消えるのを完全防止）
+  // 1. 最優先でタブバーを生成・同期
   try {
     if (typeof renderPageNav === 'function') {
       renderPageNav(typeof currentPageTab !== 'undefined' ? currentPageTab : 'office');
     }
   } catch (e) {
-    console.warn('renderPageNav error:', e);
+    console.warn('renderPageNav failed:', e);
   }
 
-  // 2. 基本ステータス・ヘッダー情報の更新
+  // 2. ヘッダー・基本情報
   try {
     setText('txt-year', typeof currentYear !== 'undefined' ? currentYear : 1);
     setText('txt-month', typeof currentMonth !== 'undefined' ? currentMonth : 1);
@@ -120,31 +120,31 @@ function updateUI() {
       });
     }
   } catch (e) {
-    console.warn('Status Header update error:', e);
+    console.warn('Header stats error:', e);
   }
 
-  // 3. 各サブラベル・リストの描画（1つが失敗しても他を止めない安全防御）
-  const safeRun = (fnName, fn) => {
+  // 3. 各パネルの描画（個別 try-catch で絶対に連鎖停止させない）
+  const runSafe = (fn) => {
     try {
       if (typeof fn === 'function') fn();
     } catch (err) {
-      console.warn(`${fnName} execution failed:`, err);
+      console.warn('Panel render warning:', err);
     }
   };
 
-  safeRun('renderSongLibrary', renderSongLibrary);
-  safeRun('renderRosterNameBar', renderRosterNameBar);
-  safeRun('renderRosterList', renderRosterList);
-  safeRun('renderRankingPanel', renderRankingPanel);
-  safeRun('renderOfficeUpgrades', renderOfficeUpgrades);
-  safeRun('renderManagerPanel', renderManagerPanel);
-  safeRun('renderManagerMarketPanel', renderManagerMarketPanel);
-  safeRun('renderSalaryPanel', renderSalaryPanel);
-  safeRun('renderGameCalendar', renderGameCalendar);
-  safeRun('renderWeeklyActionPanel', renderWeeklyActionPanel);
+  runSafe(renderSongLibrary);
+  runSafe(renderRosterNameBar);
+  runSafe(renderRosterList);
+  runSafe(renderRankingPanel);
+  runSafe(renderOfficeUpgrades);
+  runSafe(renderManagerPanel);
+  runSafe(renderManagerMarketPanel);
+  runSafe(renderSalaryPanel);
+  runSafe(renderGameCalendar);
+  runSafe(renderWeeklyActionPanel);
 
-  // 4. 自動セーブ
-  if (typeof activeSaveSlot !== 'undefined' && activeSaveSlot) {
+  // 4. セーブ
+  if (typeof activeSaveSlot !== 'undefined' && activeSaveSlot && typeof saveSlotKey === 'function') {
     try {
       localStorage.setItem(saveSlotKey(activeSaveSlot), JSON.stringify({
         currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
@@ -229,7 +229,7 @@ function renderRosterNameBar() {
     return a.name.localeCompare(b.name, 'ja');
   });
 
- const restingIds = new Set(Array.isArray(weeklySchedule?.restDayMembers) ? weeklySchedule.restDayMembers : []);
+  const restingIds = new Set(Array.isArray(weeklySchedule?.restDayMembers) ? weeklySchedule.restDayMembers : []);
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
 
@@ -271,7 +271,7 @@ function renderRosterList() {
   listUI.innerHTML = '';
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
   const filtered = roster.filter(m => currentRosterTab === 'selected' ? m.isSelected : !m.isSelected);
-  const restingIds = new Set(weeklySchedule?.restDayMembers || []);
+  const restingIds = new Set(Array.isArray(weeklySchedule?.restDayMembers) ? weeklySchedule.restDayMembers : []);
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
 
