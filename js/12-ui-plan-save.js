@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画策定・カレンダーUI・セーブ・ロード完全版
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全同期版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -11,9 +11,8 @@ let planCalendarSelection = [];
 let planCalendarRangeMode = false;
 let planMonthEventDrafts = {};
 
-// プリセット発売月判定（1年目の2月・6月）
 function isPresetReleaseMonth(month) {
-  return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
+  return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);[cite: 1]
 }
 
 function getPlanCalendarDate(month, day) {
@@ -76,10 +75,7 @@ function getPlanReleaseDefaultWednesday(month) {
   return toDateKey(d);
 }
 
-// ==========================================
-// 公演日程・配信設定 UI 生成
-// ==========================================
-
+// 公演日程・配信設定
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -320,10 +316,7 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
-// ==========================================
-// CD関連イベント（特典会・物販）設定
-// ==========================================
-
+// CD特典イベント設定
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -387,10 +380,7 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// ==========================================
-// 半年計画策定モーダル本体
-// ==========================================
-
+// 半年計画策定モーダル
 function openDecisionModal(title, yearTarget, startM, endM) {
   planYearTarget = yearTarget;
   planStartM = startM;
@@ -600,10 +590,7 @@ function openPlanningManual() {
   }
 }
 
-// ==========================================
-// 6か月分計画カレンダーモーダル
-// ==========================================
-
+// 6か月分カレンダーモーダル
 function openPlanningCalendar() {
   const targetYear = currentMonth >= 7 ? currentYear + 1 : currentYear;
   const startM = currentMonth >= 7 ? 1 : 7;
@@ -784,10 +771,7 @@ function applyPlanCalendarMark(kind) {
   renderPlanCalendarGrid();
 }
 
-// ==========================================
-// セーブデータ管理・スロットUI
-// ==========================================
-
+// セーブデータスロット管理
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
@@ -885,6 +869,7 @@ function returnToTitle() {
   openTitleScreen();
 }
 
+// 【最重要】ゲーム初期化（順序是正完全版）
 function initGame(slot, startFresh) {
   const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
   if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
@@ -907,21 +892,7 @@ function initGame(slot, startFresh) {
     }
   }
 
-  // weeklySchedule のプロパティ欠落によるクラッシュを未然に防ぐ初期補正
-  if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
-    weeklySchedule = {
-      slots: new Array(14).fill(''),
-      vacation: false,
-      individualMemberId: '',
-      individualStat: 'vocal',
-      restDayMembers: [],
-      officeAction: ''
-    };
-  } else if (!Array.isArray(weeklySchedule.restDayMembers)) {
-    weeklySchedule.restDayMembers = [];
-  }
-
-  // 1. タイトルを隠し、ゲーム画面を表示
+  // 1. タイトル画面を非表示にし、ゲーム画面を表示
   const tScreen = document.getElementById('title-screen');
   const gScreen = document.getElementById('game-screen');
   if (tScreen) tScreen.hidden = true;
@@ -930,19 +901,19 @@ function initGame(slot, startFresh) {
   const slotLabel = document.getElementById('active-slot-label');
   if (slotLabel) slotLabel.textContent = `セーブ枠 ${slot}`;
 
-  // 2. 【最重要】何よりも先にタブを生成し、初期タブ（事務所）を開く
+  // 2. 【最優先】タブバーを生成し、「事務所」タブを確実にアクティブにする
   if (typeof renderPageNav === 'function') {
-    renderPageNav(typeof DEFAULT_PAGE !== 'undefined' ? DEFAULT_PAGE : 'office');
+    renderPageNav('office');
   }
 
-  // 3. UIのデータ描画を実行
+  // 3. データ描画
   try {
     updateUI();
-  } catch (err) {
-    console.error('updateUI error caught:', err);
+  } catch (e) {
+    console.warn('Initial updateUI warning:', e);
   }
 
-  // 4. 新規開始モーダル、または保留モーダルを開く
+  // 4. 新規開始モーダルを確実にポップアップ
   if (startFresh) {
     if (typeof openDecisionModal === 'function') {
       openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
@@ -953,9 +924,8 @@ function initGame(slot, startFresh) {
     }
   }
 }
-// ==========================================
+
 // 起動時初期化
-// ==========================================
 if (typeof renderSaveSlots === 'function') {
   renderSaveSlots();
 }
