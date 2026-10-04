@@ -924,20 +924,7 @@ function initGame(slot, startFresh) {
     }
   }
 }
-
-// ==========================================
-// 起動時・DOM読み込み完了後の安全な初期化
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-  migrateLegacySave();
-  renderSaveSlots();
-});
-
-// 万が一DOMがすでに読み込み終わっている場合のフォールバック
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  migrateLegacySave();
-  renderSaveSlots();
-}
+// 1. ここに migrateLegacySave を定義する
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
   if (!legacySave) return;
@@ -953,4 +940,28 @@ function migrateLegacySave() {
   } catch (error) {
     console.error(error);
   }
+}
+
+// 2. その「下」でイベントリスナーから呼び出す
+document.addEventListener('DOMContentLoaded', () => {
+  migrateLegacySave();
+  renderSaveSlots();
+});
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  migrateLegacySave();
+  renderSaveSlots();
+}
+// ==========================================
+// 起動時・DOM読み込み完了後の安全な初期化
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+  migrateLegacySave();
+  renderSaveSlots();
+});
+
+// 万が一DOMがすでに読み込み終わっている場合のフォールバック
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  migrateLegacySave();
+  renderSaveSlots();
 }
