@@ -1,5 +1,5 @@
 // ==========================================
-// UI描画（順位・事務所・マネージャー・給与 完全版）
+// 10-ui-panels.js : UI描画（順位・事務所・マネージャー・給与）
 // ==========================================
 
 const PAGE_TABS = [
@@ -35,7 +35,7 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
 
 function switchPage(page) {
   renderPageNav(page);
-  if (page === 'records') renderRecordsPanel();
+  if (page === 'records' && typeof renderRecordsPanel === 'function') renderRecordsPanel();
 }
 
 function getRivalTeamPower(team) {
@@ -188,13 +188,14 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(event)}</li>`).join('');
 }
 
-// 週間スケジュールのUI（特別強化を個別レッスンに完全統合）
+/**
+ * 週間スケジュール設定UI（個別レッスンと特別強化が完全統合された版）
+ */
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
   const members = idolRoster.filter(member => member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
 
-  // 個別レッスンの対象メンバー（センター優先、以降体力順）
   const individualOptions = getIndividualLessonMemberOptions();
   const memberOptions = individualOptions.map(member =>
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
@@ -332,7 +333,7 @@ function renderWeeklyScheduleControls() {
     <div class="schedule-block">
       <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
       <div class="schedule-note">
-        選択したメンバー1名の指定能力に <strong>10.1倍</strong> の経験値が入ります。
+        選択したメンバー1名の指定能力に <strong>${SPECIAL_INDIVIDUAL_MULTIPLIER}倍</strong> の経験値が入ります。
       </div>
       <div class="schedule-note" style="color: #2e7d32;">
         ※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。
