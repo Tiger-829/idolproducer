@@ -1,8 +1,8 @@
 // ==========================================
-// 07-schedule.js : 週間スケジュール・進行ロジック
+// 07-schedule.js : 週間スケジュール・進行ロジック完全版
 // ==========================================
 
-// 直前週に確定したスケジュール
+// 直前週に確定したスケジュール（次週の初期値）
 let lastWeekSchedule = null;
 // 歌番組（テレビ出演）で枠が潰されていない週のスケジュール
 let savedCleanWeekSchedule = null;
@@ -10,13 +10,13 @@ let savedCleanWeekSchedule = null;
 // 特別個別レッスン（特別強化統合）の固定倍率
 const SPECIAL_INDIVIDUAL_MULTIPLIER = 10.1;
 
-// 歌番組リハーサル直前の準備ボーナス定数
+// 歌番組リハーサル前の準備ボーナス定数
 const MUSIC_PREP_BONUS_MULTIPLIER = 5;
 const MUSIC_PREP_ITEMS = ['full-run-through', 'coordination'];
 
 /**
  * 空の週間スケジュールオブジェクトを生成
- * （特別強化は個別レッスンに統合されたため、対象は1名・1能力のみ保持）
+ * （特別強化は個別レッスンに統合。対象は1名・1能力のみ保持）
  */
 function createEmptyWeeklySchedule() {
   const slots = [...DEFAULT_WEEK_SLOTS];
@@ -31,7 +31,7 @@ function createEmptyWeeklySchedule() {
     vacation: false,
     individualMemberId: defaultMember, // 統合された対象メンバー（1名のみ）
     individualStat: 'vocal',           // 統合された強化対象能力（1項目のみ）
-    restDayMembers: [],                // ユーザー指定の休養メンバー
+    restDayMembers: [],                // ユーザーが手動指定した休養メンバー
     officeAction: ''
   };
 }
@@ -50,7 +50,7 @@ function ensureWeeklySchedule() {
     
     if (!Array.isArray(weeklySchedule.restDayMembers)) weeklySchedule.restDayMembers = [];
 
-    // 旧・特別強化プロパティを完全消去して不整合を防止
+    // 旧・特別強化プロパティを完全消去して参照エラーを防止
     delete weeklySchedule.focusMemberIds;
     delete weeklySchedule.focusMemberId;
     delete weeklySchedule.autoRestMemberIds;
@@ -237,7 +237,7 @@ function getDraftSourceSchedule() {
 
 /**
  * 直前週のスケジュールから下書きを生成
- * 手動休養指定メンバーのうち、まだ目標未達のメンバーのみ引き継ぐ
+ * 手動休養指定メンバーのうち、目標体力未達のメンバーのみ引き継ぐ
  */
 function createScheduleFromLastWeek() {
   const base = createEmptyWeeklySchedule();
@@ -403,45 +403,67 @@ function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
   return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
 }
 
+/**
+ * 入力バリデーション（弾かれた理由を明示的にアラート表示）
+ */
 function validateWeeklySchedule() {
   ensureWeeklySchedule();
+
   if (weeklySchedule.vacation && getWeekFixedSlots().size) {
     weeklySchedule.vacation = false;
     setLog('【週間スケジュール】テレビ出演があるため、1週間の休暇を解除しました。');
   }
 
-  const overLimit = WEEKLY_SCHEDULE_ITEMS
-    .filter(item => item.weeklyLimit)
-    .map(item => ({ item, used: countWeekSlots(item.id) }))
-    .find(entry => entry.used > entry.item.weeklyLimit);
-  if (overLimit) {
-    alert(`「${overLimit.item.name}」は1週間で${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。`);
-    return false;
+  if (weeklySchedule.vacation) return true;
+
+  // 1. 枠上限チェック
+  if (Array.isArray(WEEKLY_SCHEDULE_ITEMS)) {
+    const overLimit = WEEKLY_SCHEDULE_ITEMS
+      .filter(item => item.weeklyLimit)
+      .map(item => ({ item, used: countWeekSlots(item.id) }))
+      .find(entry => entry.used > entry.item.weeklyLimit);
+
+    if (overLimit) {
+      alert(`【設定エラー】「${overLimit.item.name}」は1週間に${overLimit.item.weeklyLimit}枠までです（現在${overLimit.used}枠）。枠を減らしてください。`);
+      return false;
+    }
   }
 
+  // 2. グッズ開発費チェック
   if (weeklySchedule.officeAction === 'goods-development' && merchandiseProducts < MAX_MERCHANDISE_PRODUCTS
     && GOODS_DEVELOPMENT_COST > funds) {
     alert(`グッズの開発費 ${formatMoney(GOODS_DEVELOPMENT_COST)} が資金を超えています。`);
     return false;
   }
-  if (weeklySchedule.vacation) return true;
 
+  // 3. 休養日チェック（1日フル＋半休2枠）
   const rest = getWeekRestBreakdown();
-  if (isRestRequirementAchievable()) {
+  const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
+  const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
+
+  if (typeof isRestRequirementAchievable === 'function' && isRestRequirementAchievable()) {
     const restShort = [];
-    if (rest.fullRestDays < REQUIRED_FULL_REST_DAYS) restShort.push(`休養1日フル（現在${rest.fullRestDays}日）`);
-    if (rest.extraSlots < REQUIRED_EXTRA_REST_SLOTS) restShort.push(`半休${REQUIRED_EXTRA_REST_SLOTS}枠（現在${rest.extraSlots}枠）`);
-    if (restShort.length) {
-      alert(`スケジュールを実行できません。休養日の設定を見直してください。\n不足: ${restShort.join(' / ')}`);
+    if (rest.fullRestDays < reqFull) {
+      restShort.push(`・1日フル休養（午前・午後とも休養の日）：現在 ${rest.fullRestDays}日 / 必要 ${reqFull}日`);
+    }
+    if (rest.extraSlots < reqExtra) {
+      restShort.push(`・半休枠（午前または午後の休養）：現在 ${rest.extraSlots}枠 / 必要 ${reqExtra}枠`);
+    }
+
+    if (restShort.length > 0) {
+      alert(`【休養不足】スケジュールを実行できません。\n\n${restShort.join('\n')}\n\n※スロットから「休養」を設定してください。`);
       return false;
     }
   }
 
-  const mealCost = getWeekMealPartyCount() * MEAL_PARTY_COST;
+  // 4. 食事会経費チェック
+  const mealCount = getWeekMealPartyCount();
+  const mealCost = mealCount * (typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000);
   if (mealCost > funds) {
-    alert(`食事会の経費 ${formatMoney(mealCost)} が資金を超えています。`);
+    alert(`【資金不足】食事会の経費（${formatMoney(mealCost)}）が所持金を超えています。食事会を減らしてください。`);
     return false;
   }
+
   return true;
 }
 
@@ -450,29 +472,32 @@ function validateWeeklySchedule() {
  */
 function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
   const releaseMap = new Map();
+  const targetStamina = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+  const slotRecovery = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 10;
+  const mealRecovery = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 15;
 
   (restingMemberIds || []).forEach(memberId => {
     const member = idolRoster.find(m => m.id === memberId);
     if (!member) return;
 
-    let stamina = member.staminaValue ?? MAX_STAMINA_VALUE;
-    if (stamina >= AUTO_REST_STAMINA_TARGET) {
+    let stamina = member.staminaValue ?? (typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100);
+    if (stamina >= targetStamina) {
       releaseMap.set(memberId, 0);
       return;
     }
 
     let recoveredSlotIndex = -1;
-    for (let i = 0; i < weeklySchedule.slots.length; i++) {
+    for (let i = 0; i < (weeklySchedule.slots || []).length; i++) {
       const fixed = fixedSlots.get(i);
       const slotId = weeklySchedule.slots[i];
 
       if ((fixed && fixed.kind === 'rest-day') || (!fixed && slotId === 'rest-day')) {
-        stamina = Math.min(MAX_STAMINA_VALUE, stamina + REST_SLOT_RECOVERY);
+        stamina += slotRecovery;
       } else if (!fixed && slotId === 'meal-party') {
-        stamina = Math.min(MAX_STAMINA_VALUE, stamina + MEAL_PARTY_RECOVERY);
+        stamina += mealRecovery;
       }
 
-      if (stamina >= AUTO_REST_STAMINA_TARGET) {
+      if (stamina >= targetStamina) {
         recoveredSlotIndex = i + 1;
         break;
       }
@@ -578,7 +603,7 @@ function applyWeeklySchedule() {
       const slotEffect = getWeekSlotPeriod(index) === 0 ? MORNING_SLOT_MULTIPLIER : 1;
 
       // ==========================================
-      // 個別レッスン枠：1名が10.1倍、他全員は休養回復
+      // 個別レッスン枠：選ばれた1名が10.1倍、他全員は休養回復
       // ==========================================
       if (slotId === 'individual-lesson') {
         if (member.id === targetMemberId) {
@@ -591,7 +616,7 @@ function applyWeeklySchedule() {
           staminaCost += cost;
           remainingStamina = Math.max(0, remainingStamina - cost);
         } else {
-          // 選ばれなかったメンバー：午前/午後の時間帯に合わせて休養回復
+          // 選ばれなかったメンバー：午前/午後に応じた休養回復
           const recoveryAmount = Math.round(REST_SLOT_RECOVERY * slotEffect);
           remainingStamina = Math.min(MAX_STAMINA_VALUE, remainingStamina + recoveryAmount);
         }
@@ -801,25 +826,55 @@ function applyOfficeAction(actionId) {
 }
 
 /**
- * 週間スケジュールを確定して1週間進める（安全実行パッチ適用）
+ * 週間スケジュールを確定して1週間進める（原因可視化＆安全ガード付き）
  */
 function confirmWeeklySchedule() {
+  console.log('【進行ボタン押下】処理を開始します...');
+
   try {
-    const currentDate = getGameDateObject();
-    if (currentDate.getDay() !== 3) {
-      setLog('【週間スケジュール】スケジュール設定は水曜日に行えます。');
+    const gameDateObj = getGameDateObject();
+    const dayOfWeek = gameDateObj.getDay();
+
+    // 水曜日チェック
+    if (dayOfWeek !== 3) {
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      const msg = `現在は【${dayNames[dayOfWeek]}曜日】です。スケジュール確定は【水曜日】にのみ行えます。\n※画面上の「水曜日まで進行」ボタンを押してください。`;
+      alert(msg);
+      console.warn(msg);
       return;
     }
-    if (typeof hasLiveWithinWeek === 'function' && hasLiveWithinWeek()) return;
-    if (!validateWeeklySchedule()) return;
 
-    rememberWeeklySchedule(weeklySchedule);
-    markMusicPreparations();
+    // 週内ライブチェック
+    if (typeof hasLiveWithinWeek === 'function' && hasLiveWithinWeek()) {
+      const msg = '今週はグループのライブが予定されているため、通常スケジュールは組めません。\n「イベントまで進行」ボタンを押してください。';
+      alert(msg);
+      console.warn(msg);
+      return;
+    }
+
+    // バリデーションチェック
+    if (!validateWeeklySchedule()) {
+      console.warn('【バリデーション中断】条件を満たしていないため進行を中断しました。');
+      return;
+    }
+
+    // 確定内容の引き継ぎ
+    if (typeof rememberWeeklySchedule === 'function') {
+      rememberWeeklySchedule(weeklySchedule);
+    }
+    if (typeof markMusicPreparations === 'function') {
+      markMusicPreparations();
+    }
+
+    // スケジュール適用
     applyWeeklySchedule();
+
+    // カレンダー進行
     advanceOneWeek();
-  } catch (err) {
-    console.error('【週間スケジュール進行エラー】', err);
-    alert(`進行処理中にエラーが発生しました:\n${err.message}`);
+
+  } catch (error) {
+    console.error('【スケジュール進行エラー】', error);
+    alert(`進行処理中にスクリプトエラーが発生しました:\n\n${error.name}: ${error.message}\n\n（F12の開発者コンソールを確認してください）`);
   }
 }
 
