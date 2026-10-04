@@ -403,7 +403,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
     
     let prevReleaseCount = 0;
-    let liveDetails = []; // ライブの日付や会場名を格納する配列
+    let liveDetails = [];
 
     for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
       const pKey = `${prevYear}-${m}`;
@@ -415,34 +415,44 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           prevReleaseCount++;
         }
         
-        // 1. 各月のエントリやスロットからライブ情報を安全に抽出する
+        // ライブ・イベント情報の抽出（考えられるすべてのプロパティや関数を網羅）
         let entries = [];
         if (typeof getMonthLiveEntries === 'function') {
-          entries = getMonthLiveEntries(p);
+          try {
+            entries = getMonthLiveEntries(p) || [];
+          } catch (e) {
+            entries = [];
+          }
         }
         
-        //もしgetMonthLiveEntriesで取れず、単体でライブ情報を持っている場合のフォールバック
-        if ((!entries || entries.length === 0) && (p.liveVenue || p.liveDate)) {
-          entries = [{
-            liveName: p.liveName || p.liveVenue,
-            liveDate: p.liveDate,
-            liveDates: p.liveDates || []
-          }];
+        // 取得できない場合は、オブジェクト直下のプロパティから探す
+        if (!entries || entries.length === 0) {
+          if (p.liveDate || p.liveVenue || p.liveName || p.liveDates) {
+            entries = [{
+              liveName: p.liveName || p.liveVenue || 'ライブ公演',
+              liveDate: p.liveDate || '',
+              liveDates: p.liveDates || []
+            }];
+          }
         }
 
-        // 2. 取得したライブ情報から日付をそれぞれ拾う
+        // 各エントリから日付候補を徹底的に洗い出す
         entries.forEach(e => {
-          // 日付（YYYY-MM-DD形式など）があればリストに追加
           let dates = [];
           if (e.liveDate) dates.push(e.liveDate);
-          if (Array.isArray(e.liveDates)) {
-            dates = dates.concat(e.liveDates);
-          }
+          if (e.date) dates.push(e.date);
+          if (Array.isArray(e.liveDates)) dates = dates.concat(e.liveDates);
+          if (Array.isArray(e.dates)) dates = dates.concat(e.dates);
           
-          if (dates.length > 0 || e.liveName || e.liveVenue) {
+          // 重複を削除して整理
+          dates = [...new Set(dates)].filter(Boolean);
+
+          const lName = e.liveName || e.liveVenue || e.name || p.liveName || p.liveVenue || 'ライブ公演';
+
+          if (dates.length > 0 || lName) {
             liveDetails.push({
               month: m,
-              name: e.liveName || e.liveVenue || 'ライブ公演',
+              name: lName,
               dates: dates
             });
           }
@@ -450,14 +460,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       }
     }
 
-    // 3. 画面に表示するHTMLを組み立てる
+    // 表示用HTMLの組み立て
     if (prevReleaseCount > 0 || liveDetails.length > 0) {
       let liveHtml = '';
       if (liveDetails.length > 0) {
         liveHtml = `<br><strong>【ライブ予定一覧】</strong><br>` + liveDetails.map(l => {
           let dateStr = l.dates.length > 0 ? l.dates.join(', ') : '日程未定';
-          // "YYYY-MM-DD" を "M月D日" っぽく見やすく整形する簡易処理
-          dateStr = dateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1月$2日');
+          // 日付文字列を綺麗に整形 (YYYY-MM-DD -> M月D日)
+          dateStr = dateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
           return `・${l.month}月: ${l.name} (${dateStr})`;
         }).join('<br>');
       } else {
@@ -465,7 +475,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       }
 
       summaryBox.innerHTML = `
-        <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7せない・12月'}）】</strong><br>
+        <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
         CD発売数: ${prevReleaseCount}枚
         ${liveHtml}
       `;
