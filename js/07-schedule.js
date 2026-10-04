@@ -364,25 +364,39 @@ function processReleaseEvents(reachDateStr) {
   if (plan && isPlanReleaseDue(plan, reachDateStr)) {
     const isSingle = (plan.release === 'single');
     const song = ensureScheduledSong(currentYear, currentMonth, plan);
-    const quality = ((summary.averages?.popularity || 0) * 0.6) + ((summary.averages?.vocal || 0) * 0.2) + ((summary.averages?.dance || 0) * 0.2);
-    const multiplier = 1.0 + (summary.overall / 100);
-    const base = isSingle ? 5000 : 7500;
-    const songMultiplier = 1 + (((song.level || 1) - 1) * 0.02);
-    const promoAlpha = (song.promoCount || 0) * RELEASE_PROMO_ALPHA_STEP;
-    const promoMultiplier = 1 + promoAlpha;
-    const qualitySales = quality * base * multiplier * songMultiplier * promoMultiplier;
-    const fanDemand = calculateGroupFans() * (isSingle ? 0.35 : 0.5);
-    const sales = Math.floor(qualitySales * 0.6 + fanDemand * 0.4) + Math.floor(Math.random() * 30000);
 
+    // 1. ファン数 F の取得
+    const F = calculateGroupFans();
+
+    // 2. 基本初週売上: Σ(w=0→0) { (F / 20) * 10^(1 - w) } = F * 0.5
+    // ※ シングル/アルバムの基礎規模として初週分(w=0)を計算
+    const baseFirstWeek = calculateFanBasedSales(F, 0);
+
+    // 3. チーム力・楽曲レベル・発売前プロモによる品質乗数
+    const qualityMultiplier = 1.0 + (summary.overall / 100);
+    const songLevelMultiplier = 1.0 + (((song.level || 1) - 1) * 0.02);
+    const promoAlpha = (song.promoCount || 0) * (typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005);
+    const promoMultiplier = 1.0 + promoAlpha;
+
+    // アルバムの場合は単価が高いため係数を調整（0.7倍等）、シングルなら等倍
+    const typeFactor = isSingle ? 1.0 : 0.7;
+
+    // 4. 初週売上の最終算出（乱数揺らぎ ±5%）
+    const randomFactor = 0.95 + Math.random() * 0.10;
+    const sales = Math.round(baseFirstWeek * qualityMultiplier * songLevelMultiplier * promoMultiplier * typeFactor * randomFactor);
+
+    // 5. 売上計上・初週ランキング記録・フラグ更新
     addGroupSales(sales);
     addMonthlyCdRevenue(sales * getSongUnitPrice(song));
+    
     song.totalSales = (song.totalSales || 0) + sales;
     song.released = true;
     song.releaseDateKey = gameDate;
     song.releasePromoAlpha = promoAlpha;
-    song.firstWeekSales = sales;
+    song.firstWeekSales = sales; // ← 初週売上ランキング（記録タブ）に保存
     song.salesHistory = [{ weekKey: gameDate, sales }];
 
+    // 特典イベント等の経費精算
     const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
     if (benefit) {
       funds -= benefit.cost;
@@ -391,6 +405,7 @@ function processReleaseEvents(reachDateStr) {
     }
     plan.releaseCompleted = true;
 
+    // メディア報道
     scheduleInfoMedia('release', {
       releaseType: plan.release,
       songTitle: song.title,
@@ -401,10 +416,9 @@ function processReleaseEvents(reachDateStr) {
       centerText: getCurrentCenterText()
     });
 
-    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}『${song.title}』発売！ 売上: ${sales.toLocaleString()}枚！`);
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}『${song.title}』発売！ 初週売上: ${sales.toLocaleString()}枚！`);
   }
 }
-
 function processWeeklyCycle(toDate) {
   totalWeeksElapsed++;
 
