@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : UI描画（null安全・タブ完全同期版）
+// 10-ui-panels.js : UI描画（タブ＆スケジュール強制復元完全版）
 // ==========================================
 
 const PAGE_TABS = [
@@ -14,7 +14,7 @@ const PAGE_TABS = [
 const DEFAULT_PAGE = 'office';
 let currentPageTab = DEFAULT_PAGE;
 
-// アイコン取得で絶対にエラーを出さない安全ラッパー
+// アイコンSVGフォールバック
 function safeGetIconSvg(iconName) {
   if (typeof getIconSvg === 'function') {
     try {
@@ -35,10 +35,10 @@ function safeGetIconSvg(iconName) {
   return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
-// タブのボタンを描画し、指定したタブのパネルだけを表示する
+// タブナビゲーションの強制描画
 function renderPageNav(activePage) {
-  const target = PAGE_TABS.some(tab => tab.id === activePage) 
-    ? activePage 
+  const target = PAGE_TABS.some(tab => tab.id === activePage)
+    ? activePage
     : (PAGE_TABS.some(tab => tab.id === currentPageTab) ? currentPageTab : DEFAULT_PAGE);
   currentPageTab = target;
 
@@ -55,13 +55,13 @@ function renderPageNav(activePage) {
     }).join('');
   }
 
-  // パネルの表示／非表示を確実に同期
+  // 全タブパネルの表示・非表示を強制同期
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
       if (tab.id === target) {
         panel.removeAttribute('hidden');
-        panel.style.display = '';
+        panel.style.display = 'block';
       } else {
         panel.setAttribute('hidden', '');
         panel.style.display = 'none';
@@ -161,6 +161,7 @@ function renderRankingPanel() {
   }).join('');
 }
 
+// 事務所アクションパネル（スケジュールUI表示スイッチ）
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -170,6 +171,7 @@ function renderWeeklyActionPanel() {
 
   const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
   const editableSpecialLiveEvents = (typeof getEditableSpecialLiveEventsForWeek === 'function') ? getEditableSpecialLiveEventsForWeek(currentDate) : [];
+  
   if (nextLiveDate && !editableSpecialLiveEvents.length) {
     const liveDateKey = toDateKey(nextLiveDate);
     const liveDate = getGameDateObject(liveDateKey);
@@ -196,7 +198,7 @@ function renderWeeklyActionPanel() {
     return;
   }
 
-  // 水曜日以外（月末停止等）の表示
+  // 水曜日以外の場合（月末停止等）
   if (currentDate.getDay() !== 3) {
     const nextWednesday = getNextWednesday(currentDate);
     const dateLabel = nextWednesday.toLocaleDateString('ja-JP', {
@@ -213,6 +215,7 @@ function renderWeeklyActionPanel() {
     return;
   }
 
+  // 水曜日：14枠スケジュール設定UIを出力
   const notes = getWeeklyEventNoteEvents(events);
   const externalLiveNotes = editableSpecialLiveEvents.map(event =>
     `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
@@ -235,7 +238,7 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
-// スケジュール設定UIコントロール（10.1倍・休養80復帰完全版）
+// スケジュール設定UI本体（個別レッスン・休養設定）
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
@@ -266,7 +269,7 @@ function renderWeeklyScheduleControls() {
     !member.injury && member.staminaValue < warnThreshold
   );
   const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力${member.staminaValue}）`)).join('、')}</div>`
+    ? `<div class="schedule-note warn">体力が低いメンバー: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力${member.staminaValue}）`)).join('、')}</div>`
     : '';
 
   const fixedSlots = getWeekFixedSlots();
@@ -320,7 +323,7 @@ function renderWeeklyScheduleControls() {
     const lowStamina = member.staminaValue < warnThreshold;
     const injured = Boolean(member.injury);
     const label = member.injury
-      ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
+      ? `${formatMemberDisplayName(member)}（${member.injury.type}）`
       : `${formatMemberDisplayName(member)}（体力${member.staminaValue}）`;
     return `
       <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
@@ -338,7 +341,7 @@ function renderWeeklyScheduleControls() {
   const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
 
   const vacationNote = weeklySchedule.vacation
-    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
+    ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${getWeekLessonCount()}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
   const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [];
@@ -355,8 +358,8 @@ function renderWeeklyScheduleControls() {
   const broadcastSummaries = getWeekBroadcastSummaries();
   const broadcastNote = broadcastSummaries.length
     ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
-        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })} ${periodLabels[1] || '午後'}「${item.names.join('・')}」`)
-      ).join('、')} — 放送日の午前はリハーサルで固定されます。</div>`
+        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}「${item.names.join('・')}」`)
+      ).join('、')}</div>`
     : '';
 
   const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
@@ -370,7 +373,7 @@ function renderWeeklyScheduleControls() {
       ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
       <div class="schedule-note">${escapeHtml(vacationNote)}</div>
-      <div class="schedule-note">レッスン1回の基礎経験値: 約${lessonExp}（事務所レッスン設備で変動）</div>
+      <div class="schedule-note">レッスン1回の基礎経験値: 約${lessonExp}</div>
     </div>
 
     <!-- 個別レッスン（特別強化統合） -->
