@@ -465,6 +465,7 @@ function renderGameCalendar() {
   `;
 }
 
+// 設備関連の定数・関数（10-ui-panels.js で一元管理）
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -515,6 +516,7 @@ function downgradeOfficeFacility(facilityId) {
 }
 
 function maintainOfficeFacilities() {
+  if (!Array.isArray(OFFICE_FACILITIES)) return;
   const cost = OFFICE_FACILITIES.reduce((total, facility) =>
     total + getOfficeMaintenanceCost(facility), 0
   );
@@ -525,6 +527,7 @@ function maintainOfficeFacilities() {
 
 function renderOfficeUpgrades() {
   const list = document.getElementById('office-upgrades-ui');
+  if (!list) return;
   list.innerHTML = OFFICE_FACILITIES.map(facility => {
     const level = officeUpgrades[facility.id] ?? 0;
     const upgradeCost = getOfficeUpgradeCost(facility);
