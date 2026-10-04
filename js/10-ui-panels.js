@@ -1,61 +1,56 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版
+// 10-ui-panels.js : タブナビゲーション完全防護版
 // ==========================================
 
 const PAGE_TABS = [
-  { id: 'group', label: 'グループ', icon: 'group' },
-  { id: 'formation', label: '編成', icon: 'formation' },
-  { id: 'office', label: '事務所', icon: 'office' },
-  { id: 'funds', label: '資金', icon: 'funds' },
-  { id: 'ranking', label: '順位', icon: 'ranking' },
-  { id: 'records', label: '記録', icon: 'records' }
+  { id: 'group', label: 'グループ', iconText: '👥' },
+  { id: 'formation', label: '編成', iconText: '📋' },
+  { id: 'office', label: '事務所', iconText: '🏢' },
+  { id: 'funds', label: '資金', iconText: '💰' },
+  { id: 'ranking', label: '順位', iconText: '🏆' },
+  { id: 'records', label: '記録', iconText: '📊' }
 ];
 
 const DEFAULT_PAGE = 'office';
 let currentPageTab = DEFAULT_PAGE;
 
-// アイコンSVG安全フォールバック
-function safeGetIconSvg(iconName) {
+// アイコン取得（外部関数が無くても100%動くインライン安全版）
+function safeGetIconSvg(tab) {
   if (typeof getIconSvg === 'function') {
     try {
-      const res = getIconSvg(iconName);
-      if (res) return res;
+      const svg = getIconSvg(tab.id);
+      if (svg) return svg;
     } catch (e) {}
   }
-  const iconMap = {
-    group: '👥',
-    formation: '📋',
-    office: '🏢',
-    funds: '💰',
-    ranking: '🏆',
-    records: '📊',
-    upgrade: '▲',
-    downgrade: '▼'
-  };
-  return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
+  return `<span style="font-size:14px; margin-right:4px;">${tab.iconText}</span>`;
 }
 
-// タブナビゲーション描画・同期
+// タブナビゲーションの強制描画
 function renderPageNav(activePage) {
-  const target = PAGE_TABS.some(tab => tab.id === activePage)
+  const target = PAGE_TABS.some(t => t.id === activePage)
     ? activePage
-    : (PAGE_TABS.some(tab => tab.id === currentPageTab) ? currentPageTab : DEFAULT_PAGE);
+    : (PAGE_TABS.some(t => t.id === currentPageTab) ? currentPageTab : DEFAULT_PAGE);
   currentPageTab = target;
 
   const nav = document.getElementById('page-nav');
-  if (nav) {
-    nav.innerHTML = PAGE_TABS.map(tab => {
-      const active = (tab.id === target);
-      return `
-      <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
-        aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
-        onclick="switchPage('${tab.id}')">
-        <span class="tab-icon">${safeGetIconSvg(tab.icon)}</span><span>${tab.label}</span>
-      </button>`;
-    }).join('');
+  if (!nav) {
+    console.warn('page-nav element not found');
+    return;
   }
 
-  // 全タブパネルの表示・非表示を強制同期
+  // 1. タブボタンを確実に生成
+  nav.innerHTML = PAGE_TABS.map(tab => {
+    const active = (tab.id === target);
+    return `
+      <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
+        aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
+        onclick="switchPage('${tab.id}')" style="cursor:pointer;">
+        <span class="tab-icon">${safeGetIconSvg(tab)}</span><span>${tab.label}</span>
+      </button>
+    `;
+  }).join('');
+
+  // 2. パネルの表示・非表示を厳密に制御
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
@@ -73,11 +68,15 @@ function renderPageNav(activePage) {
 function switchPage(page) {
   currentPageTab = page;
   renderPageNav(page);
+
+  // 切り替えたタブ固有の描画を実行
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
-    try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
+    try { renderRecordsPanel(); } catch (e) {}
+  }
+  if (page === 'office' && typeof renderWeeklyActionPanel === 'function') {
+    try { renderWeeklyActionPanel(); } catch (e) {}
   }
 }
-
 // 業界順位集計
 function getRivalTeamPower(team) {
   const base = team?.basePower || 0;
