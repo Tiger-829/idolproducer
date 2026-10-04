@@ -389,25 +389,33 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   const titleEl = document.getElementById('modal-title');
   if (titleEl) titleEl.textContent = title;
 
-  // ▼ 【追加】1つ前の半年分の概略を表示する処理
+  // ==========================================
+  // 1. 直前の半期（1つ前）の振り返り概略を表示する処理
+  // ==========================================
   const summaryBox = document.getElementById('prev-plan-summary');
   if (summaryBox) {
-    // 直前の半期のデータを取得する処理（※データ構造に合わせてキー名などは適宜調整してください）
-    // 例として、過去のスケジュールや実績がゲームデータ内に保持されている場合を想定しています
-    const prevKey = `${startM === 1 ? yearTarget - 1 : yearTarget}-${startM === 1 ? 7 : 1}`;
-    const prevSummary = (typeof pastPlanSummaries !== 'undefined' && pastPlanSummaries[prevKey]) ? pastPlanSummaries[prevKey] : null;
-
-    if (prevSummary) {
+    // もし今が後半（7月スタートなど）であれば、同年の上半期（1〜6月）を振り返る
+    if (startM === 7) {
+      let prevReleaseCount = 0;
+      let prevLiveCount = 0;
+      for (let m = 1; m <= 6; m++) {
+        const pKey = `${yearTarget}-${m}`;
+        if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
+          const p = productionSchedule[pKey];
+          if (p.release && p.release !== 'none') prevReleaseCount++;
+          const lEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(p) : [];
+          if (lEntries.length > 0) prevLiveCount += lEntries.length;
+        }
+      }
       summaryBox.innerHTML = `
-        <strong>【直近の半期の振り返り（${prevKey.replace('-', '年')}月期）】</strong><br>
-        CD発売数: ${prevSummary.releaseCount || 0}枚 / ライブ動員合計: ${prevSummary.totalAudience || 0}人
+        <strong>【直近の半期の振り返り（${yearTarget}年上半期：1〜6月）】</strong><br>
+        CD発売数: ${prevReleaseCount}枚 / ライブ開催予定: ${prevLiveCount}件
       `;
     } else {
-      // 1つ前のデータが見つからない（初回など）の場合
-      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
+      // 1月スタート等の場合
+      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画です！`;
     }
   }
-  // ▲ 追加ここまで
 
   const container = document.getElementById('plan-rows');
   if (!container) return;
@@ -418,8 +426,21 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
   for (let m = startM; m <= endM; m++) {
     const planKey = `${yearTarget}-${m}`;
-    const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
-    const isPreset = isPresetReleaseMonth(m);
+    
+    // 既存の計画データを取得
+    let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
+    
+    // ==========================================
+    // 2. 既定（プリセット）スケジュールが未設定なら自動反映する
+    // ==========================================
+    const isPreset = typeof isPresetReleaseMonth === 'function' ? isPresetReleaseMonth(m) : false;
+    if ((!existingPlan.release || existingPlan.release === 'none') && isPreset) {
+      existingPlan = {
+        release: presetRelType,
+        releaseDate: (typeof getPlanReleaseDefaultWednesday === 'function') ? getPlanReleaseDefaultWednesday(m) : ''
+      };
+    }
+
     const releaseValue = isPreset ? presetRelType : (existingPlan.release || 'none');
     const liveEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(existingPlan) : [];
     const liveSlots = liveEntries.length ? liveEntries.map(e => ({
@@ -493,7 +514,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'flex';
 }
-
 function updateReleaseDateOptions(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
   const fields = document.getElementById(`release-fields-${month}`);
