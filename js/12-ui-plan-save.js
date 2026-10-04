@@ -925,7 +925,16 @@ function initGame(slot, startFresh) {
   }
 }
 
-// 起動時初期化
-if (typeof renderSaveSlots === 'function') {
+// ==========================================
+// 起動時・DOM読み込み完了後の安全な初期化
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+  migrateLegacySave();
+  renderSaveSlots();
+});
+
+// 万が一DOMがすでに読み込み終わっている場合のフォールバック
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  migrateLegacySave();
   renderSaveSlots();
 }
