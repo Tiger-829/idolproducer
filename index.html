@@ -290,6 +290,11 @@
 <div class="modal-overlay" id="decision-modal">
   <div class="modal-content">
     <h3 id="modal-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画の策定</h3>
+    
+    <!-- ▼ 【追加】1つ前の半年分の概略を表示するエリア -->
+    <div id="prev-plan-summary" style="margin-bottom: 10px; padding: 8px; background: #fafafa; border: 1px solid #eee; border-radius: 4px; font-size: 11px; color: #555;">
+      前回の計画データはありません。
+    </div>
     <p style="font-size:11px; color:#666;">各月のシングル/アルバム発売とライブ会場を決定してください。</p>
     <button class="plan-booth-btn" style="margin:0 0 8px;" onclick="openPlanningCalendar()">📅 6か月分のカレンダーを開く</button>
     <div id="plan-rows"></div>
