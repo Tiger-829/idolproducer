@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : タブナビゲーション完全防護版
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版
 // ==========================================
 
 const PAGE_TABS = [
@@ -14,7 +14,7 @@ const PAGE_TABS = [
 const DEFAULT_PAGE = 'office';
 let currentPageTab = DEFAULT_PAGE;
 
-// アイコン取得（外部関数が無くても100%動くインライン安全版）
+// アイコンSVG安全フォールバック
 function safeGetIconSvg(tab) {
   if (typeof getIconSvg === 'function') {
     try {
@@ -25,7 +25,7 @@ function safeGetIconSvg(tab) {
   return `<span style="font-size:14px; margin-right:4px;">${tab.iconText}</span>`;
 }
 
-// タブナビゲーションの強制描画
+// タブナビゲーション描画・同期
 function renderPageNav(activePage) {
   const target = PAGE_TABS.some(t => t.id === activePage)
     ? activePage
@@ -33,24 +33,19 @@ function renderPageNav(activePage) {
   currentPageTab = target;
 
   const nav = document.getElementById('page-nav');
-  if (!nav) {
-    console.warn('page-nav element not found');
-    return;
-  }
-
-  // 1. タブボタンを確実に生成
-  nav.innerHTML = PAGE_TABS.map(tab => {
-    const active = (tab.id === target);
-    return `
+  if (nav) {
+    nav.innerHTML = PAGE_TABS.map(tab => {
+      const active = (tab.id === target);
+      return `
       <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
         aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
         onclick="switchPage('${tab.id}')" style="cursor:pointer;">
         <span class="tab-icon">${safeGetIconSvg(tab)}</span><span>${tab.label}</span>
-      </button>
-    `;
-  }).join('');
+      </button>`;
+    }).join('');
+  }
 
-  // 2. パネルの表示・非表示を厳密に制御
+  // 全タブパネルの表示・非表示を強制同期
   PAGE_TABS.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
@@ -69,14 +64,14 @@ function switchPage(page) {
   currentPageTab = page;
   renderPageNav(page);
 
-  // 切り替えたタブ固有の描画を実行
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
-    try { renderRecordsPanel(); } catch (e) {}
+    try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
   }
   if (page === 'office' && typeof renderWeeklyActionPanel === 'function') {
     try { renderWeeklyActionPanel(); } catch (e) {}
   }
 }
+
 // 業界順位集計
 function getRivalTeamPower(team) {
   const base = team?.basePower || 0;
@@ -209,7 +204,7 @@ function renderWeeklyActionPanel() {
     if (currentDate.getDay() !== 3) {
       const nextWed = (typeof getNextWednesday === 'function') 
         ? getNextWednesday(currentDate) 
-        : new Date(currentDate.getTime() + (3 - currentDate.getDay() + 7) % 7 * 86400000);
+        : new Date(currentDate.getTime() + ((3 - currentDate.getDay() + 7) % 7 || 7) * 86400000);
       const dateLabel = nextWed.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
 
       panel.innerHTML = `
@@ -237,13 +232,7 @@ function renderWeeklyActionPanel() {
       ${renderWeeklyScheduleControls()}
     `;
   } catch (err) {
-    console.error('renderWeeklyActionPanel Error:', err);
-    panel.innerHTML = `
-      <div style="padding:12px; background:#fde8e8; border:1px solid #c0392b; border-radius:6px; color:#c0392b;">
-        <strong>【表示エラー】スケジュールUIの描画中にエラーが発生しました</strong><br>
-        <small style="font-family:monospace;">${escapeHtml(err.stack || err.message)}</small>
-      </div>
-    `;
+    panel.innerHTML = `<div style="padding:10px; color:red; font-size:12px;">スケジュール描画エラー: ${err.message}</div>`;
   }
 }
 
@@ -466,7 +455,7 @@ function renderWeeklyScheduleControls() {
         : ''}
     </div>
 
-    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="confirmWeeklySchedule()">このスケジュールで確定して進行</button>
   `;
 }
 
@@ -672,12 +661,12 @@ function renderOfficeUpgrades() {
             onclick="upgradeOfficeFacility('${facility.id}')"
             ${disabled ? 'disabled' : ''}
             title="${isMax ? `${facility.name}は最大レベルです` : `${facility.name}をLv.${level + 1}に強化（${formatMoney(upgradeCost)}）`}"
-            aria-label="${facility.name}をLv.${level + 1}に強化">${safeGetIconSvg('upgrade')}</button>
+            aria-label="${facility.name}をLv.${level + 1}に強化">${safeGetIconSvg({ id: 'upgrade', iconText: '▲' })}</button>
           ${level > 1
             ? `<button class="icon-round-btn down" type="button"
                 onclick="downgradeOfficeFacility('${facility.id}')"
                 title="${facility.name}をLv.${level - 1}にダウングレード（売却額 ${formatMoney(refund)}）"
-                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg('downgrade')}</button>`
+                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg({ id: 'downgrade', iconText: '▼' })}</button>`
             : ''}
         </div>
       </div>
@@ -780,6 +769,7 @@ function renderManagerPanel() {
   }).join('');
 }
 
+// マネージャー市場
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
