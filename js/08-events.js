@@ -1405,3 +1405,135 @@ function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, release
     centerId
   };
 }
+// ==========================================
+// 08-events.js : 細分化ライブ収支モーダル描画
+// ==========================================
+function showLiveDetailedFinanceModal(report) {
+  const modal = document.getElementById('live-finance-modal');
+  if (!modal || !report) return;
+
+  const yens = v => `${v >= 0 ? '+' : ''}${formatMoney(v)}`;
+  const minus = v => `-${formatMoney(v)}`;
+
+  // 1. 席種ごとの細分化テーブル行を組み立て
+  const seatRows = report.seatDetails.map(seat => {
+    const fillRate = seat.totalCapacity > 0 ? Math.round((seat.soldCount / seat.totalCapacity) * 100) : 0;
+    return `
+      <tr>
+        <td style="font-weight:bold;">${escapeHtml(seat.name)}</td>
+        <td class="num">${formatMoney(seat.unitPrice)}</td>
+        <td class="num">${seat.soldCount.toLocaleString()} / ${seat.totalCapacity.toLocaleString()}枚 <small style="color:#666;">(${fillRate}%)</small></td>
+        <td class="num plus" style="font-weight:bold;">${formatMoney(seat.totalSales)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const body = modal.querySelector('.live-finance-body');
+  if (!body) return;
+
+  const titleEl = modal.querySelector('.page-title');
+  if (titleEl) {
+    titleEl.textContent = `【${report.isMultiDay ? '千秋楽完走' : '単独公演'}】ライブ収支決算報告`;
+  }
+
+  body.innerHTML = `
+    <div style="margin-bottom:12px; padding:10px; background:#f5f7fa; border-radius:6px; font-size:12px; line-height:1.6;">
+      <div><strong>公演名:</strong> ${escapeHtml(report.liveName)}（会場: ${escapeHtml(report.venueName)} / ${report.venueCap}ランク）</div>
+      <div><strong>日程:</strong> ${report.showDates.map(d => formatPlanDayLabel(d)).join('・')}（全${report.showCount}公演）</div>
+      <div><strong>総動員数:</strong> <strong>${report.totalAudience.toLocaleString()}人</strong></div>
+    </div>
+
+    <!-- 席種別売上明細 -->
+    <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 席種別 チケット売上明細</h4>
+    <table class="live-finance-table" style="margin-bottom:14px; width:100%;">
+      <thead>
+        <tr>
+          <th>席種</th>
+          <th class="num">単価</th>
+          <th class="num">販売数 / 総席数</th>
+          <th class="num">売上金額</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${seatRows}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th colspan="2">チケット計</th>
+          <td class="num"><strong>${report.totalAudience.toLocaleString()}枚</strong></td>
+          <td class="num plus"><strong>${formatMoney(report.ticketRevenue)}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- 興行総合収支明細（配信・グッズ・会場費・配信設備費） -->
+    <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 興行総合収支明細（売上・経費）</h4>
+    <table class="live-finance-table" style="width:100%;">
+      <thead>
+        <tr>
+          <th>項目</th>
+          <th>詳細 / 内訳</th>
+          <th class="num">金額</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>チケット売上</td>
+          <td>会場来場者全席分（${report.totalAudience.toLocaleString()}人）</td>
+          <td class="num plus">${formatMoney(report.ticketRevenue)}</td>
+        </tr>
+        <tr>
+          <td>グッズ売上</td>
+          <td>会場・物販販売（販売数 ${report.merchandiseSold.toLocaleString()}個）</td>
+          <td class="num plus">${formatMoney(report.merchandiseRevenue)}</td>
+        </tr>
+        <tr>
+          <td>配信チケット売上</td>
+          <td>配信購入ファン（${report.streamBuyers.toLocaleString()}人 × 単価 ${formatMoney(STREAM_TICKET_PRICE)}）</td>
+          <td class="num plus">${formatMoney(report.streamRevenue)}</td>
+        </tr>
+        <tr style="background:#fff9f9;">
+          <td style="color:#c0392b;">会場使用料</td>
+          <td>${escapeHtml(report.venueName)}（${report.showCount}公演分一括契約）</td>
+          <td class="num minus">${minus(report.venueCost)}</td>
+        </tr>
+        <tr style="background:#fff9f9;">
+          <td style="color:#c0392b;">配信設備費</td>
+          <td>中継・配信制作設備費（1公演1億円 × ${report.showCount}公演）</td>
+          <td class="num minus">${minus(report.streamCost)}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="font-size:13px;">
+          <th colspan="2">売上合計（チケット＋物販＋配信）</th>
+          <td class="num plus"><strong>${formatMoney(report.grossRevenue)}</strong></td>
+        </tr>
+        <tr style="font-size:13px;">
+          <th colspan="2">経費合計（会場使用料＋配信設備費）</th>
+          <td class="num minus"><strong>${minus(report.venueCost + report.streamCost)}</strong></td>
+        </tr>
+        <tr style="font-size:14px; background:#f0f8ff;">
+          <th colspan="2"><strong>純利益（最終収支）</strong></th>
+          <td class="num ${report.profit >= 0 ? 'plus' : 'minus'}" style="font-size:15px; font-weight:bold;">
+            ${yens(report.profit)}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+// モーダルを閉じたときの連鎖フック
+window.closeLiveFinanceModal = function() {
+  const modal = document.getElementById('live-finance-modal');
+  if (modal) modal.style.display = 'none';
+
+  // キューに残っている次のレポート（同日に重なった月末決算など）があれば開く
+  if (typeof openPendingModal === 'function') {
+    openPendingModal();
+  } else {
+    updateUI();
+  }
+};
