@@ -1515,6 +1515,13 @@
     padding: 40px 60px !important;
   }
 
+  /* --- [超重要] hidden属性がついている非表示パネルは確実に隠す --- */
+  .page-panel[hidden],
+  .title-screen[hidden],
+  .game-container[hidden] {
+    display: none !important;
+  }
+
   /* --- タイトル画面のセーブ枠3分割 --- */
   .save-slots {
     display: grid !important;
@@ -1527,7 +1534,7 @@
   /* ==========================================
      1. 事務所タブ（手書きレイアウト図の完全再現）
      ========================================== */
-  #page-office {
+  #page-office:not([hidden]) {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
@@ -1555,7 +1562,7 @@
   /* ==========================================
      2. グループタブ（独自の2分割構造）
      ========================================== */
-  #page-group {
+  #page-group:not([hidden]) {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
@@ -1577,7 +1584,7 @@
   /* ==========================================
      3. 編成タブ（独自の2分割構造）
      ========================================== */
-  #page-formation {
+  #page-formation:not([hidden]) {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
@@ -1593,7 +1600,7 @@
   /* ==========================================
      4. 資金タブ（独自の2分割構造）
      ========================================== */
-  #page-funds {
+  #page-funds:not([hidden]) {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
@@ -1617,7 +1624,7 @@
   /* ==========================================
      5. 業界順位タブ
      ========================================== */
-  #page-ranking {
+  #page-ranking:not([hidden]) {
     display: flex !important;
     flex-direction: column !important;
     gap: 16px !important;
@@ -1629,7 +1636,7 @@
   /* ==========================================
      6. 記録タブ（独自の2分割構造）
      ========================================== */
-  #page-records {
+  #page-records:not([hidden]) {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
