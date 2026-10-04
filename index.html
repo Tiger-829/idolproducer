@@ -16,25 +16,67 @@
 
   <link rel="stylesheet" href="./styles.css?v=3">
 
-  <!-- タブレット横向き・ワイド画面対応レスポンシブ拡張スタイル -->
+  <!-- タブレット横向き・ワイド画面対応レスポンシブスタイル（記録タブ最適化版） -->
   <style>
-    /* ベースコンテナの拡大対応 */
+    /* ベースコンテナ設定 */
     .game-container {
       width: 100%;
       max-width: 600px;
       margin: 0 auto;
-      transition: max-width 0.2s ease;
       box-sizing: border-box;
     }
 
-    /* タブレット横向きおよび大画面向けレイアウト調整 */
+    /* 記録タブ（スマホ・タブレット共通）：横に分割せず、縦1列で独立スクロールさせる */
+    #page-records.records-scroll-panel {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 20px !important;
+      width: 100% !important;
+      max-width: 800px !important; /* 横に広がりすぎて間延びするのを防止 */
+      margin: 0 auto !important;
+      max-height: calc(100vh - 140px) !important; /* 画面下端までの領域を確保 */
+      overflow-y: auto !important;                /* 縦スクロールを強制有効化 */
+      overflow-x: hidden !important;
+      padding: 16px 20px 60px !important;        /* 下部に余裕を持たせる */
+      box-sizing: border-box !important;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 記録タブ内の各ブロックが横・縦に圧縮されるのを完全に防ぐ */
+    #page-records .records-block {
+      width: 100% !important;
+      flex-shrink: 0 !important; /* 縦方向の潰れ防止 */
+      box-sizing: border-box !important;
+    }
+
+    #page-records .records-chart {
+      width: 100% !important;
+      min-height: 180px; /* グラフ描画領域の高さをしっかり確保 */
+    }
+
+    #page-records .records-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+
+    #page-records .records-help {
+      width: 100%;
+      flex-shrink: 0;
+      margin-top: 10px;
+    }
+
+    /* タブレット横向き・大画面向けのレイアウト（記録タブ以外を2列化） */
     @media (min-width: 768px) and (orientation: landscape), (min-width: 1024px) {
       .game-container {
         max-width: 1200px;
         padding: 16px 24px;
       }
 
-      /* ヘッダー情報の横長ダッシュボード化 */
       .header-info {
         display: flex;
         justify-content: space-between;
@@ -45,7 +87,6 @@
         margin-bottom: 12px;
       }
 
-      /* ページナビゲーションの横幅均等配置 */
       .page-nav {
         display: flex;
         justify-content: center;
@@ -53,7 +94,7 @@
         margin-bottom: 16px;
       }
 
-      /* 1. グループ概要タブ: 2カラムレイアウト */
+      /* 1. グループ概要タブ */
       #page-group {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -64,7 +105,7 @@
         display: none !important;
       }
 
-      /* 2. 編成タブ: 左にメンバー名一覧、右に詳細名簿 */
+      /* 2. 編成タブ */
       #page-formation {
         display: grid;
         grid-template-columns: 360px 1fr;
@@ -79,7 +120,7 @@
         top: 16px;
       }
 
-      /* 3. 事務所タブ: 左に週間操作・カレンダー、右に設備・マネージャー */
+      /* 3. 事務所タブ */
       #page-office {
         display: grid;
         grid-template-columns: 1.1fr 0.9fr;
@@ -94,32 +135,14 @@
         margin-top: 12px;
       }
 
-      /* 4. 資金タブ: グリッドを4列〜5列へ拡張 */
+      /* 4. 資金タブ */
       #page-funds .fund-stat-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 12px;
       }
 
-      /* 5. 記録タブ: 左に推移グラフ、右にランキング・楽曲一覧 */
-      #page-records.records-scroll-panel {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 16px;
-        max-height: calc(100vh - 140px);
-        overflow-y: auto;
-      }
-      #page-records[hidden] {
-        display: none !important;
-      }
-      #page-records .records-header {
-        grid-column: span 2;
-      }
-      #page-records .records-help {
-        grid-column: span 2;
-      }
-
-      /* モーダル表示が横長画面で潰れるのを防ぐ調整 */
+      /* モーダル表示調整 */
       .modal-content {
         max-height: 85vh;
         overflow-y: auto;
