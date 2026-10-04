@@ -191,7 +191,7 @@ function rollEquipmentDowngradeEvent() {
   equipmentDowngradeCheckWeekKey = getCurrentWeekKey();
 
   const weeklyCost = OFFICE_FACILITIES.reduce((sum, f) => sum + getOfficeMaintenanceCost(f), 0);
-  // 资金低于每周维护费的状况下才触发
+  
   if (funds >= weeklyCost || Math.random() >= 0.30) return;
   const candidates = OFFICE_FACILITIES
     .filter(f => (officeUpgrades[f.id] || 0) > 1)
