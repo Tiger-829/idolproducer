@@ -286,7 +286,7 @@ function renderWeeklyScheduleControls() {
   const individualOptions = getIndividualLessonMemberOptions();
   const memberOptions = individualOptions.map(member =>
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
-    `${escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.age \vert{}\vert{} 18}歳 / 体力${member.staminaValue ?? 100}）`)}</option>`
+    `${escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.age || 18}歳 / 体力${member.staminaValue ?? 100}）`)}</option>`
   ).join('');
   const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance', 'stamina', 'recovery'];
   const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [
