@@ -1,18 +1,26 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版
+// 10-ui-panels.js : 事務所・編成・各種パネルUI（二重宣言防止完全版）
 // ==========================================
 
-const PAGE_TABS = [
-  { id: 'group', label: 'グループ', iconText: '👥' },
-  { id: 'formation', label: '編成', iconText: '📋' },
-  { id: 'office', label: '事務所', iconText: '🏢' },
-  { id: 'funds', label: '資金', iconText: '💰' },
-  { id: 'ranking', label: '順位', iconText: '🏆' },
-  { id: 'records', label: '記録', iconText: '📊' }
-];
+// 既存の定数定義があればそれを使い、無ければ安全に初期化（SyntaxError防止）
+if (typeof PAGE_TABS === 'undefined') {
+  window.PAGE_TABS = [
+    { id: 'group', label: 'グループ', iconText: '👥' },
+    { id: 'formation', label: '編成', iconText: '📋' },
+    { id: 'office', label: '事務所', iconText: '🏢' },
+    { id: 'funds', label: '資金', iconText: '💰' },
+    { id: 'ranking', label: '順位', iconText: '🏆' },
+    { id: 'records', label: '記録', iconText: '📊' }
+  ];
+}
 
-const DEFAULT_PAGE = 'office';
-let currentPageTab = DEFAULT_PAGE;
+if (typeof DEFAULT_PAGE === 'undefined') {
+  window.DEFAULT_PAGE = 'office';
+}
+
+if (typeof currentPageTab === 'undefined') {
+  window.currentPageTab = window.DEFAULT_PAGE || 'office';
+}
 
 // アイコンSVG安全フォールバック
 function safeGetIconSvg(tab) {
@@ -22,19 +30,22 @@ function safeGetIconSvg(tab) {
       if (svg) return svg;
     } catch (e) {}
   }
-  return `<span style="font-size:14px; margin-right:4px;">${tab.iconText}</span>`;
+  return `<span style="font-size:14px; margin-right:4px;">${tab.iconText || '●'}</span>`;
 }
 
 // タブナビゲーション描画・同期
 function renderPageNav(activePage) {
-  const target = PAGE_TABS.some(t => t.id === activePage)
+  const tabs = (typeof PAGE_TABS !== 'undefined') ? PAGE_TABS : window.PAGE_TABS;
+  const def = (typeof DEFAULT_PAGE !== 'undefined') ? DEFAULT_PAGE : 'office';
+  
+  const target = tabs.some(t => t.id === activePage)
     ? activePage
-    : (PAGE_TABS.some(t => t.id === currentPageTab) ? currentPageTab : DEFAULT_PAGE);
+    : (tabs.some(t => t.id === currentPageTab) ? currentPageTab : def);
   currentPageTab = target;
 
   const nav = document.getElementById('page-nav');
   if (nav) {
-    nav.innerHTML = PAGE_TABS.map(tab => {
+    nav.innerHTML = tabs.map(tab => {
       const active = (tab.id === target);
       return `
       <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
@@ -46,7 +57,7 @@ function renderPageNav(activePage) {
   }
 
   // 全タブパネルの表示・非表示を強制同期
-  PAGE_TABS.forEach(tab => {
+  tabs.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
       if (tab.id === target) {
@@ -65,7 +76,7 @@ function switchPage(page) {
   renderPageNav(page);
 
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
-    try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
+    try { renderRecordsPanel(); } catch (e) {}
   }
   if (page === 'office' && typeof renderWeeklyActionPanel === 'function') {
     try { renderWeeklyActionPanel(); } catch (e) {}
@@ -156,7 +167,7 @@ function renderRankingPanel() {
   }).join('');
 }
 
-// 事務所アクションパネル（スケジュールUI表示スイッチ）
+// 事務所アクションパネル（スケジュールUI表示）
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -244,7 +255,7 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
-// スケジュール設定UIコントロール（14枠・個別レッスン10.1倍・休養日設定完全版）
+// スケジュール設定UIコントロール
 function renderWeeklyScheduleControls() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = {
@@ -571,17 +582,16 @@ function renderGameCalendar() {
 }
 
 // 事務所設備管理
-const OFFICE_COST_GROWTH = 1.9;
-const OFFICE_MAINTENANCE_GROWTH = 1.6;
-
 function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (!facility || !facility.baseCost) return 0;
-  return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
+  const growth = typeof OFFICE_COST_GROWTH !== 'undefined' ? OFFICE_COST_GROWTH : 1.9;
+  return Math.round(facility.baseCost * (growth ** level));
 }
 
 function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
   if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
-  return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
+  const growth = typeof OFFICE_MAINTENANCE_GROWTH !== 'undefined' ? OFFICE_MAINTENANCE_GROWTH : 1.6;
+  return Math.round(facility.baseMaintenance * (growth ** (level - 2)));
 }
 
 function upgradeOfficeFacility(facilityId) {
@@ -829,7 +839,7 @@ function renderSalaryPanel() {
   const managerSalary = (typeof getTotalManagerMonthlySalary === 'function') ? getTotalManagerMonthlySalary() : 0;
   const total = memberSalary + managerSalary;
 
-  const rosterCount = Array.isArray(idolRoster) ? idolRoster.length : 0;
+  const rosterCount = Array.isArray(idolRoster) ? idolRoster : [];
   const mgrCount = Array.isArray(managers) ? managers.filter(Boolean).length : 0;
 
   setText('txt-member-count', String(rosterCount));
