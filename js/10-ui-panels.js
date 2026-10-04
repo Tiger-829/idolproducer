@@ -39,32 +39,37 @@ function switchPage(page) {
 }
 
 function getRivalTeamPower(team) {
-  const base = team.basePower || 0;
-  const growth = (team.sales || 0) / 200000;
+  const base = team?.basePower || 0;
+  const growth = (team?.sales || 0) / 200000;
   return Math.max(10, Math.round(base + growth));
 }
 
 function syncPlayerTeamStats() {
-  const pTeam = leagueTeams.find(team => team.id === 'player');
+  if (!Array.isArray(leagueTeams)) return;
+  const pTeam = leagueTeams.find(team => team && team.id === 'player');
   if (!pTeam) return;
-  pTeam.sales = yearlyStats.sales;
-  pTeam.audience = yearlyStats.audience;
+  pTeam.sales = yearlyStats?.sales || 0;
+  pTeam.audience = yearlyStats?.audience || 0;
   pTeam.showCount = countPlayerLiveShows();
   pTeam.basePower = getPlayerTeamOverall();
 }
 
 function countPlayerLiveShows() {
   let count = 0;
+  if (typeof getScheduledLiveEntries !== 'function') return 0;
   getScheduledLiveEntries().forEach(entry => {
-    if (entry.year !== currentYear) return;
-    count += getLiveEntryShowDates(entry).length;
+    if (entry && entry.year === currentYear && typeof getLiveEntryShowDates === 'function') {
+      count += getLiveEntryShowDates(entry).length;
+    }
   });
   return count;
 }
 
 function getLeagueRanking() {
   syncPlayerTeamStats();
+  if (!Array.isArray(leagueTeams)) return [];
   return leagueTeams
+    .filter(Boolean)
     .map(team => {
       const power = team.id === 'player' ? getPlayerTeamOverall() : getRivalTeamPower(team);
       return {
@@ -119,21 +124,21 @@ function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
   ensureWeeklySchedule();
-  const events = getCurrentWeekEvents();
+  const events = (typeof getCurrentWeekEvents === 'function') ? getCurrentWeekEvents() : [];
   const currentDate = getGameDateObject();
 
-  const nextLiveDate = findWeekLiveStop(currentDate);
-  const editableSpecialLiveEvents = getEditableSpecialLiveEventsForWeek(currentDate);
+  const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
+  const editableSpecialLiveEvents = (typeof getEditableSpecialLiveEventsForWeek === 'function') ? getEditableSpecialLiveEventsForWeek(currentDate) : [];
   if (nextLiveDate && !editableSpecialLiveEvents.length) {
     const liveDateKey = toDateKey(nextLiveDate);
     const liveDate = getGameDateObject(liveDateKey);
     const liveLabel = liveDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
-    const liveEntries = getScheduledLiveEntries().filter(entry =>
-      !entry.completed && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === liveDateKey
-    );
+    const liveEntries = (typeof getScheduledLiveEntries === 'function') ? getScheduledLiveEntries().filter(entry =>
+      entry && !entry.completed && typeof getLiveEntryDate === 'function' && toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month)) === liveDateKey
+    ) : [];
     const liveDetail = liveEntries.length
       ? liveEntries.map(entry => {
-        const days = getLiveEntryShowDates(entry);
+        const days = (typeof getLiveEntryShowDates === 'function') ? getLiveEntryShowDates(entry) : [];
         const suffix = days.length > 1 ? `（${days.length}公演：${days.map(key => `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日`).join('・')}）` : '';
         return `${entry.liveVenue}${suffix}`;
       }).join(' / ')
@@ -181,19 +186,17 @@ function renderWeeklyActionPanel() {
 }
 
 function getWeeklyEventNoteEvents(events) {
-  return events.filter(event => !event.startsWith('他グループのライブ'));
+  return (events || []).filter(event => !String(event).startsWith('他グループのライブ'));
 }
 
 function renderWeeklyEventItems(events) {
-  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(event)}</li>`).join('');
+  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
-/**
- * 週間スケジュール設定UI（特別強化統合・完全版）
- */
 function renderWeeklyScheduleControls() {
   ensureWeeklySchedule();
-  const members = idolRoster.filter(member => member.isSelected);
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const members = roster.filter(member => member && member.isSelected);
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
 
   const individualOptions = getIndividualLessonMemberOptions();
@@ -201,39 +204,47 @@ function renderWeeklyScheduleControls() {
     `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>${escapeHtml(`${formatMemberDisplayName(member)}（${member.age}歳 / 体力値${member.staminaValue}）`)}</option>`
   ).join('');
 
-  const lessonStatOptions = INDIVIDUAL_LESSON_STATS
+  const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : [];
+  const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
+
+  const lessonStatOptions = validStats
     .map(statId => {
-      const stat = STATUS_KEYS.find(key => key.id === statId);
+      const stat = statusKeys.find(key => key.id === statId);
       return `<option value="${statId}" ${statId === weeklySchedule.individualStat ? 'selected' : ''}>${stat ? escapeHtml(stat.name) : statId}</option>`;
     })
     .join('');
 
-  const selectedStatName = STATUS_KEYS.find(key => key.id === weeklySchedule.individualStat)?.name || '歌唱力';
-  const selectedMember = idolRoster.find(m => m.id === weeklySchedule.individualMemberId);
+  const selectedStatName = statusKeys.find(key => key.id === weeklySchedule.individualStat)?.name || '歌唱力';
+  const selectedMember = roster.find(m => m && m.id === weeklySchedule.individualMemberId);
   const selectedMemberName = selectedMember ? formatMemberDisplayName(selectedMember) : '未選択';
 
+  const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
   const fatiguedMembers = members.filter(member =>
-    !member.injury && member.staminaValue < STAMINA_WARNING_THRESHOLD
+    !member.injury && member.staminaValue < warnThreshold
   );
   const restSuggestion = fatiguedMembers.length
     ? `<div class="schedule-note warn">体力が低いメンバー（休養に設定する場合は下のボタンを選択）: ${fatiguedMembers.map(member => escapeHtml(`${formatMemberDisplayName(member)}（体力値${member.staminaValue}）`)).join('、')}</div>`
     : '';
 
   const fixedSlots = getWeekFixedSlots();
+  const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
   const itemOptions = slotId => ['<option value="">— 空き —</option>']
-    .concat(WEEKLY_SCHEDULE_ITEMS.filter(item => !item.fixed).map(item => {
+    .concat(itemsList.filter(item => !item.fixed).map(item => {
       const limit = item.weeklyLimit && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
       if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
       return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
     }))
     .join('');
 
-  const weekRows = WEEK_DAY_LABELS.map((dayLabel, dayIndex) => {
-    const morningIndex = dayIndex * WEEK_PERIOD_LABELS.length;
+  const dayLabels = typeof WEEK_DAY_LABELS !== 'undefined' ? WEEK_DAY_LABELS : ['木', '金', '土', '日', '月', '火', '水'];
+  const periodLabels = typeof WEEK_PERIOD_LABELS !== 'undefined' ? WEEK_PERIOD_LABELS : ['午前', '午後'];
+
+  const weekRows = dayLabels.map((dayLabel, dayIndex) => {
+    const morningIndex = dayIndex * periodLabels.length;
     const dayDate = getGameDateObject();
     dayDate.setDate(dayDate.getDate() + dayIndex + 1);
     const dayText = `${dayDate.getMonth() + 1}/${dayDate.getDate()}`;
-    const cells = WEEK_PERIOD_LABELS.map((periodLabel, periodIndex) => {
+    const cells = periodLabels.map((periodLabel, periodIndex) => {
       const index = morningIndex + periodIndex;
       const fixed = fixedSlots.get(index);
       const slotId = weeklySchedule.slots[index];
@@ -263,7 +274,7 @@ function renderWeeklyScheduleControls() {
 
   const restDayToggles = members.map(member => {
     const isResting = restDayIds.has(member.id);
-    const lowStamina = member.staminaValue < STAMINA_WARNING_THRESHOLD;
+    const lowStamina = member.staminaValue < warnThreshold;
     const injured = Boolean(member.injury);
     const label = member.injury
       ? `${formatMemberDisplayName(member)}（${member.injury.type} 回復まで${member.injury.weeksLeft}日）`
@@ -280,16 +291,20 @@ function renderWeeklyScheduleControls() {
   const restBreakdown = getWeekRestBreakdown();
   const mealCount = getWeekMealPartyCount();
   const lessonCount = getWeekLessonCount();
-  const mealCost = mealCount * MEAL_PARTY_COST;
+  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
+  const mealCost = mealCount * mealCostSingle;
+  const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
 
   const vacationNote = weeklySchedule.vacation
     ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません（事務作業は実施します）。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
-  const selectedOfficeAction = OFFICE_ACTIONS.find(action => action.id === weeklySchedule.officeAction) || null;
-  const officeToggles = OFFICE_ACTIONS.map(action => {
+  const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [];
+  const selectedOfficeAction = officeActions.find(action => action.id === weeklySchedule.officeAction) || null;
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
+  const officeToggles = officeActions.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
-    const atLimit = action.id === 'goods-development' && merchandiseProducts >= MAX_MERCHANDISE_PRODUCTS;
+    const atLimit = action.id === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd;
     return `
       <button type="button" class="rest-toggle office${isSelected ? ' active' : ''}"
         onclick="selectOfficeAction('${action.id}')" ${atLimit ? 'disabled' : ''}>${escapeHtml(action.name)}${atLimit ? ' <small>上限</small>' : ''}</button>`;
@@ -298,11 +313,11 @@ function renderWeeklyScheduleControls() {
   const broadcastSummaries = getWeekBroadcastSummaries();
   const broadcastNote = broadcastSummaries.length
     ? `<div class="schedule-note">今週のテレビ出演: ${broadcastSummaries.map(item =>
-        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })} ${WEEK_PERIOD_LABELS[1]}「${item.names.join('・')}」`)
+        escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })} ${periodLabels[1] \vert{}\vert{} '午後'}「${item.names.join('・')}」`)
       ).join('、')} — 放送日の午前はリハーサルで固定されます。</div>`
     : '';
 
-  const trainingNotes = WEEKLY_SCHEDULE_ITEMS
+  const trainingNotes = itemsList
     .filter(item => item.effect)
     .map(item => {
       const used = countWeekSlots(item.id);
@@ -316,11 +331,13 @@ function renderWeeklyScheduleControls() {
     })
     .join('');
 
+  const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
+
   return `
     <div class="schedule-block">
       <div class="schedule-block-title">1週間のスケジュール <small>7日×午前/午後で14枠</small></div>
       <button type="button" class="week-vacation-btn${weeklySchedule.vacation ? ' active' : ''}" onclick="toggleWeekVacation()" ${fixedSlots.size ? 'disabled' : ''}>
-        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : '□ 1週間の休暇をとる（体力値+' + FULL_VACATION_RECOVERY + '）'}
+        ${weeklySchedule.vacation ? '■ 1週間の休暇を解除する' : `□ 1週間の休暇をとる（体力値+${fullVacationRec}）`}
       </button>
       ${broadcastNote}
       <div class="week-grid">${weekRows}</div>
@@ -329,7 +346,7 @@ function renderWeeklyScheduleControls() {
       ${trainingNotes}
     </div>
 
-    <!-- 【統合版】個別レッスン（特別強化統合） -->
+    <!-- 個別レッスン（特別強化統合） -->
     <div class="schedule-block">
       <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
       <div class="schedule-note">
@@ -352,7 +369,7 @@ function renderWeeklyScheduleControls() {
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${AUTO_REST_STAMINA_TARGET}で練習に復帰</small></div>
+      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${autoRestTarget}で練習に復帰</small></div>
       ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
@@ -374,17 +391,19 @@ function renderWeeklyScheduleControls() {
 }
 
 function getIndividualLessonMemberOptions() {
-  const available = idolRoster.filter(member => !member.injury);
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const available = roster.filter(member => member && !member.injury);
   if (!available.length) return [];
-  const centerId = (pendingSelectionEvent && pendingSelectionEvent.centerId)
-    || lastAnnouncedCenterId
-    || idolRoster.find(member => member.isCenter)?.id
+  const centerId = (typeof pendingSelectionEvent !== 'undefined' && pendingSelectionEvent?.centerId)
+    || (typeof lastAnnouncedCenterId !== 'undefined' ? lastAnnouncedCenterId : null)
+    || roster.find(member => member && member.isCenter)?.id
     || null;
   const center = available.find(member => member.id === centerId);
+  const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const rest = available
     .filter(member => member.id !== centerId)
     .sort((a, b) => {
-      const diff = (a.staminaValue ?? MAX_STAMINA_VALUE) - (b.staminaValue ?? MAX_STAMINA_VALUE);
+      const diff = (a.staminaValue ?? maxStamina) - (b.staminaValue ?? maxStamina);
       return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
     });
   return center ? [center, ...rest] : rest;
@@ -392,7 +411,7 @@ function getIndividualLessonMemberOptions() {
 
 function renderGameCalendar() {
   const date = getGameDateObject();
-  const shouldFlip = Boolean(lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
+  const shouldFlip = Boolean(typeof lastRenderedCalendarDate !== 'undefined' && lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
   lastRenderedCalendarDate = gameDate;
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -400,31 +419,44 @@ function renderGameCalendar() {
   const firstWeekday = new Date(year, month, 1, 12).getDay();
   const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
   const liveDates = new Set();
-  getScheduledLiveEntries().forEach(entry => {
-    if (entry.completed) return;
-    getLiveEntryDateRange(entry).forEach(date => liveDates.add(toDateKey(date)));
-  });
-  specialLiveEvents.forEach(event => {
-    if (!event.completed) liveDates.add(event.liveDate);
-  });
+
+  if (typeof getScheduledLiveEntries === 'function') {
+    getScheduledLiveEntries().forEach(entry => {
+      if (entry && !entry.completed && typeof getLiveEntryDateRange === 'function') {
+        getLiveEntryDateRange(entry).forEach(d => liveDates.add(toDateKey(d)));
+      }
+    });
+  }
+  if (Array.isArray(specialLiveEvents)) {
+    specialLiveEvents.forEach(event => {
+      if (event && !event.completed && event.liveDate) liveDates.add(event.liveDate);
+    });
+  }
   const rivalLiveDates = new Set();
-  rivalLiveBookings.forEach(booking => {
-    (booking.venueDates || [booking.liveDate]).forEach(dateKey => rivalLiveDates.add(dateKey));
-  });
+  if (Array.isArray(rivalLiveBookings)) {
+    rivalLiveBookings.forEach(booking => {
+      if (booking) (booking.venueDates || [booking.liveDate]).forEach(dateKey => { if (dateKey) rivalLiveDates.add(dateKey); });
+    });
+  }
   const broadcastDates = new Map();
-  scheduledPerformances.forEach(performance => {
-    if (performance.airDate) broadcastDates.set(performance.airDate, performance.name);
-  });
+  if (Array.isArray(scheduledPerformances)) {
+    scheduledPerformances.forEach(performance => {
+      if (performance && performance.airDate) broadcastDates.set(performance.airDate, performance.name);
+    });
+  }
   const releaseDates = new Set();
   const planEventDates = new Set();
-  Object.entries(productionSchedule).forEach(([key, plan]) => {
-    if (plan.releaseDate && plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
-      releaseDates.add(plan.releaseDate);
-    }
-    (Array.isArray(plan.planEvents) ? plan.planEvents : []).forEach(event => {
-      if (event && event.date && !event.completed) planEventDates.add(event.date);
+  if (typeof productionSchedule !== 'undefined' && productionSchedule) {
+    Object.entries(productionSchedule).forEach(([key, plan]) => {
+      if (!plan) return;
+      if (plan.releaseDate && plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
+        releaseDates.add(plan.releaseDate);
+      }
+      (Array.isArray(plan.planEvents) ? plan.planEvents : []).forEach(event => {
+        if (event && event.date && !event.completed) planEventDates.add(event.date);
+      });
     });
-  });
+  }
 
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   let cells = weekdays.map(day => `<span class="calendar-weekday">${day}</span>`).join('');
@@ -457,66 +489,73 @@ function renderGameCalendar() {
     cells += `<span class="${classes}"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
   }
 
-  document.getElementById('calendar-visual').innerHTML = `
-    <div class="calendar-sheet${shouldFlip ? ' calendar-turn' : ''}">
-      <div class="calendar-month-heading"><strong>${year}年${month + 1}月</strong><span>水曜進行</span></div>
-      <div class="calendar-grid">${cells}</div>
-    </div>
-  `;
+  const container = document.getElementById('calendar-visual');
+  if (container) {
+    container.innerHTML = `
+      <div class="calendar-sheet${shouldFlip ? ' calendar-turn' : ''}">
+        <div class="calendar-month-heading"><strong>${year}年${month + 1}月</strong><span>水曜進行</span></div>
+        <div class="calendar-grid">${cells}</div>
+      </div>
+    `;
+  }
 }
 
-// 設備関連の定数・関数（10-ui-panels.js で一元管理）
+// 設備維持費・アップグレード
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
-function getOfficeUpgradeCost(facility, level = officeUpgrades[facility.id] ?? 0) {
+function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
+  if (!facility || !facility.baseCost) return 0;
   return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
 }
 
-function getOfficeMaintenanceCost(facility, level = officeUpgrades[facility.id] || 1) {
-  if (level <= 1) return 0;
+function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
+  if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
   return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
 }
 
 function upgradeOfficeFacility(facilityId) {
+  if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
   if (!facility) return;
-  const level = officeUpgrades[facilityId] ?? 0;
-  if (level >= MAX_OFFICE_LEVEL) return;
+  const level = officeUpgrades?.[facilityId] ?? 0;
+  const maxLvl = typeof MAX_OFFICE_LEVEL !== 'undefined' ? MAX_OFFICE_LEVEL : 10;
+  if (level >= maxLvl) return;
   const cost = getOfficeUpgradeCost(facility);
   if (funds < cost) {
     alert(`資金が足りません。必要資金: ${formatMoney(cost)}`);
     return;
   }
   funds -= cost;
-  officeUpgrades[facilityId] = level + 1;
+  if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level + 1;
   setLog(`【設備投資】${facility.name}をLv.${level + 1}に強化しました。`);
   updateUI();
 }
 
-function getOfficeDowngradeRefund(facility, level = officeUpgrades[facility.id] ?? 0) {
+function getOfficeDowngradeRefund(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (level <= 1) return 0;
   return Math.round(getOfficeUpgradeCost(facility, level - 1) * 0.5);
 }
 
 function downgradeOfficeFacility(facilityId) {
+  if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
   if (!facility) return;
-  const level = officeUpgrades[facilityId] ?? 0;
+  const level = officeUpgrades?.[facilityId] ?? 0;
   if (level <= 1) {
     alert(`${facility.name}はLv.1未満にはできません。`);
     return;
   }
   const refund = getOfficeDowngradeRefund(facility, level);
   if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n売却額: ${formatMoney(refund)}\n（能力は低下し、週間維持費も下がります）`)) return;
-  officeUpgrades[facilityId] = level - 1;
+  if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level - 1;
   funds += refund;
   setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
   updateUI();
 }
 
 function maintainOfficeFacilities() {
-  if (!Array.isArray(OFFICE_FACILITIES)) return;
+  if (typeof OFFICE_FACILITIES === 'undefined' || !Array.isArray(OFFICE_FACILITIES)) return;
   const cost = OFFICE_FACILITIES.reduce((total, facility) =>
     total + getOfficeMaintenanceCost(facility), 0
   );
@@ -527,13 +566,14 @@ function maintainOfficeFacilities() {
 
 function renderOfficeUpgrades() {
   const list = document.getElementById('office-upgrades-ui');
-  if (!list) return;
+  if (!list || typeof OFFICE_FACILITIES === 'undefined') return;
+  const maxLvl = typeof MAX_OFFICE_LEVEL !== 'undefined' ? MAX_OFFICE_LEVEL : 10;
   list.innerHTML = OFFICE_FACILITIES.map(facility => {
-    const level = officeUpgrades[facility.id] ?? 0;
+    const level = officeUpgrades?.[facility.id] ?? 0;
     const upgradeCost = getOfficeUpgradeCost(facility);
     const nextMaintenance = getOfficeMaintenanceCost(facility, level + 1);
     const currentMaintenance = getOfficeMaintenanceCost(facility, level);
-    const isMax = level >= MAX_OFFICE_LEVEL;
+    const isMax = level >= maxLvl;
     const disabled = isMax || funds < upgradeCost;
     const refund = getOfficeDowngradeRefund(facility, level);
     return `
@@ -564,45 +604,54 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
+// マネージャーパネル（nullセーフ完全保護）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
 
+  const mList = Array.isArray(managers) ? managers.filter(Boolean) : [];
+  const hireLimit = typeof MANAGER_HIRE_LIMIT !== 'undefined' ? MANAGER_HIRE_LIMIT : 3;
+
   const countLabel = document.getElementById('manager-count-label');
   if (countLabel) {
-    countLabel.textContent = `${managers.length}名 / 上限${MANAGER_HIRE_LIMIT}名`;
+    countLabel.textContent = `${mList.length}名 / 上限${hireLimit}名`;
   }
 
-  const tierRows = MANAGER_SKILLS.map(skill => {
-    const tier = getManagerSkillTier(skill.id);
+  const skillDefs = typeof MANAGER_SKILLS !== 'undefined' ? MANAGER_SKILLS : [];
+  const tierRows = skillDefs.map(skill => {
+    const tier = (typeof getManagerSkillTier === 'function') 
+      ? getManagerSkillTier(skill.id) 
+      : { total: 0, tier: 0, label: 'E', multiplier: 1.0, progress: 0, nextLabel: '' };
     return `
       <div class="manager-tier-row">
-        <span class="manager-tier-name">${skill.name}</span>
-        <span class="manager-tier-total">合計 ${tier.total}</span>
-        <span class="manager-tier-badge${tier.tier > 0 ? ' on' : ''}${tier.label === '極' ? ' max' : ''}${tier.label === 'S' || tier.label === 'SS' ? ' high' : ''}">${escapeHtml(tier.label)}</span>
-        <span class="manager-tier-mult">×${tier.multiplier.toFixed(2)}</span>
-        <span class="manager-tier-bar"><i style="width:${tier.progress}%"></i></span>
+        <span class="manager-tier-name">${escapeHtml(skill.name || '')}</span>
+        <span class="manager-tier-total">合計 ${tier.total || 0}</span>
+        <span class="manager-tier-badge${tier.tier > 0 ? ' on' : ''}${tier.label === '極' ? ' max' : ''}${tier.label === 'S' || tier.label === 'SS' ? ' high' : ''}">${escapeHtml(tier.label || '')}</span>
+        <span class="manager-tier-mult">×${(tier.multiplier || 1).toFixed(2)}</span>
+        <span class="manager-tier-bar"><i style="width:${tier.progress || 0}%"></i></span>
         <span class="manager-tier-next">${tier.nextLabel ? `次は合計${tier.nextMin}（あと${tier.remain}）` : 'MAX'}</span>
       </div>
     `;
   }).join('');
 
-  const tierPanel = managers.length ? `
+  const tierPanel = mList.length ? `
     <div class="manager-card tier">
-      <div class="manager-head"><strong>項目別の合計レベル</strong><span>在籍${managers.length}名の能力合計で効果が決まります</span></div>
+      <div class="manager-head"><strong>項目別の合計レベル</strong><span>在籍${mList.length}名の能力合計で効果が決まります</span></div>
       ${tierRows}
     </div>
   ` : '';
 
-  if (!managers.length) {
-    list.innerHTML = '<div class="office-maintenance-note">マネージャーが在籍していません。マネージャー市場で採用してください。</div>';
+  if (!mList.length) {
+    list.innerHTML = tierPanel + '<div class="office-maintenance-note">マネージャーが在籍していません。マネージャー市場で採用してください。</div>';
     return;
   }
 
-  list.innerHTML = tierPanel + managers.map(manager => {
-    const skillRows = MANAGER_SKILLS.map(skill => {
-      const level = manager.skills?.[skill.id] || 1;
-      const cost = getManagerSkillUpCost(manager, skill.id);
+  list.innerHTML = tierPanel + mList.map(manager => {
+    if (!manager) return '';
+    const skills = manager.skills || {};
+    const skillRows = skillDefs.map(skill => {
+      const level = skills[skill.id] || 1;
+      const cost = (typeof getManagerSkillUpCost === 'function') ? getManagerSkillUpCost(manager, skill.id) : null;
       const isMax = cost === null;
       const label = isMax
         ? '<span class="manager-skill-level max">MAX</span>'
@@ -612,27 +661,32 @@ function renderManagerPanel() {
             title="${skill.name}をLv.${level + 1}に（${formatMoney(cost)}）">Lv.${level + 1}<br>${formatMoney(cost)}</button>`;
       return `
         <div class="manager-skill-row">
-          <span class="manager-skill-name">${skill.name}<br><small style="color:#999;">${skill.effect}</small></span>
+          <span class="manager-skill-name">${escapeHtml(skill.name)}<br><small style="color:#999;">${escapeHtml(skill.effect || '')}</small></span>
           <span class="manager-skill-level${isMax ? ' max' : ''}">Lv.${level}</span>
           ${label}
         </div>
       `;
     }).join('');
-    const age = getManagerAge(manager);
+
+    const age = (typeof getManagerAge === 'function') ? getManagerAge(manager) : 30;
     const tenureNote = age < 32 ? '在籍：長期継続の見込み'
       : age < 36 ? '在籍：安定'
       : age < 40 ? '在籍：継続中'
       : '在籍：退職に変わる可能性あり';
-    const fireCost = getManagerFireCost(manager);
+    const monthlySalary = (typeof getManagerMonthlySalary === 'function') ? getManagerMonthlySalary(manager) : 0;
+    const annualSalary = (typeof getManagerAnnualSalary === 'function') ? getManagerAnnualSalary(manager) : 0;
+    const skillTotal = (typeof getManagerSkillTotal === 'function') ? getManagerSkillTotal(manager) : 0;
+    const fireCost = (typeof getManagerFireCost === 'function') ? getManagerFireCost(manager) : 0;
+
     return `
       <div class="manager-card">
         <div class="manager-head">
-          <strong>${escapeHtml(manager.name)} <small style="font-size:10px; color:#777;">${age}歳</small></strong>
-          <span>月給 ${formatMoney(getManagerMonthlySalary(manager))}</span>
+          <strong>${escapeHtml(manager.name || '')} <small style="font-size:10px; color:#777;">${age}歳</small></strong>
+          <span>月給 ${formatMoney(monthlySalary)}</span>
         </div>
         ${skillRows}
         <div class="manager-total">
-          能力合計 ${getManagerSkillTotal(manager)} / 40 ・ 年収 ${formatMoney(getManagerAnnualSalary(manager))}
+          能力合計 ${skillTotal} / 40 ・ 年収 ${formatMoney(annualSalary)}
           ・ ${escapeHtml(tenureNote)}
         </div>
         <div class="manager-fire-row">
@@ -648,35 +702,46 @@ function renderManagerPanel() {
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
-  refreshManagerMarket();
+  if (typeof refreshManagerMarket === 'function') {
+    try { refreshManagerMarket(); } catch (e) {}
+  }
 
+  const candidates = Array.isArray(managerMarketCandidates) ? managerMarketCandidates.filter(Boolean) : [];
   const countElement = document.getElementById('manager-market-count');
-  if (countElement) countElement.textContent = String(managerMarketCandidates.length);
+  if (countElement) countElement.textContent = String(candidates.length);
 
-  const atLimit = managers.length >= MANAGER_HIRE_LIMIT;
-  if (!managerMarketCandidates.length) {
+  const mList = Array.isArray(managers) ? managers.filter(Boolean) : [];
+  const hireLimit = typeof MANAGER_HIRE_LIMIT !== 'undefined' ? MANAGER_HIRE_LIMIT : 3;
+  const atLimit = mList.length >= hireLimit;
+  const hireCost = typeof MANAGER_HIRE_COST !== 'undefined' ? MANAGER_HIRE_COST : 500000;
+
+  if (!candidates.length) {
     list.innerHTML = '<div class="office-maintenance-note">現在の求人はありません。</div>';
     return;
   }
 
-  list.innerHTML = managerMarketCandidates.map(candidate => {
-    const monthly = getManagerMonthlySalary(candidate);
-    const skillLine = MANAGER_SKILLS
+  const skillDefs = typeof MANAGER_SKILLS !== 'undefined' ? MANAGER_SKILLS : [];
+
+  list.innerHTML = candidates.map(candidate => {
+    if (!candidate) return '';
+    const monthly = (typeof getManagerMonthlySalary === 'function') ? getManagerMonthlySalary(candidate) : 0;
+    const skillLine = skillDefs
       .map(skill => `${skill.name} Lv.${candidate.skills?.[skill.id] || 1}`)
       .join(' / ');
-    const age = candidate.age ?? (getGameDateObject().getFullYear() - candidate.birthYear);
+    const age = candidate.age ?? (getGameDateObject().getFullYear() - (candidate.birthYear || 2000));
+    const skillTotal = (typeof getManagerSkillTotal === 'function') ? getManagerSkillTotal(candidate) : 0;
     return `
       <div class="manager-card candidate">
         <div class="manager-head">
-          <strong>${escapeHtml(candidate.name)} <small style="font-size:10px; color:#777;">${age}歳</small></strong>
+          <strong>${escapeHtml(candidate.name || '')} <small style="font-size:10px; color:#777;">${age}歳</small></strong>
           <span>月給 ${formatMoney(monthly)}</span>
         </div>
         <div class="manager-total">${escapeHtml(skillLine)}</div>
-        <div class="manager-total">能力合計 ${getManagerSkillTotal(candidate)} / 40</div>
+        <div class="manager-total">能力合計 ${skillTotal} / 40</div>
         <div class="manager-fire-row">
           <button class="manager-hire-button" type="button" onclick="hireManagerFromMarket('${candidate.id}')"
-            ${atLimit || funds < MANAGER_HIRE_COST ? 'disabled' : ''}
-            title="採用費 ${formatMoney(MANAGER_HIRE_COST)}">採用する（${formatMoney(MANAGER_HIRE_COST)}）</button>
+            ${atLimit || funds < hireCost ? 'disabled' : ''}
+            title="採用費 ${formatMoney(hireCost)}">採用する（${formatMoney(hireCost)}）</button>
         </div>
       </div>
     `;
@@ -688,21 +753,28 @@ function renderSalaryPanel() {
     const element = document.getElementById(id);
     if (element) element.textContent = value;
   };
-  const memberSalary = getTotalMemberMonthlySalary();
-  const managerSalary = getTotalManagerMonthlySalary();
+  const memberSalary = (typeof getTotalMemberMonthlySalary === 'function') ? getTotalMemberMonthlySalary() : 0;
+  const managerSalary = (typeof getTotalManagerMonthlySalary === 'function') ? getTotalManagerMonthlySalary() : 0;
   const total = memberSalary + managerSalary;
 
-  setText('txt-member-count', String(idolRoster.length));
-  setText('txt-manager-count', String(managers.length));
+  const rosterCount = Array.isArray(idolRoster) ? idolRoster.length : 0;
+  const mgrCount = Array.isArray(managers) ? managers.filter(Boolean).length : 0;
+
+  setText('txt-member-count', String(rosterCount));
+  setText('txt-manager-count', String(mgrCount));
   setText('txt-member-salary', formatMoney(memberSalary));
   setText('txt-manager-salary', formatMoney(managerSalary));
   setText('txt-total-salary', formatMoney(total));
   setText('txt-annual-salary', formatMoney(total * 12));
-  setText('txt-year-salary', formatMoney(yearlyStats.salary || 0));
+  setText('txt-year-salary', formatMoney(yearlyStats?.salary || 0));
 
-  const fanGrowth = Math.max(0, (groupFansAtYearStart || 0) - (previousYearGroupFansAtYearStart || 0));
+  const startFans = typeof groupFansAtYearStart !== 'undefined' ? (groupFansAtYearStart || 0) : 0;
+  const prevFans = typeof previousYearGroupFansAtYearStart !== 'undefined' ? (previousYearGroupFansAtYearStart || 0) : 0;
+  const fanGrowth = Math.max(0, startFans - prevFans);
+  const growthFactor = typeof MEMBER_SALARY_GROUP_GROWTH_FACTOR !== 'undefined' ? MEMBER_SALARY_GROUP_GROWTH_FACTOR : 6;
+
   setText('salary-note',
-    `メンバー年収 = ファン数×8×365 ＋ (当年1月頭 ${Number(groupFansAtYearStart || 0).toLocaleString()}人 − 前年1月頭 ${Number(previousYearGroupFansAtYearStart || 0).toLocaleString()}人)×6。` +
-    ` 年間給与のうちグループファン増加分は ${formatMoney(fanGrowth * MEMBER_SALARY_GROUP_GROWTH_FACTOR * idolRoster.length)} です。` +
+    `メンバー年収 = ファン数×8×365 ＋ (当年1月頭 ${Number(startFans).toLocaleString()}人 − 前年1月頭 ${Number(prevFans).toLocaleString()}人)×6。` +
+    ` 年間給与のうちグループファン増加分は ${formatMoney(fanGrowth * growthFactor * rosterCount)} です。` +
     ` 給与は毎月末に一括で引き落とされます。`);
 }
