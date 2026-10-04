@@ -926,7 +926,6 @@ function advanceOneWeek() {
     if (typeof checkFanClubYearlyEvent === 'function') checkFanClubYearlyEvent();
     if (typeof checkSpecialBroadcastOffers === 'function') checkSpecialBroadcastOffers();
     
-    // マネージャーの安全な呼び出し
     if (typeof processManagerResignations === 'function') {
       try { processManagerResignations(); } catch (e) { console.warn('processManagerResignations safe skip:', e); }
     }
@@ -1007,6 +1006,12 @@ function advanceOneWeek() {
     else openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
   }
 
-  updateUI();
+  // updateUI() が例外を出しても進行処理全体を落とさないようセーフガード
+  try {
+    updateUI();
+  } catch (uiErr) {
+    console.error('【updateUI安全キャッチ】', uiErr);
+  }
+
   if (typeof openPendingModal === 'function') openPendingModal();
 }
