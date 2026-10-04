@@ -19,20 +19,6 @@ function formatChartWeekLabel(weekKey) {
 // ==========================================
 // 記録タブ（売上推移・楽曲一覧・初週売上ランキング）
 // ==========================================
-// 保持するログの件数（古いものから捨てる）
-const LOG_HISTORY_LIMIT = 60;
-
-// ログ履歴を「新しい順」のリストとして描画する
-function renderLogList() {
-  const box = document.getElementById('log-box');
-  if (!box) return;
-  if (!Array.isArray(logHistory) || !logHistory.length) return;
-  box.innerHTML = logHistory.map((entry, index) => `
-    <div class="log-entry${index === 0 ? ' is-latest' : ''}">
-      <span class="log-date">${escapeHtml(String(entry.date || ''))}</span>
-      <span class="log-text">${escapeHtml(String(entry.text || ''))}</span>
-    </div>`).join('');
-}
 // 外部ライブラリなしで折れ線グラフのSVGを描く
 // points は [{ label, value }] の配列
 function buildLineChartSvg(points, options = {}) {
@@ -240,21 +226,3 @@ function playTvEventEffect(kind, title) {
   setTimeout(() => card.remove(), 2600);
 }
 
-// ログにテレビ関連の放送が書かれていれば演出を出す（setLog からのフック）
-function playTvEffectFromLog(message) {
-  const text = String(message || '');
-  if (text.includes('【大型特番】')) {
-    playTvEventEffect('special', text.replace('【大型特番】', '').split('で')[0]);
-    return true;
-  }
-  if (text.includes('【テレビ出演】')) {
-    playTvEventEffect('broadcast', text.replace('【テレビ出演】', '').split('で')[0]);
-    return true;
-  }
-  const mediaMatch = text.match(/【[^】]+】/);
-  if (mediaMatch && /(報道|掲載|番組|ニュース|ウェブ|メディア|取材)/.test(mediaMatch[0])) {
-    playTvEventEffect('info', text.replace(/【[^】]*】/, '').split('。')[0].slice(0, 40));
-    return true;
-  }
-  return false;
-}
