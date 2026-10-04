@@ -229,7 +229,7 @@ function renderRosterNameBar() {
     return a.name.localeCompare(b.name, 'ja');
   });
 
-  const restingIds = new Set(weeklySchedule?.restDayMembers || []);
+ const restingIds = new Set(Array.isArray(weeklySchedule?.restDayMembers) ? weeklySchedule.restDayMembers : []);
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
 
