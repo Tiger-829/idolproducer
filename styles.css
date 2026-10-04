@@ -1,4 +1,4 @@
-    :root {
+:root {
       --primary: #e91e63;
       --bg: #fce4ec;
       --panel: #ffffff;
@@ -404,7 +404,6 @@
       font-size: 13px;
       font-weight: bold;
     }
-    /* 年月日の下にファン数を固定表示する */
     .header-fans {
       margin-top: 3px;
       font-size: 11px;
@@ -533,7 +532,6 @@
       font-weight: bold;
     }
     .team-fans-count { font-size: 18px; font-family: monospace; }
-    /* 内訳を縦に積み、パーセントバーを全幅で表示する（本文との重なりを防ぐ） */
     .team-fans-card-stack {
       flex-direction: column;
       align-items: stretch;
@@ -555,7 +553,6 @@
       background: #f0e4e8;
     }
     .fan-share-seg { display: block; height: 100%; }
-    /* コア＝濃いピンク／ファン＝紫／ライト＝薄いピンク（参加率が高いほど濃い） */
     .fan-share-core { background: #e91e63; }
     .fan-share-fan { background: #ab47bc; }
     .fan-share-light { background: #f48fb1; }
@@ -570,7 +567,6 @@
     .fan-share-note { margin-top: 3px; color: #8a6d7a; }
     .member-fan-count { display: block; color: #777; font-size: 9px; }
 
-    /* 常時表示のメンバー名一覧 */
     .roster-namebar {
       display: flex;
       flex-wrap: wrap;
@@ -817,7 +813,6 @@
     .plan-calendar-day.is-selected .plan-calendar-marks i { background: #fff; }
     .plan-calendar-month-note { margin-top: 4px; color: #777; font-size: 9px; line-height: 1.5; }
     
-    /* チーム総合力カード */
     .team-summary-card {
       background: #fff;
       border: 1px solid #f8bbd0;
@@ -862,7 +857,6 @@
     .avg-label { font-size: 9px; color: #777; display: block; }
     .avg-val { font-size: 11px; font-weight: bold; font-family: monospace; }
 
-    /* 名簿エリア */
     .roster-card {
       background: #fff;
       border: 1px solid #eee;
@@ -885,15 +879,12 @@
     }
     .roster-tab-btn.active {
       background: var(--primary);
-
-
       color: white;
       font-weight: bold;
     }
     .roster-list {
       max-height: min(55vh, 420px);
       overflow-y: auto;
-      /* スクロールバーが出ても他の行の幅が変わらないようにする */
       scrollbar-gutter: stable;
       display: flex;
       flex-direction: column;
@@ -931,21 +922,18 @@
       font-weight: bold;
     }
     .member-details[open] .member-summary::after { content: '−'; }
-    /* 名前に下線を付け、開く場所を示す */
     .member-name-toggle {
       font-size: 13px;
       font-weight: bold;
       border-bottom: 1px dotted var(--primary);
     }
     .member-summary:hover .member-name-toggle { color: var(--primary); }
-    /* 名前の右に添える基本情報 */
     .member-basic-info {
       color: #777;
       font-size: 10px;
       font-weight: normal;
       white-space: nowrap;
     }
-    /* 折りたたみ時の左寄せ（名前を先に並べる） */
     .member-summary-main {
       display: flex;
       flex-direction: column;
@@ -958,7 +946,6 @@
       gap: 5px;
       flex-wrap: wrap;
     }
-    /* 閉じているときだけ「詳細」のヒントを出す */
     .member-toggle-hint {
       color: var(--primary);
       font-size: 9px;
@@ -967,7 +954,6 @@
       padding: 0 4px;
     }
     .member-details[open] .member-toggle-hint { display: none; }
-    /* 固有能力値を表示するボタン */
     .member-ability-area { padding: 0 8px 8px; }
     .member-ability-btn {
       width: 100%;
@@ -982,23 +968,6 @@
     }
     .member-ability-btn:hover { background: var(--primary); color: #fff; }
     .member-ability-area > .member-stats { padding: 8px 0 0; }
-    /* ステータスをグループごとに整理して表示する */
-    .member-stats {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 8px;
-    }
-    .member-stat-group-label {
-      color: #888;
-      font-size: 9px;
-      margin-bottom: 3px;
-    }
-    .member-stat-group-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));
-      gap: 4px;
-    }
     .member-stats {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1046,7 +1015,6 @@
     }
     .stat-exp-bar b { display: block; height: 100%; background: var(--primary); }
 
-    /* アクション・進行 */
     .actions {
       display: flex;
       flex-direction: column;
@@ -1084,10 +1052,8 @@
       border-radius: 4px;
     }
 
-    /* ライブ収支（表） */
     .live-finance-modal-content { max-width: 720px; }
     .live-finance-body { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    /* 月次収支報告（収入／支出の2列表） */
     .monthly-report-table {
       width: 100%;
       border-collapse: collapse;
@@ -1107,7 +1073,6 @@
       font-family: monospace;
       white-space: nowrap;
     }
-    /* 収入は緑、支出（臨時支出）は赤 */
     .monthly-report-table .num.income { color: #2e7d32; }
     .monthly-report-table .num.expense { color: #c62828; }
     .monthly-report-table tr.omitted td {
@@ -1155,7 +1120,6 @@
     .live-finance-table .tag-finale { color: #b8860b; font-weight: bold; }
     .live-finance-note { margin: 8px 0 0; font-size: 10px; color: #888; line-height: 1.6; }
 
-    /* ゲーム説明（ヘルプ） */
     button.ghost-btn {
       padding: 10px 14px;
       font-size: 12px;
@@ -1180,7 +1144,6 @@
     }
     .records-help-note { margin: 0; color: #888; font-size: 11px; line-height: 1.6; }
 
-    /* 記録タブ：売上推移・楽曲一覧・初週売上ランキング */
     .records-block { margin-top: 14px; }
     .records-block-title {
       margin: 0 0 8px;
@@ -1229,7 +1192,6 @@
     .song-row-title { font-weight: 700; }
     .song-row-meta { color: #888; font-size: 10px; }
 
-    /* 楽曲詳細モーダル */
     .song-detail-modal-content { max-width: 420px; }
     .song-detail-chart { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
     .song-detail-chart .chart-svg { height: 150px; }
@@ -1241,7 +1203,6 @@
     .song-stat-label { display: block; color: #999; font-size: 10px; }
     .song-stat-value { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; }
 
-    /* TVイベントの画面演出 */
     #page-records { position: relative; }
     .tv-fx-layer {
       position: absolute; top: 8px; left: 0; right: 0;
@@ -1274,23 +1235,22 @@
     @media (prefers-reduced-motion: reduce) {
       .tv-fx-card, .tv-fx-bar { animation: none; }
     }
-    /* 記録タブ：ログ欄とドラフト疑似体験 */
-.records-log-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 6px;
-}
-.records-log-label { font-size: 12px; font-weight: 700; color: #555; }
-.ghost-btn.small { padding: 5px 10px; font-size: 11px; }
-#log-box .log-entry {
-  display: flex; gap: 6px; align-items: baseline;
-  padding: 4px 0; border-bottom: 1px dashed #eee;
-}
-#log-box .log-entry:last-child { border-bottom: none; }
-#log-box .log-date { flex: none; color: #aaa; font-size: 9px; white-space: nowrap; }
-#log-box .log-text { flex: 1; word-break: break-word; }
-#log-box .log-entry.is-latest { font-weight: 700; }
+    .records-log-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 6px;
+    }
+    .records-log-label { font-size: 12px; font-weight: 700; color: #555; }
+    .ghost-btn.small { padding: 5px 10px; font-size: 11px; }
+    #log-box .log-entry {
+      display: flex; gap: 6px; align-items: baseline;
+      padding: 4px 0; border-bottom: 1px dashed #eee;
+    }
+    #log-box .log-entry:last-child { border-bottom: none; }
+    #log-box .log-date { flex: none; color: #aaa; font-size: 9px; white-space: nowrap; }
+    #log-box .log-text { flex: 1; word-break: break-word; }
+    #log-box .log-entry.is-latest { font-weight: 700; }
 
-.help-modal-content { max-width: 560px; }
+    .help-modal-content { max-width: 560px; }
     .help-body { max-height: 66vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .help-section { padding: 10px 0; border-bottom: 1px solid #f0e4e8; }
     .help-section:last-child { border-bottom: none; }
@@ -1314,7 +1274,6 @@
     .help-table th { background: #fdf2f4; font-weight: bold; color: #555; }
     .help-table td { color: #444; }
 
-    /* モーダル */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -1333,7 +1292,6 @@
       padding: 16px;
       border-radius: 12px;
     }
-    /* 業界順位 */
     .ranking-note { font-size: 11px; color: #777; line-height: 1.6; margin-bottom: 6px; }
     .ranking-list { display: flex; flex-direction: column; gap: 5px; }
     .ranking-row {
@@ -1360,7 +1318,6 @@
     .ranking-power { text-align: right; font-family: monospace; font-weight: 900; }
     .ranking-trend { font-size: 9px; color: #888; }
 
-    /* ドラフト会議 */
     .draft-standings { display: flex; flex-direction: column; gap: 3px; margin: 8px 0; }
     .draft-standing-row {
       display: grid;
@@ -1408,8 +1365,6 @@
     .draft-lottery.win { background: #e8f5e9; border: 1px solid #66bb6a; }
     .draft-lottery.lose { background: #ffebee; border: 1px solid #e57373; }
     .draft-lottery.none { background: #f5f1f2; border: 1px solid #ddd; }
-    /* 名予記位パンル（リスト関覧） */
-    /* 指名パンル：現状コーグー */
     .draft-status {
       display: flex; flex-wrap: wrap; gap: 4px;
       margin-top: 8px; padding: 6px 8px;
@@ -1424,8 +1379,6 @@
       background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
       font-size: 10px; color: #7a5c00; line-height: 1.6;
     }
-
-    /* 他チームの指名履歴 */
     .draft-picklog {
       margin-top: 8px; padding: 8px 10px;
       background: #fafafa; border: 1px solid #eee; border-radius: 6px;
@@ -1445,8 +1398,6 @@
       background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px;
       color: #7a5c00; font-size: 9px;
     }
-
-    /* 指名済みリスト */
     .draft-acquired-list {
       margin-top: 8px; padding: 8px 10px;
       background: #fdf2f4; border: 1px solid #f3d3dc; border-radius: 6px;
@@ -1458,8 +1409,6 @@
       padding: 2px 7px; background: #fff; border: 1px solid #eee;
       border-radius: 10px; font-size: 10px; color: #555;
     }
-
-    /* 名指しパネルの並び替え */
     .draft-sort-bar {
       display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
       margin-top: 8px; padding: 6px 8px;
@@ -1471,7 +1420,6 @@
       background: #fff; color: #555; font-family: inherit; font-size: 10px; cursor: pointer;
     }
     .draft-sort-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 700; }
-
     .draft-list-head {
       display: flex; justify-content: space-between;
       margin-top: 8px; font-size: 10px; color: #777;
@@ -1479,8 +1427,6 @@
     .draft-pager { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
     .draft-pager button[disabled] { opacity: 0.4; }
     .draft-progress { font-size: 11px; color: #777; text-align: center; margin-bottom: 6px; }
-
-    /* きじ引き（回っていたチームが順に引き） */
     .draft-lottery-target {
       margin: 8px 0 4px; padding: 8px 10px;
       background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
@@ -1497,7 +1443,6 @@
       border: 1px solid var(--primary); background: #fff; color: var(--primary);
       border-radius: 999px; padding: 3px 10px; font-size: 10px; cursor: pointer;
     }
-    /* 1巡目の回転パネル（グループ名が並べる） */
     .draft-roulette { text-align: center; }
     .draft-roulette-label {
       font-size: 11px; color: #777; margin-bottom: 6px;
@@ -1543,108 +1488,116 @@
     }
     .draft-acquired { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 10px; color: #555; }
     .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }
-/* ==========================================
-   タブレット・PCなどの横長画面・向きへの対応
-   ========================================== */
-
-/* --- デフォルト（スマホの縦持ちなど、幅が狭い場合） --- */
-.game-container {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-}
 
 /* ==========================================
-   タブレット・PCなどの横長画面（幅768px以上）でのレスポンシブ対応
+   タブレット・PCなどの横長画面（幅768px以上）でのレスポンシブ対応【決定版】
    ========================================== */
 
 @media screen and (min-width: 768px) {
   /* ゲーム全体の最大幅を広げる */
   .game-container {
-    max-width: 1200px;
-  }
-
-  /* --- タイトル画面（セーブスロットを3分割で横並びにする） --- */
-  .title-screen {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 20px;
+  }
+
+  /* --- タイトル画面（3分割で横並びにする） --- */
+  .title-screen {
+    width: 100% !important;
+    max-width: 1100px !important;
+    margin: 0 auto;
+    padding: 28px 24px;
   }
   
   .save-slots {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important; /* 3つのスロットを横に等間隔で配置 */
-    gap: 16px;
-    align-items: stretch;
+    grid-template-columns: repeat(3, 1fr) !important; /* スロット1, 2, 3を横に3等分 */
+    gap: 16px !important;
+    align-items: stretch !important;
   }
 
-  /* --- 1. 事務所タブ --- */
+  /* --- 1. 事務所タブ（手書きレイアウトの再現） --- */
   #page-office {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
-  #calendar-visual { grid-column: 1 / 2; grid-row: 1; }
-  .office-facilities:nth-of-type(1), .office-facilities:nth-of-type(2) { grid-column: 1 / 2; }
-  #weekly-action-panel { grid-column: 2 / 3; grid-row: 1; }
-  .office-facilities:nth-of-type(3) { grid-column: 2 / 3; }
-  .actions { grid-column: span 2; }
+  #page-office > *:nth-child(1),
+  #page-office > *:nth-child(2),
+  #page-office > *:nth-child(3) {
+    grid-column: 1 / 2;
+  }
+  #page-office > *:nth-child(4),
+  #page-office > *:nth-child(5) {
+    grid-column: 2 / 3;
+  }
+  #page-office > .actions,
+  #page-office > #log-box {
+    grid-column: span 2 !important;
+  }
 
-  /* --- 2. グループタブ --- */
+  /* --- 2. グループタブ（2分割） --- */
   #page-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
   .team-summary-card { grid-column: 1 / 2; }
-  .team-fans-card-stack { grid-column: 2 / 3; }
-  .team-fans-card { grid-column: 2 / 3; }
-  #page-group > div:last-of-type { grid-column: span 2; }
+  .team-fans-card-stack, .team-fans-card { grid-column: 2 / 3; }
+  #page-group > div:last-of-type,
+  #page-group > .song-list,
+  #page-group > .offer-list {
+    grid-column: span 2 !important;
+  }
 
-  /* --- 3. 編成タブ --- */
+  /* --- 3. 編成タブ（2分割） --- */
   #page-formation {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
-  .roster-card { grid-column: span 2; }
+  .roster-card {
+    grid-column: span 2 !important;
+  }
 
-  /* --- 4. 資金タブ --- */
+  /* --- 4. 資金タブ（2分割） --- */
   #page-funds {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
-  #page-funds > .page-title { grid-column: span 2; }
-  .funds-card { grid-column: 1 / 2; }
-  #page-funds > .fund-stat-grid:nth-of-type(1) { grid-column: 2 / 3; }
-  #page-funds > .fund-stat-grid:nth-of-type(2) { grid-column: 2 / 3; }
-  .office-maintenance-note#salary-note { grid-column: span 2; }
+  #page-funds > .page-title { grid-column: span 2 !important; }
+  .funds-card { grid-column: 1 / 2 !important; }
+  .fund-stat-grid { grid-column: 2 / 3 !important; }
 
-  /* --- 5. 業界順位タブ --- */
+  /* --- 5. 業界順位タブ（2分割） --- */
   #page-ranking {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
-  #page-ranking > .page-title, #page-ranking > .ranking-note { grid-column: span 2; }
-  .ranking-list { grid-column: span 2; }
+  #page-ranking > .page-title, 
+  #page-ranking > .ranking-note,
+  #page-ranking > .ranking-list {
+    grid-column: span 2 !important;
+  }
 
-  /* --- 6. 記録タブ --- */
+  /* --- 6. 記録タブ（2分割） --- */
   #page-records {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: start !important;
   }
-  #page-records > .page-title { grid-column: span 2; }
-  #page-records > .records-block:nth-of-type(1) { grid-column: 1 / 2; }
-  #page-records > .records-block:nth-of-type(2) { grid-column: 2 / 3; }
-  #page-records > .records-block:nth-of-type(3) { grid-column: span 2; }
-  .records-help { grid-column: span 2; }
+  #page-records > .page-title { grid-column: span 2 !important; }
+  .records-block:nth-of-type(1) { grid-column: 1 / 2 !important; }
+  .records-block:nth-of-type(2) { grid-column: 2 / 3 !important; }
+  .records-block:nth-of-type(3),
+  .records-help {
+    grid-column: span 2 !important;
+  }
 }
