@@ -1,16 +1,15 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI（二重宣言防止完全版）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（全機能保持）
 // ==========================================
 
-// 既存の定数定義があればそれを使い、無ければ安全に初期化（SyntaxError防止）
 if (typeof PAGE_TABS === 'undefined') {
   window.PAGE_TABS = [
-    { id: 'group', label: 'グループ', iconText: '👥' },
-    { id: 'formation', label: '編成', iconText: '📋' },
-    { id: 'office', label: '事務所', iconText: '🏢' },
-    { id: 'funds', label: '資金', iconText: '💰' },
-    { id: 'ranking', label: '順位', iconText: '🏆' },
-    { id: 'records', label: '記録', iconText: '📊' }
+    { id: 'group', label: 'グループ', icon: 'group' },
+    { id: 'formation', label: '編成', icon: 'formation' },
+    { id: 'office', label: '事務所', icon: 'office' },
+    { id: 'funds', label: '資金', icon: 'funds' },
+    { id: 'ranking', label: '順位', icon: 'ranking' },
+    { id: 'records', label: '記録', icon: 'records' }
   ];
 }
 
@@ -23,24 +22,34 @@ if (typeof currentPageTab === 'undefined') {
 }
 
 // アイコンSVG安全フォールバック
-function safeGetIconSvg(tab) {
+function safeGetIconSvg(iconName) {
   if (typeof getIconSvg === 'function') {
     try {
-      const svg = getIconSvg(tab.id);
-      if (svg) return svg;
+      const res = getIconSvg(iconName);
+      if (res) return res;
     } catch (e) {}
   }
-  return `<span style="font-size:14px; margin-right:4px;">${tab.iconText || '●'}</span>`;
+  const iconMap = {
+    group: '👥',
+    formation: '📋',
+    office: '🏢',
+    funds: '💰',
+    ranking: '🏆',
+    records: '📊',
+    upgrade: '▲',
+    downgrade: '▼'
+  };
+  return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
 // タブナビゲーション描画・同期
 function renderPageNav(activePage) {
   const tabs = (typeof PAGE_TABS !== 'undefined') ? PAGE_TABS : window.PAGE_TABS;
   const def = (typeof DEFAULT_PAGE !== 'undefined') ? DEFAULT_PAGE : 'office';
-  
-  const target = tabs.some(t => t.id === activePage)
+
+  const target = tabs.some(tab => tab.id === activePage)
     ? activePage
-    : (tabs.some(t => t.id === currentPageTab) ? currentPageTab : def);
+    : (tabs.some(tab => tab.id === currentPageTab) ? currentPageTab : def);
   currentPageTab = target;
 
   const nav = document.getElementById('page-nav');
@@ -50,8 +59,8 @@ function renderPageNav(activePage) {
       return `
       <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
         aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
-        onclick="switchPage('${tab.id}')" style="cursor:pointer;">
-        <span class="tab-icon">${safeGetIconSvg(tab)}</span><span>${tab.label}</span>
+        onclick="switchPage('${tab.id}')">
+        <span class="tab-icon">${safeGetIconSvg(tab.icon)}</span><span>${tab.label}</span>
       </button>`;
     }).join('');
   }
@@ -74,12 +83,8 @@ function renderPageNav(activePage) {
 function switchPage(page) {
   currentPageTab = page;
   renderPageNav(page);
-
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
-    try { renderRecordsPanel(); } catch (e) {}
-  }
-  if (page === 'office' && typeof renderWeeklyActionPanel === 'function') {
-    try { renderWeeklyActionPanel(); } catch (e) {}
+    try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
   }
 }
 
@@ -167,7 +172,7 @@ function renderRankingPanel() {
   }).join('');
 }
 
-// 事務所アクションパネル（スケジュールUI表示）
+// 事務所アクションパネル（スケジュールUI表示スイッチ）
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -243,7 +248,13 @@ function renderWeeklyActionPanel() {
       ${renderWeeklyScheduleControls()}
     `;
   } catch (err) {
-    panel.innerHTML = `<div style="padding:10px; color:red; font-size:12px;">スケジュール描画エラー: ${err.message}</div>`;
+    console.error('renderWeeklyActionPanel Error:', err);
+    panel.innerHTML = `
+      <div style="padding:12px; background:#fde8e8; border:1px solid #c0392b; border-radius:6px; color:#c0392b;">
+        <strong>【表示エラー】スケジュールUIの描画中にエラーが発生しました</strong><br>
+        <small style="font-family:monospace;">${escapeHtml(err.stack || err.message)}</small>
+      </div>
+    `;
   }
 }
 
@@ -255,7 +266,7 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
-// スケジュール設定UIコントロール
+// スケジュール設定UIコントロール（14枠・個別レッスン10.1倍・休養日設定完全版）
 function renderWeeklyScheduleControls() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = {
@@ -466,7 +477,7 @@ function renderWeeklyScheduleControls() {
         : ''}
     </div>
 
-    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="confirmWeeklySchedule()">このスケジュールで確定して進行</button>
+    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="confirmWeeklySchedule()">このスケジュールで1週間進める</button>
   `;
 }
 
@@ -489,7 +500,7 @@ function getIndividualLessonMemberOptions() {
   return center ? [center, ...rest] : rest;
 }
 
-// カレンダー描画
+// カレンダー描画（全マス42日展開完全版）
 function renderGameCalendar() {
   const date = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   const shouldFlip = Boolean(typeof lastRenderedCalendarDate !== 'undefined' && lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
@@ -581,17 +592,18 @@ function renderGameCalendar() {
   }
 }
 
-// 事務所設備管理
+// 事務所設備管理（アップグレード・ダウングレード全機能完全版）
+if (typeof OFFICE_COST_GROWTH === 'undefined') window.OFFICE_COST_GROWTH = 1.9;
+if (typeof OFFICE_MAINTENANCE_GROWTH === 'undefined') window.OFFICE_MAINTENANCE_GROWTH = 1.6;
+
 function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (!facility || !facility.baseCost) return 0;
-  const growth = typeof OFFICE_COST_GROWTH !== 'undefined' ? OFFICE_COST_GROWTH : 1.9;
-  return Math.round(facility.baseCost * (growth ** level));
+  return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
 }
 
 function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
   if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
-  const growth = typeof OFFICE_MAINTENANCE_GROWTH !== 'undefined' ? OFFICE_MAINTENANCE_GROWTH : 1.6;
-  return Math.round(facility.baseMaintenance * (growth ** (level - 2)));
+  return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
 }
 
 function upgradeOfficeFacility(facilityId) {
@@ -671,12 +683,12 @@ function renderOfficeUpgrades() {
             onclick="upgradeOfficeFacility('${facility.id}')"
             ${disabled ? 'disabled' : ''}
             title="${isMax ? `${facility.name}は最大レベルです` : `${facility.name}をLv.${level + 1}に強化（${formatMoney(upgradeCost)}）`}"
-            aria-label="${facility.name}をLv.${level + 1}に強化">${safeGetIconSvg({ id: 'upgrade', iconText: '▲' })}</button>
+            aria-label="${facility.name}をLv.${level + 1}に強化">${safeGetIconSvg('upgrade')}</button>
           ${level > 1
             ? `<button class="icon-round-btn down" type="button"
                 onclick="downgradeOfficeFacility('${facility.id}')"
                 title="${facility.name}をLv.${level - 1}にダウングレード（売却額 ${formatMoney(refund)}）"
-                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg({ id: 'downgrade', iconText: '▼' })}</button>`
+                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg('downgrade')}</button>`
             : ''}
         </div>
       </div>
@@ -684,7 +696,7 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャー管理
+// マネージャー管理（スキル・解雇・完全版）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -779,7 +791,7 @@ function renderManagerPanel() {
   }).join('');
 }
 
-// マネージャー市場
+// マネージャー市場（採用・完全版）
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
@@ -829,7 +841,7 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
-// 給与パネル描画
+// 給与パネル描画（完全版）
 function renderSalaryPanel() {
   const setText = (id, value) => {
     const element = document.getElementById(id);
@@ -839,7 +851,7 @@ function renderSalaryPanel() {
   const managerSalary = (typeof getTotalManagerMonthlySalary === 'function') ? getTotalManagerMonthlySalary() : 0;
   const total = memberSalary + managerSalary;
 
-  const rosterCount = Array.isArray(idolRoster) ? idolRoster : [];
+  const rosterCount = Array.isArray(idolRoster) ? idolRoster.length : 0;
   const mgrCount = Array.isArray(managers) ? managers.filter(Boolean).length : 0;
 
   setText('txt-member-count', String(rosterCount));
