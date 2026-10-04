@@ -1,5 +1,5 @@
 // ==========================================
-// 07-schedule.js : 日次ループ駆動型 進行エンジン完全版
+// 07-schedule.js : 日次進行・新諸経費・イベントキュー新進行エンジン完全版
 // ==========================================
 
 let lastWeekSchedule = null;
@@ -31,7 +31,7 @@ function confirmWeeklySchedule() {
     markMusicPreparations();
     applyWeeklySchedule();
 
-    // 新進行エンジン：次の停止地点まで自動進行
+    // 次の停止地点（月末・千秋楽・水曜日）まで自動進行
     advanceUntilNextSchedulePoint();
   } catch (error) {
     console.error("【進行エラー】", error);
@@ -67,7 +67,7 @@ function advanceUntilNextSchedulePoint() {
     gameDate = toDateKey(currentDate);
     syncGameCalendar();
 
-    // 停止条件（月末、自主ライブ終了、水曜日）に達したか判定
+    // 停止条件（キュー蓄積・月末・水曜日）に達したか判定
     if (shouldStopProgress(currentDate)) {
       break;
     }
@@ -84,12 +84,12 @@ function advanceUntilNextSchedulePoint() {
 // 3. 停止判定
 // ==========================================
 function shouldStopProgress(date) {
-  // ① 月末（最終日）に到達した場合：月次決算モーダルのため停止
-  if (isMonthEnd(date)) {
+  // ① 進行中に「ライブ収支」や「月次決算」がキューに積まれたら即座に停止
+  if (pendingReports && pendingReports.length > 0) {
     return true;
   }
-  // ② 自主ライブの千秋楽（最終公演日）を迎えた場合：ライブ収支報告のため停止
-  if (hasFinishedPlayerLive(date)) {
+  // ② 月末（最終日）に到達した場合：月次決算モーダルのため停止
+  if (isMonthEnd(date)) {
     return true;
   }
   // ③ 次の編成・スケジュール設定日（水曜日）に到達した場合：編成のため停止
@@ -106,132 +106,25 @@ function processDailyFlow(fromDate, toDate) {
   const toDateStr = toDateKey(toDate);
   const wasWednesday = toDate.getDay() === 3;
 
-  // ① 年齢・誕生日処理
   processBirthdays(fromDate, toDate);
-
-  // ② 計画・CDリリース・CD関連イベント
   processPlanEvents(toDateStr);
   processReleaseEvents(toDateStr);
-
-  // ③ ライブイベント（自主ライブ＆イベント出演）
   processLiveEvents(fromDate, toDate);
 
-  // ④ テレビ出演・大型特番の消化
   if (typeof processScheduledPerformances === 'function') {
     processScheduledPerformances(toDateStr);
   }
 
-  // ⑤ 週次更新（水曜日をまたいだ場合のみ発火する週次サイクル）
   if (wasWednesday) {
     processWeeklyCycle(toDate);
   }
 
-  // ⑥ 年末特番（赤白・CD大賞）
   if (typeof processYearEndEvents === 'function') {
     processYearEndEvents(toDateStr);
   }
 
-  // ⑦ 月末決算
-  // ==========================================
-// 8. 月末決算（既存 08-events.js と完全連携版）
-// ==========================================
-function processMonthlyClosing(fromDate, toDate) {
-  // toDate が「月の最終日」であるか判定
-  if (!isMonthEnd(toDate)) {
-    return;
-  }
-
-  // ① CD売上（8割入金）、タイアップ臨時収入、FC会費、メンバー・マネージャー給与の月末引き落としを実行
-  if (typeof settleMonthlyIncome === 'function') {
-    settleMonthlyIncome();
-  }
-
-  // ② 当月の収支明細（monthlyLedger）を確定し、レポートオブジェクトを生成
-  let report = null;
-  if (typeof finalizeMonthlyLedger === 'function') {
-    report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
-  }
-
-  // ③ レポート待機キューに格納
-  if (report) {
-    pendingReports.push({
-      type: "monthly",
-      report: report
-    });
-  }
+  processMonthlyClosing(fromDate, toDate);
 }
-
-// ==========================================
-// 9. 月末判定（翌日が1日＝今月が最終日）
-// ==========================================
-function isMonthEnd(date) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + 1);
-  // 翌日の「月」が変わっていれば、本日は月末日
-  return next.getMonth() !== date.getMonth();
-}
-
-// ==========================================
-// 10. 自主ライブ終了判定
-// ==========================================
-function hasFinishedPlayerLive(date) {
-  const dateKey = toDateKey(date);
-  return getScheduledLiveEntries().some(entry => {
-    if (!entry.completed) return false;
-    const showDates = getLiveEntryShowDates(entry);
-    return showDates[showDates.length - 1] === dateKey;
-  });
-}
-
-// ==========================================
-// 11. レポート・モーダル表示（キュー消化＆チェーン対応）
-// ==========================================
-function openPendingModal() {
-  // ① 緊急モーダル（選抜発表・危機対応・FC打診・設備整理等）を最優先
-  if (pendingSelectionEvent) return openSelectionModal();
-  if (pendingCrisisResponse) return openCrisisResponseModal();
-  if (pendingFanClubEvent) return openFanClubModal();
-  if (pendingRandomEvent) return openRandomEventModal();
-  if (pendingEquipmentEvent) return openEquipmentEventModal();
-  if (Array.isArray(pendingPerformanceOffers) && pendingPerformanceOffers.length) return openMusicOfferModal();
-
-  // ② 進行中に積まれたキュー（月末決算・ライブ結果）を順番に表示
-  if (!pendingReports || !pendingReports.length) return;
-
-  const item = pendingReports.shift();
-  switch (item.type) {
-    case "monthly":
-      if (typeof showMonthlyReportModal === 'function') {
-        showMonthlyReportModal(item.report);
-      }
-      break;
-    case "live":
-      showSingleLiveResultModal(item.report);
-      break;
-    case "event":
-      // イベントライブ結果（必要に応じて表示）
-      break;
-  }
-}
-
-// ==========================================
-// モーダルを閉じたときの連鎖フック（キューが残っていれば次を開く）
-// ==========================================
-// 既存の closeMonthlyReportModal を上書き拡張
-const originalCloseMonthlyReportModal = typeof closeMonthlyReportModal === 'function' ? closeMonthlyReportModal : null;
-window.closeMonthlyReportModal = function() {
-  const modal = document.getElementById('monthly-report-modal');
-  if (modal) modal.style.display = 'none';
-  pendingMonthlyReport = null;
-
-  // キューに残っている次のレポート（ライブ結果等）があれば続けて開く
-  if (pendingReports && pendingReports.length > 0) {
-    openPendingModal();
-  } else {
-    // 全て確認し終えたらUIを更新
-    updateUI();
-  }
-};
 
 // ==========================================
 // 5. ライブ共通処理
@@ -242,7 +135,37 @@ function processLiveEvents(fromDate, toDate) {
 }
 
 // ==========================================
-// 6. 自主ライブ（通常・ツアー・周年）
+// 6. 自前ライブ新諸経費計算
+// ==========================================
+/**
+ * 自前ライブの諸経費（基本＋配信追加費用）を計算
+ * @param {string} cap - 会場キャパシティ ('SS', 'S', 'A', 'B', 'C', 'D')
+ * @param {number} totalDays - 総公演日数 (d)
+ * @param {number} streamDays - 配信実施日数 (d_stream)
+ * @returns {{ baseCost: number, streamCost: number, totalCost: number }} (単位: 円)
+ */
+function calculateLiveExpenses(cap, totalDays, streamDays) {
+  const d = Math.max(1, Number(totalDays) || 1);
+  const dStream = Math.max(0, Number(streamDays) || 0);
+  const isDome = (cap === 'SS' || cap === 'S');
+
+  // ドームクラス (SS, S): (4800*d + 14000)万円 (+ 1200*d_stream 万円)
+  // それ以外 (A, B, C, D): (2300*d + 7600)万円 (+ 800*d_stream 万円)
+  const baseManYen = isDome ? (4800 * d + 14000) : (2300 * d + 7600);
+  const streamManYen = isDome ? (1200 * dStream) : (800 * dStream);
+
+  const baseCost = baseManYen * 10000;
+  const streamCost = streamManYen * 10000;
+
+  return {
+    baseCost,
+    streamCost,
+    totalCost: baseCost + streamCost
+  };
+}
+
+// ==========================================
+// 7. 自主ライブ（細分化収支・新経費集計）
 // ==========================================
 function processPlayerLives(fromDate, toDate) {
   const scheduled = getScheduledLiveEntries();
@@ -250,85 +173,146 @@ function processPlayerLives(fromDate, toDate) {
   scheduled.forEach(entry => {
     if (entry.completed) return;
 
-    // このライブの全公演日を抽出
     const showDates = getLiveEntryShowDates(entry);
+    if (!showDates || !showDates.length) return;
+
     const finalDateStr = showDates[showDates.length - 1];
     const finalDateObj = getGameDateObject(finalDateStr);
 
-    // 本日の日付がこのライブの最終日と一致するか判定
+    // 最終公演日（千秋楽／単独公演日）に到達した瞬間に全日程分を精算
     if (finalDateObj > fromDate && finalDateObj <= toDate) {
       const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
       if (!v) return;
 
       const totalShowCount = showDates.length;
       const isMultiDay = totalShowCount > 1;
+      const isDome = (v.cap === 'SS' || v.cap === 'S');
 
-      // 収支・動員計算
+      // 配信実施日程セット（設定が無い場合は千秋楽のみ配信とする安全フォールバック）
+      const streamDateSet = new Set(
+        Array.isArray(entry.streamDates)
+          ? entry.streamDates
+          : [finalDateStr]
+      );
+      const streamDaysCount = showDates.filter(d => streamDateSet.has(d)).length;
+
+      // 新計算式による諸経費（基本）と配信追加費用を算出
+      const expenses = calculateLiveExpenses(v.cap, totalShowCount, streamDaysCount);
+      const streamTicketPrice = typeof STREAM_TICKET_PRICE !== 'undefined' ? STREAM_TICKET_PRICE : 5000;
+
       const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);
       const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, (officeUpgrades.liveProduction || 1) - 1) * 0.05);
       const priceFactor = getPriceDemandFactor(v, entry);
 
-      let totalAudience = 0;
-      let totalTicketRevenue = 0;
-
-      // 全日程分の動員とチケット代を集計
-      showDates.forEach(dateKey => {
-        const dObj = getGameDateObject(dateKey);
-        let demand = Math.floor(getLiveAudienceDemand(v, dObj, null, priceFactor) * livePromotionMultiplier);
-        seatCapacities.forEach(seat => {
-          const sold = Math.min(seat.capacity, demand);
-          totalAudience += sold;
-          demand -= sold;
-          totalTicketRevenue += sold * getEffectiveSeatPrice(v, entry, seat);
+      // 席種ごとの細分化集計マップ
+      const seatBreakdownMap = new Map();
+      seatCapacities.forEach(seat => {
+        seatBreakdownMap.set(seat.id, {
+          name: seat.name,
+          unitPrice: getEffectiveSeatPrice(v, entry, seat),
+          capacityPerShow: seat.capacity,
+          totalCapacity: seat.capacity * totalShowCount,
+          soldCount: 0,
+          totalSales: 0
         });
       });
 
-      // グッズ売上・配信売上
+      let grandTotalAudience = 0;
+      let grandTotalTicketRevenue = 0;
+      let grandTotalStreamBuyers = 0;
+      let grandTotalStreamRevenue = 0;
+
+      // 日程ごとの動員・配信売上集計
+      showDates.forEach((dateKey, index) => {
+        const dObj = getGameDateObject(dateKey);
+        const isFinale = (index === showDates.length - 1 && isMultiDay);
+        const finaleRate = typeof LIVE_FINALE_RATE !== 'undefined' ? LIVE_FINALE_RATE : 0.9;
+        
+        let demand = Math.floor(getLiveAudienceDemand(v, dObj, isFinale ? finaleRate : null, priceFactor) * livePromotionMultiplier);
+
+        // 会場チケット集計
+        seatCapacities.forEach(seat => {
+          const sold = Math.min(seat.capacity, demand);
+          demand -= sold;
+
+          const data = seatBreakdownMap.get(seat.id);
+          if (data) {
+            data.soldCount += sold;
+            data.totalSales += sold * data.unitPrice;
+          }
+          grandTotalAudience += sold;
+          grandTotalTicketRevenue += sold * getEffectiveSeatPrice(v, entry, seat);
+        });
+
+        // 配信チケット集計（この日程が「配信あり」の場合のみ売上発生）
+        if (streamDateSet.has(dateKey)) {
+          const dayStreamBuyers = getStreamTicketBuyers(dObj);
+          grandTotalStreamBuyers += dayStreamBuyers;
+          grandTotalStreamRevenue += dayStreamBuyers * streamTicketPrice;
+        }
+      });
+
+      // グッズ売上集計
       const goods = sellMerchandiseAtLive();
-      const streamBuyers = getStreamTicketBuyers(finalDateObj);
-      const streamRevenue = streamBuyers * STREAM_TICKET_PRICE;
-      const streamCost = STREAM_PRODUCTION_COST * totalShowCount;
-      const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
-      const grossRevenue = totalTicketRevenue + goods.revenue + streamRevenue;
-      const profit = grossRevenue - venueCost - streamCost;
+      const grossRevenue = grandTotalTicketRevenue + goods.revenue + grandTotalStreamRevenue;
+      const profit = grossRevenue - expenses.totalCost;
 
-      // 資金・実績へ計上
+      // 資金・年間統計へ反映
       funds += profit;
-      yearlyStats.audience += totalAudience;
-      yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
-      yearlyStats.streamCost = (yearlyStats.streamCost || 0) + streamCost;
+      yearlyStats.audience += grandTotalAudience;
+      yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue;
+      yearlyStats.streamCost = (yearlyStats.streamCost || 0) + expenses.streamCost;
 
-      // 経験値付与（最終公演完了時に全員へ付与）
-      const liveExp = applyLiveExperience(v, totalAudience, totalShowCount);
+      // 経験値・体力消費の適用
+      applyLiveExperience(v, grandTotalAudience, totalShowCount);
       applyLiveStaminaCost(v, isMultiDay, false);
 
       entry.completed = true;
       markLiveEntryCompleted(entry);
       nextLivePromotionPoints = 0;
 
-      // 詳細収支レポートをキューに蓄積
-      const report = {
-        venueName: v.name,
+      const seatDetails = [...seatBreakdownMap.values()].filter(s => s.totalCapacity > 0);
+
+      // 細分化ライブ収支レポートオブジェクト
+      const liveDetailedReport = {
         liveName: entry.liveName || v.name,
+        venueName: v.name,
+        venueCap: v.cap,
         showCount: totalShowCount,
-        audience: totalAudience,
-        ticketRevenue: totalTicketRevenue,
-        merchandise: goods.revenue,
-        streamRevenue,
-        streamCost,
-        venueCost,
-        profit,
-        liveExp
+        showDates: showDates,
+        isMultiDay: isMultiDay,
+        seatDetails: seatDetails,
+        totalAudience: grandTotalAudience,
+        ticketRevenue: grandTotalTicketRevenue,
+        merchandiseRevenue: goods.revenue,
+        merchandiseSold: goods.unitsSold,
+        // 配信情報
+        streamDaysCount: streamDaysCount,
+        streamDates: [...streamDateSet],
+        streamBuyers: grandTotalStreamBuyers,
+        streamRevenue: grandTotalStreamRevenue,
+        streamCostPerDay: isDome ? 12000000 : 8000000,
+        streamCost: expenses.streamCost,
+        // 諸経費
+        baseCost: expenses.baseCost,
+        grossRevenue: grossRevenue,
+        totalCost: expenses.totalCost,
+        profit: profit
       };
 
-      pendingReports.push({ type: "live", report });
-      setLog(`【ライブ完走】${entry.liveName || v.name}（全${totalShowCount}公演 / 動員 ${totalAudience.toLocaleString()}人 / 収支 ${profit >= 0 ? '+' : ''}${formatMoney(profit)}）`);
+      // キューに格納
+      pendingReports.push({
+        type: "live-detail",
+        report: liveDetailedReport
+      });
+
+      setLog(`【ライブ千秋楽】${liveDetailedReport.liveName}（${v.name} / 全${totalShowCount}公演[配信${streamDaysCount}日] 動員 ${grandTotalAudience.toLocaleString()}人 / 収支 ${profit >= 0 ? '+' : ''}${formatMoney(profit)}）`);
     }
   });
 }
 
 // ==========================================
-// 7. イベントライブ（フェス・特番・外部招待）
+// 8. イベントライブ（フェス・特番・外部招待）
 // ==========================================
 function processEventLives(fromDate, toDate) {
   if (!Array.isArray(specialLiveEvents)) return;
@@ -345,11 +329,9 @@ function processEventLives(fromDate, toDate) {
       const multiplier = (event.type === 'festival' ? 1.4 : 1.2);
       const audience = Math.min(capacity, Math.floor(getLiveAudienceDemand(venue, getGameDateObject(event.liveDate)) * multiplier));
 
-      // フェス等は自主興行ではないため会場費・チケット収支は発生せず、出演料・知名度・人気が還元される
       adjustTargetPopularity(2);
       groupCrisis = Math.min(100, groupCrisis + 1);
 
-      // 新規ファン獲得
       const fanGain = Math.floor(calculateGroupFans() * 0.003);
       fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + fanGain);
 
@@ -361,31 +343,38 @@ function processEventLives(fromDate, toDate) {
 }
 
 // ==========================================
-// 8. 月末決算
+// 9. 月末決算（08-events.js と完全連携）
 // ==========================================
 function processMonthlyClosing(fromDate, toDate) {
-  if (!isMonthEnd(toDate)) return;
+  if (!isMonthEnd(toDate)) {
+    return;
+  }
 
-  // 月末の給与・FC会費・CD売上精算
-  settleMonthlyIncome();
+  // CD売上8割、タイアップ、FC会費、給与の引き落とし
+  if (typeof settleMonthlyIncome === 'function') {
+    settleMonthlyIncome();
+  }
 
-  // 当月収支明細を締め切り、レポートを作成してキューへ
-  const report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
-  pendingReports.push({ type: "monthly", report });
+  // 当月の収支明細を確定
+  let report = null;
+  if (typeof finalizeMonthlyLedger === 'function') {
+    report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
+  }
+
+  if (report) {
+    pendingReports.push({
+      type: "monthly",
+      report: report
+    });
+  }
 }
 
-// ==========================================
-// 9. 月末判定
-// ==========================================
 function isMonthEnd(date) {
   const next = new Date(date);
-  next.setDate(date.getDate() + 1);
+  next.setDate(next.getDate() + 1);
   return next.getMonth() !== date.getMonth();
 }
 
-// ==========================================
-// 10. 自主ライブ終了判定
-// ==========================================
 function hasFinishedPlayerLive(date) {
   const dateKey = toDateKey(date);
   return getScheduledLiveEntries().some(entry => {
@@ -396,55 +385,40 @@ function hasFinishedPlayerLive(date) {
 }
 
 // ==========================================
-// 11. レポート・モーダル表示（キュー消化）
+// 10. モーダル待機キュー消化
 // ==========================================
 function openPendingModal() {
-  // ① イベント発生・危機管理・選抜などの緊急モーダルを優先
+  // ① 進行中に積まれたレポート（ライブ詳細収支・月末決算）を最優先で表示
+  if (pendingReports && pendingReports.length > 0) {
+    const item = pendingReports.shift();
+    if (item.type === "live-detail" || item.type === "live") {
+      if (typeof showLiveDetailedFinanceModal === 'function') {
+        showLiveDetailedFinanceModal(item.report || item);
+      } else if (typeof showLiveFinanceModal === 'function') {
+        showLiveFinanceModal(item.rows || []);
+      }
+      return;
+    }
+    if (item.type === "monthly") {
+      if (typeof showMonthlyReportModal === 'function') {
+        showMonthlyReportModal(item.report);
+      }
+      return;
+    }
+  }
+
+  // ② 通常イベントモーダル
   if (pendingSelectionEvent) return openSelectionModal();
   if (pendingCrisisResponse) return openCrisisResponseModal();
   if (pendingFanClubEvent) return openFanClubModal();
   if (pendingRandomEvent) return openRandomEventModal();
   if (pendingEquipmentEvent) return openEquipmentEventModal();
-  if (pendingPerformanceOffers.length) return openMusicOfferModal();
-
-  // ② 進行中に積まれたキュー（月末決算・ライブ結果）を順番に表示
-  if (!pendingReports || !pendingReports.length) return;
-
-  const item = pendingReports.shift();
-  switch (item.type) {
-    case "monthly":
-      showMonthlyReportModal(item.report);
-      break;
-    case "live":
-      showSingleLiveResultModal(item.report);
-      break;
-  }
-}
-
-// ライブ完了時の詳細収支モーダル
-function showSingleLiveResultModal(report) {
-  const rows = [{
-    date: gameDate,
-    venueName: report.venueName,
-    liveName: report.liveName,
-    isFinale: true,
-    audience: report.audience,
-    ticketRevenue: report.ticketRevenue,
-    merchandise: report.merchandise,
-    streamBuyers: Math.round(report.streamRevenue / STREAM_TICKET_PRICE),
-    streamRevenue: report.streamRevenue,
-    streamCost: report.streamCost,
-    revenue: report.ticketRevenue + report.merchandise + report.streamRevenue,
-    venueCost: report.venueCost,
-    profit: report.profit
-  }];
-  showLiveFinanceModal(rows);
+  if (Array.isArray(pendingPerformanceOffers) && pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
 // ==========================================
-// サブフロー・ヘルパー処理
+// 11. サブフロー・ヘルパー処理
 // ==========================================
-
 function processBirthdays(fromDate, toDate) {
   if (typeof processMemberBirthdays === 'function') {
     processMemberBirthdays(fromDate, toDate);
@@ -452,6 +426,20 @@ function processBirthdays(fromDate, toDate) {
   if (typeof syncMemberAges === 'function') {
     syncMemberAges(toDate);
   }
+}
+
+// 初週売上計算式: Σ(w=0→n){ (F / 20) * 10^(1 - w) }
+function calculateFanBasedSales(F, n = 0) {
+  const fans = Math.max(0, Math.round(Number(F) || 0));
+  if (fans <= 0 || n < 0) return 0;
+
+  let totalSales = 0;
+  for (let w = 0; w <= n; w++) {
+    const weeklySales = (fans / 20) * Math.pow(10, 1 - w);
+    if (weeklySales < 0.5) break;
+    totalSales += weeklySales;
+  }
+  return Math.round(totalSales);
 }
 
 function processReleaseEvents(reachDateStr) {
@@ -463,38 +451,28 @@ function processReleaseEvents(reachDateStr) {
     const isSingle = (plan.release === 'single');
     const song = ensureScheduledSong(currentYear, currentMonth, plan);
 
-    // 1. ファン数 F の取得
+    // ファン数 F から初週基礎売上を等比減衰式で算出 (w=0: 0.5F)
     const F = calculateGroupFans();
-
-    // 2. 基本初週売上: Σ(w=0→0) { (F / 20) * 10^(1 - w) } = F * 0.5
-    // ※ シングル/アルバムの基礎規模として初週分(w=0)を計算
     const baseFirstWeek = calculateFanBasedSales(F, 0);
 
-    // 3. チーム力・楽曲レベル・発売前プロモによる品質乗数
     const qualityMultiplier = 1.0 + (summary.overall / 100);
     const songLevelMultiplier = 1.0 + (((song.level || 1) - 1) * 0.02);
     const promoAlpha = (song.promoCount || 0) * (typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005);
     const promoMultiplier = 1.0 + promoAlpha;
-
-    // アルバムの場合は単価が高いため係数を調整（0.7倍等）、シングルなら等倍
     const typeFactor = isSingle ? 1.0 : 0.7;
-
-    // 4. 初週売上の最終算出（乱数揺らぎ ±5%）
     const randomFactor = 0.95 + Math.random() * 0.10;
+
     const sales = Math.round(baseFirstWeek * qualityMultiplier * songLevelMultiplier * promoMultiplier * typeFactor * randomFactor);
 
-    // 5. 売上計上・初週ランキング記録・フラグ更新
     addGroupSales(sales);
     addMonthlyCdRevenue(sales * getSongUnitPrice(song));
-    
     song.totalSales = (song.totalSales || 0) + sales;
     song.released = true;
     song.releaseDateKey = gameDate;
     song.releasePromoAlpha = promoAlpha;
-    song.firstWeekSales = sales; // ← 初週売上ランキング（記録タブ）に保存
+    song.firstWeekSales = sales;
     song.salesHistory = [{ weekKey: gameDate, sales }];
 
-    // 特典イベント等の経費精算
     const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
     if (benefit) {
       funds -= benefit.cost;
@@ -503,7 +481,6 @@ function processReleaseEvents(reachDateStr) {
     }
     plan.releaseCompleted = true;
 
-    // メディア報道
     scheduleInfoMedia('release', {
       releaseType: plan.release,
       songTitle: song.title,
@@ -517,24 +494,22 @@ function processReleaseEvents(reachDateStr) {
     setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}『${song.title}』発売！ 初週売上: ${sales.toLocaleString()}枚！`);
   }
 }
+
 function processWeeklyCycle(toDate) {
   totalWeeksElapsed++;
 
-  // 危機・ランダムイベント
   rollWeeklyCrisisEvent();
   rollRandomEvent();
   rollEquipmentDowngradeEvent();
   checkFanClubYearlyEvent();
   checkSpecialBroadcastOffers();
 
-  // マネージャー・怪我・疲労回復
   try { processManagerResignations(); } catch (e) {}
   try { refreshManagerMarket(); } catch (e) {}
   processMemberInjuries();
   decayLiveFatigue();
   syncPlayerTeamStats();
 
-  // ライバル競合シミュレーション
   if (Array.isArray(leagueTeams)) {
     leagueTeams.forEach(team => {
       if (!team || team.id === 'player') return;
@@ -550,7 +525,6 @@ function processWeeklyCycle(toDate) {
     });
   }
 
-  // 楽曲練習・選抜発表・オファー
   const summary = calculateTeamAverages();
   checkSenbatsuTrigger();
   checkMusicProgramOffers();
@@ -558,15 +532,12 @@ function processWeeklyCycle(toDate) {
   trainSongs(summary);
   recordAllSongSalesHistory();
 
-  // 設備維持費
   maintainOfficeFacilities();
 
-  // ドラフト会議判定
   if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
     startDraftMeeting();
   }
 
-  // 年次繰り越し
   checkYearlyTransition();
 }
 
@@ -583,14 +554,13 @@ function checkYearlyTransition() {
     yearEndAwardProcessed = false;
     yearEndKohakuProcessed = false;
 
-    // 半年計画策定モーダル
     if (currentMonth === 1) openDecisionModal("当年7月〜12月の計画策定", currentYear, 7, 12);
     else if (currentMonth === 7) openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
   }
 }
 
 // ==========================================
-// スケジュール設定・適用ロジック（個別レッスン統合版）
+// 12. スケジュール設定・適用ロジック
 // ==========================================
 function createEmptyWeeklySchedule() {
   const defaultSlots = typeof DEFAULT_WEEK_SLOTS !== 'undefined' ? DEFAULT_WEEK_SLOTS : [];
@@ -1047,10 +1017,18 @@ function validateWeeklySchedule() {
   }
 
   const mealCount = getWeekMealPartyCount();
-  const mealCost = mealCount * (typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000);
-  if (mealCost > funds) {
-    alert(`【資金不足】食事会の経費（${formatMoney(mealCost)}）が所持金を超えています。食事会を減らしてください。`);
-    return false;
+  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
+  if (mealCount > 0) {
+    funds -= mealCount * mealCostSingle;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle);
+    }
+    if (typeof adjustTargetPopularity === 'function' && typeof MEAL_PARTY_POPULARITY_GAIN !== 'undefined') {
+      adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
+    }
+    if (typeof groupCrisis !== 'undefined' && typeof MEAL_PARTY_CRISIS_GAIN !== 'undefined') {
+      groupCrisis = Math.min(100, groupCrisis + MEAL_PARTY_CRISIS_GAIN);
+    }
   }
 
   return true;
@@ -1131,21 +1109,6 @@ function applyWeeklySchedule() {
     .map(entry => entry.index));
 
   const skippedGroupOnly = groupOnlySlots.some(entry => !groupOnlyAvailableSlots.has(entry.index));
-
-  const mealCount = getWeekMealPartyCount();
-  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
-  if (mealCount > 0) {
-    funds -= mealCount * mealCostSingle;
-    if (typeof recordMonthlyExpense === 'function') {
-      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle);
-    }
-    if (typeof adjustTargetPopularity === 'function' && typeof MEAL_PARTY_POPULARITY_GAIN !== 'undefined') {
-      adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
-    }
-    if (typeof groupCrisis !== 'undefined' && typeof MEAL_PARTY_CRISIS_GAIN !== 'undefined') {
-      groupCrisis = Math.min(100, groupCrisis + MEAL_PARTY_CRISIS_GAIN);
-    }
-  }
 
   let levelUps = 0;
   const injuries = [];
@@ -1244,7 +1207,7 @@ function applyWeeklySchedule() {
     let recovery = (typeof getMemberWeeklyRecovery === 'function') ? getMemberWeeklyRecovery(member, stayedRestingAllWeek) : 20;
     const restSlotCount = weeklySchedule.slots.filter(s => s === 'rest-day').length;
     recovery += restSlotCount * restSlotRec;
-    recovery += mealCount * mealRec;
+    recovery += getWeekMealPartyCount() * mealRec;
     if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, recovery);
 
     if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
@@ -1292,6 +1255,8 @@ function applyWeeklySchedule() {
     parts.push(`個別レッスン: ${targetMember.name}（${targetStatName} 10.1倍 / 他メンバー休養）`);
   }
 
+  const mealCount = getWeekMealPartyCount();
+  const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
   if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * mealCostSingle)}）`);
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
   if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
@@ -1321,7 +1286,6 @@ function selectOfficeAction(actionId) {
   renderWeeklyActionPanel();
 }
 
-// 等比減衰販促モデル式: Σ(w=1→k) { (S / 20) * 10^(1 - w) }
 function getPromotionCumulativeSalesByFormula(baseSales, k) {
   if (baseSales <= 0 || k <= 0) return 0;
   let cumulative = 0;
