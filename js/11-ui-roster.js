@@ -1,6 +1,7 @@
 // ==========================================
-// 11-ui-roster.js : UI描画（null安全・更新同期完全版）
+// 11-ui-roster.js : UI描画（編成・楽曲・updateUI完全同期版）
 // ==========================================
+
 function updateUI() {
   const setText = (id, text) => {
     const el = document.getElementById(id);
@@ -125,7 +126,7 @@ function updateUI() {
     });
   }
 
-  // ナビゲーションバーの同期再描画
+  // 1. ナビゲーションバーの同期再描画（タブ消失防止）
   if (typeof renderPageNav === 'function') {
     renderPageNav(currentPageTab);
   }
@@ -140,7 +141,7 @@ function updateUI() {
   renderSalaryPanel();
   renderGameCalendar();
   
-  // スケジュール設定UIの安全描画
+  // 2. スケジュール設定UIの安全描画
   if (typeof renderWeeklyActionPanel === 'function') {
     renderWeeklyActionPanel();
   }
@@ -366,7 +367,7 @@ function renderRosterList() {
 }
 
 // ==========================================
-// 出来事ログ（log-box が無くてもクラッシュしない完全安全版）
+// 出来事ログ（log-box が無くてもクラッシュしない完全安全ガード版）
 // ==========================================
 function setLog(msg) {
   if (!Array.isArray(logHistory)) logHistory = [];
@@ -374,7 +375,7 @@ function setLog(msg) {
   const limit = typeof LOG_HISTORY_LIMIT !== 'undefined' ? LOG_HISTORY_LIMIT : 60;
   if (logHistory.length > limit) logHistory.length = limit;
   
-  // log-box 要素が存在する場合のみ更新（要素削除時のクラッシュを完全防止）
+  // HTML側から log-box が消去されていても安全にスルーする
   const box = document.getElementById('log-box');
   if (box) {
     box.textContent = msg;
