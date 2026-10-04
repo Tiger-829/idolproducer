@@ -1543,3 +1543,39 @@
     }
     .draft-acquired { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; font-size: 10px; color: #555; }
     .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }
+/* ==========================================
+   タブレット・PCなどの横長画面・向きへの対応
+   ========================================== */
+
+/* --- デフォルト（スマホの縦持ちなど、幅が狭い場合） --- */
+.game-container {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* --- タブレットやPC、または横長画面の場合（幅が768px以上、かつ横向き） --- */
+@media screen and (min-width: 768px) and (orientation: landscape) {
+  .game-container {
+    max-width: 900px; /* 横幅を広げる */
+  }
+  
+  /* 例：事務所画面などを左右2ペイン（2カラム）の横長レイアウトにする */
+  #page-office {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  /* カレンダーや重要な全体パネルは横幅いっぱいに使う */
+  .calendar-card, .weekly-action-panel {
+    grid-column: span 2;
+  }
+}
+
+/* --- スマホを横向きにしたときのコンパクト表示 --- */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .game-container {
+    padding: 4px;
+  }
+}
