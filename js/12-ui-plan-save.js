@@ -388,6 +388,27 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   planMonthEventDrafts = {};
   const titleEl = document.getElementById('modal-title');
   if (titleEl) titleEl.textContent = title;
+
+  // ▼ 【追加】1つ前の半年分の概略を表示する処理
+  const summaryBox = document.getElementById('prev-plan-summary');
+  if (summaryBox) {
+    // 直前の半期のデータを取得する処理（※データ構造に合わせてキー名などは適宜調整してください）
+    // 例として、過去のスケジュールや実績がゲームデータ内に保持されている場合を想定しています
+    const prevKey = `${startM === 1 ? yearTarget - 1 : yearTarget}-${startM === 1 ? 7 : 1}`;
+    const prevSummary = (typeof pastPlanSummaries !== 'undefined' && pastPlanSummaries[prevKey]) ? pastPlanSummaries[prevKey] : null;
+
+    if (prevSummary) {
+      summaryBox.innerHTML = `
+        <strong>【直近の半期の振り返り（${prevKey.replace('-', '年')}月期）】</strong><br>
+        CD発売数: ${prevSummary.releaseCount || 0}枚 / ライブ動員合計: ${prevSummary.totalAudience || 0}人
+      `;
+    } else {
+      // 1つ前のデータが見つからない（初回など）の場合
+      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
+    }
+  }
+  // ▲ 追加ここまで
+
   const container = document.getElementById('plan-rows');
   if (!container) return;
   container.innerHTML = '';
