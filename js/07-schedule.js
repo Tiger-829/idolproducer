@@ -132,8 +132,106 @@ function processDailyFlow(fromDate, toDate) {
   }
 
   // ⑦ 月末決算
-  processMonthlyClosing(fromDate, toDate);
+  // ==========================================
+// 8. 月末決算（既存 08-events.js と完全連携版）
+// ==========================================
+function processMonthlyClosing(fromDate, toDate) {
+  // toDate が「月の最終日」であるか判定
+  if (!isMonthEnd(toDate)) {
+    return;
+  }
+
+  // ① CD売上（8割入金）、タイアップ臨時収入、FC会費、メンバー・マネージャー給与の月末引き落としを実行
+  if (typeof settleMonthlyIncome === 'function') {
+    settleMonthlyIncome();
+  }
+
+  // ② 当月の収支明細（monthlyLedger）を確定し、レポートオブジェクトを生成
+  let report = null;
+  if (typeof finalizeMonthlyLedger === 'function') {
+    report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
+  }
+
+  // ③ レポート待機キューに格納
+  if (report) {
+    pendingReports.push({
+      type: "monthly",
+      report: report
+    });
+  }
 }
+
+// ==========================================
+// 9. 月末判定（翌日が1日＝今月が最終日）
+// ==========================================
+function isMonthEnd(date) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  // 翌日の「月」が変わっていれば、本日は月末日
+  return next.getMonth() !== date.getMonth();
+}
+
+// ==========================================
+// 10. 自主ライブ終了判定
+// ==========================================
+function hasFinishedPlayerLive(date) {
+  const dateKey = toDateKey(date);
+  return getScheduledLiveEntries().some(entry => {
+    if (!entry.completed) return false;
+    const showDates = getLiveEntryShowDates(entry);
+    return showDates[showDates.length - 1] === dateKey;
+  });
+}
+
+// ==========================================
+// 11. レポート・モーダル表示（キュー消化＆チェーン対応）
+// ==========================================
+function openPendingModal() {
+  // ① 緊急モーダル（選抜発表・危機対応・FC打診・設備整理等）を最優先
+  if (pendingSelectionEvent) return openSelectionModal();
+  if (pendingCrisisResponse) return openCrisisResponseModal();
+  if (pendingFanClubEvent) return openFanClubModal();
+  if (pendingRandomEvent) return openRandomEventModal();
+  if (pendingEquipmentEvent) return openEquipmentEventModal();
+  if (Array.isArray(pendingPerformanceOffers) && pendingPerformanceOffers.length) return openMusicOfferModal();
+
+  // ② 進行中に積まれたキュー（月末決算・ライブ結果）を順番に表示
+  if (!pendingReports || !pendingReports.length) return;
+
+  const item = pendingReports.shift();
+  switch (item.type) {
+    case "monthly":
+      if (typeof showMonthlyReportModal === 'function') {
+        showMonthlyReportModal(item.report);
+      }
+      break;
+    case "live":
+      showSingleLiveResultModal(item.report);
+      break;
+    case "event":
+      // イベントライブ結果（必要に応じて表示）
+      break;
+  }
+}
+
+// ==========================================
+// モーダルを閉じたときの連鎖フック（キューが残っていれば次を開く）
+// ==========================================
+// 既存の closeMonthlyReportModal を上書き拡張
+const originalCloseMonthlyReportModal = typeof closeMonthlyReportModal === 'function' ? closeMonthlyReportModal : null;
+window.closeMonthlyReportModal = function() {
+  const modal = document.getElementById('monthly-report-modal');
+  if (modal) modal.style.display = 'none';
+  pendingMonthlyReport = null;
+
+  // キューに残っている次のレポート（ライブ結果等）があれば続けて開く
+  if (pendingReports && pendingReports.length > 0) {
+    openPendingModal();
+  } else {
+    // 全て確認し終えたらUIを更新
+    updateUI();
+  }
+};
 
 // ==========================================
 // 5. ライブ共通処理
