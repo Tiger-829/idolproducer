@@ -826,7 +826,7 @@ function applyOfficeAction(actionId) {
 }
 
 /**
- * 週間スケジュールを確定して1週間進める（原因可視化＆安全ガード付き）
+ * 週間スケジュールを確定して1週間進める
  */
 function confirmWeeklySchedule() {
   console.log('【進行ボタン押下】処理を開始します...');
@@ -939,7 +939,7 @@ function advanceOneWeek() {
 
   processMonthlyReleaseAndLive(toDateKey(nextDate));
   processPlanEvents(toDateKey(nextDate));
-  if (wasWednesday) maintainOfficeFacilities();
+  if (wasWednesday && typeof maintainOfficeFacilities === 'function') maintainOfficeFacilities();
   if (wasWednesday && totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) startDraftMeeting();
 
   gameDate = toDateKey(nextDate);
