@@ -1554,37 +1554,11 @@
   margin: 0 auto;
 }
 
-/* --- タブレットやPC、または横長画面の場合（幅が768px以上、かつ横向き） --- */
-@media screen and (min-width: 768px) and (orientation: landscape) {
-  .game-container {
-    max-width: 900px; /* 横幅を広げる */
-  }
-  
-  /* 例：事務所画面などを左右2ペイン（2カラム）の横長レイアウトにする */
-  #page-office {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-  
-  /* カレンダーや重要な全体パネルは横幅いっぱいに使う */
-  .calendar-card, .weekly-action-panel {
-    grid-column: span 2;
-  }
-}
-
-/* --- スマホを横向きにしたときのコンパクト表示 --- */
-@media screen and (max-height: 500px) and (orientation: landscape) {
-  .game-container {
-    padding: 4px;
-  }
-}
-
 /* ==========================================
-   タブレット・PCなどの横長画面でのレスポンシブ対応
+   タブレット・PCなどの横長画面（幅768px以上）でのレスポンシブ対応
    ========================================== */
 
-@media screen and (min-width: 768px) and (orientation: landscape) {
+@media screen and (min-width: 768px) {
   /* ゲーム全体の最大幅を広げる */
   .game-container {
     max-width: 1200px;
@@ -1594,11 +1568,12 @@
   .title-screen {
     max-width: 1100px;
     margin: 0 auto;
+    padding: 20px;
   }
   
   .save-slots {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 3つのスロットを横に等間隔で配置 */
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* 3つのスロットを横に等間隔で配置 */
     gap: 16px;
     align-items: stretch;
   }
