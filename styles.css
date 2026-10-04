@@ -1491,7 +1491,6 @@
 
 /* タブレット・PCなどの横長画面（幅768px以上）のとき */
 @media screen and (min-width: 768px) {
-  /* スマホ用の中央寄せを解除し、全体を画面いっぱいに広げる */
   html, body {
     width: 100%;
     min-height: 100vh;
@@ -1500,7 +1499,6 @@
     background-color: var(--panel);
   }
 
-  /* 親ラッパーをワイド画面用に展開 */
   .app-wrapper {
     width: 100vw;
     min-height: 100vh;
@@ -1508,7 +1506,6 @@
     flex-direction: column;
   }
 
-  /* タイトル画面やゲームコンテナのスマホ幅制限を解除して画面いっぱいに */
   .title-screen,
   .game-container {
     width: 100% !important;
@@ -1518,7 +1515,7 @@
     padding: 40px 60px !important;
   }
 
-  /* セーブスロットの3分割横並び */
+  /* --- タイトル画面のセーブ枠3分割 --- */
   .save-slots {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
@@ -1527,10 +1524,101 @@
     max-width: 100% !important;
   }
 
-  /* 事務所タブなどの2分割レイアウト */
+  /* ==========================================
+     1. 事務所タブ（手書きレイアウト図の完全再現）
+     ========================================== */
   #page-office {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
+    align-items: start !important;
+  }
+  #calendar-visual {
+    grid-column: 1 / 2 !important;
+    grid-row: 1 !important;
+  }
+  .office-facilities:nth-of-type(1),
+  .office-facilities:nth-of-type(2) {
+    grid-column: 1 / 2 !important;
+  }
+  #weekly-action-panel {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 !important;
+  }
+  .office-facilities:nth-of-type(3) {
+    grid-column: 2 / 3 !important;
+  }
+  #page-office > .actions {
+    grid-column: span 2 !important;
+  }
+
+  /* ==========================================
+     2. グループタブ（2分割）
+     ========================================== */
+  #page-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  .team-summary-card { grid-column: 1 / 2 !important; }
+  .team-fans-card-stack, .team-fans-card { grid-column: 2 / 3 !important; }
+  #page-group > div:last-of-type { grid-column: span 2 !important; } /* 楽曲セクションは全幅 */
+
+  /* ==========================================
+     3. 編成タブ（2分割）
+     ========================================== */
+  #page-formation {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  .roster-card { grid-column: span 2 !important; }
+
+  /* ==========================================
+     4. 資金タブ（2分割）
+     ========================================== */
+  #page-funds {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-funds > .page-title { grid-column: span 2 !important; }
+  .funds-card { grid-column: 1 / 2 !important; }
+  .fund-stat-grid { grid-column: 2 / 3 !important; }
+  .office-maintenance-note#salary-note { grid-column: span 2 !important; }
+
+  /* ==========================================
+     5. 業界順位タブ（2分割）
+     ========================================== */
+  #page-ranking {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-ranking > .page-title, 
+  #page-ranking > .ranking-note,
+  #page-ranking > .ranking-list {
+    grid-column: span 2 !important;
+  }
+
+  /* ==========================================
+     6. 記録タブ（2分割）
+     ========================================== */
+  #page-records {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 32px !important;
+    align-items: start !important;
+  }
+  #page-records > .page-title { grid-column: span 2 !important; }
+  .records-block:nth-of-type(1) { grid-column: 1 / 2 !important; } /* 売上グラフ */
+  .records-block:nth-of-type(2) { grid-column: 2 / 3 !important; } /* 初週ランキング */
+  .records-block:nth-of-type(3),
+  .records-help {
+    grid-column: span 2 !important;
   }
 }
