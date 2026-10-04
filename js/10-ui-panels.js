@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : UI描画（順位・事務所・マネージャー・給与）完全版
+// 10-ui-panels.js : UI描画（nullセーフ＆エラー完全防御版）
 // ==========================================
 
 const PAGE_TABS = [
@@ -13,6 +13,28 @@ const PAGE_TABS = [
 
 const DEFAULT_PAGE = 'office';
 
+// アイコン取得で絶対に null を返さない安全ラッパー
+function safeGetIconSvg(iconName) {
+  if (typeof getIconSvg === 'function') {
+    try {
+      const res = getIconSvg(iconName);
+      if (res) return res;
+    } catch (e) {}
+  }
+  // 未定義やエラー時のフォールバックアイコン
+  const iconMap = {
+    group: '👥',
+    formation: '📋',
+    office: '🏢',
+    funds: '💰',
+    ranking: '🏆',
+    records: '📊',
+    upgrade: '▲',
+    downgrade: '▼'
+  };
+  return `<span class="fallback-icon">${iconMap[iconName] || '●'}</span>`;
+}
+
 function renderPageNav(activePage = DEFAULT_PAGE) {
   const target = PAGE_TABS.some(tab => tab.id === activePage) ? activePage : DEFAULT_PAGE;
   const nav = document.getElementById('page-nav');
@@ -23,7 +45,7 @@ function renderPageNav(activePage = DEFAULT_PAGE) {
       <button class="page-tab${active ? ' active' : ''}" id="page-tab-${tab.id}" type="button" role="tab"
         aria-selected="${active}" aria-controls="page-${tab.id}" title="${tab.label}"
         onclick="switchPage('${tab.id}')">
-        <span class="tab-icon">${getIconSvg(tab.icon)}</span>${tab.label}
+        <span class="tab-icon">${safeGetIconSvg(tab.icon)}</span>${tab.label}
       </button>`;
     }).join('');
   }
@@ -51,7 +73,7 @@ function syncPlayerTeamStats() {
   pTeam.sales = yearlyStats?.sales || 0;
   pTeam.audience = yearlyStats?.audience || 0;
   pTeam.showCount = countPlayerLiveShows();
-  pTeam.basePower = getPlayerTeamOverall();
+  pTeam.basePower = typeof getPlayerTeamOverall === 'function' ? getPlayerTeamOverall() : 50;
 }
 
 function countPlayerLiveShows() {
@@ -68,10 +90,11 @@ function countPlayerLiveShows() {
 function getLeagueRanking() {
   syncPlayerTeamStats();
   if (!Array.isArray(leagueTeams)) return [];
+  const overall = typeof getPlayerTeamOverall === 'function' ? getPlayerTeamOverall() : 50;
   return leagueTeams
     .filter(Boolean)
     .map(team => {
-      const power = team.id === 'player' ? getPlayerTeamOverall() : getRivalTeamPower(team);
+      const power = team.id === 'player' ? overall : getRivalTeamPower(team);
       return {
         id: team.id,
         name: team.name,
@@ -500,7 +523,6 @@ function renderGameCalendar() {
   }
 }
 
-// 設備維持費・アップグレード
 const OFFICE_COST_GROWTH = 1.9;
 const OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -591,12 +613,12 @@ function renderOfficeUpgrades() {
             onclick="upgradeOfficeFacility('${facility.id}')"
             ${disabled ? 'disabled' : ''}
             title="${isMax ? `${facility.name}は最大レベルです` : `${facility.name}をLv.${level + 1}に強化（${formatMoney(upgradeCost)}）`}"
-            aria-label="${facility.name}をLv.${level + 1}に強化">${getIconSvg('upgrade')}</button>
+            aria-label="${facility.name}をLv.${level + 1}に強化">${safeGetIconSvg('upgrade')}</button>
           ${level > 1
             ? `<button class="icon-round-btn down" type="button"
                 onclick="downgradeOfficeFacility('${facility.id}')"
                 title="${facility.name}をLv.${level - 1}にダウングレード（売却額 ${formatMoney(refund)}）"
-                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${getIconSvg('downgrade')}</button>`
+                aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg('downgrade')}</button>`
             : ''}
         </div>
       </div>
@@ -604,7 +626,6 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャーパネル（nullセーフ完全保護）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
