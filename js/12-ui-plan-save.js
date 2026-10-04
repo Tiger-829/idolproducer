@@ -402,20 +402,33 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     let prevStart = startM === 7 ? 1 : 7;
     let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
     
-    let prevReleaseCount = 0;
-    let liveDetails = [];
+    let releaseDetails = []; // CD発売情報のリスト
+    let liveDetails = [];    // ライブ情報のリスト
 
     for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
       const pKey = `${prevYear}-${m}`;
       if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
         const p = productionSchedule[pKey];
         
-        // CD発売のカウント
+        // 1. CD発売データの抽出（発売日や楽曲名、リリース種別）
         if (p.release && p.release !== 'none') {
-          prevReleaseCount++;
+          let relDateStr = p.releaseDate || p.date || '';
+          if (relDateStr) {
+            relDateStr = relDateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
+          } else {
+            relDateStr = '日程未定';
+          }
+          
+          let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
+          let songNameStr = p.songName ? `「${p.songName}」` : '';
+          
+          releaseDetails.push({
+            month: m,
+            text: `${m}月: ${relTypeName}${songNameStr} (${relDateStr}発売)`
+          });
         }
         
-        // ライブ・イベント情報の抽出（考えられるすべてのプロパティや関数を網羅）
+        // 2. ライブデータの抽出
         let entries = [];
         if (typeof getMonthLiveEntries === 'function') {
           try {
@@ -425,7 +438,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           }
         }
         
-        // 取得できない場合は、オブジェクト直下のプロパティから探す
+        // 関数で取得できない場合はオブジェクト直下から探す
         if (!entries || entries.length === 0) {
           if (p.liveDate || p.liveVenue || p.liveName || p.liveDates) {
             entries = [{
@@ -436,7 +449,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           }
         }
 
-        // 各エントリから日付候補を徹底的に洗い出す
         entries.forEach(e => {
           let dates = [];
           if (e.liveDate) dates.push(e.liveDate);
@@ -444,45 +456,47 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           if (Array.isArray(e.liveDates)) dates = dates.concat(e.liveDates);
           if (Array.isArray(e.dates)) dates = dates.concat(e.dates);
           
-          // 重複を削除して整理
           dates = [...new Set(dates)].filter(Boolean);
+
+          // 整形
+          let formattedDates = dates.map(d => {
+            return d.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
+          });
 
           const lName = e.liveName || e.liveVenue || e.name || p.liveName || p.liveVenue || 'ライブ公演';
 
-          if (dates.length > 0 || lName) {
-            liveDetails.push({
-              month: m,
-              name: lName,
-              dates: dates
-            });
-          }
+          liveDetails.push({
+            month: m,
+            name: lName,
+            dates: formattedDates
+          });
         });
       }
     }
 
-    // 表示用HTMLの組み立て
-    if (prevReleaseCount > 0 || liveDetails.length > 0) {
-      let liveHtml = '';
-      if (liveDetails.length > 0) {
-        liveHtml = `<br><strong>【ライブ予定一覧】</strong><br>` + liveDetails.map(l => {
-          let dateStr = l.dates.length > 0 ? l.dates.join(', ') : '日程未定';
-          // 日付文字列を綺麗に整形 (YYYY-MM-DD -> M月D日)
-          dateStr = dateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
-          return `・${l.month}月: ${l.name} (${dateStr})`;
-        }).join('<br>');
-      } else {
-        liveHtml = `<br>ライブ予定: なし`;
-      }
+    // 3. 画面表示用HTMLの組み立て
+    if (releaseDetails.length > 0 || liveDetails.length > 0) {
+      let releaseHtml = releaseDetails.length > 0 
+        ? `<strong>【CD発売】</strong><br>` + releaseDetails.map(r => `・${r.text}`).join('<br>')
+        : `<strong>【CD発売】</strong><br>・なし`;
+
+      let liveHtml = liveDetails.length > 0 
+        ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.map(l => {
+            let dateStr = l.dates.length > 0 ? l.dates.join(', ') : '日程未定';
+            return `・${l.month}月: ${l.name} (${dateStr})`;
+          }).join('<br>')
+        : `<br><strong>【ライブ予定】</strong><br>・なし`;
 
       summaryBox.innerHTML = `
         <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
-        CD発売数: ${prevReleaseCount}枚
+        ${releaseHtml}<br>
         ${liveHtml}
       `;
     } else {
       summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
     }
   }
+  
   const container = document.getElementById('plan-rows');
   if (!container) return;
   container.innerHTML = '';
