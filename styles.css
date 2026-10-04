@@ -1490,11 +1490,11 @@
     .draft-acquired span { padding: 2px 6px; background: #f5f1f2; border-radius: 10px; }
 
 /* ==========================================
-   タブレット・PCなどの横長画面（幅768px以上）でのワイド画面対応
+   タブレット・PCなどの横長画面（幅768px以上）でのワイド画面対応【タイトル画面修正版】
    ========================================== */
 
 @media screen and (min-width: 768px) {
-  /* 1. スマホ用の中央寄せを解除し、画面全体をワイドに使う */
+  /* スマホ用の中央寄せを解除し、画面全体をワイドに使う */
   html, body {
     justify-content: stretch !important;
   }
@@ -1509,14 +1509,20 @@
     gap: 20px !important;
   }
 
-  /* 2. タイトル画面を画面全体に広げ、セーブスロットを3分割で横並びにする */
+  /* --- タイトル画面を画面全体に広げ、セーブスロットを3分割で横並びにする --- */
   .title-screen {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100% !important; /* スマホ用の幅制限を完全に解除 */
     min-height: 100vh;
-    padding: 32px 40px !important;
+    padding: 36px 48px !important;
     gap: 24px !important;
     background: var(--panel);
+  }
+
+  .title-heading {
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
   }
   
   .save-slots {
@@ -1524,13 +1530,22 @@
     grid-template-columns: repeat(3, 1fr) !important; /* スロット1, 2, 3を横に3等分 */
     gap: 24px !important;
     align-items: stretch !important;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
   }
 
   .save-slot {
     padding: 20px !important;
   }
 
-  /* --- 3. 事務所タブの2分割＆手書きレイアウト --- */
+  .title-actions {
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* --- 1. 事務所タブの2分割＆手書きレイアウト --- */
   #page-office {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1551,7 +1566,7 @@
     grid-column: span 2 !important;
   }
 
-  /* --- 4. グループタブの2分割 --- */
+  /* --- 2. グループタブの2分割 --- */
   #page-group {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1566,7 +1581,7 @@
     grid-column: span 2 !important;
   }
 
-  /* --- 5. 編成タブの2分割 --- */
+  /* --- 3. 編成タブの2分割 --- */
   #page-formation {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1577,7 +1592,7 @@
     grid-column: span 2 !important;
   }
 
-  /* --- 6. 資金タブの2分割 --- */
+  /* --- 4. 資金タブの2分割 --- */
   #page-funds {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1588,7 +1603,7 @@
   .funds-card { grid-column: 1 / 2 !important; }
   .fund-stat-grid { grid-column: 2 / 3 !important; }
 
-  /* --- 7. 業界順位タブの2分割 --- */
+  /* --- 5. 業界順位タブの2分割 --- */
   #page-ranking {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
@@ -1601,7 +1616,7 @@
     grid-column: span 2 !important;
   }
 
-  /* --- 8. 記録タブの2分割 --- */
+  /* --- 6. 記録タブの2分割 --- */
   #page-records {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
