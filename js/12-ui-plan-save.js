@@ -12,7 +12,7 @@ let planCalendarRangeMode = false;
 let planMonthEventDrafts = {};
 
 function isPresetReleaseMonth(month) {
-  return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);[cite: 1]
+  return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
 }
 
 function getPlanCalendarDate(month, day) {
