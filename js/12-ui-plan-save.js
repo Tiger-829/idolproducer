@@ -382,6 +382,11 @@ function refreshPlanEventsContainer(month) {
 
 // 半年計画策定モーダル
 function openDecisionModal(title, yearTarget, startM, endM) {
+  const testBox = document.getElementById('prev-plan-summary');
+  if (testBox) {
+    testBox.style.background = '#e0f7fa'; // 色を変えて目立たせる
+    testBox.innerHTML = '<strong>【テスト】モーダル関数は動いています！</strong>';
+  }
   planYearTarget = yearTarget;
   planStartM = startM;
   planEndM = endM;
