@@ -1533,92 +1533,51 @@
     gap: 32px !important;
     align-items: start !important;
   }
-  #calendar-visual {
+  #page-office #calendar-visual {
     grid-column: 1 / 2 !important;
     grid-row: 1 !important;
   }
-  .office-facilities:nth-of-type(1),
-  .office-facilities:nth-of-type(2) {
-    grid-column: 1 / 2 !important;
-  }
-  #weekly-action-panel {
+  #page-office #weekly-action-panel {
     grid-column: 2 / 3 !important;
     grid-row: 1 !important;
   }
-  .office-facilities:nth-of-type(3) {
+  #page-office .office-facilities:nth-of-type(1),
+  #page-office .office-facilities:nth-of-type(2) {
+    grid-column: 1 / 2 !important;
+  }
+  #page-office .office-facilities:nth-of-type(3) {
     grid-column: 2 / 3 !important;
   }
-  #page-office > .actions {
+  #page-office .actions {
     grid-column: span 2 !important;
   }
 
   /* ==========================================
-     2. グループタブ（2分割）
+     2. その他のタブ（グループ、編成、資金、順位、記録）
+        一律でシンプルに左右2分割にする
      ========================================== */
-  #page-group {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 32px !important;
-    align-items: start !important;
-  }
-  .team-summary-card { grid-column: 1 / 2 !important; }
-  .team-fans-card-stack, .team-fans-card { grid-column: 2 / 3 !important; }
-  #page-group > div:last-of-type { grid-column: span 2 !important; } /* 楽曲セクションは全幅 */
-
-  /* ==========================================
-     3. 編成タブ（2分割）
-     ========================================== */
-  #page-formation {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 32px !important;
-    align-items: start !important;
-  }
-  .roster-card { grid-column: span 2 !important; }
-
-  /* ==========================================
-     4. 資金タブ（2分割）
-     ========================================== */
-  #page-funds {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 32px !important;
-    align-items: start !important;
-  }
-  #page-funds > .page-title { grid-column: span 2 !important; }
-  .funds-card { grid-column: 1 / 2 !important; }
-  .fund-stat-grid { grid-column: 2 / 3 !important; }
-  .office-maintenance-note#salary-note { grid-column: span 2 !important; }
-
-  /* ==========================================
-     5. 業界順位タブ（2分割）
-     ========================================== */
-  #page-ranking {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 32px !important;
-    align-items: start !important;
-  }
-  #page-ranking > .page-title, 
-  #page-ranking > .ranking-note,
-  #page-ranking > .ranking-list {
-    grid-column: span 2 !important;
-  }
-
-  /* ==========================================
-     6. 記録タブ（2分割）
-     ========================================== */
+  #page-group,
+  #page-formation,
+  #page-funds,
+  #page-ranking,
   #page-records {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 32px !important;
     align-items: start !important;
   }
-  #page-records > .page-title { grid-column: span 2 !important; }
-  .records-block:nth-of-type(1) { grid-column: 1 / 2 !important; } /* 売上グラフ */
-  .records-block:nth-of-type(2) { grid-column: 2 / 3 !important; } /* 初週ランキング */
-  .records-block:nth-of-type(3),
-  .records-help {
+
+  /* 各タブのタイトルや横幅いっぱいに広げたい大枠要素の指定 */
+  #page-group > div:last-of-type,
+  #page-formation .roster-card,
+  #page-funds > .page-title,
+  #page-funds .office-maintenance-note#salary-note,
+  #page-ranking > .page-title, 
+  #page-ranking > .ranking-note,
+  #page-ranking > .ranking-list,
+  #page-records > .page-title,
+  #page-records .records-block:nth-of-type(3),
+  #page-records .records-help {
     grid-column: span 2 !important;
   }
 }
