@@ -1006,7 +1006,6 @@ function advanceOneWeek() {
     else openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
   }
 
-  // updateUI() が例外を出しても進行処理全体を落とさないようセーフガード
   try {
     updateUI();
   } catch (uiErr) {
