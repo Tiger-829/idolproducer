@@ -284,10 +284,14 @@ function renderWeeklyScheduleControls() {
   const restDayIds = new Set(weeklySchedule.restDayMembers || []);
 
   const individualOptions = getIndividualLessonMemberOptions();
-  const memberOptions = individualOptions.map(member =>
-    `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
-    `${escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.age || 18}歳 / 体力${member.staminaValue ?? 100}）`)}</option>`
-  ).join('');
+  const memberOptions = individualOptions.map(member => {
+    const name = typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name;
+    const age = member.age || 18;
+    const stamina = member.staminaValue ?? 100;
+    return `<option value="${member.id}" ${member.id === weeklySchedule.individualMemberId ? 'selected' : ''}>` +
+      escapeHtml(`${name}（${age}歳 / 体力${stamina}）`) +
+      `</option>`;
+  }).join('');
   const validStats = typeof INDIVIDUAL_LESSON_STATS !== 'undefined' ? INDIVIDUAL_LESSON_STATS : ['vocal', 'dance', 'stamina', 'recovery'];
   const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [
     { id: 'vocal', name: '歌唱力' }, { id: 'dance', name: 'ダンス' }, { id: 'stamina', name: '体力' }, { id: 'recovery', name: '回復力' }
