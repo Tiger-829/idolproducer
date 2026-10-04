@@ -14,176 +14,181 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="アイドル育成">
 
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
 <body>
 
-<main class="title-screen" id="title-screen">
-  <header class="title-heading">
-    <h1>日本一のアイドルプロデューサーになろう</h1>
-    <p>セーブデータを選択してください</p>
-  </header>
-  <div class="save-slots" id="save-slots"></div>
-  <div class="title-actions">
-    <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
-  </div>
-</main>
+<!-- ▼ 画面全体を包み込む親ラッパーを追加 -->
+<div class="app-wrapper">
 
-<div class="game-container" id="game-screen" hidden>
-  <h1>日本一のアイドルプロデューサーになろう</h1>
-
-  <div class="header-info">
-    <div class="header-date">
-      <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
-      <div class="header-fans">グループファン <strong id="txt-header-fans">--</strong> </div>
-    </div>
-    <span id="active-slot-label">セーブ枠</span>
-  </div>
-
-  <nav class="page-nav" id="page-nav" role="tablist" aria-label="ゲームページ"></nav>
-
-  <!-- グループ画面（初期状態は hidden） -->
-  <section class="page-panel" id="page-group" role="tabpanel" aria-labelledby="page-tab-group" hidden>
-    <!-- チーム総合力カード -->
-    <div class="team-summary-card">
-      <div class="team-header">
-        <div>
-          <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
-          <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
-          <div style="font-size:10px; color:#888;">アイドル力 <strong id="txt-team-idol-power">--</strong>（表現5能力＋体調2能力の平均）</div>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span id="team-overall-score" class="overall-score">--</span>
-          <span id="team-rank-badge" class="rank-badge">-</span>
-        </div>
-      </div>
-      <div class="avg-grid" id="team-avg-grid"></div>
-    </div>
-    <div class="team-fans-card team-fans-card-stack">
-      <span>グループ推定ファン数の内訳</span>
-      <div class="team-fans-tiers" id="txt-group-fan-tiers">--</div>
-    </div>
-    <div class="team-fans-card">
-      <span>グループ危機回避力</span>
-      <span><strong class="team-fans-count" id="txt-group-crisis">--</strong><small> 実効 <span id="txt-effective-crisis">--</span></small></span>
-    </div>
-    <div>
-      <h2 class="page-title" style="margin-bottom:8px;">楽曲</h2>
-      <div class="song-sales-summary" id="song-sales-summary"></div>
-      <div class="song-list" id="song-list-ui"></div>
-    </div>
-  </section>
-
-  <!-- 編成画面（初期状態は hidden） -->
-  <section class="page-panel" id="page-formation" role="tabpanel" aria-labelledby="page-tab-formation" hidden>
-    <div class="roster-card">
-      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-        <span style="font-weight:bold; font-size:12px;">メンバー名一覧</span>
-        <span style="font-size:10px; color:#888;">所属 <span id="txt-roster-count">0</span>名 / 選抜 <span id="txt-selected-count">0</span>名</span>
-      </div>
-      <div class="roster-namebar" id="roster-namebar-ui"></div>
-    </div>
-    <div class="roster-card">
-      <div class="roster-tabs">
-        <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
-        <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
-      </div>
-      <button class="main-btn" style="width:100%; padding:8px; margin-bottom:6px; font-size:12px;"
-        id="btn-selection-setup" onclick="openSelectionSetup()">選抜・センターを変更する</button>
-      <div class="roster-list" id="roster-list-ui"></div>
-    </div>
-  </section>
-
-  <!-- 事務所画面（※初期表示をここに設定ため hidden を削除） -->
-  <section class="page-panel" id="page-office" role="tabpanel" aria-labelledby="page-tab-office">
-    <div class="calendar-card" id="calendar-visual"></div>
-    <div class="weekly-action-panel" id="weekly-action-panel"></div>
-    <div class="office-maintenance-note" id="goods-sales-stats"></div>
-    <section class="office-facilities">
-      <h2 class="page-title">マネージャー <small id="manager-count-label" style="font-size:10px; color:#777; font-weight:normal;"></small></h2>
-      <div class="office-maintenance-note">効果は人数ではなく<strong>項目別の合計レベル</strong>で決まります。合計レベルが <strong>E → D → C → B → A → S → SS → 極</strong> に達するごとに倍率が上がります。</div>
-      <div class="office-maintenance-note">各能力はLv.1〜Lv.10でレベルアップのみ可能です（ダウングレードはできません）。</div>
-      <div class="office-maintenance-note">40〜45歳で任意退職します。退職の時期はあらかじめ分かりません。</div>
-      <div id="manager-list-ui"></div>
-    </section>
-    <section class="office-facilities">
-      <h2 class="page-title">マネージャー市場</h2>
-      <div class="office-maintenance-note">常に求人が出ています（<span id="manager-market-count">0</span>名）。25〜35歳の女性で、4項目のレベルと月給が分かります。</div>
-      <div id="manager-market-ui"></div>
-    </section>
-    <section class="office-facilities">
-      <h2 class="page-title">事務所設備</h2>
-      <div class="office-maintenance-note">Lv.1は維持費なし。Lv.2以降は毎週維持費が発生します。</div>
-      <div class="office-facility-list" id="office-upgrades-ui"></div>
-    </section>
-    <!-- アクションボタン -->
-    <div class="actions">
-      <button class="danger-btn" style="width:100%; margin-bottom:6px;" onclick="openPlanningCalendar()">📅 半年計画カレンダーを開く（6か月分）</button>
-      <div style="display:flex; gap:6px;">
-        <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
-        <button class="danger-btn" style="flex:1;" onclick="returnToTitle()">タイトルへ戻る</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- 資金画面（初期状態は hidden） -->
-  <section class="page-panel" id="page-funds" role="tabpanel" aria-labelledby="page-tab-funds" hidden>
-    <h2 class="page-title">資金</h2>
-    <div class="funds-card">
-      <span class="fund-stat-label">現在の資金</span>
-      <div class="funds-total" id="txt-funds">1,000万円</div>
-      <div class="funds-exact" id="txt-funds-exact"></div>
-    </div>
-    <div class="fund-stat-grid">
-      <div class="fund-stat"><span class="fund-stat-label">今年の売上</span><span class="fund-stat-value" id="txt-year-sales">0 枚</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">今年のライブ動員</span><span class="fund-stat-value" id="txt-year-audience">0 人</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">今年の配信（制作費込）</span><span class="fund-stat-value" id="txt-year-stream">0円</span></div>
-      <div class="fund-stat" id="fanclub-stat"><span class="fund-stat-label">ファンクラブ</span><span class="fund-stat-value" id="txt-fanclub">未設立</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">今年の給与</span><span class="fund-stat-value" id="txt-year-salary">0円</span></div>
-    </div>
-    <h2 class="page-title" style="margin-top:12px;">給与明細（月額）</h2>
-    <div class="fund-stat-grid">
-      <div class="fund-stat"><span class="fund-stat-label">メンバー給与（<span id="txt-member-count">0</span>名）</span><span class="fund-stat-value" id="txt-member-salary">0円</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">マネージャー給与（<span id="txt-manager-count">0</span>名）</span><span class="fund-stat-value" id="txt-manager-salary">0円</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">合計（毎月引落）</span><span class="fund-stat-value" id="txt-total-salary">0円</span></div>
-      <div class="fund-stat"><span class="fund-stat-label">年間給与（推定）</span><span class="fund-stat-value" id="txt-annual-salary">0円</span></div>
-    </div>
-    <div class="office-maintenance-note" id="salary-note"></div>
-  </section>
-
-  <!-- 順位画面（初期状態は hidden） -->
-  <section class="page-panel" id="page-ranking" role="tabpanel" aria-labelledby="page-tab-ranking" hidden>
-    <h2 class="page-title">業界順位</h2>
-    <div class="ranking-note" id="ranking-note"></div>
-    <div class="ranking-list" id="ranking-list"></div>
-  </section>
-
-  <!-- 記録画面（初期状態は hidden） -->
-  <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
-    <h2 class="page-title">最新の記録</h2>
-    
-    <div class="records-block">
-      <div class="records-block-title">CD累積売上の推移 <small>直近1年間</small></div>
-      <div class="records-chart" id="records-sales-chart"></div>
-      <div class="records-chart-note" id="records-sales-note"></div>
-    </div>
-
-    <div class="records-block">
-      <div class="records-block-title">初週売上ランキング <small>自グループの作品</small></div>
-      <div class="records-firstweek" id="records-firstweek-list"></div>
-    </div>
-
-    <div class="records-block">
-      <div class="records-block-title">楽曲一覧 <small>曲名をタップすると発売後1年間の推移</small></div>
-      <div class="records-songs" id="records-song-list"></div>
-    </div>
-
-    <div class="records-help">
+  <main class="title-screen" id="title-screen">
+    <header class="title-heading">
+      <h1>日本一のアイドルプロデューサーになろう</h1>
+      <p>セーブデータを選択してください</p>
+    </header>
+    <div class="save-slots" id="save-slots"></div>
+    <div class="title-actions">
       <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
-      <p class="records-help-note">売上計算や動員ルールなど、ゲームの仕様を確認できます。</p>
     </div>
-  </section>
-</div>
+  </main>
+
+  <div class="game-container" id="game-screen" hidden>
+    <h1>日本一のアイドルプロデューサーになろう</h1>
+
+    <div class="header-info">
+      <div class="header-date">
+        <div><span id="txt-year">1</span>年目 <span id="txt-month">1</span>月 第<span id="txt-week">1</span>週<br><span class="calendar-date-label" id="txt-calendar-date"></span></div>
+        <div class="header-fans">グループファン <strong id="txt-header-fans">--</strong> </div>
+      </div>
+      <span id="active-slot-label">セーブ枠</span>
+    </div>
+
+    <nav class="page-nav" id="page-nav" role="tablist" aria-label="ゲームページ"></nav>
+
+    <!-- グループ画面（初期状態は hidden） -->
+    <section class="page-panel" id="page-group" role="tabpanel" aria-labelledby="page-tab-group" hidden>
+      <!-- チーム総合力カード -->
+      <div class="team-summary-card">
+        <div class="team-header">
+          <div>
+            <span style="font-size:10px; color:#888;">選抜チーム総合力</span>
+            <div style="font-size:11px; color:#555;">センター: <strong id="txt-center-name">未定</strong></div>
+            <div style="font-size:10px; color:#888;">アイドル力 <strong id="txt-team-idol-power">--</strong>（表現5能力＋体調2能力の平均）</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span id="team-overall-score" class="overall-score">--</span>
+            <span id="team-rank-badge" class="rank-badge">-</span>
+          </div>
+        </div>
+        <div class="avg-grid" id="team-avg-grid"></div>
+      </div>
+      <div class="team-fans-card team-fans-card-stack">
+        <span>グループ推定ファン数の内訳</span>
+        <div class="team-fans-tiers" id="txt-group-fan-tiers">--</div>
+      </div>
+      <div class="team-fans-card">
+        <span>グループ危機回避力</span>
+        <span><strong class="team-fans-count" id="txt-group-crisis">--</strong><small> 実効 <span id="txt-effective-crisis">--</span></small></span>
+      </div>
+      <div>
+        <h2 class="page-title" style="margin-bottom:8px;">楽曲</h2>
+        <div class="song-sales-summary" id="song-sales-summary"></div>
+        <div class="song-list" id="song-list-ui"></div>
+      </div>
+    </section>
+
+    <!-- 編成画面（初期状態は hidden） -->
+    <section class="page-panel" id="page-formation" role="tabpanel" aria-labelledby="page-tab-formation" hidden>
+      <div class="roster-card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+          <span style="font-weight:bold; font-size:12px;">メンバー名一覧</span>
+          <span style="font-size:10px; color:#888;">所属 <span id="txt-roster-count">0</span>名 / 選抜 <span id="txt-selected-count">0</span>名</span>
+        </div>
+        <div class="roster-namebar" id="roster-namebar-ui"></div>
+      </div>
+      <div class="roster-card">
+        <div class="roster-tabs">
+          <button class="roster-tab-btn active" id="tab-btn-sel" onclick="switchRosterTab('selected')">選抜メンバー</button>
+          <button class="roster-tab-btn" id="tab-btn-und" onclick="switchRosterTab('under')">アンダー / 控え</button>
+        </div>
+        <button class="main-btn" style="width:100%; padding:8px; margin-bottom:6px; font-size:12px;"
+          id="btn-selection-setup" onclick="openSelectionSetup()">選抜・センターを変更する</button>
+        <div class="roster-list" id="roster-list-ui"></div>
+      </div>
+    </section>
+
+    <!-- 事務所画面（※初期表示をここに設定ため hidden を削除） -->
+    <section class="page-panel" id="page-office" role="tabpanel" aria-labelledby="page-tab-office">
+      <div class="calendar-card" id="calendar-visual"></div>
+      <div class="weekly-action-panel" id="weekly-action-panel"></div>
+      <div class="office-maintenance-note" id="goods-sales-stats"></div>
+      <section class="office-facilities">
+        <h2 class="page-title">マネージャー <small id="manager-count-label" style="font-size:10px; color:#777; font-weight:normal;"></small></h2>
+        <div class="office-maintenance-note">効果は人数ではなく<strong>項目別の合計レベル</strong>で決まります。合計レベルが <strong>E → D → C → B → A → S → SS → 極</strong> に達するごとに倍率が上がります。</div>
+        <div class="office-maintenance-note">各能力はLv.1〜Lv.10でレベルアップのみ可能です（ダウングレードはできません）。</div>
+        <div class="office-maintenance-note">40〜45歳で任意退職します。退職の時期はあらかじめ分かりません。</div>
+        <div id="manager-list-ui"></div>
+      </section>
+      <section class="office-facilities">
+        <h2 class="page-title">マネージャー市場</h2>
+        <div class="office-maintenance-note">常に求人が出ています（<span id="manager-market-count">0</span>名）。25〜35歳の女性で、4項目のレベルと月給が分かります。</div>
+        <div id="manager-market-ui"></div>
+      </section>
+      <section class="office-facilities">
+        <h2 class="page-title">事務所設備</h2>
+        <div class="office-maintenance-note">Lv.1は維持費なし。Lv.2以降は毎週維持費が発生します。</div>
+        <div class="office-facility-list" id="office-upgrades-ui"></div>
+      </section>
+      <!-- アクションボタン -->
+      <div class="actions">
+        <button class="danger-btn" style="width:100%; margin-bottom:6px;" onclick="openPlanningCalendar()">📅 半年計画カレンダーを開く（6か月分）</button>
+        <div style="display:flex; gap:6px;">
+          <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
+          <button class="danger-btn" style="flex:1;" onclick="returnToTitle()">タイトルへ戻る</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 資金画面（初期状態は hidden） -->
+    <section class="page-panel" id="page-funds" role="tabpanel" aria-labelledby="page-tab-funds" hidden>
+      <h2 class="page-title">資金</h2>
+      <div class="funds-card">
+        <span class="fund-stat-label">現在の資金</span>
+        <div class="funds-total" id="txt-funds">1,000万円</div>
+        <div class="funds-exact" id="txt-funds-exact"></div>
+      </div>
+      <div class="fund-stat-grid">
+        <div class="fund-stat"><span class="fund-stat-label">今年の売上</span><span class="fund-stat-value" id="txt-year-sales">0 枚</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">今年のライブ動員</span><span class="fund-stat-value" id="txt-year-audience">0 人</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">今年の配信（制作費込）</span><span class="fund-stat-value" id="txt-year-stream">0円</span></div>
+        <div class="fund-stat" id="fanclub-stat"><span class="fund-stat-label">ファンクラブ</span><span class="fund-stat-value" id="txt-fanclub">未設立</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">今年の給与</span><span class="fund-stat-value" id="txt-year-salary">0円</span></div>
+      </div>
+      <h2 class="page-title" style="margin-top:12px;">給与明細（月額）</h2>
+      <div class="fund-stat-grid">
+        <div class="fund-stat"><span class="fund-stat-label">メンバー給与（<span id="txt-member-count">0</span>名）</span><span class="fund-stat-value" id="txt-member-salary">0円</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">マネージャー給与（<span id="txt-manager-count">0</span>名）</span><span class="fund-stat-value" id="txt-manager-salary">0円</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">合計（毎月引落）</span><span class="fund-stat-value" id="txt-total-salary">0円</span></div>
+        <div class="fund-stat"><span class="fund-stat-label">年間給与（推定）</span><span class="fund-stat-value" id="txt-annual-salary">0円</span></div>
+      </div>
+      <div class="office-maintenance-note" id="salary-note"></div>
+    </section>
+
+    <!-- 順位画面（初期状態は hidden） -->
+    <section class="page-panel" id="page-ranking" role="tabpanel" aria-labelledby="page-tab-ranking" hidden>
+      <h2 class="page-title">業界順位</h2>
+      <div class="ranking-note" id="ranking-note"></div>
+      <div class="ranking-list" id="ranking-list"></div>
+    </section>
+
+    <!-- 記録画面（初期状態は hidden） -->
+    <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
+      <h2 class="page-title">最新の記録</h2>
+      
+      <div class="records-block">
+        <div class="records-block-title">CD累積売上の推移 <small>直近1年間</small></div>
+        <div class="records-chart" id="records-sales-chart"></div>
+        <div class="records-chart-note" id="records-sales-note"></div>
+      </div>
+
+      <div class="records-block">
+        <div class="records-block-title">初週売上ランキング <small>自グループの作品</small></div>
+        <div class="records-firstweek" id="records-firstweek-list"></div>
+      </div>
+
+      <div class="records-block">
+        <div class="records-block-title">楽曲一覧 <small>曲名をタップすると発売後1年間の推移</small></div>
+        <div class="records-songs" id="records-song-list"></div>
+      </div>
+
+      <div class="records-help">
+        <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
+        <p class="records-help-note">売上計算や動員ルールなど、ゲームの仕様を確認できます。</p>
+      </div>
+    </section>
+  </div>
+
+</div><!-- ▲ app-wrapper ここまで -->
 
 <div class="modal-overlay" id="selection-modal"></div>
 
@@ -323,20 +328,20 @@
   </div>
 </div>
 
-<script src="./js/01-constants.js?v=3"></script>
-<script src="./js/02-state.js?v=3"></script>
-<script src="./js/03-venue.js?v=3"></script>
-<script src="./js/04-members.js?v=3"></script>
-<script src="./js/05-calc.js?v=3"></script>
-<script src="./js/06-progress.js?v=3"></script>
-<script src="./js/07-schedule.js?v=3"></script>
-<script src="./js/08-events.js?v=3"></script>
-<script src="./js/09-selection-draft.js?v=3"></script>
-<script src="./js/10-ui-panels.js?v=3"></script>
-<script src="./js/11-ui-roster.js?v=3"></script>
-<script src="./js/12-ui-plan-save.js?v=3"></script>
-<script src="./js/13-help.js?v=3"></script>
-<script src="./js/14-ui-records.js?v=3"></script>
+<script src="./js/01-constants.js?v=4"></script>
+<script src="./js/02-state.js?v=4"></script>
+<script src="./js/03-venue.js?v=4"></script>
+<script src="./js/04-members.js?v=4"></script>
+<script src="./js/05-calc.js?v=4"></script>
+<script src="./js/06-progress.js?v=4"></script>
+<script src="./js/07-schedule.js?v=4"></script>
+<script src="./js/08-events.js?v=4"></script>
+<script src="./js/09-selection-draft.js?v=4"></script>
+<script src="./js/10-ui-panels.js?v=4"></script>
+<script src="./js/11-ui-roster.js?v=4"></script>
+<script src="./js/12-ui-plan-save.js?v=4"></script>
+<script src="./js/13-help.js?v=4"></script>
+<script src="./js/14-ui-records.js?v=4"></script>
 
 </body>
 </html>
