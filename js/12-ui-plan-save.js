@@ -1080,10 +1080,42 @@ function initGame(slot, startFresh) {
     if (raw) {
       try {
         const data = JSON.parse(raw);
-        if (typeof applySavedGame === 'function') applySavedGame(data);
+        
+        // 🌟 データの整合性を保つための事前チェック・補完
+        if (!data || typeof data !== 'object') {
+          throw new Error('セーブデータの形式が無効です（オブジェクトではありません）。');
+        }
+
+        // 必須プロパティの欠損を防ぐフォールバック処理
+        if (!Array.isArray(data.rivalLiveBookings)) {
+          data.rivalLiveBookings = [];
+        }
+        if (!data.productionSchedule || typeof data.productionSchedule !== 'object') {
+          data.productionSchedule = {};
+        }
+
+        if (typeof applySavedGame === 'function') {
+          applySavedGame(data);
+        } else {
+          // 万が一 applySavedGame が定義されていない場合の最低限の復元
+          currentYear = data.currentYear || 1;
+          currentMonth = data.currentMonth || 1;
+          currentWeek = data.currentWeek || 1;
+          funds = data.funds || INITIAL_FUNDS;
+          rivalLiveBookings = data.rivalLiveBookings;
+          productionSchedule = data.productionSchedule;
+        }
       } catch (e) {
-        alert('セーブデータの読み込みに失敗しました。新規開始してください。');
-        if (typeof initializeNewGameState === 'function') initializeNewGameState();
+        console.error('セーブデータの解析・適用エラーの詳細:', e);
+        // 誤りを隠さず、正確にユーザーに通知した上で新規開始の選択肢を与える
+        if (confirm('セーブデータの構造に不整合または破損が見つかりました。\nデータを初期化して新規開始しますか？（キャンセルすると安全な初期状態で続行を試みます）')) {
+          if (typeof initializeNewGameState === 'function') initializeNewGameState();
+        } else {
+          // 最小限の初期値を設定して続行を試みる
+          if (typeof initializeNewGameState === 'function' && !productionSchedule) {
+            initializeNewGameState();
+          }
+        }
       }
     } else {
       if (typeof initializeNewGameState === 'function') initializeNewGameState();
@@ -1118,7 +1150,6 @@ function initGame(slot, startFresh) {
     }
   }
 }
-
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
   if (!legacySave) return;
