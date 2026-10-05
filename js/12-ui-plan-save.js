@@ -764,9 +764,6 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
-// ==========================================
-// カレンダー描画（DOMイベントリスナー方式・選択確実動作版）
-// ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
@@ -789,7 +786,6 @@ function renderPlanCalendarGrid() {
     const gridDiv = document.createElement('div');
     gridDiv.className = 'calendar-grid';
 
-    // 曜日の描画
     weekdays.forEach(w => {
       const wSpan = document.createElement('span');
       wSpan.className = 'calendar-weekday';
@@ -797,7 +793,6 @@ function renderPlanCalendarGrid() {
       gridDiv.appendChild(wSpan);
     });
 
-    // 空白セルと日付セルの描画
     for (let c = 0; c < 42; c++) {
       const day = c - firstWeekday + 1;
       const daySpan = document.createElement('span');
@@ -810,7 +805,7 @@ function renderPlanCalendarGrid() {
       }
       
       const dateObj = new Date(actualYear, m - 1, day, 12);
-      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
+      const dateKey = toDateKey(dateObj);
       const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
       
       const isSelected = planCalendarSelection.includes(dateKey);
@@ -820,7 +815,6 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      // ライバル予定のヒット判定
       const rivalConflicts = rivals.filter(booking => {
         if (!booking) return false;
         const bDate = booking.liveDate || booking.date || '';
@@ -830,7 +824,6 @@ function renderPlanCalendarGrid() {
 
       const hasRival = rivalConflicts.length > 0;
 
-      // クラス名の組み立て
       let classList = ['calendar-day'];
       if (isSelected) classList.push('plan-selected');
       if (isRelease) classList.push('release-day');
@@ -840,31 +833,13 @@ function renderPlanCalendarGrid() {
 
       daySpan.className = classList.join(' ');
       daySpan.textContent = day;
+      
+      // 🌟 クリックが確実に機能しているかを視覚・コンソールで強制確認できるようにする
+      daySpan.style.cursor = 'pointer';
 
-      // ツールチップ設定
-      const rivalTitles = rivalConflicts.map(rc => {
-        const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
-        const vName = rc.liveVenue || rc.venue || rc.place || '';
-        const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
-        const kind = isRel ? '【CD発売】' : '【ライブ】';
-        const venueStr = vName ? ` @${vName}` : '';
-        return `[${gName}] ${kind} ${rc.liveName || rc.liveVenue || '公演'}${venueStr}`;
-      }).join(' ＼ ');
-
-      const title = [
-        isRelease ? '【自グループ】CD発売' : '',
-        isLive ? '【自グループ】ライブ' : '',
-        isEvent ? '【自グループ】CDイベント' : '',
-        rivalTitles ? `--- 他グループの予定 ---\n${rivalTitles}` : ''
-      ].filter(Boolean).join('\n');
-
-      if (title) {
-        daySpan.title = title;
-      }
-
-      // 🌟 HTML文字列ではなく、確実に動作する DOM イベントリスナーで選択処理を紐付け
       daySpan.addEventListener('click', (e) => {
         e.stopPropagation();
+        console.log("🔥 カレンダー日付がクリックされました:", dateKey);
         togglePlanCalendarDate(dateKey);
       });
 
@@ -875,6 +850,8 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
+
+
 function togglePlanCalendarDate(dateKey) {
   if (!Array.isArray(planCalendarSelection)) {
     planCalendarSelection = [];
