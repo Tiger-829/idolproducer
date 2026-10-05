@@ -80,20 +80,9 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
   
-  // ★修正：ゲーム内で実際に保持されている西暦（calendarYear）を最優先でそのまま使う
-  let baseYear = 2026;
-  if (typeof calendarYear === 'number' && calendarYear > 2000) {
-    baseYear = calendarYear;
-  } else if (typeof gameDate === 'string' && gameDate.length >= 4) {
-    // gameDate ("2026-05-16"など) から年を抽出
-    const parsedYear = parseInt(gameDate.substring(0, 4), 10);
-    if (!isNaN(parsedYear) && parsedYear > 2000) {
-      baseYear = parsedYear;
-    }
-  }
-
-  // プレイヤーが選択しているターゲット年（yearTarget）のズレを考慮する
-  const actualYear = baseYear + ((Number(year) || 1) - (typeof currentYear === 'number' ? currentYear : 1));
+  // ★直結：引数で渡された年数（1年目なら1、2年目なら2）から直接西暦を決定する（1年目＝2026年）
+  const targetYearNum = Number(year) || 1;
+  const actualYear = 2025 + targetYearNum; // 1年目 -> 2026, 2年目 -> 2027
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
@@ -104,7 +93,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
       // 1. ライバルたちのライブ予定生成
-      for (let i = i = 0; i < targetLiveCount; i++) {
+      for (let i = 0; i < targetLiveCount; i++) {
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
         const targetYearOffset = Math.floor((startMonth - 1 + randomMonthOffset) / 12);
@@ -161,9 +150,8 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   }
 
   rivalLiveBookings = newRivalBookings;
-  console.log(`【ライバル先行配置完了】(ゲーム基準年: ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
+  console.log(`【ライバル先行配置完了】(年数: ${targetYearNum}年目 => 西暦 ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
-
 
 
 // ==========================================
