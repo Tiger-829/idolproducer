@@ -165,12 +165,6 @@ function createInitialProductionSchedule() {
 
 let productionSchedule = createInitialProductionSchedule();
 
-// 変数の初期化がすべて完了した安全なタイミングで初回生成を実行
-try {
-  generateRivalsAndGeneralSchedule(1, 1);
-} catch (e) {
-  console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
-}
 
 let yearlyStats = { sales: 0, audience: 0 };
 let lifetimeSales = 0;
