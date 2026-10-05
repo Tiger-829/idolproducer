@@ -1678,3 +1678,15 @@
     grid-column: span 2 !important;
   }
 }
+
+/* カレンダーの日付やグリッドに対するタップ・クリック制限を強制解除 */
+.calendar-day, 
+.plan-calendar-day, 
+#plan-calendar-grid, 
+#plan-calendar-grid span,
+.calendar-grid span {
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
