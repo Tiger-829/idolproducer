@@ -848,6 +848,91 @@ function renderPlanCalendarGrid() {
   }
 }
 
+function renderPlanCalendarGrid() {
+  const container = document.getElementById('plan-calendar-grid');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
+  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
+  
+  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+
+  for (let m = planStartM; m <= planEndM; m++) {
+    const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
+    const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
+    let cells = weekdays.map(function(w) {
+      return '<span class="calendar-weekday">' + w + '</span>';
+    }).join('');
+
+    for (let c = 0; c < 42; c++) {
+      const day = c - firstWeekday + 1;
+      if (day < 1 || day > daysInMonth) {
+        cells += '<span class="calendar-day" aria-hidden="true"></span>';
+        continue;
+      }
+      
+      const dateObj = new Date(actualYear, m - 1, day, 12);
+      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
+      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0'); // "MM-DD"
+      
+      const isSelected = planCalendarSelection.includes(dateKey);
+      const isRelease = getPlanReleaseDate(m) === dateKey;
+      const liveEntries = readLiveSlotInputs(m);
+      const isLive = liveEntries.some(function(slot) {
+        return slot.liveDates.includes(dateKey);
+      });
+      const eventDrafts = getPlanMonthEventDrafts(m);
+      const isEvent = eventDrafts.some(function(event) {
+        return event.date === dateKey;
+      });
+
+      // ライバル予定のヒット判定
+      const rivalConflicts = rivals.filter(function(booking) {
+        if (!booking) return false;
+        const bDate = booking.liveDate || booking.date || '';
+        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
+        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
+      });
+
+      const hasRival = rivalConflicts.length > 0;
+
+      const classList = [
+        'calendar-day',
+        isSelected ? 'plan-selected' : '',
+        isRelease ? 'release-day' : '',
+        isLive ? 'live-day' : '',
+        isEvent ? 'plan-event-day' : '',
+        hasRival ? 'rival-live-day' : ''
+      ].filter(Boolean).join(' ');
+
+      const rivalTitles = rivalConflicts.map(function(rc) {
+        const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
+        const vName = rc.liveVenue || rc.venue || rc.place || '';
+        const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
+        const kind = isRel ? '【CD発売】' : '【ライブ】';
+        const venueStr = vName ? ' @' + vName : '';
+        return '[' + gName + '] ' + kind + ' ' + (rc.liveName || rc.liveVenue || '公演') + venueStr;
+      }).join(' ＼ ');
+
+      const title = [
+        isRelease ? '【自グループ】CD発売' : '',
+        isLive ? '【自グループ】ライブ' : '',
+        isEvent ? '【自グループ】CDイベント' : '',
+        rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
+      ].filter(Boolean).join('\n');
+
+      // 🌟 HTML属性の文字列クラッシュを防ぐため、クリック時は安全に日付キーのみを渡し、内部でライバル予定を紐付ける設計に変更
+      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\')">' + day + '</span>';
+    }
+
+    const monthSheet = document.createElement('div');
+    monthSheet.className = 'plan-calendar-month';
+    monthSheet.innerHTML = '<strong>' + actualYear + '年' + m + '月</strong><div class="calendar-grid">' + cells + '</div>';
+    container.appendChild(monthSheet);
+  }
+}
+
 // 🌟 安全に日付選択とスマホ用アラート表示を行うハンドラ
 function handleCalendarDayClick(dateKey) {
   togglePlanCalendarDate(dateKey);
@@ -876,7 +961,6 @@ function handleCalendarDayClick(dateKey) {
     alert('📅 ' + dateKey + ' の他グループ予定:\n\n' + infoText);
   }
 }
-
 
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
