@@ -933,41 +933,26 @@ function renderPlanCalendarGrid() {
   }
 }
 
-// 🌟 安全に日付選択とスマホ用アラート表示を行うハンドラ
+// ==========================================
+// カレンダーの日付クリック・選択管理（完全修正版）
+// ==========================================
 function handleCalendarDayClick(dateKey) {
+  // 1. 確実に配列への追加・削除（選択のON/OFF）を行う
   togglePlanCalendarDate(dateKey);
-
-  // 該当日のライバル予定を動的に取得してアラート表示
-  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
-  const m = Number(dateKey.slice(5, 7));
-  const day = Number(dateKey.slice(8, 10));
-  const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-
-  const conflicts = rivals.filter(function(booking) {
-    if (!booking) return false;
-    const bDate = booking.liveDate || booking.date || '';
-    const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
-    return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
-  });
-
-  if (conflicts.length > 0) {
-    const infoText = conflicts.map(function(rc) {
-      const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
-      const vName = rc.liveVenue || rc.venue || rc.place || '会場未定';
-      const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
-      const kind = isRel ? '【CD発売】' : '【ライブ】';
-      return '・ ' + gName + ' (' + kind + ') 会場: ' + vName;
-    }).join('\n');
-    alert('📅 ' + dateKey + ' の他グループ予定:\n\n' + infoText);
-  }
 }
 
 function togglePlanCalendarDate(dateKey) {
+  if (!Array.isArray(planCalendarSelection)) {
+    planCalendarSelection = [];
+  }
+
   const index = planCalendarSelection.indexOf(dateKey);
   if (index >= 0) {
+    // すでに選択されている場合は解除
     planCalendarSelection.splice(index, 1);
   } else {
     if (planCalendarRangeMode && planCalendarSelection.length > 0) {
+      // 範囲選択モードの場合
       const last = planCalendarSelection[planCalendarSelection.length - 1];
       const start = new Date(`${last}T12:00:00`);
       const end = new Date(`${dateKey}T12:00:00`);
@@ -979,16 +964,20 @@ function togglePlanCalendarDate(dateKey) {
       const curr = new Date(start);
       while (curr <= end) {
         const k = toDateKey(curr);
-        if (!planCalendarSelection.includes(k)) planCalendarSelection.push(k);
+        if (!planCalendarSelection.includes(k)) {
+          planCalendarSelection.push(k);
+        }
         curr.setDate(curr.getDate() + 1);
       }
     } else {
+      // 単体選択の場合
       planCalendarSelection.push(dateKey);
     }
   }
+
+  // 2. 選択状態を即座にカレンダーグリッド全体に再描画して反映
   renderPlanCalendarGrid();
 }
-
 function clearPlanCalendarSelection() {
   planCalendarSelection = [];
   renderPlanCalendarGrid();
