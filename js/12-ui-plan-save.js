@@ -745,7 +745,7 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
-ffunction renderPlanCalendarGrid() {
+function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
   container.innerHTML = '';
