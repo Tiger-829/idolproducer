@@ -1,7 +1,4 @@
 // ==========================================
-// ゲーム状態（ステート）
-// ==========================================
-// ==========================================
 // 2. ゲーム状態（ステート）
 // ==========================================
 
@@ -19,19 +16,15 @@ let merchandiseStock = 0;
 let merchandiseUnitsSold = 0;
 let merchandiseSellThrough = null;
 let nextLivePromotionPoints = 0;
-// 月末に入金するCD売上収入（売上の8割）とタイアップの臨時収入
 let monthlyCdRevenue = 0;
 let monthlyTieUpRevenue = 0;
-// 明細を初期化する（収入／支出）。他ファイルより先に実行されるため、ここに定義する
+
 function createMonthlyLedger() {
   return { income: [], expense: [] };
 }
 
-// 当月の収支明細（月末の報告で表示する）。臨時支出も月末にまとめて処理する
 let monthlyLedger = createMonthlyLedger();
-// 表示待ちの月次収支報告（月の最終日で停止して画面に出す）
 let pendingMonthlyReport = null;
-// 販促効果が乗っている作品（販促効果は1作のみ）
 let promoSongId = '';
 let crisisCheckWeekKey = '';
 let crisisEventWeekKey = '';
@@ -39,13 +32,9 @@ let crisisEventType = '';
 let pendingCrisisResponse = null;
 let pendingRandomEvent = null;
 let randomEventCheckWeekKey = '';
-// 予約中のランダムイベント。発生する週を隠すため、数週間前に予約する
-let armedRandomEvents = [];   // [{ eventId, targetDate }]
-// 選抜・センターの選定待ち（新曲発売10週前に発生。編成ページからも手動で開ける）
+let armedRandomEvents = [];   
 let pendingSelectionEvent = null;
-// 選抜のロック（発表時に確定。スキャンダル等が発生するまで変更不可）
 let selectionLock = null;
-// 直近の選抜発表で選ばれたセンター（個別レッスンの候補順に使う）
 let lastAnnouncedCenterId = null;
 const MIN_SELECTION_SIZE = 3;
 const SENBATSU_LEAD_DAYS = 70;
@@ -68,72 +57,91 @@ let scheduledPerformances = [];
 let specialOffersSent = [];
 let rivalLiveBookings = [];
 
-// マネージャー制度（初期状態で1人配備）
 let managers = [];
-// 市场上的求人（5名）
 let managerMarketCandidates = [];
-// 当該年の1月頭／前年1月頭のグループファン数（メンバー年収の算定に使う）
 let groupFansAtYearStart = 0;
 let previousYearGroupFansAtYearStart = 0;
-// 週間スケジュールの下書き（その週に組むレッスン／休養の枠）
 let weeklySchedule = null;
-// 年末イベント（日本CD大賞 12/30 ／ 赤白歌合戦 12/31）の処理済みフラグ
 let yearEndAwardProcessed = false;
 let yearEndKohakuProcessed = false;
 
-// 初期のライブ予定（5〜7月のランダムな土日2days）
-function buildInitialLivePlan() {
-  const year = calendarYear || (new Date().getFullYear() + 1);
-  // 5〜7月のいずれか1ヶ月を選ぶ
-  const month = INITIAL_LIVE_MONTH_MIN
-    + Math.floor(Math.random() * (INITIAL_LIVE_MONTH_MAX - INITIAL_LIVE_MONTH_MIN + 1));
-  const lastDay = new Date(year, month, 0, 12).getDate();
-  // その月の「土→日」の連続ペアをすべて列挙してランダムに選ぶ
-  const weekendPairs = [];
-  for (let day = 1; day < lastDay; day++) {
-    const first = new Date(year, month - 1, day, 12);
-    const second = new Date(year, month - 1, day + 1, 12);
-    if (first.getDay() === 6 && second.getDay() === 0) {
-      weekendPairs.push({ liveDate: toDateKey(first), secondDate: toDateKey(second) });
+// ==========================================
+// ライバルおよび全グループの自動スケジュール生成（人気比例・ランダム会場）
+// ==========================================
+function generateRivalsAndGeneralSchedule(year, startMonth) {
+  const newRivalBookings = [];
+
+  if (typeof leagueTeams !== 'undefined' && Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
+    leagueTeams.forEach(team => {
+      if (team.id === 'player') return; // 自グループは除外
+
+      // basePower（例: 50〜92）に比例して半年間の公演数を決定（80以上なら約12公演）
+      const power = team.basePower || 50;
+      const targetLiveCount = Math.max(2, Math.round((power / 92) * 12));
+
+      for (let i = 0; i < targetLiveCount; i++) {
+        const randomMonth = startMonth + Math.floor(Math.random() * 6);
+        const lastDay = new Date(year, randomMonth, 0).getDate();
+        const randomDay = 1 + Math.floor(Math.random() * lastDay);
+        
+        const dateObj = new Date(year, randomMonth - 1, randomDay);
+        const dateStr = toDateKey(dateObj);
+
+        // 37会場データからランダムに会場を選択
+        const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
+
+        newRivalBookings.push({
+          groupId: team.id,
+          groupName: team.name,
+          liveVenue: venue.name,
+          liveName: `${team.name} 単独公演`,
+          liveDate: dateStr,
+          liveDates: [],
+          status: 'confirmed'
+        });
+      }
+    });
+  }
+
+  rivalLiveBookings = newRivalBookings;
+}
+
+// 指定月内のランダムな水曜日を取得（CD発売用）
+function getRandomWednesdayKey(year, month) {
+  const wednesdays = [];
+  const lastDay = new Date(year, month, 0).getDate();
+  for (let d = 1; d <= lastDay; d++) {
+    const date = new Date(year, month - 1, d);
+    if (date.getDay() === 3) {
+      wednesdays.push(toDateKey(date));
     }
   }
-  const pair = weekendPairs.length
-    ? weekendPairs[Math.floor(Math.random() * weekendPairs.length)]
-    : { liveDate: toDateKey(getLastWednesday(year, month - 1)), secondDate: '' };
-  return {
-    month,
-    liveVenue: INITIAL_LIVE_VENUE,
-    liveName: INITIAL_LIVE_VENUE,
-    liveDate: pair.liveDate,
-    liveDates: pair.secondDate ? [pair.secondDate] : []
-  };
+  if (wednesdays.length === 0) return `${year}-${String(month).padStart(2, '0')}-15`;
+  return wednesdays[Math.floor(Math.random() * wednesdays.length)];
 }
 
 let idolRoster = [];
-// 初期の半年計画（2月・6月のCD発売は確定。ライブは5〜7月のランダム土日2days）
-// 初期の半年計画（CD: 2/18, 6/17、ライブ: 5/16, 5/17 を初期設定として内蔵）
+
+// 初期の半年計画（CD: 2/18, 6/17、ライブ: 5/16, 5/17 [両日配信]）
 function createInitialProductionSchedule() {
   const schedule = {};
   
-  // 2月のCD発売（2月18日）
   schedule[`1-2`] = {
     release: 'single',
     songName: 'SnowDrops',
-    releaseDate: '2026-02-18', // または '2026-02-18' などフォーマットに合わせて調整
+    releaseDate: '2026-02-18',
     releaseBenefit: 'none',
     liveVenue: null
   };
 
-  // 6月のCD発売（6月17日）
   schedule[`1-6`] = {
     release: 'single',
     songName: 'アジサイと風鈴',
-    releaseDate: '1-06-17',
+    releaseDate: '2026-06-17',
     releaseBenefit: 'none',
     liveVenue: null
   };
 
-  // 5月のライブ（5月16日・17日）
   schedule[`1-5`] = {
     release: 'none',
     songName: '',
@@ -141,23 +149,23 @@ function createInitialProductionSchedule() {
     liveName: INITIAL_LIVE_VENUE || 'Debut Live',
     liveDate: '2026-05-16',
     liveDates: ['2026-05-17'],
-    streamDates: ['2026-05-16','2026-05-17']
+    streamDates: ['2026-05-16', '2026-05-17']
   };
 
   return schedule;
 }
 
 let productionSchedule = createInitialProductionSchedule();
+
+// 初回起動時に1年目上半期のライバル予定を生成
+generateRivalsAndGeneralSchedule(1, 1);
+
 let yearlyStats = { sales: 0, audience: 0 };
-// 生涯累計売上（年を跨いでも積み上がり、ファン成長に使う）
 let lifetimeSales = 0;
-// CD累積売上の週次推移（記録タブのグラフ用。直近1年分だけ保持する）
 let salesHistory = [];
-// 出来事ログの履歴（記録タブで newest を上に並べる）
 let logHistory = [];
 let funds = INITIAL_FUNDS;
 
-// 競合チーム（初期6チーム）
 function createInitialLeagueTeams() {
   return [
     { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
@@ -169,7 +177,6 @@ function createInitialLeagueTeams() {
   ];
 }
 
-// 既存と重複しない新世代グループの名前を引く（前半語×後半語。枯渇時は期数を添える）
 function generateRivalGroupName(usedNames = []) {
   const used = new Set(usedNames);
   const candidates = [];
@@ -180,7 +187,6 @@ function generateRivalGroupName(usedNames = []) {
     }
   }
   if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
-  // 語彙を使い切った場合は、既存名に現れる最大の期数より大きい期数を添える
   let maxSeq = 0;
   for (const name of used) {
     const match = /^新世代プロジェクト(\d+)期$/.exec(name);
@@ -189,7 +195,6 @@ function generateRivalGroupName(usedNames = []) {
   return `新世代プロジェクト${maxSeq + 1}期`;
 }
 
-// 既存チームと衝突しない競合チームの ID を採番する
 function createRivalTeamId() {
   let index = leagueTeams.length;
   let id = `rival_${index}`;
@@ -197,7 +202,6 @@ function createRivalTeamId() {
   return id;
 }
 
-// 旧セーブで重複していた ID を整理する（公演予約はグループ名で照合して付け替える）
 function normalizeLeagueTeams() {
   const usedIds = new Set();
   leagueTeams.forEach(team => {
@@ -218,10 +222,6 @@ function createInitialOfficeUpgrades() {
   return { lessons: 0, dormitory: 0, analytics: 0, snsTraining: 0, liveProduction: 0, merchandise: 0 };
 }
 
-// ==========================================
-// マネージャー制度（Lv.1〜Lv.10／レベルアップのみ）
-// ==========================================
-
 const MANAGER_SURNAMES = ['桐生', '水無瀬', '南雲', '日和見', '早乙女', '如月', '峰岸', '真柴', '三雲', '花房', '天海', '和久井', '白石', '榊原'];
 const MANAGER_GIVEN_NAMES = ['沙耶', '美咲', '彩乃', '结衣', '玲奈', '千尋', '雅代', '志穂', '真由', '亜紀', '深津', '志乃'];
 
@@ -231,12 +231,11 @@ function createManagerName() {
   return `${surname} ${given}`;
 }
 
-// 25〜35歳のマネージャー候補を1人生成する（退職年齢は40〜45歳でランダム）
 function createManagerCandidate(age = null) {
   const managerAge = age ?? (MANAGER_AGE_MIN + Math.floor(Math.random() * (MANAGER_AGE_MAX - MANAGER_AGE_MIN + 1)));
   const skills = {};
   MANAGER_SKILLS.forEach(skill => {
-    skills[skill.id] = 1 + Math.floor(Math.random() * 4); // Lv.1〜Lv.4
+    skills[skill.id] = 1 + Math.floor(Math.random() * 4);
   });
   return {
     id: `candidate-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
@@ -248,7 +247,6 @@ function createManagerCandidate(age = null) {
   };
 }
 
-// 新規にマネージャーとして採用する（初期状態用）
 function createManager() {
   const candidate = createManagerCandidate();
   return {
@@ -262,23 +260,19 @@ function createManager() {
   };
 }
 
-// マネージャーの年齢（生年から再計算する）
 function getManagerAge(manager) {
   if (!Number.isInteger(manager.birthYear)) return manager.age ?? MANAGER_AGE_MIN;
   return calculateAgeFromBirth(manager.birthYear, getGameDateObject(), 1, 1);
 }
 
-// マネージャーの能力合計
 function getManagerSkillTotal(manager) {
   return MANAGER_SKILLS.reduce((total, skill) => total + (manager.skills?.[skill.id] || 1), 0);
 }
 
-// マネージャー年収 = (300000 + 4項目のレベル総和×15000)×12
 function getManagerAnnualSalary(manager) {
   return (MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL) * 12;
 }
 
-// マネージャー給与（月額）
 function getManagerMonthlySalary(manager) {
   return getManagerAnnualSalary(manager) / 12;
 }
@@ -287,12 +281,10 @@ function getTotalManagerMonthlySalary() {
   return managers.reduce((total, manager) => total + getManagerMonthlySalary(manager), 0);
 }
 
-// 解雇料 = 4か月分の給料
 function getManagerFireCost(manager) {
   return getManagerMonthlySalary(manager) * MANAGER_FIRE_MONTHS;
 }
 
-// レベルアップ費用（レベルが高いほど高い。ダウングレードは存在しない）
 function getManagerSkillUpCost(manager, skillId) {
   const level = manager.skills?.[skillId] || 1;
   if (level >= MAX_MANAGER_LEVEL) return null;
@@ -323,11 +315,6 @@ function getManagerSkillName(skillId) {
   return MANAGER_SKILLS.find(skill => skill.id === skillId)?.name || skillId;
 }
 
-// ==========================================
-// マネージャー市場（常に開いている）
-// ==========================================
-
-// 市場にいる候補を補充する（足りない枠だけを追加する）
 function refreshManagerMarket() {
   if (!Array.isArray(managerMarketCandidates)) managerMarketCandidates = [];
   const missing = MANAGER_MARKET_CANDIDATE_COUNT - managerMarketCandidates.length;
@@ -346,7 +333,6 @@ function refreshManagerMarket() {
   }
 }
 
-// 市場から候補を採用する
 function hireManagerFromMarket(candidateId) {
   if (managers.length >= MANAGER_HIRE_LIMIT) {
     setLog(`【マネージャー】上限の${MANAGER_HIRE_LIMIT}名まで採用済みです。`);
@@ -373,13 +359,11 @@ function hireManagerFromMarket(candidateId) {
   };
   managers.push(hired);
   managerMarketCandidates = managerMarketCandidates.filter(item => item.id !== candidateId);
-  // 空いた枠だけを補充する（他の求人はそのまま残る）
   refreshManagerMarket();
   setLog(`【マネージャー】${hired.name}（${getManagerAge(hired)}歳）を採用しました（採用費 ${formatMoney(MANAGER_HIRE_COST)} / 月給 ${formatMoney(getManagerMonthlySalary(hired))}）。`);
   updateUI();
 }
 
-// マネージャーを解雇する（4か月分の給料を支払う）
 function fireManager(managerId) {
   const index = managers.findIndex(item => item.id === managerId);
   if (index < 0) return;
@@ -396,7 +380,6 @@ function fireManager(managerId) {
   updateUI();
 }
 
-// 40〜45歳で任意退職する
 function processManagerResignations() {
   const resigned = [];
   managers = managers.filter(manager => {
@@ -407,27 +390,22 @@ function processManagerResignations() {
     return false;
   });
   if (!resigned.length) return;
-  // 退職で空いた枠を補充する
   refreshManagerMarket();
   setLog(`【マネージャー】${resigned.join('、')}が退職しました。マネージャー市場の求人は増加します。`);
 }
 
-// マネージャーの平均レベル（複数在籍なら平均を使う）
 function getManagerAverageLevel(skillId) {
   if (!managers.length) return 1;
   const total = managers.reduce((sum, manager) => sum + (manager.skills?.[skillId] || 1), 0);
   return total / managers.length;
 }
 
-// 項目別の合計レベル（在籍マネージャーの該当能力をすべて足す）
 function getManagerSkillLevelTotal(skillId) {
   return managers.reduce((sum, manager) => sum + (manager.skills?.[skillId] || 1), 0);
 }
 
-// 合計レベルがどの段階に当たるか（E/D/C/B/A/S/SS/極）
 function getManagerSkillTier(skillId) {
   const total = getManagerSkillLevelTotal(skillId);
-  // MANAGER_LEVEL_TIERS は降順なので、「合計レベルに達する最も高い段階」を探す
   let current = MANAGER_LEVEL_TIERS[MANAGER_LEVEL_TIERS.length - 1];
   let currentIndex = MANAGER_LEVEL_TIERS.length - 1;
   for (let i = 0; i < MANAGER_LEVEL_TIERS.length; i++) {
@@ -437,7 +415,6 @@ function getManagerSkillTier(skillId) {
       break;
     }
   }
-  // 次に上げる段階（より小さいしきい値側のひとつ）
   const next = currentIndex > 0 ? MANAGER_LEVEL_TIERS[currentIndex - 1] : null;
   const progress = next
     ? Math.min(100, Math.round(((total - current.min) / (next.min - current.min)) * 100))
@@ -446,7 +423,6 @@ function getManagerSkillTier(skillId) {
     total,
     label: current.label,
     multiplier: current.multiplier,
-    // 段階番号（0=E … 6=SS … 7=極）。週の枠数などに使う
     tier: MANAGER_LEVEL_TIERS.length - 1 - currentIndex,
     currentMin: current.min,
     nextLabel: next ? next.label : null,
@@ -456,14 +432,6 @@ function getManagerSkillTier(skillId) {
   };
 }
 
-// ==========================================
-// マネージャーの効果（すべて「特別強化」に効く）
-// 週間スケジュール自体は点名制限なしで自由に組める
-// ==========================================
-
-// 段階倍率を「最大段階（極）を1とする 0〜1」に正規化する
-// 倍率表を引き下げても効果幅が変わらないよう、
-// ハードコードした係数ではなく MANAGER_LEVEL_TIERS の上限を参照する
 function getManagerTierGain(skillId) {
   const top = MANAGER_LEVEL_TIERS[0].multiplier;
   const bottom = MANAGER_LEVEL_TIERS[MANAGER_LEVEL_TIERS.length - 1].multiplier;
@@ -473,27 +441,22 @@ function getManagerTierGain(skillId) {
   return Math.max(0, Math.min(1, (multiplier - bottom) / span));
 }
 
-// 統率力：特別強化の倍率（基礎10倍 × 段階倍率）
-// 浮動小数点の誤差（10.600000000000001など）がUIに出ないよう丸める
 function getSpecialTrainingMultiplier() {
   const multiplier = SPECIAL_TRAINING_MULTIPLIER * getManagerSkillTier('leadership').multiplier;
   return Math.round(multiplier * 100) / 100;
 }
 
-// スケジュール管理力：特別強化できる人数（E/D/C=1人、B以上=2人、極=3人）
 function getSpecialTrainingTargetLimit() {
   const tier = getManagerSkillTier('scheduling');
-  if (tier.tier >= MANAGER_LEVEL_TIERS.length - 1) return 3; // 極
-  if (tier.tier >= 3) return 2;                              // B以上
-  return 1;                                                   // E/D/C
+  if (tier.tier >= MANAGER_LEVEL_TIERS.length - 1) return 3; 
+  if (tier.tier >= 3) return 2;                            
+  return 1;                                                   
 }
 
-// メンタルケア：特別強化時の体力消費軽減率（0〜0.75）
 function getSpecialTrainingStaminaReduction() {
   return getManagerTierGain('mentalCare') * 0.75;
 }
 
-// リスクマネジメント：特別強化中のケガ・体調不良リスク軽減率（0〜0.75）
 function getSpecialTrainingRiskReduction() {
   return getManagerTierGain('riskControl') * 0.75;
 }
@@ -507,7 +470,6 @@ function toDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-// 球場・ドームは野球日程調整のため長期間の予約が必要
 function isStadiumVenue(venue) {
   return Boolean(venue && (venue.name.includes('球場') || venue.name.includes('ドーム')));
 }
@@ -516,7 +478,6 @@ function getLiveBookingLeadDays(venue) {
   return isStadiumVenue(venue) ? 180 : 45;
 }
 
-// 金額の表示単位: 5桁までは円、6桁以上は万円、9桁以上は億円
 function formatMoney(value) {
   const amount = Math.round(Number(value) || 0);
   const sign = amount < 0 ? '-' : '';
@@ -524,7 +485,6 @@ function formatMoney(value) {
   if (abs < 100000) return `${sign}${abs.toLocaleString()}円`;
   if (abs < 1000000000) {
     const man = abs / 10000;
-    // 1億円以上になる手前の端数は億円表記に切り替える
     if (man < 9999.95) {
       const digits = man < 100 ? 1 : 0;
       return `${sign}${Number(man.toFixed(digits))}万円`;
@@ -535,7 +495,6 @@ function formatMoney(value) {
   return `${sign}${Number(oku.toFixed(okuDigits))}億円`;
 }
 
-// ファン数の表示単位: 5桁までは人、6桁以上は万人、9桁以上は億人
 function formatFanCount(value) {
   const count = Math.max(0, Math.round(Number(value) || 0));
   if (count < 100000) return `${count.toLocaleString()}人`;
