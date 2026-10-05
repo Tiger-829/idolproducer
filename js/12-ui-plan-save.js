@@ -774,14 +774,15 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      // ★強力な照合：日付文字列が完全に一致するもの、または前方一致するものも含めて確実にヒットさせる
+      // 他グループの予定（ライブやCD発売）がこの日付に該当するか全プロパティから強力に探す
       const rivalConflicts = rivals.filter(booking => {
-        const bDate = booking.liveDate || booking.date || '';
-        if (!bDate) return false;
-        // 完全一致、または日付部分のプレ一致を許容
-        return bDate === dateKey || bDate.startsWith(dateKey) || dateKey.startsWith(bDate);
+        // bookingオブジェクトが持つすべての値の中から、"YYYY-MM-DD" 形式の日付文字列を探す
+        const values = Object.values(booking);
+        return values.some(val => {
+          if (typeof val !== 'string') return false;
+          return val === dateKey || val.startsWith(dateKey) || dateKey.startsWith(val);
+        });
       });
-
       const hasRival = rivalConflicts.length > 0;
 
       const classes = [
