@@ -492,3 +492,10 @@ function formatFanCount(value) {
   const okuDigits = oku < 10 ? 2 : (oku < 100 ? 1 : 0);
   return `${Number(oku.toFixed(okuDigits))}億人`;
 }
+// ==========================================
+// 未定義関数エラー防止用の安全なフォールバック
+// ==========================================
+function normalizeLeagueTeams(teams) {
+  if (!Array.isArray(teams)) return createInitialLeagueTeams();
+  return teams;
+}
