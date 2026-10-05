@@ -80,22 +80,20 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
   
-  // ★強制固定：1901年にならないよう、現在の実際の年（2026年）を絶対的な基準にする
+  // ★修正：ゲーム内で実際に保持されている西暦（calendarYear）を最優先でそのまま使う
   let baseYear = 2026;
-  try {
-    if (typeof calendarYear === 'number' && calendarYear > 2000) {
-      baseYear = calendarYear;
-    } else if (typeof currentYear === 'number' && currentYear > 0) {
-      baseYear = 2025 + currentYear;
-    } else {
-      const currentRealYear = new Date().getFullYear();
-      if (currentRealYear > 2000) baseYear = currentRealYear;
+  if (typeof calendarYear === 'number' && calendarYear > 2000) {
+    baseYear = calendarYear;
+  } else if (typeof gameDate === 'string' && gameDate.length >= 4) {
+    // gameDate ("2026-05-16"など) から年を抽出
+    const parsedYear = parseInt(gameDate.substring(0, 4), 10);
+    if (!isNaN(parsedYear) && parsedYear > 2000) {
+      baseYear = parsedYear;
     }
-  } catch (e) {
-    baseYear = 2026;
   }
-  
-  const actualYear = baseYear + ((Number(year) || 1) - 1);
+
+  // プレイヤーが選択しているターゲット年（yearTarget）のズレを考慮する
+  const actualYear = baseYear + ((Number(year) || 1) - (typeof currentYear === 'number' ? currentYear : 1));
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
@@ -106,7 +104,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
       // 1. ライバルたちのライブ予定生成
-      for (let i = 0; i < targetLiveCount; i++) {
+      for (let i = i = 0; i < targetLiveCount; i++) {
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
         const targetYearOffset = Math.floor((startMonth - 1 + randomMonthOffset) / 12);
@@ -115,7 +113,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
         const randomDay = 1 + Math.floor(Math.random() * lastDay);
         
-        // 文字列として直接 "2026-05-16" のように組み立てるため、1901年になる隙を与えない
         const mm = String(targetMonth).padStart(2, '0');
         const dd = String(randomDay).padStart(2, '0');
         const dateStr = `${bookingYear}-${mm}-${dd}`;
@@ -142,7 +139,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const targetCdYearOffset = Math.floor((startMonth - 1 + cdMonthOffset) / 12);
         const cdBookingYear = actualYear + targetCdYearOffset;
 
-        // 水曜日取得関数が古い年を返さないようフォールバックを組み込む
         let wednesdayStr = '';
         try {
           wednesdayStr = getRandomWednesdayKey(cdBookingYear, targetCdMonth);
@@ -165,7 +161,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   }
 
   rivalLiveBookings = newRivalBookings;
-  console.log(`【ライバル先行配置完了】(基準年: ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
+  console.log(`【ライバル先行配置完了】(ゲーム基準年: ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
 
 
