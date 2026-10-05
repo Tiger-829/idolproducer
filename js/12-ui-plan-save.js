@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全同期・ライバル動向可視化版）
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（全機能完全復元・完全同期版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -16,7 +16,7 @@ function isPresetReleaseMonth(month) {
 }
 
 function getPlanCalendarDate(month, day) {
-  const actualYear = calendarYear + (planYearTarget - currentYear);
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
   return new Date(actualYear, month - 1, day, 12);
 }
 
@@ -64,7 +64,7 @@ function getStandardSeatPrice(venue, seatId) {
 }
 
 function getPlanReleaseDefaultWednesday(month) {
-  const actualYear = calendarYear + (planYearTarget - currentYear);
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
   if (typeof getLastWednesday === 'function') {
     return toDateKey(getLastWednesday(actualYear, month - 1));
   }
@@ -492,12 +492,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
 
     for (let m = startM; m <= endM; m++) {
-      // 各月のライバル動向リストアップ用
+      // ★月別ブースでのライバル動向一覧表示（年月ベースで確実にヒット）
+      const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
       const monthRivals = rivals.filter(b => {
-        const bDate = b.liveDate || b.date || '';
-        return bDate.startsWith(`${yearTarget}-${String(m).padStart(2, '0')}`);
+        const bDate = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
+        return bDate.startsWith(targetMonthPrefix);
       });
 
       const monthRivalsHtml = monthRivals.length > 0 
@@ -505,7 +507,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
              <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件)</strong>
              <ul style="margin:2px 0 0 16px; padding:0; color:#555;">
                ${monthRivals.map(r => {
-                 const matchDay = r.liveDate ? r.liveDate.split('-')[2] : '??';
+                 const matchDay = (r.liveDate || '').split('-')[2] || '??';
                  const kindStr = r.type === 'release' ? 'CD発売' : `ライブ@${r.liveVenue || '未定'}`;
                  return `<li>${parseInt(matchDay)}日: <strong>${r.groupName}</strong> (${kindStr})</li>`;
                }).join('')}
@@ -745,12 +747,15 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
+// ==========================================
+// カレンダー描画（月日マッチングによる確実な予定表示版）
+// ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
   container.innerHTML = '';
   
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget || 1));
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
@@ -771,6 +776,7 @@ function renderPlanCalendarGrid() {
       
       const dateObj = new Date(actualYear, m - 1, day, 12);
       const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
+      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0'); // "MM-DD"
       
       const isSelected = planCalendarSelection.includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
@@ -783,12 +789,12 @@ function renderPlanCalendarGrid() {
         return event.date === dateKey;
       });
 
-      // ライバル予定のヒット判定（日付文字列が完全一致、または含まれているものを確実に拾う）
+      // ★年号やフォーマットに左右されず、月日が一致していれば100%確実に拾う照合
       const rivalConflicts = rivals.filter(function(booking) {
         if (!booking) return false;
         const bDate = booking.liveDate || booking.date || '';
         const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
-        return bDate === dateKey || bDate.includes(dateKey) || bDates.includes(dateKey);
+        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
       });
 
       const hasRival = rivalConflicts.length > 0;
@@ -802,7 +808,6 @@ function renderPlanCalendarGrid() {
         hasRival ? 'rival-live-day' : ''
       ].filter(Boolean).join(' ');
 
-      // ツールチップでグループ名、種別、会場名を表示
       const rivalTitles = rivalConflicts.map(function(rc) {
         const kind = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
         const venue = rc.liveVenue ? ' @' + rc.liveVenue : '';
@@ -825,7 +830,6 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
-
 
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
