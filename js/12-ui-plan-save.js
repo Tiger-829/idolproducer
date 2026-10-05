@@ -495,6 +495,11 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
   for (let m = startM; m <= endM; m++) {
+    // 月別ブロックのHTML内に、その月のライバル予定をリスト化して差し込む例
+    const monthRivals = rivals.filter(b => {
+      const bDate = b.liveDate || b.date || '';
+      return bDate.startsWith(`${yearTarget}-${String(m).padStart(2, '0')}`);
+    });
     const planKey = `${yearTarget}-${m}`;
     let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     
@@ -732,6 +737,8 @@ function renderPlanCalendarGrid() {
   container.innerHTML = '';
   const actualYear = calendarYear + (planYearTarget - currentYear);
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
+  
+  // ライバルたちの予定配列を確実に取得
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
   for (let m = planStartM; m <= planEndM; m++) {
@@ -753,11 +760,15 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-     // 他グループのライブ・CD発売予定が該当日付に含まれるか判定
-      const rivalConflict = rivals.find(booking => {
-        const bDate = booking.liveDate || booking.date;
-        return bDate === dateKey;
+      // ★修正：ライバル予定（ライブ・CD発売）がこの日付に存在するかを全件チェック
+      const rivalConflicts = rivals.filter(booking => {
+        const bDates = booking.liveDates && booking.liveDates.length > 0 
+          ? booking.liveDates 
+          : [booking.liveDate, booking.date].filter(Boolean);
+        return bDates.includes(dateKey);
       });
+
+      const hasRival = rivalConflicts.length > 0;
 
       const classes = [
         'calendar-day',
@@ -765,14 +776,17 @@ function renderPlanCalendarGrid() {
         isRelease ? 'release-day' : '',
         isLive ? 'live-day' : '',
         isEvent ? 'plan-event-day' : '',
-        rivalConflict ? 'rival-live-day' : ''
+        hasRival ? 'rival-live-day' : '' // カレンダー上でライバル予定日としてハイライト
       ].filter(Boolean).join(' ');
+
+      // ツールチップ用の文字列生成
+      const rivalTitles = rivalConflicts.map(rc => `${rc.groupName || '他グループ'}: ${rc.liveName || rc.liveVenue || 'イベント'}`).join(' / ');
 
       const title = [
         isRelease ? 'CD発売' : '',
         isLive ? '自グループライブ' : '',
         isEvent ? 'CD関連イベント' : '',
-        rivalConflict ? `他グループ公演: ${rivalConflict.groupName || ''} (${rivalConflict.liveVenue || ''})` : ''
+        rivalTitles ? `他グループ予定: ${rivalTitles}` : ''
       ].filter(Boolean).join(' / ');
 
       cells += `<span class="${classes}" ${title ? `title="${escapeHtml(title)}"` : ''} onclick="togglePlanCalendarDate('${dateKey}')">${day}</span>`;
@@ -784,7 +798,6 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
-
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
   if (index >= 0) {
