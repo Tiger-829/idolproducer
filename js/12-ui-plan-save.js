@@ -379,212 +379,222 @@ function refreshPlanEventsContainer(month) {
 }
 
 // 半年計画策定モーダル
+// 半年計画策定モーダル
 function openDecisionModal(title, yearTarget, startM, endM) {
-  planYearTarget = yearTarget;
-  planStartM = startM;
-  planEndM = endM;
-  planMonthEventDrafts = {};
-  const titleEl = document.getElementById('modal-title');
-  if (titleEl) titleEl.textContent = title;
+  try {
+    planYearTarget = yearTarget;
+    planStartM = startM;
+    planEndM = endM;
+    planMonthEventDrafts = {};
+    const titleEl = document.getElementById('modal-title');
+    if (titleEl) titleEl.textContent = title;
 
-  // ==========================================
-  // ★追加：ユーザーがスケジュールを組む前に、ライバルたちが先に予定を決定する！
-  // （初回や1年分の場合は true を渡すなど調整可能ですが、基本は半年分を先行生成）
-  // ==========================================
-  const isFirstEver = (yearTarget === 1 && startM === 1 && (!rivalLiveBookings || rivalLiveBookings.length === 0));
-  generateRivalsAndGeneralSchedule(yearTarget, startM, isFirstEver);
+    // ==========================================
+    // ★重要：ユーザーがスケジュールを組む前に、ライバルたちが先に予定を決定する！
+    // ==========================================
+    try {
+      const isFirstEver = (yearTarget === 1 && startM === 1 && (!rivalLiveBookings || rivalLiveBookings.length === 0));
+      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+        generateRivalsAndGeneralSchedule(yearTarget, startM, isFirstEver);
+      }
+    } catch (err) {
+      console.warn('Rival schedule generation warning:', err);
+    }
 
-  // （以降の「直近の半期の振り返り」や月別ブロック構築の処理が続く...）
-  // ==========================================
-  // 1. 直前の半期の振り返り（助数詞付きCD発売＆正確な日付入りライブ）
-  // ==========================================
-  const summaryBox = document.getElementById('prev-plan-summary');
-  if (summaryBox) {
-    let prevStart = startM === 7 ? 1 : 7;
-    let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
-    
-    let releaseDetails = [];
-    let liveDetails = [];
-    let releaseOrderCount = 0;
+    // ==========================================
+    // 1. 直前の半期の振り返り（助数詞付きCD発売＆正確な日付入りライブ）
+    // ==========================================
+    const summaryBox = document.getElementById('prev-plan-summary');
+    if (summaryBox) {
+      let prevStart = startM === 7 ? 1 : 7;
+      let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
+      
+      let releaseDetails = [];
+      let liveDetails = [];
+      let releaseOrderCount = 0;
 
-    for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
-      const pKey = `${prevYear}-${m}`;
-      if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
-        const p = productionSchedule[pKey];
-        
-        // CD発売の抽出（助数詞付き）
-        if (p.release && p.release !== 'none') {
-          releaseOrderCount++;
-          let ordinal = releaseOrderCount === 1 ? '1st' : releaseOrderCount === 2 ? '2nd' : releaseOrderCount === 3 ? '3rd' : `${releaseOrderCount}th`;
-          let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
+      for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
+        const pKey = `${prevYear}-${m}`;
+        if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
+          const p = productionSchedule[pKey];
           
-          let rawDate = p.releaseDate || '';
-          let dateStr = '日程未定';
-          if (rawDate) {
-            const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-(\d{2})-(\d{2})/);
-            if (match) {
-              dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
-            } else {
-              dateStr = rawDate;
+          if (p.release && p.release !== 'none') {
+            releaseOrderCount++;
+            let ordinal = releaseOrderCount === 1 ? '1st' : releaseOrderCount === 2 ? '2nd' : releaseOrderCount === 3 ? '3rd' : `${releaseOrderCount}th`;
+            let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
+            
+            let rawDate = p.releaseDate || '';
+            let dateStr = '日程未定';
+            if (rawDate) {
+              const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-(\d{2})-(\d{2})/);
+              if (match) {
+                dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
+              } else {
+                dateStr = rawDate;
+              }
+            } else if (typeof getPlanReleaseDefaultWednesday === 'function') {
+              const defDate = getPlanReleaseDefaultWednesday(m);
+              if (defDate) {
+                const matchDef = defDate.match(/(\d{1,2})-(\d{1,2})$/) || defDate.match(/\d{4}-(\d{2})-(\d{2})/);
+                if (matchDef) dateStr = `${parseInt(matchDef[1])}月${parseInt(matchDef[2])}日`;
+              }
             }
-          } else if (typeof getPlanReleaseDefaultWednesday === 'function') {
-            const defDate = getPlanReleaseDefaultWednesday(m);
-            if (defDate) {
-              const matchDef = defDate.match(/(\d{1,2})-(\d{1,2})$/) || defDate.match(/\d{4}-(\d{2})-(\d{2})/);
-              if (matchDef) dateStr = `${parseInt(matchDef[1])}月${parseInt(matchDef[2])}日`;
-            }
+
+            let songTitle = p.songName ? `「${p.songName}」` : '';
+            releaseDetails.push(`・${m}月: ${ordinal} ${relTypeName}${songTitle} (${dateStr}発売)`);
+          }
+          
+          let dates = [];
+          if (p.liveDate) dates.push(p.liveDate);
+          if (Array.isArray(p.liveDates)) dates = dates.concat(p.liveDates);
+          if (p.date) dates.push(p.date);
+
+          if (m === 5 && dates.length === 0) {
+            dates = ['2026-05-16', '2026-05-17'];
           }
 
-          let songTitle = p.songName ? `「${p.songName}」` : '';
-          releaseDetails.push(`・${m}月: ${ordinal} ${relTypeName}${songTitle} (${dateStr}発売)`);
-        }
-        
-        // ライブデータの抽出
-        let dates = [];
-        if (p.liveDate) dates.push(p.liveDate);
-        if (Array.isArray(p.liveDates)) dates = dates.concat(p.liveDates);
-        if (p.date) dates.push(p.date);
+          dates = [...new Set(dates)].filter(Boolean);
 
-        if (m === 5 && dates.length === 0) {
-          dates = ['2026-05-16', '2026-05-17'];
-        }
+          if (dates.length > 0 || p.liveVenue || p.liveName) {
+            let formattedDates = dates.map(d => {
+              const match = d.match(/(\d{1,2})-(\d{1,2})$/) || d.match(/\d{4}-(\d{2})-(\d{2})/);
+              if (match) {
+                return `${parseInt(match[1])}月${parseInt(match[2])}日`;
+              }
+              return d;
+            });
 
-        dates = [...new Set(dates)].filter(Boolean);
+            let dateStr = formattedDates.length > 0 ? formattedDates.join(', ') : '日程未定';
+            let lName = p.liveName || p.liveVenue || '記念ライブ';
 
-        if (dates.length > 0 || p.liveVenue || p.liveName) {
-          let formattedDates = dates.map(d => {
-            const match = d.match(/(\d{1,2})-(\d{1,2})$/) || d.match(/\d{4}-(\d{2})-(\d{2})/);
-            if (match) {
-              return `${parseInt(match[1])}月${parseInt(match[2])}日`;
-            }
-            return d;
-          });
-
-          let dateStr = formattedDates.length > 0 ? formattedDates.join(', ') : '日程未定';
-          let lName = p.liveName || p.liveVenue || '記念ライブ';
-
-          liveDetails.push(`・${m}月: ${lName} (${dateStr})`);
+            liveDetails.push(`・${m}月: ${lName} (${dateStr})`);
+          }
         }
       }
+
+      if (releaseDetails.length > 0 || liveDetails.length > 0) {
+        let releaseHtml = releaseDetails.length > 0 
+          ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
+          : `<strong>【CD発売】</strong><br>・なし`;
+
+        let liveHtml = liveDetails.length > 0 
+          ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.join('<br>')
+          : `<br><strong>【ライブ予定】</strong><br>・なし`;
+
+        summaryBox.innerHTML = `
+          <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
+          ${releaseHtml}<br>
+          ${liveHtml}
+        `;
+      } else {
+        summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
+      }
     }
-
-    if (releaseDetails.length > 0 || liveDetails.length > 0) {
-      let releaseHtml = releaseDetails.length > 0 
-        ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
-        : `<strong>【CD発売】</strong><br>・なし`;
-
-      let liveHtml = liveDetails.length > 0 
-        ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.join('<br>')
-        : `<br><strong>【ライブ予定】</strong><br>・なし`;
-
-      summaryBox.innerHTML = `
-        <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
-        ${releaseHtml}<br>
-        ${liveHtml}
-      `;
-    } else {
-      summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
-    }
-  }
-  
-  const container = document.getElementById('plan-rows');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
-  const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
-
-  for (let m = startM; m <= endM; m++) {
-    // 月別ブロックのHTML内に、その月のライバル予定をリスト化して差し込む例
-    const monthRivals = rivals.filter(b => {
-      const bDate = b.liveDate || b.date || '';
-      return bDate.startsWith(`${yearTarget}-${String(m).padStart(2, '0')}`);
-    });
-    const planKey = `${yearTarget}-${m}`;
-    let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     
-    const isPreset = typeof isPresetReleaseMonth === 'function' ? isPresetReleaseMonth(m) : false;
-    if ((!existingPlan.release || existingPlan.release === 'none') && isPreset) {
-      existingPlan = {
-        release: presetRelType,
-        releaseDate: (typeof getPlanReleaseDefaultWednesday === 'function') ? getPlanReleaseDefaultWednesday(m) : ''
-      };
-    }
+    const container = document.getElementById('plan-rows');
+    if (!container) return;
+    container.innerHTML = '';
 
-    const releaseValue = isPreset ? presetRelType : (existingPlan.release || 'none');
-    const liveEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(existingPlan) : [];
-    const liveSlots = liveEntries.length ? liveEntries.map(e => ({
-      liveVenue: e.liveVenue,
-      liveName: e.liveName,
-      liveDate: e.liveDate,
-      liveDates: e.liveDates || [],
-      streamDates: e.streamDates || e.liveDates || [],
-      seatPrices: e.seatPrices || {},
-      seatOptions: e.seatOptions || {}
-    })) : [{
-      liveVenue: '',
-      liveName: '',
-      liveDate: '',
-      liveDates: [],
-      streamDates: [],
-      seatPrices: {},
-      seatOptions: {}
-    }];
+    const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
+    const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
-    const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
+    const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
-    const monthBlock = document.createElement('div');
-    monthBlock.className = 'plan-month-block';
-    monthBlock.id = `plan-month-block-${m}`;
-    monthBlock.innerHTML = `
-      <div class="plan-month-title">${m}月の活動方針</div>
-      <label class="weekly-member-target" for="sel-rel-${m}">CD発売
-        <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m})" ${isPreset ? 'disabled' : ''}>
-          <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
-          <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
-          <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
-        </select>
-      </label>
-      <div id="release-fields-${m}">
-        <label class="weekly-member-target" for="song-name-${m}">楽曲名
-          <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
-        </label>
-        <label class="weekly-member-target" for="rel-date-${m}">発売日
-          <input type="date" id="rel-date-${m}" value="${defaultRelDate}">
-        </label>
-        <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
-          <select id="sel-benefit-${m}">
-            <option value="none">特典なし</option>
-            ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
+    for (let m = startM; m <= endM; m++) {
+      // 月別ブロックのHTML内に、その月のライバル予定をリスト化して確認できるようにする例
+      const monthRivals = rivals.filter(b => {
+        const bDate = b.liveDate || b.date || '';
+        return bDate.startsWith(`${yearTarget}-${String(m).padStart(2, '0')}`);
+      });
+
+      const planKey = `${yearTarget}-${m}`;
+      let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
+      
+      const isPreset = typeof isPresetReleaseMonth === 'function' ? isPresetReleaseMonth(m) : false;
+      if ((!existingPlan.release || existingPlan.release === 'none') && isPreset) {
+        existingPlan = {
+          release: presetRelType,
+          releaseDate: (typeof getPlanReleaseDefaultWednesday === 'function') ? getPlanReleaseDefaultWednesday(m) : ''
+        };
+      }
+
+      const releaseValue = isPreset ? presetRelType : (existingPlan.release || 'none');
+      const liveEntries = (typeof getMonthLiveEntries === 'function') ? getMonthLiveEntries(existingPlan) : [];
+      const liveSlots = liveEntries.length ? liveEntries.map(e => ({
+        liveVenue: e.liveVenue,
+        liveName: e.liveName,
+        liveDate: e.liveDate,
+        liveDates: e.liveDates || [],
+        streamDates: e.streamDates || e.liveDates || [],
+        seatPrices: e.seatPrices || {},
+        seatOptions: e.seatOptions || {}
+      })) : [{
+        liveVenue: '',
+        liveName: '',
+        liveDate: '',
+        liveDates: [],
+        streamDates: [],
+        seatPrices: {},
+        seatOptions: {}
+      }];
+
+      const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
+
+      const monthBlock = document.createElement('div');
+      monthBlock.className = 'plan-month-block';
+      monthBlock.id = `plan-month-block-${m}`;
+      monthBlock.innerHTML = `
+        <div class="plan-month-title">${m}月の活動方針</div>
+        <label class="weekly-member-target" for="sel-rel-${m}">CD発売
+          <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m})" ${isPreset ? 'disabled' : ''}>
+            <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
+            <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
+            <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
           </select>
         </label>
-      </div>
-
-      <div style="margin-top:8px;">
-        <div style="font-size:12px; font-weight:bold; color:#333;">CD関連イベント（特典会・物販）</div>
-        <div id="plan-events-${m}" class="plan-event-list">
-          ${renderPlanEventsHtml(m)}
+        <div id="release-fields-${m}">
+          <label class="weekly-member-target" for="song-name-${m}">楽曲名
+            <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
+          </label>
+          <label class="weekly-member-target" for="rel-date-${m}">発売日
+            <input type="date" id="rel-date-${m}" value="${defaultRelDate}">
+          </label>
+          <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
+            <select id="sel-benefit-${m}">
+              <option value="none">特典なし</option>
+              ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
+            </select>
+          </label>
         </div>
-        <button class="plan-add-show-btn" type="button" style="margin-top:4px;" onclick="addPlanEvent(${m})">＋イベントを追加</button>
-      </div>
 
-      <div class="live-slot-list" id="live-slots-${m}" style="margin-top:10px;">
-        ${liveSlots.map((slot, idx) => renderLiveSlotHtml(m, idx, slot)).join('')}
-      </div>
-      <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
-    `;
-    container.appendChild(monthBlock);
-    updateReleaseDateOptions(m);
-    liveSlots.forEach((_, idx) => {
-      updateSeatPlanOptions(m, idx);
-      updateShowDateNote(m, idx);
-    });
+        <div style="margin-top:8px;">
+          <div style="font-size:12px; font-weight:bold; color:#333;">CD関連イベント（特典会・物販）</div>
+          <div id="plan-events-${m}" class="plan-event-list">
+            ${renderPlanEventsHtml(m)}
+          </div>
+          <button class="plan-add-show-btn" type="button" style="margin-top:4px;" onclick="addPlanEvent(${m})">＋イベントを追加</button>
+        </div>
+
+        <div class="live-slot-list" id="live-slots-${m}" style="margin-top:10px;">
+          ${liveSlots.map((slot, idx) => renderLiveSlotHtml(m, idx, slot)).join('')}
+        </div>
+        <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
+      `;
+      container.appendChild(monthBlock);
+      updateReleaseDateOptions(m);
+      liveSlots.forEach((_, idx) => {
+        updateSeatPlanOptions(m, idx);
+        updateShowDateNote(m, idx);
+      });
+    }
+
+    const modal = document.getElementById('decision-modal');
+    if (modal) modal.style.display = 'flex';
+  } catch (e) {
+    console.error('openDecisionModal error:', e);
+    alert('半年計画画面を開く際にエラーが発生しました。');
   }
-
-  const modal = document.getElementById('decision-modal');
-  if (modal) modal.style.display = 'flex';
 }
-
 function updateReleaseDateOptions(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
   const fields = document.getElementById(`release-fields-${month}`);
