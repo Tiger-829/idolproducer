@@ -763,9 +763,6 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
-// ==========================================
-// カレンダー描画（スマホタップ対応＆確実な情報表示版）
-// ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
@@ -805,7 +802,7 @@ function renderPlanCalendarGrid() {
         return event.date === dateKey;
       });
 
-      // ライバル予定の確実なヒット判定
+      // ライバル予定のヒット判定
       const rivalConflicts = rivals.filter(function(booking) {
         if (!booking) return false;
         const bDate = booking.liveDate || booking.date || '';
@@ -824,7 +821,6 @@ function renderPlanCalendarGrid() {
         hasRival ? 'rival-live-day' : ''
       ].filter(Boolean).join(' ');
 
-      // ツールチップでグループ名と会場名を確実に抽出表示
       const rivalTitles = rivalConflicts.map(function(rc) {
         const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
         const vName = rc.liveVenue || rc.venue || rc.place || '';
@@ -841,7 +837,8 @@ function renderPlanCalendarGrid() {
         rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
       ].filter(Boolean).join('\n');
 
-      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\', ' + JSON.stringify(rivalConflicts).replace(/"/g, '&quot;') + ')">' + day + '</span>';
+      // 🌟 HTML属性の文字列クラッシュを防ぐため、クリック時は安全に日付キーのみを渡し、内部でライバル予定を紐付ける設計に変更
+      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\')">' + day + '</span>';
     }
 
     const monthSheet = document.createElement('div');
@@ -851,10 +848,24 @@ function renderPlanCalendarGrid() {
   }
 }
 
-// スマホタップ時にグループ名と会場名をダイアログで表示する関数
-function handleCalendarDayClick(dateKey, conflicts) {
+// 🌟 安全に日付選択とスマホ用アラート表示を行うハンドラ
+function handleCalendarDayClick(dateKey) {
   togglePlanCalendarDate(dateKey);
-  if (Array.isArray(conflicts) && conflicts.length > 0) {
+
+  // 該当日のライバル予定を動的に取得してアラート表示
+  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+  const m = Number(dateKey.slice(5, 7));
+  const day = Number(dateKey.slice(8, 10));
+  const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+
+  const conflicts = rivals.filter(function(booking) {
+    if (!booking) return false;
+    const bDate = booking.liveDate || booking.date || '';
+    const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
+    return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
+  });
+
+  if (conflicts.length > 0) {
     const infoText = conflicts.map(function(rc) {
       const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
       const vName = rc.liveVenue || rc.venue || rc.place || '会場未定';
@@ -865,6 +876,7 @@ function handleCalendarDayClick(dateKey, conflicts) {
     alert('📅 ' + dateKey + ' の他グループ予定:\n\n' + infoText);
   }
 }
+
 
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
