@@ -138,9 +138,20 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
         // 🌟 2日連続、あるいは3日連続のツアー公演にする確率判定（約40%の確率で連日にする）
-        const isConsecutive = Math.random() < 0.4;
-        const durationDays = isConsecutive ? (Math.random() < 0.7 ? 2 : 3) : 1;
-
+        const isConsecutive = Math.random() < 0.9;
+       let durationDays = 1;
+        if (isConsecutive) {
+          const rand = Math.random();
+          if (rand < 0.50) {
+            durationDays = 2; // 50%の確率で2連
+          } else if (rand < 0.80) {
+            durationDays = 3; // 30%の確率で3連 (50%〜80%)
+          } else if (rand < 0.95) {
+            durationDays = 4; // 15%の確率で4連 (80%〜95%)
+          } else {
+            durationDays = 5; // 5%の確率で5連 (95%〜100%)
+          }
+        }
         const liveDatesArr = [];
         const baseLiveName = `${team.name} ${venue.name} 公演`;
 
