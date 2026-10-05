@@ -815,6 +815,8 @@ function renderPlanCalendarGrid() {
   }
 }
 
+
+
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
   if (index >= 0) {
