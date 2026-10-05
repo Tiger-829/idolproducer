@@ -137,8 +137,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
-        // 🌟 2日連続、あるいは3日連続のツアー公演にする確率判定（約40%の確率で連日にする）
-        const isConsecutive = Math.random() < 0.9;
+        const isConsecutive = Math.random() < 0.99;
        let durationDays = 1;
         if (isConsecutive) {
           const rand = Math.random();
