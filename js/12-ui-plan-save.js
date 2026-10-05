@@ -1081,40 +1081,44 @@ function initGame(slot, startFresh) {
       try {
         const data = JSON.parse(raw);
         
-        // 🌟 データの整合性を保つための事前チェック・補完
         if (!data || typeof data !== 'object') {
-          throw new Error('セーブデータの形式が無効です（オブジェクトではありません）。');
+          throw new Error('セーブデータの形式が無効です。');
         }
 
-        // 必須プロパティの欠損を防ぐフォールバック処理
-        if (!Array.isArray(data.rivalLiveBookings)) {
-          data.rivalLiveBookings = [];
-        }
-        if (!data.productionSchedule || typeof data.productionSchedule !== 'object') {
-          data.productionSchedule = {};
-        }
+        // 🌟 過去のセーブデータに欠損している可能性のある主要プロパティをすべて安全にデフォルト補完
+        data.rivalLiveBookings = Array.isArray(data.rivalLiveBookings) ? data.rivalLiveBookings : [];
+        data.productionSchedule = (data.productionSchedule && typeof data.productionSchedule === 'object') ? data.productionSchedule : {};
+        data.idolRoster = Array.isArray(data.idolRoster) ? data.idolRoster : [];
+        data.funds = Number.isFinite(data.funds) ? data.funds : (typeof INITIAL_FUNDS !== 'undefined' ? INITIAL_FUNDS : 10000000);
+        data.currentYear = Number.isInteger(data.currentYear) ? data.currentYear : 1;
+        data.currentMonth = Number.isInteger(data.currentMonth) ? data.currentMonth : 1;
+        data.currentWeek = Number.isInteger(data.currentWeek) ? data.currentWeek : 1;
 
         if (typeof applySavedGame === 'function') {
           applySavedGame(data);
         } else {
-          // 万が一 applySavedGame が定義されていない場合の最低限の復元
-          currentYear = data.currentYear || 1;
-          currentMonth = data.currentMonth || 1;
-          currentWeek = data.currentWeek || 1;
-          funds = data.funds || INITIAL_FUNDS;
+          // applySavedGame が存在しない場合の直接復元
+          currentYear = data.currentYear;
+          currentMonth = data.currentMonth;
+          currentWeek = data.currentWeek;
+          funds = data.funds;
           rivalLiveBookings = data.rivalLiveBookings;
           productionSchedule = data.productionSchedule;
+          idolRoster = data.idolRoster;
         }
+
+        console.log('【セーブデータ読込成功】不整合なプロパティを自動修復してロードしました。');
+
       } catch (e) {
         console.error('セーブデータの解析・適用エラーの詳細:', e);
-        // 誤りを隠さず、正確にユーザーに通知した上で新規開始の選択肢を与える
-        if (confirm('セーブデータの構造に不整合または破損が見つかりました。\nデータを初期化して新規開始しますか？（キャンセルすると安全な初期状態で続行を試みます）')) {
+        
+        // 🚨 データのパースや適用に完全に失敗した場合は、破損データとして安全に初期化を促す
+        if (confirm('保存されているセーブデータが著しく破損しているか、古いバージョンのため読み込めません。\nデータを初期化して新しくゲームを開始しますか？')) {
+          localStorage.removeItem(saveSlotKey(slot));
           if (typeof initializeNewGameState === 'function') initializeNewGameState();
         } else {
-          // 最小限の初期値を設定して続行を試みる
-          if (typeof initializeNewGameState === 'function' && !productionSchedule) {
-            initializeNewGameState();
-          }
+          // キャンセルされた場合は最低限の初期状態を生成して続行
+          if (typeof initializeNewGameState === 'function') initializeNewGameState();
         }
       }
     } else {
@@ -1136,8 +1140,8 @@ function initGame(slot, startFresh) {
 
   try {
     updateUI();
-  } catch (e) {
-    console.warn('Initial updateUI warning:', e);
+  } catch (err) {
+    console.warn('Initial updateUI warning:', err);
   }
 
   if (startFresh) {
@@ -1150,6 +1154,8 @@ function initGame(slot, startFresh) {
     }
   }
 }
+
+
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
   if (!legacySave) return;
