@@ -111,24 +111,43 @@ function buildInitialLivePlan() {
 
 let idolRoster = [];
 // 初期の半年計画（2月・6月のCD発売は確定。ライブは5〜7月のランダム土日2days）
+// 初期の半年計画（CD: 2/18, 6/17、ライブ: 5/16, 5/17 を初期設定として内蔵）
 function createInitialProductionSchedule() {
-  const live = buildInitialLivePlan();
   const schedule = {};
-  // 発売とライブは別々の月に置く（2月・6月の発売は必ず確定させる）
-  schedule[`1-${PRESET_RELEASE_MONTHS[0]}`] = { release: PRESET_RELEASE_TYPE, liveVenue: null };
-  schedule[`1-${PRESET_RELEASE_MONTHS[1]}`] = { release: PRESET_RELEASE_TYPE, liveVenue: null };
-  schedule[`1-${live.month}`] = {
-    release: 'none',
-    liveVenue: live.liveVenue,
-    liveName: live.liveName,
-    liveDate: live.liveDate,
-    liveDates: live.liveDates
+  
+  // 2月のCD発売（2月18日）
+  schedule[`1-2`] = {
+    release: 'single',
+    songName: 'SnowDrops',
+    releaseDate: '2026-02-18', // または '2026-02-18' などフォーマットに合わせて調整
+    releaseBenefit: 'none',
+    liveVenue: null
   };
+
+  // 6月のCD発売（6月17日）
+  schedule[`1-6`] = {
+    release: 'single',
+    songName: 'アジサイと風鈴',
+    releaseDate: '1-06-17',
+    releaseBenefit: 'none',
+    liveVenue: null
+  };
+
+  // 5月のライブ（5月16日・17日）
+  schedule[`1-5`] = {
+    release: 'none',
+    songName: '',
+    liveVenue: INITIAL_LIVE_VENUE || '原宿体育館',
+    liveName: INITIAL_LIVE_VENUE || 'Debut Live',
+    liveDate: '2026-05-16',
+    liveDates: ['2026-05-17'],
+    streamDates: ['2026-05-16','2026-05-17']
+  };
+
   return schedule;
 }
 
 let productionSchedule = createInitialProductionSchedule();
-
 let yearlyStats = { sales: 0, audience: 0 };
 // 生涯累計売上（年を跨いでも積み上がり、ファン成長に使う）
 let lifetimeSales = 0;
