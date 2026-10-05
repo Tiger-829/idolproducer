@@ -1172,7 +1172,21 @@ function migrateLegacySave() {
     console.error(error);
   }
 }
-
+// セーブデータを手動で読み込んでエラー箇所を特定するテスト
+try {
+  const raw = localStorage.getItem('idol_manager_save_slot_' + (activeSaveSlot || 1));
+  console.log("生データ取得成功:", Boolean(raw));
+  const data = JSON.parse(raw);
+  console.log("JSONパース成功:", data);
+  if (typeof applySavedGame === 'function') {
+    applySavedGame(data);
+    console.log("applySavedGame 成功！");
+  } else {
+    console.warn("applySavedGame が定義されていません");
+  }
+} catch (e) {
+  console.error("🚨 実際のクラッシュ箇所を発見:", e);
+}
 document.addEventListener('DOMContentLoaded', () => {
   migrateLegacySave();
   renderSaveSlots();
