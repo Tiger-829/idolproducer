@@ -80,9 +80,8 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
   
-  // ★直結：引数で渡された年数（1年目なら1、2年目なら2）から直接西暦を決定する（1年目＝2026年）
   const targetYearNum = Number(year) || 1;
-  const actualYear = 2025 + targetYearNum; // 1年目 -> 2026, 2年目 -> 2027
+  const actualYear = 2025 + targetYearNum; // 1年目＝2026年、2年目＝2027年
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
@@ -92,7 +91,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
-      // 1. ライバルたちのライブ予定生成
+      // 1. ライバルたちのライブ予定生成（※ここで 'i = 0' のタイポを修正済み）
       for (let i = 0; i < targetLiveCount; i++) {
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
@@ -152,7 +151,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   rivalLiveBookings = newRivalBookings;
   console.log(`【ライバル先行配置完了】(年数: ${targetYearNum}年目 => 西暦 ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
-
 
 // ==========================================
 // ★一番最初の起動時は「1年分（1〜12月）」をまとめて生成する！
