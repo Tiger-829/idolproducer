@@ -775,15 +775,12 @@ function renderPlanCalendarGrid() {
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
       // 他グループの予定（ライブやCD発売）がこの日付に該当するか全プロパティから強力に探す
-      const rivalConflicts = rivals.filter(booking => {
-        // bookingオブジェクトが持つすべての値の中から、"YYYY-MM-DD" 形式の日付文字列を探す
-        const values = Object.values(booking);
-        return values.some(val => {
-          if (typeof val !== 'string') return false;
-          return val === dateKey || val.startsWith(dateKey) || dateKey.startsWith(val);
-        });
-      });
-      const hasRival = rivalConflicts.length > 0;
+      // ツールチップ用の詳細文字列生成
+      const rivalTitles = rivalConflicts.map(rc => {
+        const typeStr = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
+        const venueStr = rc.liveVenue ? ` @${rc.liveVenue}` : '';
+        return `${rc.groupName} ${typeStr} ${rc.liveName || ''}${venueStr}`;
+      }).join(' ／ ');      const hasRival = rivalConflicts.length > 0;
 
       const classes = [
         'calendar-day',
