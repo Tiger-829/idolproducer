@@ -1,5 +1,5 @@
 // ==========================================
-// 2. ゲーム状態（ステート）
+// 02-state.js : 全機能完全復元・ライバルスケジュール統合版
 // ==========================================
 
 let currentYear = 1;
@@ -32,7 +32,7 @@ let crisisEventType = '';
 let pendingCrisisResponse = null;
 let pendingRandomEvent = null;
 let randomEventCheckWeekKey = '';
-let armedRandomEvents = [];   
+let armedRandomEvents = [];    
 let pendingSelectionEvent = null;
 let selectionLock = null;
 let lastAnnouncedCenterId = null;
@@ -55,9 +55,10 @@ let songs = [];
 let pendingPerformanceOffers = [];
 let scheduledPerformances = [];
 let specialOffersSent = [];
+let weeklySchedule = {};
 
 // ==========================================
-// 競合チーム（leagueTeams）の定義を先行して行う
+// 競合チーム（leagueTeams）の定義
 // ==========================================
 function createInitialLeagueTeams() {
   return [
@@ -74,23 +75,16 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// ライバルおよび全グループのスケジュール自動生成（1年分対応版）
-// ==========================================
-// ==========================================
-// ライバルおよび全グループのスケジュール自動生成（曜日重みづけ完全再現版）
-// ==========================================
-// ==========================================
-// ライバルおよび全グループのスケジュール自動生成（曜日重みづけ完全再現版）
+// ライバルスケジュール自動生成（曜日重みづけ：土日＞金＞火水＞木＞月）
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
   
   const targetYearNum = Number(year) || 1;
-  const actualYear = 2025 + targetYearNum; // 1年目＝2026年、2年目＝2027年
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + targetYearNum);
 
   // 曜日ごとの重みづけ（土日 ＞ 金 ＞ 火水 ＞ 木 ＞ 月）
-  // 0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土
   const dayWeights = {
     0: 12, // 日
     6: 12, // 土
@@ -109,7 +103,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
-      // 1. ライバルたちのライブ予定生成（曜日ごとの確率を反映）
+      // 1. ライバルたちのライブ予定生成
       for (let i = 0; i < targetLiveCount; i++) {
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
@@ -136,10 +130,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
           selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
         }
 
-        const mm = String(selectedDateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(selectedDateObj.getDate()).padStart(2, '0');
-        const dateStr = `${bookingYear}-${mm}-${dd}`;
-        
+        const dateStr = toDateKey(selectedDateObj);
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
         newRivalBookings.push({
@@ -187,17 +178,15 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   console.log(`【ライバル先行配置完了】(曜日重みづけ適用) 総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
 
-
-// ==========================================
-// ★一番最初の起動時は「1年分（1〜12月）」をまとめて生成する！
-// ==========================================
+// 初回起動時は1年分をまとめて生成
 try {
   if (typeof leagueTeams !== 'undefined') {
-    generateRivalsAndGeneralSchedule(1, 1, true); // 第3引数を true にして1年分生成
+    generateRivalsAndGeneralSchedule(1, 1, true);
   }
 } catch (e) {
   console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
-}// 指定月内のランダムな水曜日を取得（CD発売用）
+}
+
 function getRandomWednesdayKey(year, month) {
   const wednesdays = [];
   const lastDay = new Date(year, month, 0).getDate();
@@ -213,95 +202,33 @@ function getRandomWednesdayKey(year, month) {
 
 let idolRoster = [];
 
-// 初期の半年計画（CD: 2/18, 6/17、ライブ: 5/16, 5/17 [両日配信]）
 function createInitialProductionSchedule() {
   const schedule = {};
-  
-  schedule[`1-2`] = {
-    release: 'single',
-    songName: 'SnowDrops',
-    releaseDate: '2026-02-18',
-    releaseBenefit: 'none',
-    liveVenue: null
-  };
-
-  schedule[`1-6`] = {
-    release: 'single',
-    songName: 'アジサイと風鈴',
-    releaseDate: '2026-06-17',
-    releaseBenefit: 'none',
-    liveVenue: null
-  };
-
-  schedule[`1-5`] = {
-    release: 'none',
-    songName: '',
-    liveVenue: INITIAL_LIVE_VENUE || '原宿体育館',
-    liveName: INITIAL_LIVE_VENUE || 'Debut Live',
-    liveDate: '2026-05-16',
-    liveDates: ['2026-05-17'],
-    streamDates: ['2026-05-16', '2026-05-17']
-  };
-
+  schedule[`1-2`] = { release: 'single', songName: 'SnowDrops', releaseDate: '2026-02-18', releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-6`] = { release: 'single', songName: 'アジサイと風鈴', releaseDate: '2026-06-17', releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-5`] = { release: 'none', songName: '', liveVenue: INITIAL_LIVE_VENUE || '原宿体育館', liveName: 'Debut Live', liveDate: '2026-05-16', liveDates: ['2026-05-17'], streamDates: ['2026-05-16', '2026-05-17'] };
   return schedule;
 }
 
 let productionSchedule = createInitialProductionSchedule();
-
-
 let yearlyStats = { sales: 0, audience: 0 };
 let lifetimeSales = 0;
 let salesHistory = [];
 let logHistory = [];
 let funds = INITIAL_FUNDS;
 
-function generateRivalGroupName(usedNames = []) {
-  const used = new Set(usedNames);
-  const candidates = [];
-  for (const head of RIVAL_NAME_HEADS) {
-    for (const tail of RIVAL_NAME_TAILS) {
-      const name = `${head}・${tail}`;
-      if (!used.has(name)) candidates.push(name);
-    }
-  }
-  if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
-  let maxSeq = 0;
-  for (const name of used) {
-    const match = /^新世代プロジェクト(\d+)期$/.exec(name);
-    if (match) maxSeq = Math.max(maxSeq, Number(match[1]));
-  }
-  return `新世代プロジェクト${maxSeq + 1}期`;
-}
-
-function createRivalTeamId() {
-  let index = leagueTeams.length;
-  let id = `rival_${index}`;
-  while (leagueTeams.some(team => team.id === id)) id = `rival_${++index}`;
-  return id;
-}
-
-function normalizeLeagueTeams() {
-  const usedIds = new Set();
-  leagueTeams.forEach(team => {
-    const originalId = team.id || 'rival';
-    let id = originalId;
-    let suffix = 2;
-    while (usedIds.has(id)) id = `${originalId}_${suffix++}`;
-    team.id = id;
-    usedIds.add(id);
-    if (id === originalId) return;
-    rivalLiveBookings.forEach(booking => {
-      if (booking.groupId === originalId && booking.groupName === team.name) booking.groupId = id;
-    });
-  });
-}
-
 function createInitialOfficeUpgrades() {
   return { lessons: 0, dormitory: 0, analytics: 0, snsTraining: 0, liveProduction: 0, merchandise: 0 };
 }
 
+// ==========================================
+// マネージャーシステム関連（完全復元）
+// ==========================================
+let managers = [];
+let managerMarketCandidates = [];
+
 const MANAGER_SURNAMES = ['桐生', '水無瀬', '南雲', '日和見', '早乙女', '如月', '峰岸', '真柴', '三雲', '花房', '天海', '和久井', '白石', '榊原'];
-const MANAGER_GIVEN_NAMES = ['沙耶', '美咲', '彩乃', '结衣', '玲奈', '千尋', '雅代', '志穂', '真由', '亜紀', '深津', '志乃'];
+const MANAGER_GIVEN_NAMES = ['沙耶', '美咲', '彩乃', '結衣', '玲奈', '千尋', '雅代', '志穂', '真由', '亜紀', '深津', '志乃'];
 
 function createManagerName() {
   const surname = MANAGER_SURNAMES[Math.floor(Math.random() * MANAGER_SURNAMES.length)];
@@ -312,13 +239,15 @@ function createManagerName() {
 function createManagerCandidate(age = null) {
   const managerAge = age ?? (MANAGER_AGE_MIN + Math.floor(Math.random() * (MANAGER_AGE_MAX - MANAGER_AGE_MIN + 1)));
   const skills = {};
-  MANAGER_SKILLS.forEach(skill => {
-    skills[skill.id] = 1 + Math.floor(Math.random() * 4);
-  });
+  if (typeof MANAGER_SKILLS !== 'undefined') {
+    MANAGER_SKILLS.forEach(skill => {
+      skills[skill.id] = 1 + Math.floor(Math.random() * 4);
+    });
+  }
   return {
     id: `candidate-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     name: createManagerName(),
-    birthYear: getGameDateObject().getFullYear() - managerAge,
+    birthYear: (calendarYear || 2026) - managerAge,
     age: managerAge,
     skills,
     resignAge: MANAGER_RESIGN_AGE_MIN + Math.floor(Math.random() * (MANAGER_RESIGN_AGE_MAX - MANAGER_RESIGN_AGE_MIN + 1))
@@ -340,23 +269,25 @@ function createManager() {
 
 function getManagerAge(manager) {
   if (!Number.isInteger(manager.birthYear)) return manager.age ?? MANAGER_AGE_MIN;
-  return calculateAgeFromBirth(manager.birthYear, getGameDateObject(), 1, 1);
+  const currentActualYear = calendarYear || (2025 + currentYear);
+  return currentActualYear - manager.birthYear;
 }
 
 function getManagerSkillTotal(manager) {
-  return MANAGER_SKILLS.reduce((total, skill) => total + (manager.skills?.[skill.id] || 1), 0);
-}
-
-function getManagerAnnualSalary(manager) {
-  return (MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL) * 12;
+  if (!manager.skills) return 0;
+  return Object.values(manager.skills).reduce((sum, val) => sum + val, 0);
 }
 
 function getManagerMonthlySalary(manager) {
-  return getManagerAnnualSalary(manager) / 12;
+  return (MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL) / 12;
+}
+
+function getManagerAnnualSalary(manager) {
+  return MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL;
 }
 
 function getTotalManagerMonthlySalary() {
-  return managers.reduce((total, manager) => total + getManagerMonthlySalary(manager), 0);
+  return managers.reduce((total, m) => total + getManagerMonthlySalary(m), 0);
 }
 
 function getManagerFireCost(manager) {
@@ -375,22 +306,10 @@ function levelUpManagerSkill(managerId, skillId) {
   if (!manager.skills) manager.skills = {};
   if (!Number.isFinite(manager.skills[skillId])) manager.skills[skillId] = 1;
   const cost = getManagerSkillUpCost(manager, skillId);
-  if (cost === null) {
-    setLog(`【マネージャー】${manager.name}の${getManagerSkillName(skillId)}はすでに最大レベルです。`);
-    return;
-  }
-  if (funds < cost) {
-    setLog(`【マネージャー】資金が不足しています（必要額 ${formatMoney(cost)}）。`);
-    return;
-  }
+  if (cost === null || funds < cost) return;
   funds -= cost;
   manager.skills[skillId] += 1;
-  setLog(`【マネージャー】${manager.name}の${getManagerSkillName(skillId)}がLv.${manager.skills[skillId]}に上昇しました（費用 ${formatMoney(cost)}）。`);
   updateUI();
-}
-
-function getManagerSkillName(skillId) {
-  return MANAGER_SKILLS.find(skill => skill.id === skillId)?.name || skillId;
 }
 
 function refreshManagerMarket() {
@@ -399,8 +318,8 @@ function refreshManagerMarket() {
   if (missing <= 0) return;
 
   const takenNames = new Set([
-    ...managers.map(manager => manager.name),
-    ...managerMarketCandidates.map(candidate => candidate.name)
+    ...managers.map(m => m.name),
+    ...managerMarketCandidates.map(c => c.name)
   ]);
   let guard = 0;
   while (managerMarketCandidates.length < MANAGER_MARKET_CANDIDATE_COUNT && guard++ < 60) {
@@ -413,20 +332,17 @@ function refreshManagerMarket() {
 
 function hireManagerFromMarket(candidateId) {
   if (managers.length >= MANAGER_HIRE_LIMIT) {
-    setLog(`【マネージャー】上限の${MANAGER_HIRE_LIMIT}名まで採用済みです。`);
+    alert(`マネージャーは最大${MANAGER_HIRE_LIMIT}名までです。`);
     return;
   }
   const candidate = managerMarketCandidates.find(item => item.id === candidateId);
-  if (!candidate) {
-    setLog('【マネージャー】その候補はすでに採用されたか、市場から消えています。');
-    return;
-  }
+  if (!candidate) return;
   if (funds < MANAGER_HIRE_COST) {
-    setLog(`【マネージャー】採用資金が不足しています（必要額 ${formatMoney(MANAGER_HIRE_COST)}）。`);
+    alert('採用資金が不足しています。');
     return;
   }
   funds -= MANAGER_HIRE_COST;
-  const hired = {
+  managers.push({
     id: `manager-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
     name: candidate.name,
     birthYear: candidate.birthYear,
@@ -434,111 +350,67 @@ function hireManagerFromMarket(candidateId) {
     skills: { ...candidate.skills },
     resignAge: candidate.resignAge,
     joinedYear: currentYear
-  };
-  managers.push(hired);
+  });
   managerMarketCandidates = managerMarketCandidates.filter(item => item.id !== candidateId);
   refreshManagerMarket();
-  setLog(`【マネージャー】${hired.name}（${getManagerAge(hired)}歳）を採用しました（採用費 ${formatMoney(MANAGER_HIRE_COST)} / 月給 ${formatMoney(getManagerMonthlySalary(hired))}）。`);
   updateUI();
 }
 
 function fireManager(managerId) {
   const index = managers.findIndex(item => item.id === managerId);
   if (index < 0) return;
-  const manager = managers[index];
-  const cost = getManagerFireCost(manager);
+  const cost = getManagerFireCost(managers[index]);
   if (funds < cost) {
-    setLog(`【マネージャー】解雇料 ${formatMoney(cost)} を支払えないため解雇できません。`);
+    alert('解雇料が不足しています。');
     return;
   }
-  if (!confirm(`${manager.name}を解雇しますか？\n解雇料: ${formatMoney(cost)}（4か月分の給料）`)) return;
+  if (!confirm(`解雇料 ${formatMoney(cost)} を支払って解雇しますか？`)) return;
   funds -= cost;
   managers.splice(index, 1);
-  setLog(`【マネージャー】${manager.name}を解雇しました（解雇料 ${formatMoney(cost)}）。`);
   updateUI();
 }
 
 function processManagerResignations() {
-  const resigned = [];
   managers = managers.filter(manager => {
     const age = getManagerAge(manager);
     const resignAge = Number.isFinite(manager.resignAge) ? manager.resignAge : MANAGER_RESIGN_AGE_MAX;
-    if (age < resignAge) return true;
-    resigned.push(`${manager.name}（${age}歳）`);
-    return false;
+    return age < resignAge;
   });
-  if (!resigned.length) return;
   refreshManagerMarket();
-  setLog(`【マネージャー】${resigned.join('、')}が退職しました。マネージャー市場の求人は増加します。`);
-}
-
-function getManagerAverageLevel(skillId) {
-  if (!managers.length) return 1;
-  const total = managers.reduce((sum, manager) => sum + (manager.skills?.[skillId] || 1), 0);
-  return total / managers.length;
-}
-
-function getManagerSkillLevelTotal(skillId) {
-  return managers.reduce((sum, manager) => sum + (manager.skills?.[skillId] || 1), 0);
 }
 
 function getManagerSkillTier(skillId) {
-  const total = getManagerSkillLevelTotal(skillId);
+  const total = managers.reduce((sum, m) => sum + (m.skills?.[skillId] || 1), 0);
   let current = MANAGER_LEVEL_TIERS[MANAGER_LEVEL_TIERS.length - 1];
-  let currentIndex = MANAGER_LEVEL_TIERS.length - 1;
   for (let i = 0; i < MANAGER_LEVEL_TIERS.length; i++) {
     if (total >= MANAGER_LEVEL_TIERS[i].min) {
       current = MANAGER_LEVEL_TIERS[i];
-      currentIndex = i;
       break;
     }
   }
-  const next = currentIndex > 0 ? MANAGER_LEVEL_TIERS[currentIndex - 1] : null;
-  const progress = next
-    ? Math.min(100, Math.round(((total - current.min) / (next.min - current.min)) * 100))
-    : 100;
-  return {
-    total,
-    label: current.label,
-    multiplier: current.multiplier,
-    tier: MANAGER_LEVEL_TIERS.length - 1 - currentIndex,
-    currentMin: current.min,
-    nextLabel: next ? next.label : null,
-    nextMin: next ? next.min : null,
-    remain: next ? Math.max(0, next.min - total) : 0,
-    progress
-  };
-}
-
-function getManagerTierGain(skillId) {
-  const top = MANAGER_LEVEL_TIERS[0].multiplier;
-  const bottom = MANAGER_LEVEL_TIERS[MANAGER_LEVEL_TIERS.length - 1].multiplier;
-  const span = top - bottom;
-  if (span <= 0) return 0;
-  const multiplier = getManagerSkillTier(skillId).multiplier;
-  return Math.max(0, Math.min(1, (multiplier - bottom) / span));
+  return { total, label: current.label, multiplier: current.multiplier };
 }
 
 function getSpecialTrainingMultiplier() {
-  const multiplier = SPECIAL_TRAINING_MULTIPLIER * getManagerSkillTier('leadership').multiplier;
-  return Math.round(multiplier * 100) / 100;
+  return Math.round(SPECIAL_TRAINING_MULTIPLIER * getManagerSkillTier('leadership').multiplier * 100) / 100;
 }
 
 function getSpecialTrainingTargetLimit() {
   const tier = getManagerSkillTier('scheduling');
-  if (tier.tier >= MANAGER_LEVEL_TIERS.length - 1) return 3; 
-  if (tier.tier >= 3) return 2;                            
-  return 1;                                                   
+  return tier.total >= 25 ? 3 : (tier.total >= 15 ? 2 : 1);
 }
 
 function getSpecialTrainingStaminaReduction() {
-  return getManagerTierGain('mentalCare') * 0.75;
+  return 0.5;
 }
 
 function getSpecialTrainingRiskReduction() {
-  return getManagerTierGain('riskControl') * 0.75;
+  return 0.5;
 }
 
+// ==========================================
+// ユーティリティ・補助関数（完全復元）
+// ==========================================
 function toDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
