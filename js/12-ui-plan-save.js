@@ -388,6 +388,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   if (titleEl) titleEl.textContent = title;
 
   // ==========================================
+  // ★追加：ユーザーがスケジュールを組む前に、ライバルたちが先に予定を決定する！
+  // （初回や1年分の場合は true を渡すなど調整可能ですが、基本は半年分を先行生成）
+  // ==========================================
+  const isFirstEver = (yearTarget === 1 && startM === 1 && (!rivalLiveBookings || rivalLiveBookings.length === 0));
+  generateRivalsAndGeneralSchedule(yearTarget, startM, isFirstEver);
+
+  // （以降の「直近の半期の振り返り」や月別ブロック構築の処理が続く...）
+  // ==========================================
   // 1. 直前の半期の振り返り（助数詞付きCD発売＆正確な日付入りライブ）
   // ==========================================
   const summaryBox = document.getElementById('prev-plan-summary');
