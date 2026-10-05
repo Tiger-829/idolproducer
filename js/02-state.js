@@ -55,27 +55,35 @@ let songs = [];
 let pendingPerformanceOffers = [];
 let scheduledPerformances = [];
 let specialOffersSent = [];
-let rivalLiveBookings = [];
-
-let managers = [];
-let managerMarketCandidates = [];
-let groupFansAtYearStart = 0;
-let previousYearGroupFansAtYearStart = 0;
-let weeklySchedule = null;
-let yearEndAwardProcessed = false;
-let yearEndKohakuProcessed = false;
 
 // ==========================================
-// ライバルおよび全グループの自動スケジュール生成（人気比例・ランダム会場）
+// 競合チーム（leagueTeams）の定義を先行して行う
+// ==========================================
+function createInitialLeagueTeams() {
+  return [
+    { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
+    { id: 'rival_1', name: 'スターライト・クイーン', sales: 0, audience: 0, basePower: 92 },
+    { id: 'rival_2', name: 'ネオ・エレメンツ', sales: 0, audience: 0, basePower: 85 },
+    { id: 'rival_3', name: 'サクラ・シンフォニー', sales: 0, audience: 0, basePower: 78 },
+    { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
+    { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
+  ];
+}
+
+let leagueTeams = createInitialLeagueTeams();
+let rivalLiveBookings = [];
+
+// ==========================================
+// ライバルおよび全グループの自動スケジュール生成関数
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth) {
   const newRivalBookings = [];
 
-  if (typeof leagueTeams !== 'undefined' && Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
+  if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
       if (team.id === 'player') return; // 自グループは除外
 
-      // basePower（例: 50〜92）に比例して半年間の公演数を決定（80以上なら約12公演）
+      // basePower に比例して半年間の公演数を決定（80以上なら約12公演）
       const power = team.basePower || 50;
       const targetLiveCount = Math.max(2, Math.round((power / 92) * 12));
 
@@ -157,25 +165,18 @@ function createInitialProductionSchedule() {
 
 let productionSchedule = createInitialProductionSchedule();
 
-// 初回起動時に1年目上半期のライバル予定を生成
-generateRivalsAndGeneralSchedule(1, 1);
+// 変数の初期化がすべて完了した安全なタイミングで初回生成を実行
+try {
+  generateRivalsAndGeneralSchedule(1, 1);
+} catch (e) {
+  console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
+}
 
 let yearlyStats = { sales: 0, audience: 0 };
 let lifetimeSales = 0;
 let salesHistory = [];
 let logHistory = [];
 let funds = INITIAL_FUNDS;
-
-function createInitialLeagueTeams() {
-  return [
-    { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
-    { id: 'rival_1', name: 'スターライト・クイーン', sales: 0, audience: 0, basePower: 92 },
-    { id: 'rival_2', name: 'ネオ・エレメンツ', sales: 0, audience: 0, basePower: 85 },
-    { id: 'rival_3', name: 'サクラ・シンフォニー', sales: 0, audience: 0, basePower: 78 },
-    { id: 'rival_4', name: 'ハピネス・プロジェクト', sales: 0, audience: 0, basePower: 70 },
-    { id: 'rival_5', name: 'アンダー・グラウンド', sales: 0, audience: 0, basePower: 65 }
-  ];
-}
 
 function generateRivalGroupName(usedNames = []) {
   const used = new Set(usedNames);
@@ -460,8 +461,6 @@ function getSpecialTrainingStaminaReduction() {
 function getSpecialTrainingRiskReduction() {
   return getManagerTierGain('riskControl') * 0.75;
 }
-
-let leagueTeams = createInitialLeagueTeams();
 
 function toDateKey(date) {
   const year = date.getFullYear();
