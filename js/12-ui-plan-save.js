@@ -379,7 +379,6 @@ function refreshPlanEventsContainer(month) {
 }
 
 // 半年計画策定モーダル
-// 半年計画策定モーダル
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -498,10 +497,10 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
+    // ★ここで rivals 変数を安全に定義する
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
     for (let m = startM; m <= endM; m++) {
-      // 月別ブロックのHTML内に、その月のライバル予定をリスト化して確認できるようにする例
       const monthRivals = rivals.filter(b => {
         const bDate = b.liveDate || b.date || '';
         return bDate.startsWith(`${yearTarget}-${String(m).padStart(2, '0')}`);
@@ -595,6 +594,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     alert('半年計画画面を開く際にエラーが発生しました。');
   }
 }
+
 function updateReleaseDateOptions(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
   const fields = document.getElementById(`release-fields-${month}`);
