@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全同期版）
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全同期・ライバル連動版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -75,7 +75,6 @@ function getPlanReleaseDefaultWednesday(month) {
   return toDateKey(d);
 }
 
-// 公演日程・配信設定
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -316,7 +315,6 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
-// CD特典イベント設定
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -382,11 +380,6 @@ function refreshPlanEventsContainer(month) {
 
 // 半年計画策定モーダル
 function openDecisionModal(title, yearTarget, startM, endM) {
-  const testBox = document.getElementById('prev-plan-summary');
-  if (testBox) {
-    testBox.style.background = '#e0f7fa'; // 色を変えて目立たせる
-    testBox.innerHTML = '<strong>【テスト】モーダル関数は動いています！</strong>';
-  }
   planYearTarget = yearTarget;
   planStartM = startM;
   planEndM = endM;
@@ -395,7 +388,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   if (titleEl) titleEl.textContent = title;
 
   // ==========================================
-  // 1. 直前の半期（1つ前）の振り返り概略を表示する処理
+  // 1. 直前の半期の振り返り（助数詞付きCD発売＆正確な日付入りライブ）
   // ==========================================
   const summaryBox = document.getElementById('prev-plan-summary');
   if (summaryBox) {
@@ -404,30 +397,22 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     
     let releaseDetails = [];
     let liveDetails = [];
-    let releaseOrderCount = 0; // 何枚目のシングル/アルバムか数える用
+    let releaseOrderCount = 0;
 
     for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
       const pKey = `${prevYear}-${m}`;
       if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
         const p = productionSchedule[pKey];
         
-        // 1. CD発売データの抽出（助数詞付き）
+        // CD発売の抽出（助数詞付き）
         if (p.release && p.release !== 'none') {
           releaseOrderCount++;
-          // 助数詞の決定 (1st, 2nd, 3rd...)
-          const suffixes = ['st', 'nd', 'rd', 'th'];
-          const getSuffix = (n) => ['st', 'nd', 'rd'][(n - 1) % 10] && (n - 1) % 10 < 3 && !((n - 1) % 100 >= 10 && (n - 1) % 100 < 20) ? ['st', 'nd', 'rd'][(n - 1) % 10] : 'th';
-          // シンプルに 1st, 2nd, 3rd, 4th... を生成
           let ordinal = releaseOrderCount === 1 ? '1st' : releaseOrderCount === 2 ? '2nd' : releaseOrderCount === 3 ? '3rd' : `${releaseOrderCount}th`;
-          
           let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
           
-          // 日付の取得（productionSchedule直下、あるいは自動計算関数から）
           let rawDate = p.releaseDate || '';
           let dateStr = '日程未定';
-          
           if (rawDate) {
-            // "1-02-18" や "2026-02-18" から月日を抽出
             const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-(\d{2})-(\d{2})/);
             if (match) {
               dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
@@ -435,7 +420,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
               dateStr = rawDate;
             }
           } else if (typeof getPlanReleaseDefaultWednesday === 'function') {
-            // フォールバックとして水曜日の日付を取得
             const defDate = getPlanReleaseDefaultWednesday(m);
             if (defDate) {
               const matchDef = defDate.match(/(\d{1,2})-(\d{1,2})$/) || defDate.match(/\d{4}-(\d{2})-(\d{2})/);
@@ -447,15 +431,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           releaseDetails.push(`・${m}月: ${ordinal} ${relTypeName}${songTitle} (${dateStr}発売)`);
         }
         
-        // 2. ライブデータの抽出（確実に拾い上げる）
+        // ライブデータの抽出
         let dates = [];
         if (p.liveDate) dates.push(p.liveDate);
         if (Array.isArray(p.liveDates)) dates = dates.concat(p.liveDates);
         if (p.date) dates.push(p.date);
 
-        // 初期の5月ライブのように固定で入っている場合を考慮し、5月であれば強制的に日付候補を補う（必要に応じた保険）
         if (m === 5 && dates.length === 0) {
-          dates = ['1-05-16', '1-05-17'];
+          dates = ['2026-05-16', '2026-05-17'];
         }
 
         dates = [...new Set(dates)].filter(Boolean);
@@ -477,7 +460,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       }
     }
 
-    // 3. 画面表示の組み立て
     if (releaseDetails.length > 0 || liveDetails.length > 0) {
       let releaseHtml = releaseDetails.length > 0 
         ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
@@ -506,13 +488,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
   for (let m = startM; m <= endM; m++) {
     const planKey = `${yearTarget}-${m}`;
-    
-    // 既存の計画データを取得
     let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     
-    // ==========================================
-    // 2. 既定（プリセット）スケジュールが未設定なら自動反映する
-    // ==========================================
     const isPreset = typeof isPresetReleaseMonth === 'function' ? isPresetReleaseMonth(m) : false;
     if ((!existingPlan.release || existingPlan.release === 'none') && isPreset) {
       existingPlan = {
@@ -594,6 +571,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'flex';
 }
+
 function updateReleaseDateOptions(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
   const fields = document.getElementById(`release-fields-${month}`);
@@ -649,6 +627,9 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
+// ==========================================
+// 計画保存時に関与してライバル予定も自動再生成する
+// ==========================================
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
   const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
@@ -696,10 +677,14 @@ function saveDecisionPlan() {
       productionSchedule[planKey] = plan;
     }
   }
+
+  // 半年計画の決定と同時にライバルたちの新しいスケジュールを動的生成！
+  generateRivalsAndGeneralSchedule(planYearTarget, planStartM);
+
   closePlanCalendar();
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、ライバルグループの新しいスケジュールが発表されました。`);
   updateUI();
 }
 
@@ -711,7 +696,6 @@ function openPlanningManual() {
   }
 }
 
-// 6か月分カレンダーモーダル
 function openPlanningCalendar() {
   const targetYear = currentMonth >= 7 ? currentYear + 1 : currentYear;
   const startM = currentMonth >= 7 ? 1 : 7;
@@ -778,7 +762,7 @@ function renderPlanCalendarGrid() {
         isRelease ? 'CD発売' : '',
         isLive ? '自グループライブ' : '',
         isEvent ? 'CD関連イベント' : '',
-        rivalConflict ? `他グループ公演: ${rivalConflict.groupName || ''} (${rivalConflict.venue || ''})` : ''
+        rivalConflict ? `他グループ公演: ${rivalConflict.groupName || ''} (${rivalConflict.liveVenue || ''})` : ''
       ].filter(Boolean).join(' / ');
 
       cells += `<span class="${classes}" ${title ? `title="${escapeHtml(title)}"` : ''} onclick="togglePlanCalendarDate('${dateKey}')">${day}</span>`;
@@ -892,7 +876,6 @@ function applyPlanCalendarMark(kind) {
   renderPlanCalendarGrid();
 }
 
-// セーブデータスロット管理
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
@@ -911,9 +894,11 @@ function getSaveSlotSummary(slotKey) {
     return { isCorrupt: true };
   }
 }
+
 function saveSlotKey(slot) {
   return `idol_manager_save_slot_${slot}`;
 }
+
 function renderSaveSlots() {
   const container = document.getElementById('save-slots');
   if (!container) return;
@@ -992,7 +977,6 @@ function returnToTitle() {
   openTitleScreen();
 }
 
-// 【最重要】ゲーム初期化（順序是正完全版）
 function initGame(slot, startFresh) {
   const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
   if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
@@ -1015,7 +999,6 @@ function initGame(slot, startFresh) {
     }
   }
 
-  // 1. タイトル画面を非表示にし、ゲーム画面を表示
   const tScreen = document.getElementById('title-screen');
   const gScreen = document.getElementById('game-screen');
   if (tScreen) tScreen.hidden = true;
@@ -1024,19 +1007,16 @@ function initGame(slot, startFresh) {
   const slotLabel = document.getElementById('active-slot-label');
   if (slotLabel) slotLabel.textContent = `セーブ枠 ${slot}`;
 
-  // 2. 【最優先】タブバーを生成し、「事務所」タブを確実にアクティブにする
   if (typeof renderPageNav === 'function') {
     renderPageNav('office');
   }
 
-  // 3. データ描画
   try {
     updateUI();
   } catch (e) {
     console.warn('Initial updateUI warning:', e);
   }
 
-  // 4. 新規開始モーダルを確実にポップアップ
   if (startFresh) {
     if (typeof openDecisionModal === 'function') {
       openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
@@ -1047,7 +1027,7 @@ function initGame(slot, startFresh) {
     }
   }
 }
-// 1. ここに migrateLegacySave を定義する
+
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
   if (!legacySave) return;
@@ -1065,25 +1045,11 @@ function migrateLegacySave() {
   }
 }
 
-// 2. その「下」でイベントリスナーから呼び出す
 document.addEventListener('DOMContentLoaded', () => {
   migrateLegacySave();
   renderSaveSlots();
 });
 
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  migrateLegacySave();
-  renderSaveSlots();
-}
-// ==========================================
-// 起動時・DOM読み込み完了後の安全な初期化
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-  migrateLegacySave();
-  renderSaveSlots();
-});
-
-// 万が一DOMがすでに読み込み終わっている場合のフォールバック
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   migrateLegacySave();
   renderSaveSlots();
