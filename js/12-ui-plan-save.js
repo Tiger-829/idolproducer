@@ -773,11 +773,18 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
+      // ★柔軟かつ確実な判定：オブジェクト内のプロパティから日付文字列（YYYY-MM-DD）を探して完全一致・前方一致をすべて拾う
       const rivalConflicts = rivals.filter(booking => {
-        const bDates = booking.liveDates && booking.liveDates.length > 0 
-          ? booking.liveDates 
-          : [booking.liveDate, booking.date].filter(Boolean);
-        return bDates.includes(dateKey);
+        const values = Object.values(booking);
+        return values.some(val => {
+          if (typeof val === 'string') {
+            return val === dateKey || val.startsWith(dateKey) || dateKey.startsWith(val);
+          }
+          if (Array.isArray(val)) {
+            return val.some(d => typeof d === 'string' && (d === dateKey || d.startsWith(dateKey) || dateKey.startsWith(d)));
+          }
+          return false;
+        });
       });
 
       const hasRival = rivalConflicts.length > 0;
@@ -791,11 +798,11 @@ function renderPlanCalendarGrid() {
         hasRival ? 'rival-live-day' : ''
       ].filter(Boolean).join(' ');
 
-      // ツールチップでグループ名、種別、会場名がひと目でわかるようにする
+      // ツールチップでグループ名、種別、会場名を表示
       const rivalTitles = rivalConflicts.map(rc => {
         const kind = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
         const venue = rc.liveVenue ? ` @${rc.liveVenue}` : '';
-        return `[${rc.groupName}] ${kind} ${rc.liveName || '公演'}${venue}`;
+        return `[${rc.groupName || '他グループ'}] ${kind} ${rc.liveName || rc.liveVenue || '公演'}${venue}`;
       }).join(' ＼ ');
 
       const title = [
@@ -814,7 +821,6 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
-
 
 
 function togglePlanCalendarDate(dateKey) {
