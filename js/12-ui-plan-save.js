@@ -750,7 +750,7 @@ function renderPlanCalendarGrid() {
   if (!container) return;
   container.innerHTML = '';
   
-  const actualYear = calendarYear + (planYearTarget - currentYear);
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget || 1));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
@@ -770,7 +770,7 @@ function renderPlanCalendarGrid() {
       }
       
       const dateObj = new Date(actualYear, m - 1, day, 12);
-      const dateKey = toDateKey(dateObj);
+      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
       
       const isSelected = planCalendarSelection.includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
@@ -783,17 +783,12 @@ function renderPlanCalendarGrid() {
         return event.date === dateKey;
       });
 
-      // ライバル予定のヒット判定
+      // ライバル予定のヒット判定（日付文字列が完全一致、または含まれているものを確実に拾う）
       const rivalConflicts = rivals.filter(function(booking) {
         if (!booking) return false;
-        if (typeof booking.liveDate === 'string' && booking.liveDate.trim() === dateKey) return true;
-        if (Array.isArray(booking.liveDates)) {
-          return booking.liveDates.some(function(d) {
-            return typeof d === 'string' && d.trim() === dateKey;
-          });
-        }
-        if (typeof booking.date === 'string' && booking.date.trim() === dateKey) return true;
-        return false;
+        const bDate = booking.liveDate || booking.date || '';
+        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
+        return bDate === dateKey || bDate.includes(dateKey) || bDates.includes(dateKey);
       });
 
       const hasRival = rivalConflicts.length > 0;
@@ -807,6 +802,7 @@ function renderPlanCalendarGrid() {
         hasRival ? 'rival-live-day' : ''
       ].filter(Boolean).join(' ');
 
+      // ツールチップでグループ名、種別、会場名を表示
       const rivalTitles = rivalConflicts.map(function(rc) {
         const kind = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
         const venue = rc.liveVenue ? ' @' + rc.liveVenue : '';
@@ -829,7 +825,6 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
-
 
 
 function togglePlanCalendarDate(dateKey) {
