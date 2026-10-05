@@ -16,6 +16,16 @@ let pendingReports = [];
 // ==========================================
 // 1. スケジュール確定
 // ==========================================
+
+function ensureWeeklySchedule() {
+  if (typeof weeklySchedule === 'undefined' || !weeklySchedule || typeof weeklySchedule !== 'object') {
+    window.weeklySchedule = {};
+  }
+  return window.weeklySchedule;
+}
+
+// 既存のスケジュール関連処理がここに続きます
+
 function confirmWeeklySchedule() {
   try {
     const today = getGameDateObject();
