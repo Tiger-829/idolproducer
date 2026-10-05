@@ -74,7 +74,7 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// ライバルおよび全グループの自動スケジュール生成関数
+// ライバルおよび全グループのスケジュール自動生成（大規模・完全版）
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth) {
   const newRivalBookings = [];
@@ -83,10 +83,12 @@ function generateRivalsAndGeneralSchedule(year, startMonth) {
     leagueTeams.forEach(team => {
       if (team.id === 'player') return; // 自グループは除外
 
-      // basePower に比例して半年間の公演数を決定（80以上なら約12公演）
+      // ご要望の「合計120件程度（5グループで割ると1グループあたり約24件/半年）」に合わせた計算
       const power = team.basePower || 50;
-      const targetLiveCount = Math.max(2, Math.round((power / 92) * 12));
+      // 基礎パワーに応じて20〜26公演程度をランダム生成
+      const targetLiveCount = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
 
+      // 1. ライバルチームのライブ・イベント予定生成
       for (let i = 0; i < targetLiveCount; i++) {
         const randomMonth = startMonth + Math.floor(Math.random() * 6);
         const lastDay = new Date(year, randomMonth, 0).getDate();
@@ -95,7 +97,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth) {
         const dateObj = new Date(year, randomMonth - 1, randomDay);
         const dateStr = toDateKey(dateObj);
 
-        // 37会場データからランダムに会場を選択
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
         newRivalBookings.push({
@@ -105,15 +106,45 @@ function generateRivalsAndGeneralSchedule(year, startMonth) {
           liveName: `${team.name} 単独公演`,
           liveDate: dateStr,
           liveDates: [],
-          status: 'confirmed'
+          status: 'confirmed',
+          type: 'live'
+        });
+      }
+
+      // 2. ライバルチームのCD発売予定生成（半年で1〜2作、年間を通じて多数の作数を担保）
+      // 水曜日をランダムに選んでCD発売日とする
+      const cdReleaseCount = 2; // 半年で2作ペース
+      for (let j = 0; j < cdReleaseCount; j++) {
+        const cdMonth = startMonth + (j === 0 ? 1 : 4); // 期間中に分散
+        const wednesdayStr = getRandomWednesdayKey(year, cdMonth);
+        
+        newRivalBookings.push({
+          groupId: team.id,
+          groupName: team.name,
+          liveVenue: '',
+          liveName: `${team.name} 新曲リリース`,
+          liveDate: wednesdayStr,
+          liveDates: [],
+          status: 'confirmed',
+          type: 'release'
         });
       }
     });
   }
 
+  // グローバル変数に反映
   rivalLiveBookings = newRivalBookings;
+  console.log(`【スケジュール生成完了】ライバル公演・CD発売予定 総数: ${rivalLiveBookings.length}件`);
 }
 
+// 安全なタイミング（ゲーム初期化時や新規開始時）に一度実行する
+try {
+  if (typeof leagueTeams !== 'undefined') {
+    generateRivalsAndGeneralSchedule(1, 1);
+  }
+} catch (e) {
+  console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
+}
 // 指定月内のランダムな水曜日を取得（CD発売用）
 function getRandomWednesdayKey(year, month) {
   const wednesdays = [];
