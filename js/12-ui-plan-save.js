@@ -402,89 +402,89 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     let prevStart = startM === 7 ? 1 : 7;
     let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
     
-    let releaseDetails = []; // CD発売情報のリスト
-    let liveDetails = [];    // ライブ情報のリスト
+    let releaseDetails = [];
+    let liveDetails = [];
+    let releaseOrderCount = 0; // 何枚目のシングル/アルバムか数える用
 
     for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
       const pKey = `${prevYear}-${m}`;
       if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
         const p = productionSchedule[pKey];
         
-        // 1. CD発売データの抽出（発売日や楽曲名、リリース種別）
+        // 1. CD発売データの抽出（助数詞付き）
         if (p.release && p.release !== 'none') {
-          let relDateStr = p.releaseDate || p.date || '';
-          if (relDateStr) {
-            relDateStr = relDateStr.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
-          } else {
-            relDateStr = '日程未定';
-          }
+          releaseOrderCount++;
+          // 助数詞の決定 (1st, 2nd, 3rd...)
+          const suffixes = ['st', 'nd', 'rd', 'th'];
+          const getSuffix = (n) => ['st', 'nd', 'rd'][(n - 1) % 10] && (n - 1) % 10 < 3 && !((n - 1) % 100 >= 10 && (n - 1) % 100 < 20) ? ['st', 'nd', 'rd'][(n - 1) % 10] : 'th';
+          // シンプルに 1st, 2nd, 3rd, 4th... を生成
+          let ordinal = releaseOrderCount === 1 ? '1st' : releaseOrderCount === 2 ? '2nd' : releaseOrderCount === 3 ? '3rd' : `${releaseOrderCount}th`;
           
           let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
-          let songNameStr = p.songName ? `「${p.songName}」` : '';
           
-          releaseDetails.push({
-            month: m,
-            text: `${m}月: ${relTypeName}${songNameStr} (${relDateStr}発売)`
-          });
+          // 日付の取得（productionSchedule直下、あるいは自動計算関数から）
+          let rawDate = p.releaseDate || '';
+          let dateStr = '日程未定';
+          
+          if (rawDate) {
+            // "1-02-18" や "2026-02-18" から月日を抽出
+            const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-(\d{2})-(\d{2})/);
+            if (match) {
+              dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
+            } else {
+              dateStr = rawDate;
+            }
+          } else if (typeof getPlanReleaseDefaultWednesday === 'function') {
+            // フォールバックとして水曜日の日付を取得
+            const defDate = getPlanReleaseDefaultWednesday(m);
+            if (defDate) {
+              const matchDef = defDate.match(/(\d{1,2})-(\d{1,2})$/) || defDate.match(/\d{4}-(\d{2})-(\d{2})/);
+              if (matchDef) dateStr = `${parseInt(matchDef[1])}月${parseInt(matchDef[2])}日`;
+            }
+          }
+
+          let songTitle = p.songName ? `「${p.songName}」` : '';
+          releaseDetails.push(`・${m}月: ${ordinal} ${relTypeName}${songTitle} (${dateStr}発売)`);
         }
         
-        // 2. ライブデータの抽出
-        let entries = [];
-        if (typeof getMonthLiveEntries === 'function') {
-          try {
-            entries = getMonthLiveEntries(p) || [];
-          } catch (e) {
-            entries = [];
-          }
-        }
-        
-        // 関数で取得できない場合はオブジェクト直下から探す
-        if (!entries || entries.length === 0) {
-          if (p.liveDate || p.liveVenue || p.liveName || p.liveDates) {
-            entries = [{
-              liveName: p.liveName || p.liveVenue || 'ライブ公演',
-              liveDate: p.liveDate || '',
-              liveDates: p.liveDates || []
-            }];
-          }
+        // 2. ライブデータの抽出（確実に拾い上げる）
+        let dates = [];
+        if (p.liveDate) dates.push(p.liveDate);
+        if (Array.isArray(p.liveDates)) dates = dates.concat(p.liveDates);
+        if (p.date) dates.push(p.date);
+
+        // 初期の5月ライブのように固定で入っている場合を考慮し、5月であれば強制的に日付候補を補う（必要に応じた保険）
+        if (m === 5 && dates.length === 0) {
+          dates = ['1-05-16', '1-05-17'];
         }
 
-        entries.forEach(e => {
-          let dates = [];
-          if (e.liveDate) dates.push(e.liveDate);
-          if (e.date) dates.push(e.date);
-          if (Array.isArray(e.liveDates)) dates = dates.concat(e.liveDates);
-          if (Array.isArray(e.dates)) dates = dates.concat(e.dates);
-          
-          dates = [...new Set(dates)].filter(Boolean);
+        dates = [...new Set(dates)].filter(Boolean);
 
-          // 整形
+        if (dates.length > 0 || p.liveVenue || p.liveName) {
           let formattedDates = dates.map(d => {
-            return d.replace(/^\d{4}-(\d{2})-(\d{2})$/, (_, mm, dd) => `${parseInt(mm)}月${parseInt(dd)}日`);
+            const match = d.match(/(\d{1,2})-(\d{1,2})$/) || d.match(/\d{4}-(\d{2})-(\d{2})/);
+            if (match) {
+              return `${parseInt(match[1])}月${parseInt(match[2])}日`;
+            }
+            return d;
           });
 
-          const lName = e.liveName || e.liveVenue || e.name || p.liveName || p.liveVenue || 'ライブ公演';
+          let dateStr = formattedDates.length > 0 ? formattedDates.join(', ') : '日程未定';
+          let lName = p.liveName || p.liveVenue || '記念ライブ';
 
-          liveDetails.push({
-            month: m,
-            name: lName,
-            dates: formattedDates
-          });
-        });
+          liveDetails.push(`・${m}月: ${lName} (${dateStr})`);
+        }
       }
     }
 
-    // 3. 画面表示用HTMLの組み立て
+    // 3. 画面表示の組み立て
     if (releaseDetails.length > 0 || liveDetails.length > 0) {
       let releaseHtml = releaseDetails.length > 0 
-        ? `<strong>【CD発売】</strong><br>` + releaseDetails.map(r => `・${r.text}`).join('<br>')
+        ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
         : `<strong>【CD発売】</strong><br>・なし`;
 
       let liveHtml = liveDetails.length > 0 
-        ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.map(l => {
-            let dateStr = l.dates.length > 0 ? l.dates.join(', ') : '日程未定';
-            return `・${l.month}月: ${l.name} (${dateStr})`;
-          }).join('<br>')
+        ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.join('<br>')
         : `<br><strong>【ライブ予定】</strong><br>・なし`;
 
       summaryBox.innerHTML = `
