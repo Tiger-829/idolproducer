@@ -745,6 +745,7 @@ function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
   container.innerHTML = '';
+  
   const actualYear = calendarYear + (planYearTarget - currentYear);
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
@@ -762,7 +763,10 @@ function renderPlanCalendarGrid() {
         cells += '<span class="calendar-day" aria-hidden="true"></span>';
         continue;
       }
-      const dateKey = toDateKey(new Date(actualYear, m - 1, day, 12));
+      
+      const dateObj = new Date(actualYear, m - 1, day, 12);
+      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD" 形式
+      
       const isSelected = planCalendarSelection.includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
       const liveEntries = readLiveSlotInputs(m);
@@ -770,12 +774,12 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      // ★修正：ライバル予定（ライブ・CD発売）がこの日付に存在するかを全件チェック
+      // ★強力な照合：日付文字列が完全に一致するもの、または前方一致するものも含めて確実にヒットさせる
       const rivalConflicts = rivals.filter(booking => {
-        const bDates = booking.liveDates && booking.liveDates.length > 0 
-          ? booking.liveDates 
-          : [booking.liveDate, booking.date].filter(Boolean);
-        return bDates.includes(dateKey);
+        const bDate = booking.liveDate || booking.date || '';
+        if (!bDate) return false;
+        // 完全一致、または日付部分のプレ一致を許容
+        return bDate === dateKey || bDate.startsWith(dateKey) || dateKey.startsWith(bDate);
       });
 
       const hasRival = rivalConflicts.length > 0;
@@ -786,7 +790,7 @@ function renderPlanCalendarGrid() {
         isRelease ? 'release-day' : '',
         isLive ? 'live-day' : '',
         isEvent ? 'plan-event-day' : '',
-        hasRival ? 'rival-live-day' : '' // カレンダー上でライバル予定日としてハイライト
+        hasRival ? 'rival-live-day' : '' // カレンダー上で他グループの予定日としてハイライト
       ].filter(Boolean).join(' ');
 
       // ツールチップ用の文字列生成
@@ -808,6 +812,7 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
+
 function togglePlanCalendarDate(dateKey) {
   const index = planCalendarSelection.indexOf(dateKey);
   if (index >= 0) {
