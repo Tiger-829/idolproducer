@@ -74,27 +74,32 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// ライバルおよび全グループのスケジュール自動生成（大規模・完全版）
+// ライバルおよび全グループのスケジュール自動生成（1年分対応版）
 // ==========================================
-function generateRivalsAndGeneralSchedule(year, startMonth) {
+function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
+  // generateFullYear が true、または1月から始まる初回などの場合は12ヶ月分（1年間）、通常は半年間（6ヶ月）
+  const monthSpan = generateFullYear ? 12 : 6;
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
       if (team.id === 'player') return; // 自グループは除外
 
-      // ご要望の「合計120件程度（5グループで割ると1グループあたり約24件/半年）」に合わせた計算
+      // 1年分なら約24公演、半年分なら約12公演にスケーリング
       const power = team.basePower || 50;
-      // 基礎パワーに応じて20〜26公演程度をランダム生成
-      const targetLiveCount = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
+      const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
+      const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
       // 1. ライバルチームのライブ・イベント予定生成
       for (let i = 0; i < targetLiveCount; i++) {
-        const randomMonth = startMonth + Math.floor(Math.random() * 6);
-        const lastDay = new Date(year, randomMonth, 0).getDate();
+        const randomMonth = startMonth + Math.floor(Math.random() * monthSpan);
+        const actualMonth = ((randomMonth - 1) % 12) + 1; // 1〜12月に収める
+        const targetYear = year + Math.floor((randomMonth - 1) / 12);
+
+        const lastDay = new Date(targetYear, actualMonth, 0).getDate();
         const randomDay = 1 + Math.floor(Math.random() * lastDay);
         
-        const dateObj = new Date(year, randomMonth - 1, randomDay);
+        const dateObj = new Date(targetYear, actualMonth - 1, randomDay);
         const dateStr = toDateKey(dateObj);
 
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
@@ -111,12 +116,14 @@ function generateRivalsAndGeneralSchedule(year, startMonth) {
         });
       }
 
-      // 2. ライバルチームのCD発売予定生成（半年で1〜2作、年間を通じて多数の作数を担保）
-      // 水曜日をランダムに選んでCD発売日とする
-      const cdReleaseCount = 2; // 半年で2作ペース
+      // 2. ライバルチームのCD発売予定生成（年間3〜4作ペース）
+      const cdReleaseCount = generateFullYear ? 4 : 2; // 1年なら4作、半年なら2作
       for (let j = 0; j < cdReleaseCount; j++) {
-        const cdMonth = startMonth + (j === 0 ? 1 : 4); // 期間中に分散
-        const wednesdayStr = getRandomWednesdayKey(year, cdMonth);
+        const cdMonth = startMonth + Math.floor((j * (monthSpan / cdReleaseCount)) + Math.random() * 2);
+        const actualCdMonth = ((cdMonth - 1) % 12) + 1;
+        const targetCdYear = year + Math.floor((cdMonth - 1) / 12);
+
+        const wednesdayStr = getRandomWednesdayKey(targetCdYear, actualCdMonth);
         
         newRivalBookings.push({
           groupId: team.id,
@@ -132,20 +139,20 @@ function generateRivalsAndGeneralSchedule(year, startMonth) {
     });
   }
 
-  // グローバル変数に反映
   rivalLiveBookings = newRivalBookings;
-  console.log(`【スケジュール生成完了】ライバル公演・CD発売予定 総数: ${rivalLiveBookings.length}件`);
+  console.log(`【スケジュール生成完了】${year}年 (${monthSpan}ヶ月分) ライバル予定総数: ${rivalLiveBookings.length}件`);
 }
 
-// 安全なタイミング（ゲーム初期化時や新規開始時）に一度実行する
+// ==========================================
+// ★一番最初の起動時は「1年分（1〜12月）」をまとめて生成する！
+// ==========================================
 try {
   if (typeof leagueTeams !== 'undefined') {
-    generateRivalsAndGeneralSchedule(1, 1);
+    generateRivalsAndGeneralSchedule(1, 1, true); // 第3引数を true にして1年分生成
   }
 } catch (e) {
   console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
-}
-// 指定月内のランダムな水曜日を取得（CD発売用）
+}// 指定月内のランダムな水曜日を取得（CD発売用）
 function getRandomWednesdayKey(year, month) {
   const wednesdays = [];
   const lastDay = new Date(year, month, 0).getDate();
