@@ -75,7 +75,7 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// ライバルスケジュール自動生成（曜日重みづけ：土日＞金＞火水＞木＞月）
+// ライバルスケジュール自動生成（連日公演・曜日重みづけ完全対応版）
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
@@ -84,7 +84,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const targetYearNum = Number(year) || 1;
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + targetYearNum);
 
-  // 曜日ごとの重みづけ（土日 ＞ 金 ＞ 火水 ＞ 木 ＞ 月）
   const dayWeights = {
     0: 12, // 日
     6: 12, // 土
@@ -97,14 +96,19 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
-      if (team.id === 'player') return; // 自グループは除外
+      if (team.id === 'player') return;
 
       const power = team.basePower || 50;
+      // ライブの総公演日数を決める
       const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
-      // 1. ライバルたちのライブ予定生成
-      for (let i = 0; i < targetLiveCount; i++) {
+      let generatedDaysCount = 0;
+      let safetyCounter = 0;
+
+      // 1. ライバルたちのライブ予定生成（連日公演を極力再現）
+      while (generatedDaysCount < targetLiveCount && safetyCounter < 200) {
+        safetyCounter++;
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
         const targetYearOffset = Math.floor((startMonth - 1 + randomMonthOffset) / 12);
@@ -112,6 +116,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
         
+        // 開始日の抽選
         let selectedDateObj = null;
         for (let attempt = 0; attempt < 30; attempt++) {
           const randomDay = 1 + Math.floor(Math.random() * lastDay);
@@ -130,19 +135,40 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
           selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
         }
 
-        const dateStr = toDateKey(selectedDateObj);
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
-        newRivalBookings.push({
-          groupId: team.id,
-          groupName: team.name,
-          liveVenue: venue.name,
-          liveName: `${team.name} 単独公演`,
-          liveDate: dateStr,
-          liveDates: [dateStr],
-          status: 'confirmed',
-          type: 'live'
-        });
+        // 🌟 2日連続、あるいは3日連続のツアー公演にする確率判定（約40%の確率で連日にする）
+        const isConsecutive = Math.random() < 0.4;
+        const durationDays = isConsecutive ? (Math.random() < 0.7 ? 2 : 3) : 1;
+
+        const liveDatesArr = [];
+        const baseLiveName = `${team.name} ${venue.name} 公演`;
+
+        for (let dIdx = 0; dIdx < durationDays; dIdx++) {
+          const targetDate = new Date(selectedDateObj);
+          targetDate.setDate(selectedDateObj.getDate() + dIdx);
+          
+          // 月をまたぐ場合はループを抜ける
+          if (targetDate.getMonth() + 1 !== targetMonth) break;
+
+          liveDatesArr.push(toDateKey(targetDate));
+        }
+
+        if (liveDatesArr.length > 0) {
+          generatedDaysCount += liveDatesArr.length;
+          const firstDateStr = liveDatesArr[0];
+
+          newRivalBookings.push({
+            groupId: team.id,
+            groupName: team.name,
+            liveVenue: venue.name,
+            liveName: baseLiveName,
+            liveDate: firstDateStr,
+            liveDates: liveDatesArr,
+            status: 'confirmed',
+            type: 'live'
+          });
+        }
       }
 
       // 2. ライバルたちのCD発売予定生成（水曜日固定）
@@ -175,8 +201,9 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   }
 
   rivalLiveBookings = newRivalBookings;
-  console.log(`【ライバル先行配置完了】(曜日重みづけ適用) 総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
+  console.log(`【ライバル先行配置完了】(連日公演・曜日重みづけ適用) 総数: ${rivalLiveBookings.length}件`);
 }
+
 
 // 初回起動時は1年分をまとめて生成
 try {
