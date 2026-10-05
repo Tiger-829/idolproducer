@@ -137,7 +137,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
-        const isConsecutive = Math.random() < 0.99;
+        const isConsecutive = Math.random() < 1;
        let durationDays = 1;
         if (isConsecutive) {
           const rand = Math.random();
