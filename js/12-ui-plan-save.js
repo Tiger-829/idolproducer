@@ -745,10 +745,11 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
-function renderPlanCalendarGrid() {
+ffunction renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
   container.innerHTML = '';
+  
   const actualYear = calendarYear + (planYearTarget - currentYear);
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
@@ -765,7 +766,10 @@ function renderPlanCalendarGrid() {
         cells += '<span class="calendar-day" aria-hidden="true"></span>';
         continue;
       }
-      const dateKey = toDateKey(new Date(actualYear, m - 1, day, 12));
+      
+      const dateObj = new Date(actualYear, m - 1, day, 12);
+      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
+      
       const isSelected = planCalendarSelection.includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
       const liveEntries = readLiveSlotInputs(m);
@@ -773,18 +777,28 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      // ★柔軟かつ確実な判定：オブジェクト内のプロパティから日付文字列（YYYY-MM-DD）を探して完全一致・前方一致をすべて拾う
+      // ★絶対に見落とさない完全一致・部分一致の照合
       const rivalConflicts = rivals.filter(booking => {
-        const values = Object.values(booking);
-        return values.some(val => {
-          if (typeof val === 'string') {
-            return val === dateKey || val.startsWith(dateKey) || dateKey.startsWith(val);
+        if (!booking) return false;
+        
+        // 1. liveDate プロパティのチェック
+        if (typeof booking.liveDate === 'string' && booking.liveDate.trim() === dateKey) {
+          return true;
+        }
+        
+        // 2. liveDates 配列のチェック
+        if (Array.isArray(booking.liveDates)) {
+          if (booking.liveDates.some(d => typeof d === 'string' && d.trim() === dateKey)) {
+            return true;
           }
-          if (Array.isArray(val)) {
-            return val.some(d => typeof d === 'string' && (d === dateKey || d.startsWith(dateKey) || dateKey.startsWith(d)));
-          }
-          return false;
-        });
+        }
+        
+        // 3. その他のプロパティ（dateなど）のチェック
+        if (typeof booking.date === 'string' && booking.date.trim() === dateKey) {
+          return true;
+        }
+        
+        return false;
       });
 
       const hasRival = rivalConflicts.length > 0;
@@ -795,10 +809,10 @@ function renderPlanCalendarGrid() {
         isRelease ? 'release-day' : '',
         isLive ? 'live-day' : '',
         isEvent ? 'plan-event-day' : '',
-        hasRival ? 'rival-live-day' : ''
+        hasRival ? 'rival-live-day' : '' // これによりCSSでカレンダーに色がつく
       ].filter(Boolean).join(' ');
 
-      // ツールチップでグループ名、種別、会場名を表示
+      // ツールチップ用テキスト
       const rivalTitles = rivalConflicts.map(rc => {
         const kind = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
         const venue = rc.liveVenue ? ` @${rc.liveVenue}` : '';
@@ -821,6 +835,8 @@ function renderPlanCalendarGrid() {
     container.appendChild(monthSheet);
   }
 }
+
+
 
 
 function togglePlanCalendarDate(dateKey) {
