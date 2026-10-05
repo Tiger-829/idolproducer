@@ -745,9 +745,11 @@ function renderPlanCalendarGrid() {
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
-      const rivalConflict = rivals.find(booking => 
-        (booking.venueDates || [booking.liveDate]).includes(dateKey)
-      );
+     // 他グループのライブ・CD発売予定が該当日付に含まれるか判定
+      const rivalConflict = rivals.find(booking => {
+        const bDate = booking.liveDate || booking.date;
+        return bDate === dateKey;
+      });
 
       const classes = [
         'calendar-day',
