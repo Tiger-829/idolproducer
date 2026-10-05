@@ -79,6 +79,9 @@ let rivalLiveBookings = [];
 // ==========================================
 // ライバルおよび全グループのスケジュール自動生成（曜日重みづけ完全再現版）
 // ==========================================
+// ==========================================
+// ライバルおよび全グループのスケジュール自動生成（曜日重みづけ完全再現版）
+// ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
@@ -86,16 +89,16 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const targetYearNum = Number(year) || 1;
   const actualYear = 2025 + targetYearNum; // 1年目＝2026年、2年目＝2027年
 
-  // ご指定の曜日ごとの重みづけ（土日 ＞ 金 ＞ 火水 ＞ 木 ＞ 月）
+  // 曜日ごとの重みづけ（土日 ＞ 金 ＞ 火水 ＞ 木 ＞ 月）
   // 0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土
   const dayWeights = {
-    0: 12, // 日 (高)
-    6: 12, // 土 (高)
-    5: 8,  // 金 (中高)
-    2: 5,  // 火 (中)
-    3: 5,  // 水 (中)
-    4: 3,  // 木 (低)
-    1: 1   // 月 (最安)
+    0: 12, // 日
+    6: 12, // 土
+    5: 8,  // 金
+    2: 5,  // 火
+    3: 5,  // 水
+    4: 3,  // 木
+    1: 1   // 月
   };
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
@@ -106,7 +109,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
-      // 1. ライバルたちのライブ予定生成（曜日ごとの確率を厳密に反映）
+      // 1. ライバルたちのライブ予定生成（曜日ごとの確率を反映）
       for (let i = 0; i < targetLiveCount; i++) {
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
@@ -115,22 +118,19 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
         
-        // 重みづけ抽選：条件に合う日まで最大30回ランダム試行
         let selectedDateObj = null;
         for (let attempt = 0; attempt < 30; attempt++) {
           const randomDay = 1 + Math.floor(Math.random() * lastDay);
           const dObj = new Date(bookingYear, targetMonth - 1, randomDay);
-          const dayOfWeek = dObj.getDay(); // 0〜6
+          const dayOfWeek = dObj.getDay();
           const weight = dayWeights[dayOfWeek] || 1;
 
-          // 1〜15の乱数に対して重みが上回れば採用
           if (Math.random() * 15 < weight) {
             selectedDateObj = dObj;
             break;
           }
         }
 
-        // 万が一漏れた場合のフォールバック（その月のランダムな日）
         if (!selectedDateObj) {
           const randomDay = 1 + Math.floor(Math.random() * lastDay);
           selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
@@ -186,6 +186,8 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   rivalLiveBookings = newRivalBookings;
   console.log(`【ライバル先行配置完了】(曜日重みづけ適用) 総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
+
+
 // ==========================================
 // ★一番最初の起動時は「1年分（1〜12月）」をまとめて生成する！
 // ==========================================
