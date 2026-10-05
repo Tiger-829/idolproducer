@@ -80,12 +80,22 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
   
-  // ★安全な年の取得：calendarYear が無ければ現在の実際の西暦（2026年など）を基準にする
-  const baseYear = (typeof calendarYear !== 'undefined' && calendarYear > 2000) 
-    ? calendarYear 
-    : (typeof currentYear !== 'undefined' ? 2025 + currentYear : new Date().getFullYear());
+  // ★強制固定：1901年にならないよう、現在の実際の年（2026年）を絶対的な基準にする
+  let baseYear = 2026;
+  try {
+    if (typeof calendarYear === 'number' && calendarYear > 2000) {
+      baseYear = calendarYear;
+    } else if (typeof currentYear === 'number' && currentYear > 0) {
+      baseYear = 2025 + currentYear;
+    } else {
+      const currentRealYear = new Date().getFullYear();
+      if (currentRealYear > 2000) baseYear = currentRealYear;
+    }
+  } catch (e) {
+    baseYear = 2026;
+  }
   
-  const actualYear = baseYear + (year - 1);
+  const actualYear = baseYear + ((Number(year) || 1) - 1);
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
@@ -105,7 +115,11 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
         const randomDay = 1 + Math.floor(Math.random() * lastDay);
         
-        const dateStr = `${bookingYear}-${String(targetMonth).padStart(2, '0')}-${String(randomDay).padStart(2, '0')}`;
+        // 文字列として直接 "2026-05-16" のように組み立てるため、1901年になる隙を与えない
+        const mm = String(targetMonth).padStart(2, '0');
+        const dd = String(randomDay).padStart(2, '0');
+        const dateStr = `${bookingYear}-${mm}-${dd}`;
+        
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
         newRivalBookings.push({
@@ -128,7 +142,13 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const targetCdYearOffset = Math.floor((startMonth - 1 + cdMonthOffset) / 12);
         const cdBookingYear = actualYear + targetCdYearOffset;
 
-        const wednesdayStr = getRandomWednesdayKey(cdBookingYear, targetCdMonth);
+        // 水曜日取得関数が古い年を返さないようフォールバックを組み込む
+        let wednesdayStr = '';
+        try {
+          wednesdayStr = getRandomWednesdayKey(cdBookingYear, targetCdMonth);
+        } catch (err) {
+          wednesdayStr = `${cdBookingYear}-${String(targetCdMonth).padStart(2, '0')}-15`;
+        }
         
         newRivalBookings.push({
           groupId: team.id,
@@ -145,8 +165,10 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   }
 
   rivalLiveBookings = newRivalBookings;
-  console.log(`【ライバル先行配置完了】(${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
+  console.log(`【ライバル先行配置完了】(基準年: ${actualYear}年) 予定総数: ${rivalLiveBookings.length}件`, rivalLiveBookings[0]);
 }
+
+
 
 // ==========================================
 // ★一番最初の起動時は「1年分（1〜12月）」をまとめて生成する！
