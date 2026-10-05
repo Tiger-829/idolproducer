@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（全機能完全復元・完全同期版）
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（スマホ対応・ライバル動向完全可視化版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -495,7 +495,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
 
     for (let m = startM; m <= endM; m++) {
-      // ★月別ブースでのライバル動向一覧表示（年月ベースで確実にヒット）
+      // ★月別ブースでのライバル動向一覧表示（会場名・グループ名がスマホでも見えるように改善）
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
       const monthRivals = rivals.filter(b => {
         const bDate = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
@@ -503,13 +503,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       });
 
       const monthRivalsHtml = monthRivals.length > 0 
-        ? `<div style="background:#f9f9f9; border:1px solid #ddd; padding:6px; border-radius:4px; font-size:11px; margin-bottom:8px;">
+        ? `<div style="background:#f9f9f9; border:1px solid #ddd; padding:8px; border-radius:4px; font-size:11px; margin-bottom:8px; max-height:130px; overflow-y:auto;">
              <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件)</strong>
-             <ul style="margin:2px 0 0 16px; padding:0; color:#555;">
+             <ul style="margin:4px 0 0 16px; padding:0; color:#333; line-height:1.4;">
                ${monthRivals.map(r => {
                  const matchDay = (r.liveDate || '').split('-')[2] || '??';
-                 const kindStr = r.type === 'release' ? 'CD発売' : `ライブ@${r.liveVenue || '未定'}`;
-                 return `<li>${parseInt(matchDay)}日: <strong>${r.groupName}</strong> (${kindStr})</li>`;
+                 const isRel = r.type === 'release';
+                 const kindStr = isRel ? '💿 CD発売' : `🎤 ライブ [<strong>${r.liveVenue || '会場未定'}</strong>]`;
+                 return `<li><strong>${parseInt(matchDay)}日</strong>: ${r.groupName} —${kindStr}</li>`;
                }).join('')}
              </ul>
            </div>`
@@ -748,7 +749,7 @@ function closePlanCalendar() {
 }
 
 // ==========================================
-// カレンダー描画（月日マッチングによる確実な予定表示版）
+// カレンダー描画（スマホ対応タップ確認機能付き）
 // ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
@@ -789,7 +790,7 @@ function renderPlanCalendarGrid() {
         return event.date === dateKey;
       });
 
-      // ★年号やフォーマットに左右されず、月日が一致していれば100%確実に拾う照合
+      // ライバル予定のヒット判定
       const rivalConflicts = rivals.filter(function(booking) {
         if (!booking) return false;
         const bDate = booking.liveDate || booking.date || '';
@@ -821,13 +822,28 @@ function renderPlanCalendarGrid() {
         rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
       ].filter(Boolean).join('\n');
 
-      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="togglePlanCalendarDate(\'' + dateKey + '\')">' + day + '</span>';
+      // ★スマホでもタップで予定（会場名など）を確認できるようにクリックハンドラを拡張
+      const conflictsJson = escapeHtml(JSON.stringify(rivalConflicts));
+      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\', ' + JSON.stringify(rivalConflicts).replace(/"/g, '&quot;') + ')">' + day + '</span>';
     }
 
     const monthSheet = document.createElement('div');
     monthSheet.className = 'plan-calendar-month';
     monthSheet.innerHTML = '<strong>' + actualYear + '年' + m + '月</strong><div class="calendar-grid">' + cells + '</div>';
     container.appendChild(monthSheet);
+  }
+}
+
+// スマホタップ時にダイアログでライバル予定（会場名など）を表示する関数
+function handleCalendarDayClick(dateKey, conflicts) {
+  togglePlanCalendarDate(dateKey);
+  if (Array.isArray(conflicts) && conflicts.length > 0) {
+    const infoText = conflicts.map(function(rc) {
+      const kind = rc.type === 'release' ? '【CD発売】' : '【ライブ】';
+      const venue = rc.liveVenue ? ' 会場: ' + rc.liveVenue : '';
+      return '・ ' + rc.groupName + ' (' + kind + ')' + venue;
+    }).join('\n');
+    alert('📅 ' + dateKey + ' の他グループ予定:\n\n' + infoText);
   }
 }
 
