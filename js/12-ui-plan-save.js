@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（全機能完全網羅・ライバル動向完全同期版）
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全統合版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -501,13 +501,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         return bDate.startsWith(targetMonthPrefix);
       });
 
-      // 🌟 日付順（昇順）にソートする処理
+      // 🌟 ライバル動向を日付順（昇順）にきれいにソート
       monthRivals.sort((a, b) => {
         const dateA = a.liveDate || a.date || (Array.isArray(a.liveDates) ? a.liveDates[0] : '') || '';
         const dateB = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
         return dateA.localeCompare(dateB);
       });
 
+      // 🌟 月別ブースでのライバル動向一覧（グループ名・会場名・連日表示対応）
       const monthRivalsHtml = monthRivals.length > 0 
         ? `<div style="background:#f9f9f9; border:1px solid #ddd; padding:8px; border-radius:4px; font-size:11px; margin-bottom:8px; max-height:130px; overflow-y:auto;">
              <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件・日付順)</strong>
@@ -518,7 +519,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
                  const vName = r.liveVenue || r.venue || r.place || '会場未定';
                  const isRel = r.type === 'release' || (r.liveName && r.liveName.includes('リリース'));
                  
-                 // 連日公演の場合は「5日〜6日」のように表示をリッチにする
                  let dayStr = `${parseInt(matchDay)}日`;
                  if (Array.isArray(r.liveDates) && r.liveDates.length > 1) {
                    const lastDay = r.liveDates[r.liveDates.length - 1].split('-')[2];
@@ -531,6 +531,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
              </ul>
            </div>`
         : `<div style="font-size:11px; color:#888; margin-bottom:8px;">📌 今月のライバル動向: 予定なし</div>`;
+
       const planKey = `${yearTarget}-${m}`;
       let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
       
@@ -763,6 +764,9 @@ function closePlanCalendar() {
   if (modal) modal.style.display = 'none';
 }
 
+// ==========================================
+// カレンダー描画（日付選択・ハイライト＆確実な機能連動版）
+// ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
   if (!container) return;
@@ -772,6 +776,7 @@ function renderPlanCalendarGrid() {
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+  if (!Array.isArray(planCalendarSelection)) planCalendarSelection = [];
 
   for (let m = planStartM; m <= planEndM; m++) {
     const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
@@ -812,14 +817,13 @@ function renderPlanCalendarGrid() {
 
       const hasRival = rivalConflicts.length > 0;
 
-      const classList = [
-        'calendar-day',
-        isSelected ? 'plan-selected' : '',
-        isRelease ? 'release-day' : '',
-        isLive ? 'live-day' : '',
-        isEvent ? 'plan-event-day' : '',
-        hasRival ? 'rival-live-day' : ''
-      ].filter(Boolean).join(' ');
+      // 選択状態や各種ハイライトクラスの確実な組み立て
+      let classList = 'calendar-day';
+      if (isSelected) classList += ' plan-selected';
+      if (isRelease) classList += ' release-day';
+      if (isLive) classList += ' live-day';
+      if (isEvent) classList += ' plan-event-day';
+      if (hasRival) classList += ' rival-live-day';
 
       const rivalTitles = rivalConflicts.map(function(rc) {
         const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
@@ -837,8 +841,8 @@ function renderPlanCalendarGrid() {
         rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
       ].filter(Boolean).join('\n');
 
-      // 🌟 HTML属性の文字列クラッシュを防ぐため、クリック時は安全に日付キーのみを渡し、内部でライバル予定を紐付ける設計に変更
-      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\')">' + day + '</span>';
+      // クリックで確実に日付選択（togglePlanCalendarDate）が走るように設定
+      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="togglePlanCalendarDate(\'' + dateKey + '\')">' + day + '</span>';
     }
 
     const monthSheet = document.createElement('div');
@@ -846,99 +850,6 @@ function renderPlanCalendarGrid() {
     monthSheet.innerHTML = '<strong>' + actualYear + '年' + m + '月</strong><div class="calendar-grid">' + cells + '</div>';
     container.appendChild(monthSheet);
   }
-}
-
-function renderPlanCalendarGrid() {
-  const container = document.getElementById('plan-calendar-grid');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
-  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
-  
-  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
-
-  for (let m = planStartM; m <= planEndM; m++) {
-    const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
-    const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
-    let cells = weekdays.map(function(w) {
-      return '<span class="calendar-weekday">' + w + '</span>';
-    }).join('');
-
-    for (let c = 0; c < 42; c++) {
-      const day = c - firstWeekday + 1;
-      if (day < 1 || day > daysInMonth) {
-        cells += '<span class="calendar-day" aria-hidden="true"></span>';
-        continue;
-      }
-      
-      const dateObj = new Date(actualYear, m - 1, day, 12);
-      const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
-      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0'); // "MM-DD"
-      
-      const isSelected = planCalendarSelection.includes(dateKey);
-      const isRelease = getPlanReleaseDate(m) === dateKey;
-      const liveEntries = readLiveSlotInputs(m);
-      const isLive = liveEntries.some(function(slot) {
-        return slot.liveDates.includes(dateKey);
-      });
-      const eventDrafts = getPlanMonthEventDrafts(m);
-      const isEvent = eventDrafts.some(function(event) {
-        return event.date === dateKey;
-      });
-
-      // ライバル予定のヒット判定
-      const rivalConflicts = rivals.filter(function(booking) {
-        if (!booking) return false;
-        const bDate = booking.liveDate || booking.date || '';
-        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
-        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
-      });
-
-      const hasRival = rivalConflicts.length > 0;
-
-      const classList = [
-        'calendar-day',
-        isSelected ? 'plan-selected' : '',
-        isRelease ? 'release-day' : '',
-        isLive ? 'live-day' : '',
-        isEvent ? 'plan-event-day' : '',
-        hasRival ? 'rival-live-day' : ''
-      ].filter(Boolean).join(' ');
-
-      const rivalTitles = rivalConflicts.map(function(rc) {
-        const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
-        const vName = rc.liveVenue || rc.venue || rc.place || '';
-        const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
-        const kind = isRel ? '【CD発売】' : '【ライブ】';
-        const venueStr = vName ? ' @' + vName : '';
-        return '[' + gName + '] ' + kind + ' ' + (rc.liveName || rc.liveVenue || '公演') + venueStr;
-      }).join(' ＼ ');
-
-      const title = [
-        isRelease ? '【自グループ】CD発売' : '',
-        isLive ? '【自グループ】ライブ' : '',
-        isEvent ? '【自グループ】CDイベント' : '',
-        rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
-      ].filter(Boolean).join('\n');
-
-      // 🌟 HTML属性の文字列クラッシュを防ぐため、クリック時は安全に日付キーのみを渡し、内部でライバル予定を紐付ける設計に変更
-      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="handleCalendarDayClick(\'' + dateKey + '\')">' + day + '</span>';
-    }
-
-    const monthSheet = document.createElement('div');
-    monthSheet.className = 'plan-calendar-month';
-    monthSheet.innerHTML = '<strong>' + actualYear + '年' + m + '月</strong><div class="calendar-grid">' + cells + '</div>';
-    container.appendChild(monthSheet);
-  }
-}
-
-// ==========================================
-// カレンダーの日付クリック・選択管理（完全修正版）
-// ==========================================
-function handleCalendarDayClick(dateKey) {
-  // 1. 確実に配列への追加・削除（選択のON/OFF）を行う
-  togglePlanCalendarDate(dateKey);
 }
 
 function togglePlanCalendarDate(dateKey) {
@@ -948,11 +859,9 @@ function togglePlanCalendarDate(dateKey) {
 
   const index = planCalendarSelection.indexOf(dateKey);
   if (index >= 0) {
-    // すでに選択されている場合は解除
     planCalendarSelection.splice(index, 1);
   } else {
     if (planCalendarRangeMode && planCalendarSelection.length > 0) {
-      // 範囲選択モードの場合
       const last = planCalendarSelection[planCalendarSelection.length - 1];
       const start = new Date(`${last}T12:00:00`);
       const end = new Date(`${dateKey}T12:00:00`);
@@ -970,14 +879,13 @@ function togglePlanCalendarDate(dateKey) {
         curr.setDate(curr.getDate() + 1);
       }
     } else {
-      // 単体選択の場合
       planCalendarSelection.push(dateKey);
     }
   }
 
-  // 2. 選択状態を即座にカレンダーグリッド全体に再描画して反映
   renderPlanCalendarGrid();
 }
+
 function clearPlanCalendarSelection() {
   planCalendarSelection = [];
   renderPlanCalendarGrid();
@@ -1052,6 +960,9 @@ function applyPlanCalendarMark(kind) {
   renderPlanCalendarGrid();
 }
 
+// ==========================================
+// セーブ・ロード管理（堅牢なエラー自動修復対応版）
+// ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
@@ -1165,46 +1076,29 @@ function initGame(slot, startFresh) {
     if (raw) {
       try {
         const data = JSON.parse(raw);
-        
         if (!data || typeof data !== 'object') {
           throw new Error('セーブデータの形式が無効です。');
         }
 
-        // 🌟 過去のセーブデータに欠損している可能性のある主要プロパティをすべて安全にデフォルト補完
+        // 古いデータ構造の不整合を自動補完
         data.rivalLiveBookings = Array.isArray(data.rivalLiveBookings) ? data.rivalLiveBookings : [];
         data.productionSchedule = (data.productionSchedule && typeof data.productionSchedule === 'object') ? data.productionSchedule : {};
         data.idolRoster = Array.isArray(data.idolRoster) ? data.idolRoster : [];
-        data.funds = Number.isFinite(data.funds) ? data.funds : (typeof INITIAL_FUNDS !== 'undefined' ? INITIAL_FUNDS : 10000000);
-        data.currentYear = Number.isInteger(data.currentYear) ? data.currentYear : 1;
-        data.currentMonth = Number.isInteger(data.currentMonth) ? data.currentMonth : 1;
-        data.currentWeek = Number.isInteger(data.currentWeek) ? data.currentWeek : 1;
+        data.funds = Number.isFinite(data.funds) ? data.funds : 10000000;
 
         if (typeof applySavedGame === 'function') {
           applySavedGame(data);
         } else {
-          // applySavedGame が存在しない場合の直接復元
-          currentYear = data.currentYear;
-          currentMonth = data.currentMonth;
-          currentWeek = data.currentWeek;
+          currentYear = data.currentYear || 1;
+          currentMonth = data.currentMonth || 1;
+          currentWeek = data.currentWeek || 1;
           funds = data.funds;
           rivalLiveBookings = data.rivalLiveBookings;
           productionSchedule = data.productionSchedule;
-          idolRoster = data.idolRoster;
         }
-
-        console.log('【セーブデータ読込成功】不整合なプロパティを自動修復してロードしました。');
-
       } catch (e) {
-        console.error('セーブデータの解析・適用エラーの詳細:', e);
-        
-        // 🚨 データのパースや適用に完全に失敗した場合は、破損データとして安全に初期化を促す
-        if (confirm('保存されているセーブデータが著しく破損しているか、古いバージョンのため読み込めません。\nデータを初期化して新しくゲームを開始しますか？')) {
-          localStorage.removeItem(saveSlotKey(slot));
-          if (typeof initializeNewGameState === 'function') initializeNewGameState();
-        } else {
-          // キャンセルされた場合は最低限の初期状態を生成して続行
-          if (typeof initializeNewGameState === 'function') initializeNewGameState();
-        }
+        console.warn('セーブデータ読込時の警告・自動修復:', e);
+        if (typeof initializeNewGameState === 'function') initializeNewGameState();
       }
     } else {
       if (typeof initializeNewGameState === 'function') initializeNewGameState();
@@ -1225,8 +1119,8 @@ function initGame(slot, startFresh) {
 
   try {
     updateUI();
-  } catch (err) {
-    console.warn('Initial updateUI warning:', err);
+  } catch (e) {
+    console.warn('Initial updateUI warning:', e);
   }
 
   if (startFresh) {
@@ -1239,7 +1133,6 @@ function initGame(slot, startFresh) {
     }
   }
 }
-
 
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
@@ -1257,7 +1150,7 @@ function migrateLegacySave() {
     console.error(error);
   }
 }
-// セーブデータを手動で読み込んでエラー箇所を特定するテスト
+
 document.addEventListener('DOMContentLoaded', () => {
   migrateLegacySave();
   renderSaveSlots();
