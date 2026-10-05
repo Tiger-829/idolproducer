@@ -765,7 +765,7 @@ function closePlanCalendar() {
 }
 
 // ==========================================
-// カレンダー描画（日付選択・ハイライト＆確実な機能連動版）
+// カレンダー描画（DOMイベントリスナー方式・選択確実動作版）
 // ==========================================
 function renderPlanCalendarGrid() {
   const container = document.getElementById('plan-calendar-grid');
@@ -781,34 +781,47 @@ function renderPlanCalendarGrid() {
   for (let m = planStartM; m <= planEndM; m++) {
     const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
     const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
-    let cells = weekdays.map(function(w) {
-      return '<span class="calendar-weekday">' + w + '</span>';
-    }).join('');
 
+    const monthSheet = document.createElement('div');
+    monthSheet.className = 'plan-calendar-month';
+    monthSheet.innerHTML = `<strong>${actualYear}年${m}月</strong>`;
+
+    const gridDiv = document.createElement('div');
+    gridDiv.className = 'calendar-grid';
+
+    // 曜日の描画
+    weekdays.forEach(w => {
+      const wSpan = document.createElement('span');
+      wSpan.className = 'calendar-weekday';
+      wSpan.textContent = w;
+      gridDiv.appendChild(wSpan);
+    });
+
+    // 空白セルと日付セルの描画
     for (let c = 0; c < 42; c++) {
       const day = c - firstWeekday + 1;
+      const daySpan = document.createElement('span');
+
       if (day < 1 || day > daysInMonth) {
-        cells += '<span class="calendar-day" aria-hidden="true"></span>';
+        daySpan.className = 'calendar-day';
+        daySpan.setAttribute('aria-hidden', 'true');
+        gridDiv.appendChild(daySpan);
         continue;
       }
       
       const dateObj = new Date(actualYear, m - 1, day, 12);
       const dateKey = toDateKey(dateObj); // "YYYY-MM-DD"
-      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0'); // "MM-DD"
+      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
       
       const isSelected = planCalendarSelection.includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
       const liveEntries = readLiveSlotInputs(m);
-      const isLive = liveEntries.some(function(slot) {
-        return slot.liveDates.includes(dateKey);
-      });
+      const isLive = liveEntries.some(slot => slot.liveDates.includes(dateKey));
       const eventDrafts = getPlanMonthEventDrafts(m);
-      const isEvent = eventDrafts.some(function(event) {
-        return event.date === dateKey;
-      });
+      const isEvent = eventDrafts.some(event => event.date === dateKey);
 
       // ライバル予定のヒット判定
-      const rivalConflicts = rivals.filter(function(booking) {
+      const rivalConflicts = rivals.filter(booking => {
         if (!booking) return false;
         const bDate = booking.liveDate || booking.date || '';
         const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
@@ -817,41 +830,51 @@ function renderPlanCalendarGrid() {
 
       const hasRival = rivalConflicts.length > 0;
 
-      // 選択状態や各種ハイライトクラスの確実な組み立て
-      let classList = 'calendar-day';
-      if (isSelected) classList += ' plan-selected';
-      if (isRelease) classList += ' release-day';
-      if (isLive) classList += ' live-day';
-      if (isEvent) classList += ' plan-event-day';
-      if (hasRival) classList += ' rival-live-day';
+      // クラス名の組み立て
+      let classList = ['calendar-day'];
+      if (isSelected) classList.push('plan-selected');
+      if (isRelease) classList.push('release-day');
+      if (isLive) classList.push('live-day');
+      if (isEvent) classList.push('plan-event-day');
+      if (hasRival) classList.push('rival-live-day');
 
-      const rivalTitles = rivalConflicts.map(function(rc) {
+      daySpan.className = classList.join(' ');
+      daySpan.textContent = day;
+
+      // ツールチップ設定
+      const rivalTitles = rivalConflicts.map(rc => {
         const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
         const vName = rc.liveVenue || rc.venue || rc.place || '';
         const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
         const kind = isRel ? '【CD発売】' : '【ライブ】';
-        const venueStr = vName ? ' @' + vName : '';
-        return '[' + gName + '] ' + kind + ' ' + (rc.liveName || rc.liveVenue || '公演') + venueStr;
+        const venueStr = vName ? ` @${vName}` : '';
+        return `[${gName}] ${kind} ${rc.liveName || rc.liveVenue || '公演'}${venueStr}`;
       }).join(' ＼ ');
 
       const title = [
         isRelease ? '【自グループ】CD発売' : '',
         isLive ? '【自グループ】ライブ' : '',
         isEvent ? '【自グループ】CDイベント' : '',
-        rivalTitles ? '--- 他グループの予定 ---\n' + rivalTitles : ''
+        rivalTitles ? `--- 他グループの予定 ---\n${rivalTitles}` : ''
       ].filter(Boolean).join('\n');
 
-      // クリックで確実に日付選択（togglePlanCalendarDate）が走るように設定
-      cells += '<span class="' + classList + '" ' + (title ? 'title="' + escapeHtml(title) + '"' : '') + ' onclick="togglePlanCalendarDate(\'' + dateKey + '\')">' + day + '</span>';
+      if (title) {
+        daySpan.title = title;
+      }
+
+      // 🌟 HTML文字列ではなく、確実に動作する DOM イベントリスナーで選択処理を紐付け
+      daySpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlanCalendarDate(dateKey);
+      });
+
+      gridDiv.appendChild(daySpan);
     }
 
-    const monthSheet = document.createElement('div');
-    monthSheet.className = 'plan-calendar-month';
-    monthSheet.innerHTML = '<strong>' + actualYear + '年' + m + '月</strong><div class="calendar-grid">' + cells + '</div>';
+    monthSheet.appendChild(gridDiv);
     container.appendChild(monthSheet);
   }
 }
-
 function togglePlanCalendarDate(dateKey) {
   if (!Array.isArray(planCalendarSelection)) {
     planCalendarSelection = [];
