@@ -501,23 +501,36 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         return bDate.startsWith(targetMonthPrefix);
       });
 
-      // ★月別ブースでのライバル動向一覧（グループ名・会場名を確実に安全抽出して表示）
+      // 🌟 日付順（昇順）にソートする処理
+      monthRivals.sort((a, b) => {
+        const dateA = a.liveDate || a.date || (Array.isArray(a.liveDates) ? a.liveDates[0] : '') || '';
+        const dateB = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
+        return dateA.localeCompare(dateB);
+      });
+
       const monthRivalsHtml = monthRivals.length > 0 
         ? `<div style="background:#f9f9f9; border:1px solid #ddd; padding:8px; border-radius:4px; font-size:11px; margin-bottom:8px; max-height:130px; overflow-y:auto;">
-             <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件)</strong>
+             <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件・日付順)</strong>
              <ul style="margin:4px 0 0 16px; padding:0; color:#333; line-height:1.4;">
                ${monthRivals.map(r => {
                  const matchDay = (r.liveDate || r.date || '').split('-')[2] || '??';
                  const gName = r.groupName || r.name || r.teamName || '他グループ';
                  const vName = r.liveVenue || r.venue || r.place || '会場未定';
                  const isRel = r.type === 'release' || (r.liveName && r.liveName.includes('リリース'));
+                 
+                 // 連日公演の場合は「5日〜6日」のように表示をリッチにする
+                 let dayStr = `${parseInt(matchDay)}日`;
+                 if (Array.isArray(r.liveDates) && r.liveDates.length > 1) {
+                   const lastDay = r.liveDates[r.liveDates.length - 1].split('-')[2];
+                   dayStr = `${parseInt(matchDay)}日〜${parseInt(lastDay)}日`;
+                 }
+
                  const kindStr = isRel ? '💿 CD発売' : `🎤 ライブ [<strong>${vName}</strong>]`;
-                 return `<li><strong>${parseInt(matchDay)}日</strong>: ${gName} —${kindStr}</li>`;
+                 return `<li><strong>${dayStr}</strong>: ${gName} —${kindStr}</li>`;
                }).join('')}
              </ul>
            </div>`
         : `<div style="font-size:11px; color:#888; margin-bottom:8px;">📌 今月のライバル動向: 予定なし</div>`;
-
       const planKey = `${yearTarget}-${m}`;
       let existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
       
