@@ -1022,11 +1022,22 @@ function saveDecisionPlan() {
     }
   }
 
+  // 🌟 【新規追加】2年目以降も、半年計画を決定するたびにその期間（半年分）のライバルスケジュールを追加生成する
+  try {
+    if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      // planYearTarget（例: 2年目）と planStartM（例: 1月または7月）を渡し、半年分（false）を生成
+      generateRivalsAndGeneralSchedule(planYearTarget, planStartM, false);
+    }
+  } catch (err) {
+    console.warn('Rival schedule generation on save error:', err);
+  }
+
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、新しいスケジュールが反映されました。`);
   updateUI();
 }
+
 
 function openPlanningManual() {
   if (currentMonth >= 7) {
