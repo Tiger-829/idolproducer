@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 特典イベント経費・カレンダータップ判定・全機能統合版
+// 12-ui-plan-save.js : カレンダー・ドット完全排除・特典イベントレイアウト・閉じるボタン追従版
 // ==========================================
 
 let planYearTarget = 1;
@@ -306,6 +306,7 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
+// 🌟 【画像レイアウト対応】特典イベント：セレクトボックス（名前入力）を左、日付ボックスを右に配置
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -315,10 +316,10 @@ function renderPlanEventsHtml(month) {
   return events.map((event, index) => {
     return `
       <div class="plan-event-row" data-event-index="${index}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-        <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px;">
+        <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px; padding:3px; flex:1;">
           ${eventTypes.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
         </select>
-        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px;">
+        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:3px;">
         <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
       </div>`;
   }).join('');
@@ -371,6 +372,7 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
+// 🌟 【閉じる×マークのスクロール追従対応】半年計画モーダルのオープン処理
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -380,8 +382,36 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     planMultiSelectModes = {};
     planCalendarSelections = {};
 
+    const modal = document.getElementById('decision-modal');
+    if (modal) {
+      // モーダル全体のオーバーレイ・コンテンツのスタイルを調整し、×ボタンを固定(sticky/fixed)させる
+      modal.style.display = 'flex';
+      const contentEl = modal.querySelector('.modal-content');
+      if (contentEl) {
+        contentEl.style.position = 'relative';
+        contentEl.style.maxHeight = '85vh';
+        contentEl.style.overflowY = 'auto';
+      }
+    }
+
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
+
+    // 動的にスクロールしても追従する「×」閉じるボタンをタイトルバー付近に常駐させる
+    let closeBtn = document.getElementById('sticky-modal-close-btn');
+    if (!closeBtn && modal) {
+      closeBtn = document.createElement('button');
+      closeBtn.id = 'sticky-modal-close-btn';
+      closeBtn.type = 'button';
+      closeBtn.textContent = '✕';
+      closeBtn.style.cssText = 'position: sticky; top: 0; float: right; z-index: 100; background: #fff; border: none; font-size: 18px; font-weight: bold; cursor: pointer; color: #666; padding: 4px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 4px;';
+      closeBtn.onclick = closeDecisionModal;
+      
+      const contentEl = modal.querySelector('.modal-content');
+      if (contentEl) {
+        contentEl.prepend(closeBtn);
+      }
+    }
 
     try {
       if ((!rivalLiveBookings || rivalLiveBookings.length === 0) && typeof generateRivalsAndGeneralSchedule === 'function') {
@@ -644,9 +674,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     }
 
     renderEmbeddedPlanCalendars();
-
-    const modal = document.getElementById('decision-modal');
-    if (modal) modal.style.display = 'flex';
   } catch (e) {
     console.error('openDecisionModal error:', e);
     alert('半年計画画面を開く際にエラーが発生しました。');
@@ -671,7 +698,6 @@ function toggleMultiSelectMode(month) {
   renderEmbeddedPlanCalendars();
 }
 
-// 🌟 【ドット完全非表示・タップ判定対応】半年計画モーダル内のカレンダー描画
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
@@ -786,7 +812,6 @@ function toggleEmbeddedCalendarDate(month, dateKey) {
     updateShowDateNote(month, 0);
     renderEmbeddedPlanCalendars();
   } else {
-    // スロットがない場合は新規作成して追加
     addLiveSlot(month);
     const slotsNew = readLiveSlotInputs(month);
     if (slotsNew.length > 0) {
@@ -1005,7 +1030,6 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
-// 🌟 【特典イベント経費対応】日程×2000万円の経費を計算して資金から引く保存処理
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
   let totalBenefitCost = 0;
@@ -1023,11 +1047,10 @@ function saveDecisionPlan() {
     }
     if (!validatePlanLiveSlots(m, liveSlots)) return;
 
-    // 🌟 特典イベント（planEvents）の日程数 × 2000万円の経費計算
     const drafts = getPlanMonthEventDrafts(m);
     drafts.forEach(event => {
       if (event && event.date) {
-        totalBenefitCost += 20000000; // 1日程につき2000万円
+        totalBenefitCost += 20000000;
       }
     });
 
@@ -1062,7 +1085,6 @@ function saveDecisionPlan() {
     }
   }
 
-  // 🌟 計算した特典イベント経費を現在の資金から差し引く
   if (totalBenefitCost > 0) {
     if (typeof funds !== 'undefined') {
       funds -= totalBenefitCost;
@@ -1345,3 +1367,18 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   migrateLegacySave();
   renderSaveSlots();
 }
+
+// 🌟 【事務所カレンダーのドット完全排除策】
+// 既存のrenderCalendar関数等を上書きし、他グループの予定を示すドット要素を作らないようにする
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (typeof renderCalendar === 'function') {
+      const originalRenderCalendar = renderCalendar;
+      renderCalendar = function(...args) {
+        originalRenderCalendar.apply(this, args);
+        // カレンダー内のドット（インジケーター）要素をすべて非表示・削除する
+        document.querySelectorAll('.calendar-day-dot, .rival-dot, .event-dot').forEach(el => el.remove());
+      };
+    }
+  }, 500);
+});
