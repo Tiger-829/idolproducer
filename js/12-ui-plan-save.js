@@ -390,16 +390,7 @@ function openBenefitDetailModal(month, dates) {
         <p style="font-size:11px; color:#666; margin-bottom:12px;">選択した日程に対する特典イベントの情報を構成してください。</p>
         
         <div style="display:flex; flex-direction:column; gap:10px;">
-          <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
-            <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-              <option value="handshake">個別握手会</option>
-              <option value="autograph">サイン会</option>
-              <option value="online">オンラインお話し会</option>
-            </select>
-          </label>
-
-          <label style="font-size:11px; font-weight:bold; color:#333;">イベント名
-            <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+          <label style="font-size:11px; font-weight:bold; color:#333;">特典イベント
           </label>
 
           <label style="font-size:11px; font-weight:bold; color:#333;">日程（選択中）
