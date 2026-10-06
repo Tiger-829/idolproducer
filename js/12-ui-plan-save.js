@@ -394,6 +394,9 @@ function refreshPlanEventsContainer(month) {
 // ==========================================
 // 半年計画策定モーダル（横並びレイアウト・確認専用カレンダー統合版）
 // ==========================================
+// ==========================================
+// 半年計画策定モーダル（各月ブースの上に対応月カレンダーを配置する縦長最適化版）
+// ==========================================
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -509,24 +512,9 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
 
-    // 🌟 横並びレイアウト用ラッパー作成
-    const layoutWrapper = document.createElement('div');
-    layoutWrapper.className = 'plan-layout-container';
-
-    // 1. 左側（または上部）：6か月確認用カレンダーサイドバー
-    const sidebarDiv = document.createElement('div');
-    sidebarDiv.className = 'plan-calendar-sidebar';
-    sidebarDiv.innerHTML = `
-      <div style="background:#fff; border:1px solid #eadde1; padding:10px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-        <div style="font-size:12px; font-weight:bold; color:var(--primary); margin-bottom:8px; text-align:center;">📅 半年スケジュール確認</div>
-        <div id="embedded-plan-calendar-grid" style="display:flex; flex-direction:column; gap:8px;"></div>
-      </div>
-    `;
-    layoutWrapper.appendChild(sidebarDiv);
-
-    // 2. 右側：月別ブース設定エリア
-    const boothsDiv = document.createElement('div');
-    boothsDiv.style.cssText = 'display:flex; flex-direction:column; gap:12px; min-width:0;';
+    // 全体ラッパー
+    const wrapperDiv = document.createElement('div');
+    wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
     for (let m = startM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
@@ -597,48 +585,58 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
       const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
 
-      const monthBlock = document.createElement('div');
-      monthBlock.className = 'plan-month-block';
-      monthBlock.id = `plan-month-block-${m}`;
-      monthBlock.innerHTML = `
-        <div class="plan-month-title">${m}月の活動方針</div>
-        ${monthRivalsHtml}
-        <label class="weekly-member-target" for="sel-rel-${m}">CD発売
-          <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m}); if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();" ${isPreset ? 'disabled' : ''}>
-            <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
-            <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
-            <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
-          </select>
-        </label>
-        <div id="release-fields-${m}">
-          <label class="weekly-member-target" for="song-name-${m}">楽曲名
-            <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
-          </label>
-          <label class="weekly-member-target" for="rel-date-${m}">発売日
-            <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();">
-          </label>
-          <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
-            <select id="sel-benefit-${m}">
-              <option value="none">特典なし</option>
-              ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
+      // 🌟 各月のブロック（上部に「対応月カレンダー」、下部に「月別ブース設定」を配置）
+      const monthWrapper = document.createElement('div');
+      monthWrapper.className = 'plan-month-wrapper';
+      monthWrapper.style.cssText = 'background: #fff; border: 1px solid #eadde1; padding: 10px; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);';
+
+      monthWrapper.innerHTML = `
+        <div style="font-size: 13px; font-weight: bold; color: var(--primary); margin-bottom: 8px; border-bottom: 2px solid #fdf2f4; padding-bottom: 4px;">📅 ${actualYear}年 ${m}月 スケジュール確認</div>
+        <div id="embedded-calendar-month-${m}" style="margin-bottom: 10px;"></div>
+
+        <div class="plan-month-block" id="plan-month-block-${m}">
+          <div class="plan-month-title">${m}月の活動方針</div>
+          ${monthRivalsHtml}
+          <label class="weekly-member-target" for="sel-rel-${m}">CD発売
+            <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m}); if(typeof renderEmbeddedPlanCalendars==='function') renderEmbeddedPlanCalendars();" ${isPreset ? 'disabled' : ''}>
+              <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
+              <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
+              <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
             </select>
           </label>
-        </div>
-
-        <div style="margin-top:8px;">
-          <div style="font-size:12px; font-weight:bold; color:#333;">CD関連イベント（特典会・物販）</div>
-          <div id="plan-events-${m}" class="plan-event-list">
-            ${renderPlanEventsHtml(m)}
+          <div id="release-fields-${m}">
+            <label class="weekly-member-target" for="song-name-${m}">楽曲名
+              <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
+            </label>
+            <label class="weekly-member-target" for="rel-date-${m}">発売日
+              <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="if(typeof renderEmbeddedPlanCalendars==='function') renderEmbeddedPlanCalendars();">
+            </label>
+            <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
+              <select id="sel-benefit-${m}">
+                <option value="none">特典なし</option>
+                ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
+              </select>
+            </label>
           </div>
-          <button class="plan-add-show-btn" type="button" style="margin-top:4px;" onclick="addPlanEvent(${m})">＋イベントを追加</button>
-        </div>
 
-        <div class="live-slot-list" id="live-slots-${m}" style="margin-top:10px;">
-          ${liveSlots.map((slot, idx) => renderLiveSlotHtml(m, idx, slot)).join('')}
+          <div style="margin-top:8px;">
+            <div style="font-size:12px; font-weight:bold; color:#333;">CD関連イベント（特典会・物販）</div>
+            <div id="plan-events-${m}" class="plan-event-list">
+              ${renderPlanEventsHtml(m)}
+            </div>
+            <button class="plan-add-show-btn" type="button" style="margin-top:4px;" onclick="addPlanEvent(${m})">＋イベントを追加</button>
+          </div>
+
+          <div class="live-slot-list" id="live-slots-${m}" style="margin-top:10px;">
+            ${liveSlots.map((slot, idx) => renderLiveSlotHtml(m, idx, slot)).join('')}
+          </div>
+          <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
         </div>
-        <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
       `;
-      boothsDiv.appendChild(monthBlock);
+
+      wrapperDiv.appendChild(monthWrapper);
+      container.appendChild(wrapperDiv);
+
       updateReleaseDateOptions(m);
       liveSlots.forEach((_, idx) => {
         updateSeatPlanOptions(m, idx);
@@ -646,11 +644,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       });
     }
 
-    layoutWrapper.appendChild(boothsDiv);
-    container.appendChild(layoutWrapper);
-
-    // 確認用カレンダーの描画を実行
-    renderEmbeddedPlanCalendar();
+    // 各月のカレンダー描画を実行
+    renderEmbeddedPlanCalendars();
 
     const modal = document.getElementById('decision-modal');
     if (modal) modal.style.display = 'flex';
@@ -661,27 +656,27 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 }
 
 // ==========================================
-// 6か月分の確認専用カレンダー（予定の印つき・クリック干渉ゼロ）
+// 各月ブースの直上に対応するカレンダーを描画する関数
 // ==========================================
-function renderEmbeddedPlanCalendar() {
-  const container = document.getElementById('embedded-plan-calendar-grid');
-  if (!container) return;
-  container.innerHTML = '';
-
+function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
   for (let m = planStartM; m <= planEndM; m++) {
+    const container = document.getElementById(`embedded-calendar-month-${m}`);
+    if (!container) continue;
+    container.innerHTML = '';
+
     const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
     const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
 
-    let cells = weekdays.map(w => `<span style="text-align:center; font-size:9px; color:#777; font-weight:bold;">${w}</span>`).join('');
+    let cells = weekdays.map(w => `<span style="text-align:center; font-size:10px; color:#777; font-weight:bold; padding:2px 0;">${w}</span>`).join('');
 
     for (let c = 0; c < 42; c++) {
       const day = c - firstWeekday + 1;
       if (day < 1 || day > daysInMonth) {
-        cells += `<span style="min-height:18px;"></span>`;
+        cells += `<span style="min-height:22px;"></span>`;
         continue;
       }
 
@@ -703,21 +698,21 @@ function renderEmbeddedPlanCalendar() {
       });
       const hasRival = rivalConflicts.length > 0;
 
-      let bgStyle = 'background:#fafafa; color:#444;';
+      let bgStyle = 'background:#fafafa; color:#444; border:1px solid #eee;';
       let indicator = '';
       
       if (isRelease) {
-        bgStyle = 'background:#e2eefc; color:#12447e; font-weight:bold;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:0 auto;"></i>';
+        bgStyle = 'background:#e2eefc; color:#12447e; font-weight:bold; border:1px solid #bce0fd;';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:1px auto 0;"></i>';
       } else if (isLive) {
-        bgStyle = 'background:#e0f1ea; color:#1f5c49; font-weight:bold;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:0 auto;"></i>';
+        bgStyle = 'background:#e0f1ea; color:#1f5c49; font-weight:bold; border:1px solid #b8e2d2;';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:1px auto 0;"></i>';
       } else if (isEvent) {
-        bgStyle = 'background:#fdf0da; color:#8a5a12;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:0 auto;"></i>';
+        bgStyle = 'background:#fdf0da; color:#8a5a12; border:1px solid #fce3b2;';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:1px auto 0;"></i>';
       } else if (hasRival) {
-        bgStyle = 'background:#fdf6ec; color:#b8860b;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:0 auto;"></i>';
+        bgStyle = 'background:#fdf6ec; color:#b8860b; border:1px solid #f7dfbe;';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:1px auto 0;"></i>';
       }
 
       const rivalTitles = rivalConflicts.map(rc => {
@@ -730,15 +725,17 @@ function renderEmbeddedPlanCalendar() {
 
       const titleAttr = rivalTitles ? `title="他グループ:\n${escapeHtml(rivalTitles)}"` : '';
 
-      cells += `<span style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:20px; font-size:9px; border-radius:3px; ${bgStyle} cursor:default;" ${titleAttr}>${day}${indicator}</span>`;
+      cells += `<span style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:24px; font-size:10px; border-radius:4px; ${bgStyle} cursor:default;" ${titleAttr}>${day}${indicator}</span>`;
     }
 
-    const monthBox = document.createElement('div');
-    monthBox.style.cssText = 'border: 1px solid #eee; padding: 4px; border-radius: 4px; background: #fff; margin-bottom: 6px;';
-    monthBox.innerHTML = `<div style="font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px; text-align: center;">${actualYear}年${m}月</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;">${cells}</div>`;
-    container.appendChild(monthBox);
+    const calendarGridHtml = `<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; background: #fff; padding: 4px; border: 1px solid #eadde1; border-radius: 6px;">${cells}</div>`;
+    container.innerHTML = calendarGridHtml;
   }
 }
+
+
+
+
 // 旧モーダル用カレンダーのプレースホルダー（エラー防止）
 function openPlanCalendar() {}
 function closePlanCalendar() {}
