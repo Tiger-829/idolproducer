@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・詳細設定統合版（完全版）
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・野球開催バリデーション統合版
 // ==========================================
 
 let planYearTarget = 1;
@@ -479,7 +479,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
-    const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+    const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => !b.hiddenFromPlayer) : [];
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (yearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
@@ -575,7 +575,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'event-benefit')" style="padding:6px; font-size:10px; background:#fdf0da; border:1px solid #b8742a; color:#8a5a12; border-radius:4px; font-weight:bold; cursor:pointer;">🎁 特典イベントに設定</button>
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'event-other')" style="padding:6px; font-size:10px; background:#fafafa; border:1px solid #ccc; color:#555; border-radius:4px; font-weight:bold; cursor:pointer;">📌 その他イベントに設定</button>
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'release-live')" style="padding:6px; font-size:10px; background:#ede7f6; border:1px solid #4527a0; color:#4527a0; border-radius:4px; font-weight:bold; cursor:pointer;">💿+🎤 CD発売＋ライブ</button>
-            <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'delete')" style="padding:6px; font-size:10px; background:#ffebee; border:1px solid #c62828; color:#c62828; border-radius:4px; font-weight:bold; cursor:pointer;">🗑️️ 削除する</button>
+            <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'delete')" style="padding:6px; font-size:10px; background:#ffebee; border:1px solid #c62828; color:#c62828; border-radius:4px; font-weight:bold; cursor:pointer;">🗑 削除する</button>
           </div>
           <button type="button" id="multiselect-btn-${m}" onclick="toggleMultiSelectMode(${m})" style="padding:6px; font-size:10px; background:#fafafa; border:1px dashed var(--primary); color:var(--primary); border-radius:4px; font-weight:bold; cursor:pointer;">📦 複数選択モード: OFF (単独クリック)</button>
         </div>
@@ -667,7 +667,7 @@ function toggleMultiSelectMode(month) {
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
-  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => !b.hiddenFromPlayer) : [];
 
   for (let m = planStartM; m <= planEndM; m++) {
     const container = document.getElementById(`embedded-calendar-month-${m}`);
@@ -938,6 +938,7 @@ function updateReleaseDateOptions(month) {
   }
 }
 
+// 🌟 野球開催チェックを含むバリデーション関数
 function validatePlanLiveSlots(month, liveSlots) {
   const usedVenues = new Set();
   const usedDates = new Set();
@@ -961,6 +962,12 @@ function validatePlanLiveSlots(month, liveSlots) {
         return false;
       }
       usedDates.add(d);
+
+      // 🌟 球場・ドームのプロ野球公式戦開催日チェック
+      if (typeof isBaseballGameDay === 'function' && isBaseballGameDay(slot.liveVenue, d)) {
+        alert(`${d}の「${slot.liveVenue}」はプロ野球公式戦の開催日のため、ライブを設定できません。別の日程または会場をお選びください。`);
+        return false;
+      }
 
       const dObj = getGameDateObject(d);
       const diffDays = Math.round((dObj - now) / 86400000);
@@ -1207,7 +1214,6 @@ function initGame(slot, startFresh) {
   }
 
   if (startFresh) {
-    // 🌟 新規ゲーム開始時に1年分のライバル予定を確実に生成し、1月〜6月の計画策定からスタート
     if (typeof generateRivalsAndGeneralSchedule === 'function') {
       generateRivalsAndGeneralSchedule(1, 1, true);
     }
