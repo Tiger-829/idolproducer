@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 開始直後計画策定・ドット非表示対応版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・全機能統合最終完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -731,7 +731,6 @@ function renderEmbeddedPlanCalendars() {
         bgStyle = 'background:#fdf0da; color:#8a5a12; border:1px solid #fce3b2;';
         indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:1px auto 0;"></i>';
       }
-      // ※他グループの予定によるドットインジケータ表示処理は除外しているため、他社の予定で勝手にドットがつくことはありません。
 
       daySpan.style.cssText = `display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:24px; font-size:10px; border-radius:4px; ${bgStyle} cursor:pointer; user-select:none;`;
       daySpan.innerHTML = `${day}${indicator}`;
@@ -1140,26 +1139,33 @@ function startNewGame(slot) {
       return;
     }
   }
-
-  const group = prompt("プロデュースするグループ名を入力してください:", "スタースコープ");
-  if (group === null) return;
-  if (group.trim()) customGroupName = group.trim();
-
-  const song1 = prompt("1stシングルの曲名を入力してください:", "はじまりの光");
-  if (song1 === null) return;
-  if (song1.trim()) customFirstSong = song1.trim();
-
-  const song2 = prompt("2ndシングルの曲名を入力してください:", "青春の軌跡");
-  if (song2 === null) return;
-  if (song2.trim()) customSecondSong = song2.trim();
-
-  const live = prompt("ファーストライブの名称を入力してください:", "1stデビューライブ");
-  if (live === null) return;
-  if (live.trim()) customFirstLiveName = live.trim();
-
   pendingActiveSlot = slot;
-  initGame(slot, true);
-  pendingActiveSlot = null;
+  const setupModal = document.getElementById('setup-game-modal');
+  if (setupModal) {
+    setupModal.style.display = 'flex';
+  } else {
+    initGame(slot, true);
+  }
+}
+
+function submitGameSetupAndPlan() {
+  const gNameInput = document.getElementById('input-setup-groupname');
+  const song1Input = document.getElementById('input-setup-1st-song');
+  const song2Input = document.getElementById('input-setup-2nd-song');
+  const liveInput = document.getElementById('input-setup-live-name');
+
+  if (gNameInput && gNameInput.value.trim()) customGroupName = gNameInput.value.trim();
+  if (song1Input && song1Input.value.trim()) customFirstSong = song1Input.value.trim();
+  if (song2Input && song2Input.value.trim()) customSecondSong = song2Input.value.trim();
+  if (liveInput && liveInput.value.trim()) customFirstLiveName = liveInput.value.trim();
+
+  const setupModal = document.getElementById('setup-game-modal');
+  if (setupModal) setupModal.style.display = 'none';
+
+  if (pendingActiveSlot !== null) {
+    initGame(pendingActiveSlot, true);
+    pendingActiveSlot = null;
+  }
 }
 
 function deleteSaveSlot(slot) {
@@ -1262,7 +1268,6 @@ function initGame(slot, startFresh) {
     console.warn('Initial updateUI warning:', e);
   }
 
-  // 🌟 【新規機能】ゲーム開始直後に、すぐに1年目下半期（7〜12月）のスケジュールを組む画面を開く
   if (startFresh) {
     openPlanningManual();
   } else {
