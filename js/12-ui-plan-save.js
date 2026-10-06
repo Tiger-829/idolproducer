@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・先読み自動生成統合版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・全機能統合最終完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -974,7 +974,6 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
-// 🌟 【クリーン設計】保存処理にはワールド生成を混ぜず、プレイヤーの入力データ保存だけに特化
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
   const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
@@ -1047,7 +1046,7 @@ function openPlanningCalendar() {
 }
 
 // ==========================================
-// 🌟 タイトル画面・セーブ枠管理・ロード関連関数（完全復旧版）
+// 🌟 タイトル画面・セーブ枠管理・ロード関連関数（完全安定版）
 // ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
