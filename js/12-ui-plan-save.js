@@ -6,8 +6,8 @@ let planYearTarget = 1;
 let planStartM = 1;
 let planEndM = 6;
 let planMonthEventDrafts = {};
-let planMultiSelectModes = {}; // 月ごとの複数選択モードの状態 { 5: true/false }
-let planCalendarSelections = {}; // 月ごとのカレンダー選択日付配列 { 5: ["2026-05-16", ...] }
+let planMultiSelectModes = {}; 
+let planCalendarSelections = {}; 
 
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
@@ -365,9 +365,6 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// ==========================================
-// 半年計画策定モーダル
-// ==========================================
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -379,23 +376,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
-
-    // 🌟 修正①: モーダル内の閉じる系ボタン（×やキャンセル等）が確実に機能するように表示を制御
-    const decisionModal = document.getElementById('decision-modal');
-    if (decisionModal) {
-      const closeButtons = decisionModal.querySelectorAll('.modal-close, .danger-btn, [onclick*="close"], [onclick*="cancel"]');
-      closeButtons.forEach(btn => {
-        if (btn.textContent.includes('やめる') || btn.textContent.includes('閉じる') || btn.classList.contains('modal-close')) {
-          btn.style.display = 'inline-block';
-        }
-      });
-    }
-
-    document.querySelectorAll('button').forEach(btn => {
-      if (btn.textContent.includes('カレンダー') || btn.textContent.includes('6か月')) {
-        btn.style.display = 'none';
-      }
-    });
 
     try {
       const isFirstEver = (yearTarget === 1 && startM === 1 && (!rivalLiveBookings || rivalLiveBookings.length === 0));
@@ -506,7 +486,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
-    // 🌟 修正②: 現在のゲーム内月（currentMonth）以降の月を通しで参照・編集できるように開始月を調整
     const effectiveStartM = (typeof currentMonth !== 'undefined' && yearTarget === currentYear && currentMonth > startM) ? currentMonth : startM;
 
     for (let m = effectiveStartM; m <= endM; m++) {
@@ -668,7 +647,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   }
 }
 
-// 🌟 計画画面を閉じる汎用関数
 function closeDecisionModal() {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
@@ -1070,7 +1048,6 @@ function openPlanningCalendar() {
   openPlanningManual();
 }
 
-// セーブ・ロード管理
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
