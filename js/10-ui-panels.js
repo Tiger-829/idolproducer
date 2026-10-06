@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー月移動機能統合）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー予定ポップアップ対応）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -499,7 +499,7 @@ function getIndividualLessonMemberOptions() {
 }
 
 // ==========================================
-// 事務所タブのカレンダー（予定が決定済みの月まで `<` `>` で行き来可能）
+// 事務所のカレンダー（月切替 ＆ 日付クリックポップアップ対応）
 // ==========================================
 let officeCalendarViewYear = null;
 let officeCalendarViewMonth = null;
@@ -513,12 +513,10 @@ function getOfficeCalendarViewDate() {
   return { year: officeCalendarViewYear, month: officeCalendarViewMonth };
 }
 
-// 予定が決定・登録されている最大の年月を算出する
 function getMaxScheduledYearMonth() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   let maxVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
 
-  // 1. 自グループのライブ・発売・イベント予定をチェック
   if (typeof productionSchedule !== 'undefined' && productionSchedule) {
     Object.entries(productionSchedule).forEach(([key, plan]) => {
       if (!plan) return;
@@ -527,7 +525,6 @@ function getMaxScheduledYearMonth() {
       const val = actualY * 12 + m;
       if (val > maxVal) maxVal = val;
 
-      // ライブ日程や発売日が存在する場合も考慮
       if (plan.releaseDate) {
         const d = new Date(plan.releaseDate);
         if (!isNaN(d)) {
@@ -538,7 +535,6 @@ function getMaxScheduledYearMonth() {
     });
   }
 
-  // 2. 登録済みの自グループライブエントリをチェック
   if (typeof getScheduledLiveEntries === 'function') {
     getScheduledLiveEntries().forEach(entry => {
       if (entry && entry.date) {
@@ -551,7 +547,6 @@ function getMaxScheduledYearMonth() {
     });
   }
 
-  // 3. ライバルライブの予約をチェック
   if (typeof rivalLiveBookings !== 'undefined' && Array.isArray(rivalLiveBookings)) {
     rivalLiveBookings.forEach(booking => {
       const bDate = booking?.liveDate || booking?.date || '';
@@ -574,7 +569,6 @@ function shiftOfficeCalendarMonth(delta) {
   const v = getOfficeCalendarViewDate();
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   const minVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
-  
   const maxYM = getMaxScheduledYearMonth();
   const maxVal = maxYM.year * 12 + maxYM.month;
 
@@ -587,13 +581,95 @@ function shiftOfficeCalendarMonth(delta) {
   renderGameCalendar();
 }
 
+// 指定した日付に該当する自他グループの予定をすべて収集
+function getEventsForDate(dateKey) {
+  const events = [];
+
+  if (typeof getScheduledLiveEntries === 'function') {
+    getScheduledLiveEntries().forEach(entry => {
+      if (!entry.completed && typeof getLiveEntryShowDates === 'function') {
+        const showDates = getLiveEntryShowDates(entry);
+        if (showDates.includes(dateKey)) {
+          events.push(`🎤 [自グループライブ] ${entry.liveName || entry.liveVenue} (${entry.liveVenue})`);
+        }
+      }
+    });
+  }
+
+  if (Array.isArray(specialLiveEvents)) {
+    specialLiveEvents.forEach(event => {
+      if (event && !event.completed && event.liveDate === dateKey) {
+        events.push(`🎤 [外部ライブ] ${event.name} (${event.venue})`);
+      }
+    });
+  }
+
+  if (typeof productionSchedule !== 'undefined' && productionSchedule) {
+    Object.entries(productionSchedule).forEach(([key, plan]) => {
+      if (!plan) return;
+      if (plan.releaseDate === dateKey && plan.release && plan.release !== 'none') {
+        const typeName = plan.release === 'album' ? 'アルバム' : 'シングル';
+        events.push(`💿 [CD発売] ${typeName}「${plan.songName || '新曲'}」`);
+      }
+      if (Array.isArray(plan.planEvents)) {
+        plan.planEvents.forEach(ev => {
+          if (ev && ev.date === dateKey && !ev.completed) {
+            const bInfo = typeof PLAN_EVENT_TYPES !== 'undefined' ? PLAN_EVENT_TYPES.find(t => t.id === ev.benefitId) : null;
+            events.push(`🎁 [特典イベント] ${bInfo ? bInfo.name : 'イベント'}`);
+          }
+        });
+      }
+    });
+  }
+
+  if (Array.isArray(scheduledPerformances)) {
+    scheduledPerformances.forEach(perf => {
+      if (perf && perf.airDate === dateKey) {
+        events.push(`📺 [${perf.isSpecial ? '大型特番' : 'テレビ出演'}] ${perf.name}`);
+      }
+    });
+  }
+
+  if (Array.isArray(rivalLiveBookings)) {
+    rivalLiveBookings.forEach(booking => {
+      if (!booking) return;
+      const bDates = booking.venueDates || [booking.liveDate];
+      if (bDates.includes(dateKey)) {
+        const isRel = booking.type === 'release' || (booking.liveName && booking.liveName.includes('リリース'));
+        if (isRel) {
+          events.push(`💿 [他グループ] ${booking.groupName} 新曲リリース`);
+        } else {
+          events.push(`🎤 [他グループライブ] ${booking.groupName} (${booking.venue})`);
+        }
+      }
+    });
+  }
+
+  return events;
+}
+
+function handleCalendarDayClick(dateKey) {
+  if (!dateKey) return;
+  const events = getEventsForDate(dateKey);
+  const formattedDate = new Date(`${dateKey}T12:00:00`).toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short'
+  });
+
+  if (events.length === 0) {
+    alert(`【${formattedDate}】\n予定されているスケジュールはありません。`);
+  } else {
+    alert(`【${formattedDate}の予定】\n\n${events.join('\n')}`);
+  }
+}
+
 function renderGameCalendar() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
-  const currentVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
-
   const v = getOfficeCalendarViewDate();
   const year = v.year;
-  const month = v.month - 1; // 0-indexed
+  const month = v.month - 1;
   const actualMonthNum = v.month;
 
   const today = (year === currentDate.getFullYear() && month === currentDate.getMonth()) ? currentDate.getDate() : -1;
@@ -667,7 +743,9 @@ function renderGameCalendar() {
       planEventDates.has(dateKey) ? 'CD関連イベント' : '',
       broadcastName ? `テレビ出演: ${broadcastName}` : ''
     ].filter(Boolean).join(' / ');
-    cells += `<span class="${classes}"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
+    
+    // 🌟 日付セルクリックで予定ポップアップを表示する機能を追加
+    cells += `<span class="${classes}" style="cursor:pointer;" onclick="handleCalendarDayClick('${dateKey}')"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
   }
 
   const minVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
