@@ -387,16 +387,19 @@ function findRivalVenueConflict(venueName, dateKey) {
 
 function syncGameCalendar() {
   const date = getGameDateObject();
-  if (calendarYear && date.getFullYear() !== calendarYear) {
-    currentYear += date.getFullYear() - calendarYear;
+  // calendarYear が未設定の場合のみ現在のシステム年を初期値にする
+  if (!calendarYear) {
+    calendarYear = date.getFullYear();
   }
-  calendarYear = date.getFullYear();
+  // カレンダーの月と週を正しく算出する
   currentMonth = date.getMonth() + 1;
   currentWeek = Math.ceil(date.getDate() / 7);
 }
 
 function migrateLegacyGameDate(year, month, week) {
-  const firstWednesday = getFirstWednesday(new Date().getFullYear() + 1 + year - 1, month - 1);
+  // 実システムの年ではなく、ゲーム内の基準年（例: 2026年）をベースに水曜日を計算する
+  const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
+  const firstWednesday = getFirstWednesday(baseYear + (year - 1), month - 1);
   firstWednesday.setDate(firstWednesday.getDate() + (week - 1) * 7);
   return toDateKey(firstWednesday);
 }
