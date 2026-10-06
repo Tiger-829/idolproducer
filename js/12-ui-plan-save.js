@@ -923,19 +923,23 @@ function applyScheduleAction(month, actionType) {
   const isMulti = planMultiSelectModes[month];
   const selections = planCalendarSelections[month] || [];
 
-  if (isMulti && selections.length === 0) {
-    alert('カレンダー上で対象の日付を選択してください。');
-    return;
-  }
-
   let targetDates = [];
+
   if (isMulti) {
+    // 複数選択モードの場合：選ばれているすべての डेट を対象にする
+    if (selections.length === 0) {
+      alert('カレンダー上で対象の日付を選択してください。');
+      return;
+    }
     targetDates = [...selections];
   } else {
-    const defaultDate = getPlanReleaseDefaultWednesday(month);
-    targetDates = [defaultDate];
-    alert('単独モードです。カレンダーの各日付を直接タップしてライブ日等に設定するか、複数選択モードをONにして一括設定してください。');
-    return;
+    // 🌟 【修正】単独モードの場合：カレンダーでタップして選択した日付があればそれを優先、なければデフォルトの水曜日
+    if (selections.length > 0) {
+      targetDates = [selections[0]];
+    } else {
+      const defaultDate = getPlanReleaseDefaultWednesday(month);
+      targetDates = [defaultDate];
+    }
   }
 
   if (actionType === 'live') {
@@ -974,6 +978,7 @@ function applyScheduleAction(month, actionType) {
       updateReleaseDateOptions(month);
     }
   } else if (actionType === 'event-benefit') {
+    // 🌟 単独モードでも複数選択モードでも、選んだ日付をそのまま特典イベント設定モーダルに渡す
     openBenefitDetailModal(month, targetDates);
     return;
   } else if (actionType === 'event-other') {
@@ -1049,6 +1054,7 @@ function applyScheduleAction(month, actionType) {
   planCalendarSelections[month] = [];
   renderEmbeddedPlanCalendars();
 }
+
 
 function openPlanCalendar() {}
 function closePlanCalendar() {}
