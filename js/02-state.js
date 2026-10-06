@@ -485,9 +485,11 @@ function initializeNewGameState() {
   currentYear = 1;
   currentMonth = 1;
   currentWeek = 1;
-  calendarYear = new Date().getFullYear();
+  calendarYear = new Date().getFullYear(); // 実世界の西暦（2026年）に同期
+  
   productionSchedule = createInitialProductionSchedule();
   gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
+  
   totalWeeksElapsed = 0;
   draftCount = 0;
   currentRosterTab = 'selected';
@@ -544,6 +546,7 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
+  // 🌟【最重要】新規ゲーム開始時に、初月から12か月分（1年分フル）のライバルスケジュールを強制的にランダム生成する
   generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
 
   idolRoster = [];
@@ -564,6 +567,7 @@ function initializeNewGameState() {
   groupFansAtYearStart = calculateGroupFans();
   previousYearGroupFansAtYearStart = groupFansAtYearStart;
 }
+
 
 function applySavedGame(data) {
   currentYear = data.currentYear || 1;
