@@ -2,6 +2,56 @@
 // 03-venue.js : 情報メディア・ライブ会場・日付管理（完全版）
 // ==========================================
 
+// 🌟 最初にすべての基本日付・水曜日計算ヘルパーを定義し、参照エラーを防止する
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getGameDateObject(value = gameDate) {
+  return new Date(`${value}T12:00:00`);
+}
+
+function getFirstWednesday(year, monthIndex = 0) {
+  const date = new Date(year, monthIndex, 1, 12);
+  const offset = (3 - date.getDay() + 7) % 7;
+  date.setDate(date.getDate() + offset);
+  return date;
+}
+
+function getNextWednesday(date) {
+  const nextDate = new Date(date);
+  const daysUntilWednesday = (3 - nextDate.getDay() + 7) % 7 || 7;
+  nextDate.setDate(nextDate.getDate() + daysUntilWednesday);
+  return nextDate;
+}
+
+function getWeekAnchorDate(date = getGameDateObject()) {
+  const anchor = new Date(date);
+  const daysSinceWednesday = (anchor.getDay() - 3 + 7) % 7;
+  anchor.setDate(anchor.getDate() - daysSinceWednesday);
+  return anchor;
+}
+
+function getLastWednesday(year, monthIndex) {
+  const date = new Date(year, monthIndex + 1, 0, 12);
+  const daysSinceWednesday = (date.getDay() - 3 + 7) % 7;
+  date.setDate(date.getDate() - daysSinceWednesday);
+  return date;
+}
+
 // ライブの日数を安全な範囲（1〜5日）に正規化する関数
 function normalizeLiveDays(value) {
   const days = Number.parseInt(value, 10);
@@ -274,48 +324,6 @@ function findOwnLiveConflict(liveVenue, liveDate, ignorePlanKey = null) {
     && entry.liveVenue === liveVenue
     && entry.liveDate === liveDate
   ) || null;
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, character => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  })[character]);
-}
-
-function getGameDateObject(value = gameDate) {
-  return new Date(`${value}T12:00:00`);
-}
-
-function getFirstWednesday(year, monthIndex = 0) {
-  const date = new Date(year, monthIndex, 1, 12);
-  const offset = (3 - date.getDay() + 7) % 7;
-  date.setDate(date.getDate() + offset);
-  return date;
-}
-
-function getNextWednesday(date) {
-  const nextDate = new Date(date);
-  const daysUntilWednesday = (3 - nextDate.getDay() + 7) % 7 || 7;
-  nextDate.setDate(nextDate.getDate() + daysUntilWednesday);
-  return nextDate;
-}
-
-function getWeekAnchorDate(date = getGameDateObject()) {
-  const anchor = new Date(date);
-  const daysSinceWednesday = (anchor.getDay() - 3 + 7) % 7;
-  anchor.setDate(anchor.getDate() - daysSinceWednesday);
-  return anchor;
-}
-
-function getLastWednesday(year, monthIndex) {
-  const date = new Date(year, monthIndex + 1, 0, 12);
-  const daysSinceWednesday = (date.getDay() - 3 + 7) % 7;
-  date.setDate(date.getDate() - daysSinceWednesday);
-  return date;
 }
 
 function ensureRivalLiveBookings(gameYear, month) {
