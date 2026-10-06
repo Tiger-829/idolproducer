@@ -6,7 +6,7 @@ let currentYear = 1;
 let currentMonth = 1;
 let currentWeek = 1; // 1〜4週
 let gameDate = '';
-let calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦（2026年等）を動的同期
+let calendarYear = new Date().getFullYear();
 let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
@@ -57,9 +57,6 @@ let scheduledPerformances = [];
 let specialOffersSent = [];
 let weeklySchedule = {};
 
-// ==========================================
-// 競合チーム（leagueTeams）の定義
-// ==========================================
 function createInitialLeagueTeams() {
   return [
     { id: 'player', name: '自グループ', sales: 0, audience: 0, basePower: 50 },
@@ -74,9 +71,6 @@ function createInitialLeagueTeams() {
 let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
-// ==========================================
-// ライバルスケジュール自動生成（連日公演・曜日重みづけ・初年度対応版）
-// ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
   const monthSpan = generateFullYear ? 12 : 6;
@@ -244,9 +238,6 @@ function createInitialOfficeUpgrades() {
   return { lessons: 0, dormitory: 0, analytics: 0, snsTraining: 0, liveProduction: 0, merchandise: 0 };
 }
 
-// ==========================================
-// マネージャーシステム関連
-// ==========================================
 let managers = [];
 let managerMarketCandidates = [];
 
@@ -431,9 +422,6 @@ function getSpecialTrainingRiskReduction() {
   return 0.5;
 }
 
-// ==========================================
-// ユーティリティ・補助関数
-// ==========================================
 function toDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -479,7 +467,6 @@ function formatFanCount(value) {
   return `${Number(oku.toFixed(okuDigits))}億人`;
 }
 
-// 🌟 カレンダー同期処理（実システムの西暦ベース）
 function syncGameCalendar() {
   const date = getGameDateObject();
   if (!calendarYear) {
@@ -498,7 +485,7 @@ function initializeNewGameState() {
   currentYear = 1;
   currentMonth = 1;
   currentWeek = 1;
-  calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦に動的同期
+  calendarYear = new Date().getFullYear();
   productionSchedule = createInitialProductionSchedule();
   gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
   totalWeeksElapsed = 0;
@@ -557,7 +544,6 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
-  // 🌟 初年度のライバルスケジュール（上半期・下半期を含む1年分）を確実にランダムセット
   generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
 
   idolRoster = [];
