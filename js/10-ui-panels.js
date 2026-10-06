@@ -724,7 +724,6 @@ function renderGameCalendar() {
       cellDate.getDay() === 0 ? 'sunday' : '',
       day === today ? 'today' : '',
       liveDates.has(dateKey) ? 'live-day' : '',
-      rivalLiveDates.has(dateKey) ? 'rival-live-day' : '',
       releaseDates.has(dateKey) ? 'release-day' : '',
       planEventDates.has(dateKey) ? 'plan-event-day' : '',
       broadcastName ? 'broadcast-day' : ''
