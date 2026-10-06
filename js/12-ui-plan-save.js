@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・全機能統合最終完全版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・初期設定統合版
 // ==========================================
 
 let planYearTarget = 1;
@@ -8,6 +8,13 @@ let planEndM = 6;
 let planMonthEventDrafts = {};
 let planMultiSelectModes = {}; 
 let planCalendarSelections = {}; 
+
+// 🌟 新規ゲーム初期設定用のカスタム保持変数
+let pendingActiveSlot = null;
+let customGroupName = "";
+let customFirstSong = "雪どけ";
+let customSecondSong = "なつみかん";
+let customFirstLiveName = "Debut Live";
 
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
@@ -669,8 +676,6 @@ function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
-  const rivals = [];
-
   for (let m = planStartM; m <= planEndM; m++) {
     const container = document.getElementById(`embedded-calendar-month-${m}`);
     if (!container) continue;
@@ -1046,7 +1051,7 @@ function openPlanningCalendar() {
 }
 
 // ==========================================
-// 🌟 タイトル画面・セーブ枠管理・ロード関連関数（完全安定版）
+// 🌟 タイトル画面・セーブ枠管理・新規開始フロー
 // ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
@@ -1118,6 +1123,7 @@ function continueSavedGame(slot) {
   initGame(slot, false);
 }
 
+// 🌟 新規開始ボタンを押したときの処理（まず初期設定モーダルを開く）
 function startNewGame(slot) {
   const slotKey = saveSlotKey(slot);
   if (localStorage.getItem(slotKey)) {
@@ -1125,7 +1131,34 @@ function startNewGame(slot) {
       return;
     }
   }
-  initGame(slot, true);
+  pendingActiveSlot = slot;
+  const setupModal = document.getElementById('setup-game-modal');
+  if (setupModal) {
+    setupModal.style.display = 'flex';
+  } else {
+    initGame(slot, true);
+  }
+}
+
+// 🌟 初期設定モーダルで「プロデュース開始」を押した時の処理
+function submitGameSetup() {
+  const gNameInput = document.getElementById('input-setup-groupname');
+  const song1Input = document.getElementById('input-setup-1st-song');
+  const song2Input = document.getElementById('input-setup-2nd-song');
+  const liveInput = document.getElementById('input-setup-live-name');
+
+  if (gNameInput && gNameInput.value.trim()) customGroupName = gNameInput.value.trim();
+  if (song1Input && song1Input.value.trim()) customFirstSong = song1Input.value.trim();
+  if (song2Input && song2Input.value.trim()) customSecondSong = song2Input.value.trim();
+  if (liveInput && liveInput.value.trim()) customFirstLiveName = liveInput.value.trim();
+
+  const setupModal = document.getElementById('setup-game-modal');
+  if (setupModal) setupModal.style.display = 'none';
+
+  if (pendingActiveSlot !== null) {
+    initGame(pendingActiveSlot, true);
+    pendingActiveSlot = null;
+  }
 }
 
 function deleteSaveSlot(slot) {
@@ -1155,7 +1188,24 @@ function initGame(slot, startFresh) {
   activeSaveSlot = slot;
 
   if (startFresh) {
-    if (typeof initializeNewGameState === 'function') initializeNewGameState();
+    if (typeof initializeNewGameState === 'function') {
+      initializeNewGameState();
+    }
+    // 🌟 入力されたカスタム値を初期状態（グループ名・1st/2ndシングル・ファーストライブ名）に反映
+    if (typeof groupName !== 'undefined') {
+      groupName = customGroupName;
+    }
+    if (typeof productionSchedule !== 'undefined') {
+      if (productionSchedule['1-1']) {
+        productionSchedule['1-1'].songName = customFirstSong;
+        if (productionSchedule['1-1'].liveName) {
+          productionSchedule['1-1'].liveName = customFirstLiveName;
+        }
+      }
+      if (productionSchedule['1-2']) {
+        productionSchedule['1-2'].songName = customSecondSong;
+      }
+    }
   } else {
     const raw = localStorage.getItem(saveSlotKey(slot));
     if (raw) {
