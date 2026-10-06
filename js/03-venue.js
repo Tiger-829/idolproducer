@@ -404,6 +404,13 @@ function syncGameCalendar() {
   currentMonth = date.getMonth() + 1;
   currentWeek = Math.ceil(date.getDate() / 7);
 }
+// ライブの日数を安全な範囲（1〜5日、またはプレビュー用の最大3日など）に正規化する関数
+function normalizeLiveDays(value) {
+  const days = Number.parseInt(value, 10);
+  // 日数オプション（1, 2, 3, 4, 5）のいずれかであればそのまま、違えば1を返す
+  const validOptions = typeof LIVE_DAY_OPTIONS !== 'undefined' ? LIVE_DAY_OPTIONS : [1, 2, 3, 4, 5];
+  return validOptions.includes(days) ? days : 1;
+}
 
 function migrateLegacyGameDate(year, month, week) {
   const firstWednesday = getFirstWednesday(new Date().getFullYear() + 1 + year - 1, month - 1);
