@@ -1690,3 +1690,30 @@
   pointer-events: auto !important;
   cursor: pointer !important;
 }
+
+/* 半年計画モーダル内の横並びレイアウト調整 */
+#decision-modal .modal-content {
+  max-width: 900px !important;
+  width: 95% !important;
+}
+
+.plan-layout-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media screen and (min-width: 768px) {
+  .plan-layout-container {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    align-items: start;
+    gap: 20px;
+  }
+  
+  /* 左側の確認用カレンダーを固定表示 */
+  .plan-calendar-sidebar {
+    position: sticky;
+    top: 10px;
+  }
+}
