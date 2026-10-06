@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・全機能統合最終完全版
+// 12-ui-plan-save.js : 特典イベント経費・カレンダータップ判定・全機能統合版
 // ==========================================
 
 let planYearTarget = 1;
@@ -671,7 +671,7 @@ function toggleMultiSelectMode(month) {
   renderEmbeddedPlanCalendars();
 }
 
-// 🌟 【ドット非表示対応】他グループの予定合図(ドット)を表示しないカレンダー描画
+// 🌟 【ドット完全非表示・タップ判定対応】半年計画モーダル内のカレンダー描画
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
@@ -712,28 +712,24 @@ function renderEmbeddedPlanCalendars() {
       const isSelected = planCalendarSelections[m].includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
       const liveEntries = readLiveSlotInputs(m);
-      const isLive = liveEntries.some(slot => slot.liveDates.includes(dateKey));
+      const isLive = liveEntries.some(slot => slot.liveDates && slot.liveDates.includes(dateKey));
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
 
       let bgStyle = 'background:#fafafa; color:#444; border:1px solid #eee;';
-      let indicator = '';
       
       if (isSelected) {
         bgStyle = 'background:var(--primary); color:#fff; font-weight:bold; border:1px solid var(--primary);';
       } else if (isRelease) {
         bgStyle = 'background:#e2eefc; color:#12447e; font-weight:bold; border:1px solid #bce0fd;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:1px auto 0;"></i>';
       } else if (isLive) {
         bgStyle = 'background:#e0f1ea; color:#1f5c49; font-weight:bold; border:1px solid #b8e2d2;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:1px auto 0;"></i>';
       } else if (isEvent) {
         bgStyle = 'background:#fdf0da; color:#8a5a12; border:1px solid #fce3b2;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:1px auto 0;"></i>';
       }
 
       daySpan.style.cssText = `display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:24px; font-size:10px; border-radius:4px; ${bgStyle} cursor:pointer; user-select:none;`;
-      daySpan.innerHTML = `${day}${indicator}`;
+      daySpan.textContent = day;
 
       daySpan.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -768,6 +764,9 @@ function toggleEmbeddedCalendarDate(month, dateKey) {
   const slots = readLiveSlotInputs(month);
   if (slots.length > 0) {
     const slot = slots[0];
+    if (!Array.isArray(slot.liveDates)) slot.liveDates = [];
+    if (!Array.isArray(slot.streamDates)) slot.streamDates = [];
+
     const idx = slot.liveDates.indexOf(dateKey);
     if (idx >= 0) {
       slot.liveDates.splice(idx, 1);
@@ -786,6 +785,20 @@ function toggleEmbeddedCalendarDate(month, dateKey) {
     }
     updateShowDateNote(month, 0);
     renderEmbeddedPlanCalendars();
+  } else {
+    // スロットがない場合は新規作成して追加
+    addLiveSlot(month);
+    const slotsNew = readLiveSlotInputs(month);
+    if (slotsNew.length > 0) {
+      slotsNew[0].liveDates = [dateKey];
+      slotsNew[0].streamDates = [dateKey];
+      const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
+      if (showDatesContainer) {
+        showDatesContainer.innerHTML = renderShowDateRow(month, 0, 0, dateKey, true);
+      }
+      updateShowDateNote(month, 0);
+      renderEmbeddedPlanCalendars();
+    }
   }
 }
 
@@ -810,23 +823,31 @@ function applyScheduleAction(month, actionType) {
 
   if (actionType === 'live') {
     const slots = readLiveSlotInputs(month);
-    if (slots.length === 0) return;
-    const slot = slots[0];
-    targetDates.forEach(d => {
-      if (!slot.liveDates.includes(d)) {
-        slot.liveDates.push(d);
-        slot.streamDates.push(d);
-      }
-    });
-    slot.liveDates.sort();
-
-    const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
-    if (showDatesContainer) {
-      showDatesContainer.innerHTML = slot.liveDates.map((dKey, dIdx) => 
-        renderShowDateRow(month, 0, dIdx, dKey, slot.streamDates.includes(dKey))
-      ).join('');
+    if (slots.length === 0) {
+      addLiveSlot(month);
     }
-    updateShowDateNote(month, 0);
+    const slotsAfterAdd = readLiveSlotInputs(month);
+    if (slotsAfterAdd.length > 0) {
+      const slot = slotsAfterAdd[0];
+      if (!Array.isArray(slot.liveDates)) slot.liveDates = [];
+      if (!Array.isArray(slot.streamDates)) slot.streamDates = [];
+
+      targetDates.forEach(d => {
+        if (!slot.liveDates.includes(d)) {
+          slot.liveDates.push(d);
+          slot.streamDates.push(d);
+        }
+      });
+      slot.liveDates.sort();
+
+      const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
+      if (showDatesContainer) {
+        showDatesContainer.innerHTML = slot.liveDates.map((dKey, dIdx) => 
+          renderShowDateRow(month, 0, dIdx, dKey, slot.streamDates.includes(dKey))
+        ).join('');
+      }
+      updateShowDateNote(month, 0);
+    }
   } else if (actionType === 'release') {
     const relInput = document.getElementById(`rel-date-${month}`);
     const selRel = document.getElementById(`sel-rel-${month}`);
@@ -867,8 +888,13 @@ function applyScheduleAction(month, actionType) {
         updateReleaseDateOptions(month);
       }
       const slots = readLiveSlotInputs(month);
-      if (slots.length > 0) {
-        const slot = slots[0];
+      if (slots.length === 0) addLiveSlot(month);
+      const slotsAfterAdd = readLiveSlotInputs(month);
+      if (slotsAfterAdd.length > 0) {
+        const slot = slotsAfterAdd[0];
+        if (!Array.isArray(slot.liveDates)) slot.liveDates = [];
+        if (!Array.isArray(slot.streamDates)) slot.streamDates = [];
+
         targetDates.forEach(d => {
           if (!slot.liveDates.includes(d)) {
             slot.liveDates.push(d);
@@ -889,13 +915,13 @@ function applyScheduleAction(month, actionType) {
     targetDates.forEach(d => {
       const slots = readLiveSlotInputs(month);
       slots.forEach(slot => {
-        slot.liveDates = slot.liveDates.filter(date => date !== d);
-        slot.streamDates = slot.streamDates.filter(date => date !== d);
+        if (Array.isArray(slot.liveDates)) slot.liveDates = slot.liveDates.filter(date => date !== d);
+        if (Array.isArray(slot.streamDates)) slot.streamDates = slot.streamDates.filter(date => date !== d);
       });
       const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
       if (showDatesContainer) {
         const slotsAfter = readLiveSlotInputs(month);
-        if (slotsAfter.length > 0) {
+        if (slotsAfter.length > 0 && Array.isArray(slotsAfter[0].liveDates)) {
           showDatesContainer.innerHTML = slotsAfter[0].liveDates.map((dKey, dIdx) => 
             renderShowDateRow(month, 0, dIdx, dKey, slotsAfter[0].streamDates.includes(dKey))
           ).join('');
@@ -950,7 +976,7 @@ function validatePlanLiveSlots(month, liveSlots) {
     const venue = venues.find(v => v.name === slot.liveVenue);
     const leadDays = typeof getLiveBookingLeadDays === 'function' ? getLiveBookingLeadDays(venue) : 45;
 
-    for (const d of slot.liveDates) {
+    for (const d of (slot.liveDates || [])) {
       if (usedDates.has(d)) {
         alert(`${month}月の中で公演日（${d}）が重複しています。`);
         return false;
@@ -979,9 +1005,10 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
+// 🌟 【特典イベント経費対応】日程×2000万円の経費を計算して資金から引く保存処理
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
-  const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
+  let totalBenefitCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
@@ -996,12 +1023,20 @@ function saveDecisionPlan() {
     }
     if (!validatePlanLiveSlots(m, liveSlots)) return;
 
+    // 🌟 特典イベント（planEvents）の日程数 × 2000万円の経費計算
+    const drafts = getPlanMonthEventDrafts(m);
+    drafts.forEach(event => {
+      if (event && event.date) {
+        totalBenefitCost += 20000000; // 1日程につき2000万円
+      }
+    });
+
     const primary = liveSlots[0] || null;
     const plan = {
       release,
       songName: songName || null,
       releaseDate: release === 'none' ? null : (getPlanReleaseDate(m) || null),
-      planEvents: getPlanMonthEventDrafts(m).map(item => ({ ...item })),
+      planEvents: drafts.map(item => ({ ...item })),
       liveVenue: primary ? primary.liveVenue : null,
       liveName: primary ? (primary.liveName || primary.liveVenue) : null,
       liveDate: primary ? (primary.liveDate || null) : null,
@@ -1027,9 +1062,16 @@ function saveDecisionPlan() {
     }
   }
 
+  // 🌟 計算した特典イベント経費を現在の資金から差し引く
+  if (totalBenefitCost > 0) {
+    if (typeof funds !== 'undefined') {
+      funds -= totalBenefitCost;
+    }
+  }
+
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（特典イベント経費合計: ${formatMoney(totalBenefitCost)}）`);
   updateUI();
 }
 
