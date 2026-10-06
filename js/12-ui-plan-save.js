@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : イベントレイアウト修正＆スクロール追従✕ボタン完全版
+// 12-ui-plan-save.js : 特典イベントレイアウト・専用モーダル入力完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -14,6 +14,9 @@ let customGroupName = "スタースコープ";
 let customFirstSong = "はじまりの光";
 let customSecondSong = "青春の軌跡";
 let customFirstLiveName = "1stデビューライブ";
+
+let pendingBenefitMonth = null;
+let pendingBenefitDates = [];
 
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
@@ -306,7 +309,7 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
-// 🌟 【②反映】特典イベント：名前セレクトボックスを左、日付ボックスを右に配置
+// 🌟 特典イベント一覧行：セレクトボックス（種類）を左、日付を右に配置
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -372,7 +375,97 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// 🌟 【③反映】スクロールしてもついてくる（sticky）✕閉じるボタンの完全適用
+// 🌟 特典イベント専用モーダル（種類・イベント名・日程の3項目構成）
+function openBenefitDetailModal(month, dates) {
+  pendingBenefitMonth = month;
+  pendingBenefitDates = [...dates];
+
+  let modalEl = document.getElementById('benefit-detail-modal');
+  if (!modalEl) {
+    modalEl = document.createElement('div');
+    modalEl.id = 'benefit-detail-modal';
+    modalEl.className = 'modal-overlay';
+    modalEl.style.cssText = 'display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:10000;';
+    modalEl.innerHTML = `
+      <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
+        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
+        <p style="font-size:11px; color:#666; margin-bottom:12px;">選択した日程に対する特典イベントの情報を構成してください。</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
+            <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+              <option value="handshake">個別握手会</option>
+              <option value="autograph">サイン会</option>
+              <option value="online">オンラインお話し会</option>
+            </select>
+          </label>
+
+          <label style="font-size:11px; font-weight:bold; color:#333;">イベント名
+            <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+          </label>
+
+          <label style="font-size:11px; font-weight:bold; color:#333;">日程（選択中）
+            <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
+          </label>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:16px;">
+          <button class="main-btn" style="flex:1; padding:8px;" onclick="submitBenefitDetailModal()">確定して登録</button>
+          <button class="danger-btn" style="flex:1; padding:8px;" onclick="closeBenefitDetailModal()">キャンセル</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalEl);
+  }
+
+  const displayEl = document.getElementById('benefit-modal-dates-display');
+  if (displayEl) {
+    displayEl.textContent = dates.join(', ');
+  }
+
+  modalEl.style.display = 'flex';
+}
+
+function closeBenefitDetailModal() {
+  const modalEl = document.getElementById('benefit-detail-modal');
+  if (modalEl) modalEl.style.display = 'none';
+  pendingBenefitMonth = null;
+  pendingBenefitDates = [];
+}
+
+function submitBenefitDetailModal() {
+  if (pendingBenefitMonth === null || pendingBenefitDates.length === 0) {
+    closeBenefitDetailModal();
+    return;
+  }
+
+  const typeSelect = document.getElementById('benefit-modal-type');
+  const nameInput = document.getElementById('benefit-modal-name');
+  
+  const benefitId = typeSelect ? typeSelect.value : 'handshake';
+  const eventName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : '特典イベント';
+
+  const drafts = getPlanMonthEventDrafts(pendingBenefitMonth);
+  pendingBenefitDates.forEach(d => {
+    const existing = drafts.find(e => e.date === d);
+    if (existing) {
+      existing.benefitId = benefitId;
+      existing.name = eventName;
+    } else {
+      drafts.push({
+        benefitId: benefitId,
+        name: eventName,
+        date: d,
+        completed: false
+      });
+    }
+  });
+
+  refreshPlanEventsContainer(pendingBenefitMonth);
+  renderEmbeddedPlanCalendars();
+  closeBenefitDetailModal();
+}
+
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -397,11 +490,9 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
 
-    // 既存のHTML側の閉じるボタンを非表示にし、スクロール追従するボタンを確実に上部に固定する
     if (modal) {
       const contentEl = modal.querySelector('.modal-content');
       if (contentEl) {
-        // 既存の古い閉じるボタン要素があればすべて削除
         contentEl.querySelectorAll('.sticky-close-btn').forEach(el => el.remove());
 
         const stickyClose = document.createElement('button');
@@ -883,16 +974,8 @@ function applyScheduleAction(month, actionType) {
       updateReleaseDateOptions(month);
     }
   } else if (actionType === 'event-benefit') {
-    const eventName = prompt('特典イベントの種類（例: 個別握手会、サイン会）を入力してください:', '個別握手会');
-    if (eventName) {
-      const drafts = getPlanMonthEventDrafts(month);
-      targetDates.forEach(d => {
-        if (!drafts.some(e => e.date === d)) {
-          drafts.push({ benefitId: 'handshake', name: eventName, date: d, completed: false });
-        }
-      });
-      refreshPlanEventsContainer(month);
-    }
+    openBenefitDetailModal(month, targetDates);
+    return;
   } else if (actionType === 'event-other') {
     const eventName = prompt('その他イベントの名前を入力してください:', 'メディア出演・取材');
     if (eventName) {
@@ -1369,7 +1452,6 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   renderSaveSlots();
 }
 
-// 事務所メインカレンダー側のドット（インジケーター）を完全に非表示・削除する監視処理
 document.addEventListener('DOMContentLoaded', () => {
   const observer = new MutationObserver(() => {
     document.querySelectorAll('.calendar-day-dot, .rival-dot, .event-dot, .calendar-dot').forEach(el => el.remove());
