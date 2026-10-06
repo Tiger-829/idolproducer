@@ -1,6 +1,3 @@
-// ==========================================
-// ゲーム内ヘルプ（設定画面）
-// ==========================================
 const HELP_SECTIONS = [
   {
     id: 'basics',
@@ -17,8 +14,8 @@ const HELP_SECTIONS = [
           ['資金', '資金、年間売上、ライブ動員、ファンクラブ、給与'],
           ['順位', '業界順位。他グループとの売上・動員比較'],
           ['記録', '最近の出来事ログ＋ゲーム説明'],
-        ] },
-    ],
+        ] }
+    ]
   },
   {
     id: 'schedule',
@@ -37,7 +34,7 @@ const HELP_SECTIONS = [
           ['連携', '連携力を鍛えるグループ練習です。体力の消費は大きめです'],
           ['個別レッスン', '対象メンバーの能力を集中的に鍛えます。体力の消費は大きめです'],
           ['食事会', '人気や危機回避力を高め、体力も回復します'],
-          ['休養', 'レッスンも体力消費もしない枠。回復・ケガリスク低下'],
+          ['休養', 'レッスンも体力消費もしない枠。回復・ケガリスク低下']
         ] },
       { type: 'ul', items: [
         '練習メニューによって体力の消費量が異なります。残り体力が少ないほど消費も小さくなり、午前の練習は午後より負担が軽くなります。',
@@ -48,9 +45,9 @@ const HELP_SECTIONS = [
         'テレビ出演がある週は、放送日の午前がリハーサル、午後が出演で固定されます。',
         '<b>歌番組の翌週は、歌番組の「前」の週のスケジュールが最初から入ります。</b>歌番組で潰された枠は空きに戻り、残りの枠はそのまま引き継がれます。',
         '自グループのライブや他グループ公演がある週は「ライブ週」となり、スケジュールは組めません。',
-        '受諾したフェス・対バンの週はスケジュールを組めます。前日から当日午前までリハーサル、当日午後は出演、翌日は全日休養で固定されます。',
-      ] },
-    ],
+        '受諾したフェス・対バンの週はスケジュールを組めます。前日から当日午前までリハーサル、当日午後は出演、翌日は全日休養で固定されます。'
+      ] }
+    ]
   },
   {
     id: 'planning',
@@ -59,9 +56,9 @@ const HELP_SECTIONS = [
       { type: 'p', text: '事務所の年間方針として、シングルやアルバムの発売、大規模なライブ日程をあらかじめ計画します。' },
       { type: 'ul', items: [
         '記念すべき最初の半年間は初期の固定スケジュールで進行しますが、その後はプレイヤー自身の判断で自由にライブ会場やリリース日を組み立てられるようになります。',
-        '先を読みながら一つ先の半年の計画をあらかじめ決定していくことで、他グループの動向やプロ野球のペナントレース日程と重ならないように戦略的なスケジュール調整が行えます。',
-      ] },
-    ],
+        '先を読みながら一つ先の半年の計画をあらかじめ決定していくことで、他グループの動向やプロ野球のペナントレース日程と重ならないように戦略的なスケジュール調整が行えます。'
+      ] }
+    ]
   },
   {
     id: 'special',
@@ -75,7 +72,7 @@ const HELP_SECTIONS = [
           ['歌唱レッスン', '歌唱力・体力'],
           ['持久力トレーニング', '体力'],
           ['通し練習', 'ダンス・歌唱力'],
-          ['リテラシー講義・筋力トレーニング・連携・個別レッスン', '特別強化の対象外'],
+          ['リテラシー講義・筋力トレーニング・連携・個別レッスン', '特別強化の対象外']
         ] },
       { type: 'p', text: '対象能力を鍛える練習がない週は、特別強化の効果は発生しません。' },
       { type: 'table',
@@ -84,10 +81,10 @@ const HELP_SECTIONS = [
           ['統率力', '連携力練習の効果を高める'],
           ['スケジュール管理力', '特別強化できる人数を増やす'],
           ['メンタルケア', '体力消費の抑制・疲労回復率の上昇'],
-          ['リスクマネジメント', '危機回避力の補正'],
+          ['リスクマネジメント', '危機回避力の補正']
         ] },
-      { type: 'p', text: 'マネージャーの能力が高いほど、特別強化や担当業務の効果が大きくなります。複数のマネージャーの能力もチーム全体で活用されます。' },
-    ],
+      { type: 'p', text: 'マネージャーの能力が高いほど、特別強化や担当業務の効果が大きくなります。複数のマネージャーの能力もチーム全体で活用されます。' }
+    ]
   },
   {
     id: 'draft',
@@ -102,9 +99,9 @@ const HELP_SECTIONS = [
         '他グループと同じ候補者を指名しようとした場合は<b>くじ引きになり、くじを選んで引きます</b>。',
         'くじ引きで落選しても、同じ指名枠から再指名できます。落選した候補者の指名は他チームの履歴に記録されます。',
         '他チームも巡ごとに指名します。指名履歴はパネル上に開示されます。',
-        '記録タブの「ドラフト疑似体験」では、ドラフトのルールを先に確認できます。',
-      ] },
-    ],
+        '記録タブの「ドラフト疑似体験」では、ドラフトのルールを先に確認できます。'
+      ] }
+    ]
   },
   {
     id: 'release',
@@ -116,14 +113,14 @@ const HELP_SECTIONS = [
         rows: [
           ['シングル販促', '対象の曲を週次で販促。楽曲経験値UP'],
           ['次のライブの広報', '次回ライブの集客効果が累計で上昇'],
-          ['グッズの開発', '新しいグッズを開発'],
+          ['グッズの開発', '新しいグッズを開発']
         ] },
       { type: 'ul', items: [
         '発売前に販促すると、発売時の売上が大きくなります。',
         '発売後も販促を続けると売上が増えますが、効果は徐々に小さくなります。',
-        'CDの売上は月末の収入に反映されます。',
-      ] },
-    ],
+        'CDの売上は月末の収入に反映されます。'
+      ] }
+    ]
   },
   {
     id: 'live',
@@ -133,7 +130,7 @@ const HELP_SECTIONS = [
         head: ['会場規模', '収容人数イメージ'],
         rows: [
           ['D', '小規模ホール'], ['C', '中規模ホール'], ['B', '大規模ホール'],
-          ['A', 'アリーナ'], ['S', '大型アリーナ'], ['SS', 'ドーム級'],
+          ['A', 'アリーナ'], ['S', '大型アリーナ'], ['SS', 'ドーム級']
         ] },
       { type: 'p', text: '<b>小規模な会場から段階的にステップアップしていくことで、ファンが会場に足を運びやすくなります。</b>' },
       { type: 'table',
@@ -146,18 +143,18 @@ const HELP_SECTIONS = [
           ['4Fスタンド'],
           ['注釈'],
           ['ステージバック'],
-          ['配信(設定した場合)'],
+          ['配信(設定した場合)']
         ] },
-      { type: 'p', text: '<b>曜日や会場の規模によって集客のしやすさや得られる経験点が異なります。</b>' },
-    ],
+      { type: 'p', text: '<b>曜日や会場の規模によって集客のしやすさや得られる経験点が異なります。</b>' }
+    ]
   },
   {
     id: 'fans',
     title: 'ファン数',
     blocks: [
       { type: 'p', text: 'ファン層には3種類あり、<b>コア／ファン／ライト</b>です。' },
-      { type: 'p', text: '<b>コア &gt; ファン &gt; ライト</b>の順に熱量が高く、ライブ会場によく足を運びます。' },
-    ],
+      { type: 'p', text: '<b>コア &gt; ファン &gt; ライト</b>の順に熱量が高く、ライブ会場によく足を運びます。' }
+    ]
   },
   {
     id: 'stamina',
@@ -168,21 +165,20 @@ const HELP_SECTIONS = [
       { type: 'ul', items: [
         'こまめに休養日を設けると、体力を安全に保ちながら活動できます。',
         'マネージャーのメンタルケアが高いほど、過酷なスケジュールによるケガや体調不良のリスクが下がります。',
-        '1週間の休暇を取ると、全員の体力が大きく回復します。',
-      ] },
-    ],
+        '1週間の休暇を取ると、全員の体力が大きく回復します。'
+      ] }
+    ]
   },
   {
     id: 'save',
     title: 'セーブデータ',
     blocks: [
       { type: 'p', text: 'タイトル画面から「続きから」で再開、「新規開始」で最初から、「削除」でデータを消せます。' },
-      { type: 'p', text: 'データはブラウザに保存されます。ブラウザのキャッシュや設定を変更すると読み込めなくなる場合があります。' },
-    ],
-  },
+      { type: 'p', text: 'データはブラウザに保存されます。ブラウザのキャッシュや設定を変更すると読み込めなくなる場合があります。' }
+    ]
+  }
 ];
 
-// ヘルプモーダルを開く関数
 function openHelpModal() {
   const modal = document.getElementById('help-modal');
   if (!modal) return;
@@ -193,32 +189,35 @@ function openHelpModal() {
   modal.style.display = 'flex';
 }
 
-// ヘルプモーダルを閉じる関数
 function closeHelpModal() {
   const modal = document.getElementById('help-modal');
   if (modal) modal.style.display = 'none';
 }
 
-// ヘルプ本文をHTML化する関数
 function renderHelpContent() {
-  return HELP_SECTIONS.map(section => `
-    <section class="help-section">
-      <h4 class="help-section-title">${escapeHtml(section.title)}</h4>
-      ${section.blocks.map(renderHelpBlock).join('')}
-    </section>
-  `).join('');
+  return HELP_SECTIONS.map(function(section) {
+    return '<section class="help-section">' +
+      '<h4 class="help-section-title">' + escapeHtml(section.title) + '</h4>' +
+      section.blocks.map(renderHelpBlock).join('') +
+      '</section>';
+  }).join('');
 }
 
-// ブロックごとのHTML生成
 function renderHelpBlock(block) {
-  if (block.type === 'p') return `<p class="help-p">${block.text}</p>`;
+  if (block.type === 'p') {
+    return '<p class="help-p">' + block.text + '</p>';
+  }
   if (block.type === 'ul') {
-    return `<ul class="help-ul">${block.items.map(item => `<li>${item}</li>`).join('')}</ul>`;
+    return '<ul class="help-ul">' + block.items.map(function(item) {
+      return '<li>' + item + '</li>';
+    }).join('') + '</ul>';
   }
   if (block.type === 'table') {
-    const head = block.head ? `<tr>${block.head.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>` : '';
-    const rows = block.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    return `<table class="help-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+    var head = block.head ? '<tr>' + block.head.map(function(h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr>' : '';
+    var rows = block.rows.map(function(r) {
+      return '<tr>' + r.map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+    }).join('');
+    return '<table class="help-table"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>';
   }
   return '';
 }
