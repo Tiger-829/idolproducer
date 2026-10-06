@@ -126,7 +126,6 @@ const HELP_SECTIONS = [
     ],
   },
   {
-    {
     id: 'live',
     title: 'ライブ会場',
     blocks: [
