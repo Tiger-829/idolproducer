@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・詳細設定統合版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・詳細設定統合版（完全版）
 // ==========================================
 
 let planYearTarget = 1;
@@ -14,7 +14,7 @@ function isPresetReleaseMonth(month) {
 }
 
 function getPlanCalendarDate(month, day) {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   return new Date(actualYear, month - 1, day, 12);
 }
 
@@ -44,7 +44,7 @@ function getStandardSeatPrice(venue, seatId) {
 }
 
 function getPlanReleaseDefaultWednesday(month) {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   if (typeof getLastWednesday === 'function') {
     return toDateKey(getLastWednesday(actualYear, month - 1));
   }
@@ -96,7 +96,7 @@ function renderLiveSlotHtml(month, index, slot) {
       <div style="margin-top:6px; font-size:11px;">
         <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
         <div id="show-dates-${month}-${index}" class="show-date-list">
-          ${(slot.liveDates || []).map((dateKey, dateIndex) => 
+           ${(slot.liveDates || []).map((dateKey, dateIndex) => 
             renderShowDateRow(month, index, dateIndex, dateKey, streamDates.has(dateKey))
           ).join('')}
         </div>
@@ -366,7 +366,7 @@ function refreshPlanEventsContainer(month) {
 }
 
 // ==========================================
-// 半年計画策定モーダル（各月カレンダー ＋ 7つのスケジュール登録ボタン配置）
+// 半年計画策定モーダル
 // ==========================================
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
@@ -379,6 +379,17 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
+
+    // 🌟 修正①: モーダル内の閉じる系ボタン（×やキャンセル等）が確実に機能するように表示を制御
+    const decisionModal = document.getElementById('decision-modal');
+    if (decisionModal) {
+      const closeButtons = decisionModal.querySelectorAll('.modal-close, .danger-btn, [onclick*="close"], [onclick*="cancel"]');
+      closeButtons.forEach(btn => {
+        if (btn.textContent.includes('やめる') || btn.textContent.includes('閉じる') || btn.classList.contains('modal-close')) {
+          btn.style.display = 'inline-block';
+        }
+      });
+    }
 
     document.querySelectorAll('button').forEach(btn => {
       if (btn.textContent.includes('カレンダー') || btn.textContent.includes('6か月')) {
@@ -468,14 +479,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
           : `<strong>【CD発売】</strong><br>・なし`;
 
-        let liveHtml = liveDetails.length > 0 
+        let liveDetailsHtml = liveDetails.length > 0 
           ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.join('<br>')
           : `<br><strong>【ライブ予定】</strong><br>・なし`;
 
         summaryBox.innerHTML = `
           <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
           ${releaseHtml}<br>
-          ${liveHtml}
+          ${liveDetailsHtml}
         `;
       } else {
         summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
@@ -490,16 +501,20 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
-    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
+    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (yearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
-    for (let m = startM; m <= endM; m++) {
+    // 🌟 修正②: 現在のゲーム内月（currentMonth）以降の月を通しで参照・編集できるように開始月を調整
+    const effectiveStartM = (typeof currentMonth !== 'undefined' && yearTarget === currentYear && currentMonth > startM) ? currentMonth : startM;
+
+    for (let m = effectiveStartM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
       const monthRivals = rivals.filter(b => {
-        const bDate = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
-        return bDate.startsWith(targetMonthPrefix);
+        const bDate = b.liveDate || b.date || '';
+        const bDates = Array.isArray(b.liveDates) ? b.liveDates : [];
+        return bDate.startsWith(targetMonthPrefix) || bDates.some(d => d.startsWith(targetMonthPrefix));
       });
 
       monthRivals.sort((a, b) => {
@@ -568,14 +583,12 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       monthWrapper.className = 'plan-month-wrapper';
       monthWrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;';
 
-      // 1. カレンダー部分 ＋ 7つのスケジュール登録ボタン
       const calendarCard = document.createElement('div');
       calendarCard.style.cssText = 'background: #fff; border: 1px solid #eadde1; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);';
       calendarCard.innerHTML = `
         <div style="font-size: 13px; font-weight: bold; color: var(--primary); margin-bottom: 8px; border-bottom: 2px solid #fdf2f4; padding-bottom: 4px;">📅 ${actualYear}年 ${m}月 スケジュール確認</div>
         <div id="embedded-calendar-month-${m}"></div>
         
-        <!-- 🌟 7つのスケジュール登録ボタン -->
         <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;">
           <div style="font-size: 11px; font-weight: bold; color: #555;">スケジュール登録・変更（日付を選んでボタンを押下）</div>
           <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;">
@@ -591,7 +604,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       `;
       monthWrapper.appendChild(calendarCard);
 
-      // 2. 予定設定ブース部分
       const boothCard = document.createElement('div');
       boothCard.className = 'plan-month-block';
       boothCard.id = `plan-month-block-${m}`;
@@ -656,9 +668,12 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   }
 }
 
-// ==========================================
-// 複数選択モードの切替
-// ==========================================
+// 🌟 計画画面を閉じる汎用関数
+function closeDecisionModal() {
+  const modal = document.getElementById('decision-modal');
+  if (modal) modal.style.display = 'none';
+}
+
 function toggleMultiSelectMode(month) {
   planMultiSelectModes[month] = !planMultiSelectModes[month];
   if (!planMultiSelectModes[month]) {
@@ -672,11 +687,8 @@ function toggleMultiSelectMode(month) {
   renderEmbeddedPlanCalendars();
 }
 
-// ==========================================
-// 各月カレンダー描画 ＆ クリック・複数選択処理
-// ==========================================
 function renderEmbeddedPlanCalendars() {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
 
@@ -776,7 +788,6 @@ function handleEmbeddedCalendarClick(month, dateKey) {
     }
     renderEmbeddedPlanCalendars();
   } else {
-    // 単独モード：クリックされたら即座にライブ日としてトグル登録
     toggleEmbeddedCalendarDate(month, dateKey);
   }
 }
@@ -806,9 +817,6 @@ function toggleEmbeddedCalendarDate(month, dateKey) {
   }
 }
 
-// ==========================================
-// 7つのボタンに対応するスケジュール一括・単独アクション処理
-// ==========================================
 function applyScheduleAction(month, actionType) {
   const isMulti = planMultiSelectModes[month];
   const selections = planCalendarSelections[month] || [];
@@ -818,12 +826,10 @@ function applyScheduleAction(month, actionType) {
     return;
   }
 
-  // ターゲット日付の決定（複数選択なら選択された全日付、単独なら直近操作日またはアラート）
   let targetDates = [];
   if (isMulti) {
     targetDates = [...selections];
   } else {
-    // 単独モードの場合、直近で選択されているか、本日の日付などをデフォルトにする
     const defaultDate = getPlanReleaseDefaultWednesday(month);
     targetDates = [defaultDate];
     alert('単独モードです。カレンダーの各日付を直接タップしてライブ日等に設定するか、複数選択モードをONにして一括設定してください。');
@@ -853,7 +859,7 @@ function applyScheduleAction(month, actionType) {
     const relInput = document.getElementById(`rel-date-${month}`);
     const selRel = document.getElementById(`sel-rel-${month}`);
     if (relInput && targetDates.length > 0) {
-      relInput.value = targetDates[0]; // 発売日は最初の日付
+      relInput.value = targetDates[0];
       if (selRel && selRel.value === 'none') selRel.value = 'single';
       updateReleaseDateOptions(month);
     }
@@ -880,7 +886,6 @@ function applyScheduleAction(month, actionType) {
       refreshPlanEventsContainer(month);
     }
   } else if (actionType === 'release-live') {
-    // CD発売日 ＋ ライブ日を同時に設定
     if (targetDates.length > 0) {
       const relInput = document.getElementById(`rel-date-${month}`);
       const selRel = document.getElementById(`sel-rel-${month}`);
@@ -909,7 +914,6 @@ function applyScheduleAction(month, actionType) {
       }
     }
   } else if (actionType === 'delete') {
-    // 選択された日付の予定（ライブ日・特典イベント・発売日）をクリア
     targetDates.forEach(d => {
       const slots = readLiveSlotInputs(month);
       slots.forEach(slot => {
@@ -935,12 +939,10 @@ function applyScheduleAction(month, actionType) {
     });
   }
 
-  // 選択状態をリセットして再描画
   planCalendarSelections[month] = [];
   renderEmbeddedPlanCalendars();
 }
 
-// プレースホルダー関数
 function openPlanCalendar() {}
 function closePlanCalendar() {}
 function renderPlanCalendarGrid() {}
@@ -1068,9 +1070,7 @@ function openPlanningCalendar() {
   openPlanningManual();
 }
 
-// ==========================================
 // セーブ・ロード管理
-// ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
