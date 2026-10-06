@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・タイトル画面完全復旧版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・正規表現修正完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -479,7 +479,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
-    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (yearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
@@ -1022,233 +1022,20 @@ function saveDecisionPlan() {
     }
   }
 
-  try {
-    if (typeof generateRivalsAndGeneralSchedule === 'function') {
-      generateRivalsAndGeneralSchedule(planYearTarget, planStartM, false);
-    }
-  } catch (err) {
-    console.warn('Rival schedule generation on save error:', err);
-  }
-
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、新しいスケジュールが反映されました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   updateUI();
 }
 
 function openPlanningManual() {
-  if (currentYear === 1 && currentMonth < 7) {
-    alert('1年目上半期（1〜6月）は初期プリセットスケジュールで固定運用されます。\nプレイヤー自身の計画策定は1年目下半期（7〜12月）からとなります。');
-    return;
-  }
-  
-  if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
-    openDecisionModal(`${currentYear}年下半期（7〜12月）の計画策定`, currentYear, 7, 12);
+  if (currentMonth >= 7) {
+    openDecisionModal('翌年1月〜6月の計画策定', currentYear + 1, 1, 6);
   } else {
-    openDecisionModal(`${currentYear + 1}年上半期（1〜6月）の計画策定`, currentYear + 1, 1, 6);
+    openDecisionModal('当年1月〜6月の計画策定', currentYear, 1, 6);
   }
 }
 
 function openPlanningCalendar() {
   openPlanningManual();
-}
-
-// ==========================================
-// 🌟 タイトル画面・セーブ枠管理・ロード関連関数（完全復旧）
-// ==========================================
-function getSaveSlotSummary(slotKey) {
-  try {
-    const raw = localStorage.getItem(slotKey);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    return {
-      year: data.currentYear || 1,
-      month: data.currentMonth || 1,
-      week: data.currentWeek || 1,
-      date: data.gameDate || '',
-      memberCount: Array.isArray(data.idolRoster) ? data.idolRoster.length : 0,
-      funds: Number(data.funds) || 0,
-      savedAt: data.savedAt ? new Date(data.savedAt).toLocaleString() : '日時不明'
-    };
-  } catch (e) {
-    return { isCorrupt: true };
-  }
-}
-
-function saveSlotKey(slot) {
-  return `idol_manager_save_slot_${slot}`;
-}
-
-function renderSaveSlots() {
-  const container = document.getElementById('save-slots');
-  if (!container) return;
-  container.innerHTML = '';
-  const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
-
-  for (let slot = 1; slot <= slotCount; slot++) {
-    const slotKey = saveSlotKey(slot);
-    const summary = getSaveSlotSummary(slotKey);
-    const isCorrupt = summary?.isCorrupt;
-    const hasData = Boolean(summary && !isCorrupt);
-
-    const slotCard = document.createElement('section');
-    slotCard.className = 'save-slot';
-    slotCard.innerHTML = `
-      <div class="save-slot-heading">
-        <h2>セーブ枠 ${slot}</h2>
-        ${hasData ? '<span>保存済み</span>' : ''}
-      </div>
-      <div class="save-slot-info">
-        ${isCorrupt
-          ? '<span style="color:#c0392b;">セーブデータが破損しています。削除してください。</span>'
-          : hasData
-            ? `${summary.year}年目 ${summary.month}月 第${summary.week}週<br>` +
-              `${summary.date ? `${new Date(`${summary.date}T12:00:00`).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' })}<br>` : ''}` +
-              `所属 ${summary.memberCount}名 / 資金 ${formatMoney(summary.funds)}<br>` +
-              `<small style="color:#888;">最終保存: ${summary.savedAt}</small>`
-            : '<span style="color:#888;">空き枠</span>'}
-      </div>
-      <div class="save-slot-actions">
-        ${hasData
-          ? `<button class="main-btn" type="button" onclick="continueSavedGame(${slot})">続きから</button>` +
-            `<button class="danger-btn" type="button" onclick="startNewGame(${slot})">新規開始</button>` +
-            `<button class="danger-btn slot-delete-btn" type="button" onclick="deleteSaveSlot(${slot})">削除</button>`
-          : isCorrupt
-            ? `<button class="danger-btn slot-delete-btn" type="button" onclick="deleteSaveSlot(${slot})">削除</button>`
-            : `<button class="main-btn" type="button" onclick="startNewGame(${slot})">新規開始</button>`}
-      </div>
-    `;
-    container.appendChild(slotCard);
-  }
-}
-
-function continueSavedGame(slot) {
-  initGame(slot, false);
-}
-
-function startNewGame(slot) {
-  const slotKey = saveSlotKey(slot);
-  if (localStorage.getItem(slotKey)) {
-    if (!confirm(`セーブ枠 ${slot} のデータを上書きして新しくゲームを開始しますか？`)) {
-      return;
-    }
-  }
-  initGame(slot, true);
-}
-
-function deleteSaveSlot(slot) {
-  if (!confirm(`セーブ枠 ${slot} のデータを完全に削除しますか？\nこの操作は取り消せません。`)) {
-    return;
-  }
-  localStorage.removeItem(saveSlotKey(slot));
-  renderSaveSlots();
-}
-
-function openTitleScreen() {
-  const gScreen = document.getElementById('game-screen');
-  const tScreen = document.getElementById('title-screen');
-  if (gScreen) gScreen.hidden = true;
-  if (tScreen) tScreen.hidden = false;
-  renderSaveSlots();
-}
-
-function returnToTitle() {
-  activeSaveSlot = null;
-  openTitleScreen();
-}
-
-function initGame(slot, startFresh) {
-  const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
-  if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
-  activeSaveSlot = slot;
-
-  if (startFresh) {
-    if (typeof initializeNewGameState === 'function') initializeNewGameState();
-  } else {
-    const raw = localStorage.getItem(saveSlotKey(slot));
-    if (raw) {
-      try {
-        const data = JSON.parse(raw);
-        if (!data || typeof data !== 'object') {
-          throw new Error('セーブデータの形式が無効です。');
-        }
-
-        data.rivalLiveBookings = Array.isArray(data.rivalLiveBookings) ? data.rivalLiveBookings : [];
-        data.productionSchedule = (data.productionSchedule && typeof data.productionSchedule === 'object') ? data.productionSchedule : {};
-        data.idolRoster = Array.isArray(data.idolRoster) ? data.idolRoster : [];
-        data.funds = Number.isFinite(data.funds) ? data.funds : 10000000;
-
-        if (typeof applySavedGame === 'function') {
-          applySavedGame(data);
-        } else {
-          currentYear = data.currentYear || 1;
-          currentMonth = data.currentMonth || 1;
-          currentWeek = data.currentWeek || 1;
-          funds = data.funds;
-          rivalLiveBookings = data.rivalLiveBookings;
-          productionSchedule = data.productionSchedule;
-        }
-      } catch (e) {
-        console.warn('セーブデータ読込時の警告・自動修復:', e);
-        if (typeof initializeNewGameState === 'function') initializeNewGameState();
-      }
-    } else {
-      if (typeof initializeNewGameState === 'function') initializeNewGameState();
-    }
-  }
-
-  const tScreen = document.getElementById('title-screen');
-  const gScreen = document.getElementById('game-screen');
-  if (tScreen) tScreen.hidden = true;
-  if (gScreen) gScreen.hidden = false;
-
-  const slotLabel = document.getElementById('active-slot-label');
-  if (slotLabel) slotLabel.textContent = `セーブ枠 ${slot}`;
-
-  if (typeof renderPageNav === 'function') {
-    renderPageNav('office');
-  }
-
-  try {
-    updateUI();
-  } catch (e) {
-    console.warn('Initial updateUI warning:', e);
-  }
-
-  if (startFresh) {
-    if (typeof generateRivalsAndGeneralSchedule === 'function' && (!rivalLiveBookings || rivalLiveBookings.length === 0)) {
-      generateRivalsAndGeneralSchedule(1, 1, true);
-    }
-  } else {
-    if (typeof openPendingModal === 'function') {
-      openPendingModal();
-    }
-  }
-}
-
-function migrateLegacySave() {
-  const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
-  if (!legacySave) return;
-  const slotOneKey = saveSlotKey(1);
-  if (localStorage.getItem(slotOneKey)) {
-    localStorage.removeItem(LEGACY_SAVE_KEY);
-    return;
-  }
-  try {
-    JSON.parse(legacySave);
-    localStorage.setItem(slotOneKey, legacySave);
-    localStorage.removeItem(LEGACY_SAVE_KEY);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  migrateLegacySave();
-  renderSaveSlots();
-});
-
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  migrateLegacySave();
-  renderSaveSlots();
 }
