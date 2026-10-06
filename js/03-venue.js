@@ -2,27 +2,27 @@
 // 情報メディア（実績を報道する番組・サイト）
 // ライブ後・CD発売後にメディアが掲載され、実績が告知される
 // ==========================================
-// メディア定義：fame=人気, fans=新規ファン, fee=出演料/記事料
+// メディア定義：fans=新規ファン獲得係数, fee=出演料/記事料
 const INFO_MEDIA = {
   thehour: {
     id: 'thehour', name: 'The Hour', isWeb: false, kind: 'live',
-    fame: 10, fans: 0.05, fee: 0, label: '番組'
+    fans: 0.05, fee: 0, label: '番組'
   },
   gutenmorgen: {
     id: 'gutenmorgen', name: 'グーテンモルゲン', isWeb: false, kind: 'release',
-    fame: 8, fans: 0.15, fee: 2000000, label: '番組'
+    fans: 0.15, fee: 2000000, label: '番組'
   },
   web: {
     id: 'web', name: 'アイドルWebメディア', isWeb: true, kind: 'both',
-    fame: 4, fans: 0.08, fee: 0, label: 'サイト'
+    fans: 0.08, fee: 0, label: 'サイト'
   },
   stacon: {
     id: 'stacon', name: 'スタコン', isWeb: true, kind: 'release',
-    fame: 5, fans: 0.12, fee: 0, label: 'ファンサイト'
+    fans: 0.12, fee: 0, label: 'ファンサイト'
   },
   kahoo: {
     id: 'kahoo', name: 'kahoo news', isWeb: true, kind: 'live',
-    fame: 5, fans: 0.10, fee: 0, label: 'ニュースサイト'
+    fans: 0.10, fee: 0, label: 'ニュースサイト'
   }
 };
 
@@ -33,8 +33,12 @@ const INFO_MEDIA_DELAY = {
 // 情報メディアで得られる楽曲経験値
 const INFO_MEDIA_SONG_EXPERIENCE = 20;
 
-// 🌟 メディア出演・報道時に各メンバーに付与する経験値の量（5000ポイント）
-const INFO_MEDIA_STAT_EXP_REWARD = 5000;
+// メディア出演・報道時に付与する個別経験値（歌・ダンス各3000、人気5000）
+const INFO_MEDIA_EXP_REWARDS = {
+  vocal: 3000,
+  dance: 3000,
+  popularity: 5000
+};
 
 // 現在のセンター名（年齢つき）
 function getCurrentCenterText() {
@@ -93,7 +97,7 @@ function scheduleInfoMedia(kind, payload) {
   airDate.setDate(airDate.getDate() + delay);
   const summary = calculateTeamAverages();
   const scale = 0.7 + summary.overall / 100;
-  const fameGain = Math.round(media.fame * scale);
+  
   const base = kind === 'live' ? (payload.audience || 0) : (payload.sales || 0);
   const bonusFans = Math.round(base * media.fans);
   const fee = Math.round(media.fee * scale);
@@ -120,30 +124,23 @@ function scheduleInfoMedia(kind, payload) {
     songTitle: payload.songTitle || '',
     centerText: payload.centerText || '',
     songId: payload.songId || null,
-    fameGain,
     bonusFans,
     fee
   });
   return scheduledPerformances[scheduledPerformances.length - 1];
 }
 
-// 情報メディアの放送／掲載を処理する（🌟 人気の代わりに5000経験点を付与）
+// 情報メディアの放送／掲載を処理する（🌟 経験点付与は裏で行い、ログからは除外）
 function processInfoMedia(performance) {
   const media = INFO_MEDIA[performance.mediaId] || INFO_MEDIA.web;
   
-  // 🌟 選抜メンバー全員（またはロスター全員）に各能力経験値を5000ずつ付与
   const selected = idolRoster.filter(member => member.isSelected);
   const participants = selected.length ? selected : idolRoster;
   
-  let totalExpGained = 0;
   participants.forEach(member => {
-    // STATUS_KEYSに定義されているすべての能力に対して5000経験点を加算
-    if (typeof STATUS_KEYS !== 'undefined') {
-      STATUS_KEYS.forEach(k => {
-        addMemberStatExp(member, k.id, INFO_MEDIA_STAT_EXP_REWARD);
-        totalExpGained += INFO_MEDIA_STAT_EXP_REWARD;
-      });
-    }
+    Object.entries(INFO_MEDIA_EXP_REWARDS).forEach(([statId, amount]) => {
+      addMemberStatExp(member, statId, amount);
+    });
   });
 
   const fee = performance.fee || 0;
@@ -155,9 +152,12 @@ function processInfoMedia(performance) {
   
   fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + (performance.bonusFans || 0));
   const article = buildInfoMediaArticle(media, performance);
-  const result = `（メンバー全員の各能力に経験点 +${INFO_MEDIA_STAT_EXP_REWARD.toLocaleString()}pt / 新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
+  
+  // 🌟 ログからは経験点の表記を削除し、新規ファンとギャラのみに整理
+  const result = `（新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
   setLog(`【${media.label}】${article}${result}`);
 }
+
 // 1か月の計画から、メインライブ＋追加ライブの開催情報を列挙する
 // （旧セーブで保存された単一ライブ形式もそのまま扱える）
 function getMonthLiveEntries(plan) {
