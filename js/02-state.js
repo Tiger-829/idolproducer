@@ -211,9 +211,9 @@ let idolRoster = [];
 function createInitialProductionSchedule() {
   const baseYear = calendarYear || new Date().getFullYear();
   const schedule = {};
-  schedule[`1-2`] = { release: 'single', songName: 'SnowDrops', releaseDate: `${baseYear}-02-18`, releaseBenefit: 'none', liveVenue: null };
-  schedule[`1-6`] = { release: 'single', songName: 'アジサイと風鈴', releaseDate: `${baseYear}-06-17`, releaseBenefit: 'none', liveVenue: null };
-  schedule[`1-5`] = { release: 'none', songName: '', liveVenue: INITIAL_LIVE_VENUE || '原宿体育館', liveName: 'Debut Live', liveDate: `${baseYear}-05-16`, liveDates: [`${baseYear}-05-17`], streamDates: [`${baseYear}-05-16`, `${baseYear}-05-17`] };
+  schedule[`1-2`] = { release: 'single', songName: 'SnowDrops', releaseDate: `${baseYear}-02-17`, releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-6`] = { release: 'single', songName: 'アジサイと風鈴', releaseDate: `${baseYear}-06-16`, releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-5`] = { release: 'none', songName: '', liveVenue: INITIAL_LIVE_VENUE || '原宿体育館', liveName: 'Debut Live', liveDate: `${baseYear}-05-15`, liveDates: [`${baseYear}-05-16`], streamDates: [`${baseYear}-05-16`, `${baseYear}-05-17`] };
   return schedule;
 }
 
