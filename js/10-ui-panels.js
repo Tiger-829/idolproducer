@@ -21,7 +21,6 @@ if (typeof currentPageTab === 'undefined') {
   window.currentPageTab = window.DEFAULT_PAGE || 'office';
 }
 
-// アイコンSVG安全フォールバック
 function safeGetIconSvg(iconName) {
   if (typeof getIconSvg === 'function') {
     try {
@@ -42,7 +41,6 @@ function safeGetIconSvg(iconName) {
   return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
-// タブナビゲーション描画・同期
 function renderPageNav(activePage) {
   const tabs = (typeof PAGE_TABS !== 'undefined') ? PAGE_TABS : window.PAGE_TABS;
   const def = (typeof DEFAULT_PAGE !== 'undefined') ? DEFAULT_PAGE : 'office';
@@ -87,7 +85,6 @@ function switchPage(page) {
   }
 }
 
-// 業界順位集計
 function getRivalTeamPower(team) {
   const base = team?.basePower || 0;
   const growth = (team?.sales || 0) / 200000;
@@ -171,7 +168,6 @@ function renderRankingPanel() {
   }).join('');
 }
 
-// 事務所アクションパネル（スケジュールUI表示スイッチ）
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -498,9 +494,6 @@ function getIndividualLessonMemberOptions() {
   return center ? [center, ...rest] : rest;
 }
 
-// ==========================================
-// 事務所のカレンダー（月切替 ＆ 日付クリックポップアップ対応）
-// ==========================================
 let officeCalendarViewYear = null;
 let officeCalendarViewMonth = null;
 
@@ -581,7 +574,6 @@ function shiftOfficeCalendarMonth(delta) {
   renderGameCalendar();
 }
 
-// 指定した日付に該当する自他グループの予定をすべて収集
 function getEventsForDate(dateKey) {
   const events = [];
 
@@ -744,7 +736,6 @@ function renderGameCalendar() {
       broadcastName ? `テレビ出演: ${broadcastName}` : ''
     ].filter(Boolean).join(' / ');
     
-    // 🌟 日付セルクリックで予定ポップアップを表示する機能を追加
     cells += `<span class="${classes}" style="cursor:pointer;" onclick="handleCalendarDayClick('${dateKey}')"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
   }
 
@@ -771,7 +762,6 @@ function renderGameCalendar() {
   }
 }
 
-// 事務所設備管理（アップグレード・ダウングレード全機能完全版）
 if (typeof OFFICE_COST_GROWTH === 'undefined') window.OFFICE_COST_GROWTH = 1.9;
 if (typeof OFFICE_MAINTENANCE_GROWTH === 'undefined') window.OFFICE_MAINTENANCE_GROWTH = 1.6;
 
@@ -875,7 +865,6 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャー管理（スキル・解雇・完全版）
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -970,7 +959,6 @@ function renderManagerPanel() {
   }).join('');
 }
 
-// マネージャー市場（採用・完全版）
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
@@ -1020,7 +1008,6 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
-// 給与パネル描画（完全版）
 function renderSalaryPanel() {
   const setText = (id, value) => {
     const element = document.getElementById(id);
