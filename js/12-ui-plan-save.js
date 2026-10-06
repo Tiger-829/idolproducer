@@ -11,7 +11,7 @@ let planCalendarSelections = {};
 
 // 🌟 新規ゲーム初期設定用のカスタム保持変数
 let pendingActiveSlot = null;
-let customGroupName = "";
+let customGroupName = "スタースコープ";
 let customFirstSong = "雪どけ";
 let customSecondSong = "なつみかん";
 let customFirstLiveName = "Debut Live";
