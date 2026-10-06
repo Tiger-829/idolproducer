@@ -1,213 +1,31 @@
 // ==========================================
-// 定数・マスターデータ
-// ==========================================
-// ==========================================
-// 1. 定数・マスターデータ
+// 1. 定数・マスターデータ・計算ロジック（完全版）
 // ==========================================
 
 // 苗字上位189件
 const SURNAMES_TOP200 = [
-  "佐藤",
-  "鈴木",
-  "高橋",
-  "田中",
-  "伊藤",
-  "渡辺",
-  "山本",
-  "中村",
-  "小林",
-  "加藤",
-  "吉田",
-  "山田",
-  "佐々木",
-  "山口",
-  "松本",
-  "井上",
-  "木村",
-  "林",
-  "斎藤",
-  "清水",
-  "山崎",
-  "森",
-  "池田",
-  "橋本",
-  "阿部",
-  "石川",
-  "山下",
-  "中島",
-  "石井",
-  "小川",
-  "前田",
-  "岡田",
-  "長谷川",
-  "藤田",
-  "後藤",
-  "近藤",
-  "村上",
-  "遠藤",
-  "青木",
-  "坂本",
-  "斉藤",
-  "福田",
-  "藤井",
-  "西村",
-  "三浦",
-  "岡本",
-  "松田",
-  "中川",
-  "中野",
-  "原田",
-  "小野",
-  "田村",
-  "竹内",
-  "金子",
-  "和田",
-  "中山",
-  "石田",
-  "上田",
-  "森田",
-  "原",
-  "柴田",
-  "酒井",
-  "工藤",
-  "横山",
-  "宮崎",
-  "宮本",
-  "内田",
-  "高木",
-  "安藤",
-  "谷口",
-  "大野",
-  "丸山",
-  "今井",
-  "高田",
-  "河野",
-  "藤原",
-  "武田",
-  "村田",
-  "上野",
-  "杉山",
-  "増田",
-  "平野",
-  "大塚",
-  "千葉",
-  "久保",
-  "松井",
-  "小島",
-  "岩崎",
-  "桜井",
-  "野口",
-  "松尾",
-  "菊地",
-  "野村",
-  "新井",
-  "渡部",
-  "本田",
-  "吉川",
-  "菅原",
-  "矢野",
-  "市川",
-  "大久保",
-  "黒田",
-  "杉田",
-  "白井",
-  "黒川",
-  "青山",
-  "菊池",
-  "西尾",
-  "長田",
-  "森下",
-  "小野寺",
-  "岩本",
-  "桜田",
-  "大橋",
-  "平松",
-  "中谷",
-  "中井",
-  "浜田",
-  "市原",
-  "坂東",
-  "諸星",
-  "萩原",
-  "土屋",
-  "桐生",
-  "星野",
-  "桑原",
-  "坂口",
-  "大坪",
-  "堀内",
-  "荒木",
-  "黒木",
-  "白石",
-  "畑中",
-  "堀江",
-  "松永",
-  "西岡",
-  "井口",
-  "栗原",
-  "園田",
-  "柏木",
-  "迫",
-  "田代",
-  "秋山",
-  "河村",
-  "岸本",
-  "大島",
-  "榎本",
-  "神田",
-  "須田",
-  "倉田",
-  "金城",
-  "滝沢",
-  "大川",
-  "吉村",
-  "安田",
-  "小笠原",
-  "菅野",
-  "片桐",
-  "大竹",
-  "川島",
-  "古川",
-  "栗田",
-  "中田",
-  "永田",
-  "小池",
-  "沖田",
-  "大原",
-  "宮田",
-  "川端",
-  "谷本",
-  "石原",
-  "小田",
-  "平田",
-  "栗林",
-  "松浦",
-  "山内",
-  "吉岡",
-  "高松",
-  "山中",
-  "大村",
-  "小西",
-  "福島",
-  "堀",
-  "荒井",
-  "大森",
-  "阿久津",
-  "内藤",
-  "高瀬",
-  "浦山",
-  "落合",
-  "宮島",
-  "浅野",
-  "浜口",
-  "矢島",
-  "瀬川",
-  "坂田",
-  "黒沢",
-  "根岸",
-  "栗栖",
-  "川畑",
+  "佐藤", "鈴木", "高橋", "田中", "伊藤", "渡辺", "山本", "中村", "小林", "加藤",
+  "吉田", "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水",
+  "山崎", "森", "池田", "橋本", "阿部", "石川", "山下", "中島", "石井", "小川",
+  "前田", "岡田", "長谷川", "藤田", "後藤", "近藤", "村上", "遠藤", "青木", "坂本",
+  "斉藤", "福田", "藤井", "西村", "三浦", "岡本", "松田", "中川", "中野", "原田",
+  "小野", "田村", "竹内", "金子", "和田", "中山", "石田", "上田", "森田", "原",
+  "柴田", "酒井", "工藤", "横山", "宮崎", "宮本", "内田", "高木", "安藤", "谷口",
+  "大野", "丸山", "今井", "高田", "河野", "藤原", "武田", "村田", "上野", "杉山",
+  "増田", "平野", "大塚", "千葉", "久保", "松井", "小島", "岩崎", "桜井", "野口",
+  "松尾", "菊地", "野村", "新井", "渡部", "本田", "吉川", "菅原", "矢野", "市川",
+  "大久保", "黒田", "杉田", "白井", "黒川", "青山", "菊池", "西尾", "長田", "森下",
+  "小野寺", "岩本", "桜田", "大橋", "平松", "中谷", "中井", "浜田", "市原", "坂東",
+  "諸星", "萩原", "土屋", "桐生", "星野", "桑原", "坂口", "大坪", "堀内", "荒木",
+  "黒木", "白石", "畑中", "堀江", "松永", "西岡", "井口", "栗原", "園田", "柏木",
+  "迫", "田代", "秋山", "河村", "岸本", "大島", "榎本", "神田", "須田", "倉田",
+  "金城", "滝沢", "大川", "吉村", "安田", "小笠原", "菅野", "片桐", "大竹", "川島",
+  "古川", "栗田", "中田", "永田", "小池", "沖田", "大原", "宮田", "川端", "谷本",
+  "石原", "小田", "平田", "栗林", "松浦", "山内", "吉岡", "高松", "山中", "大村",
+  "小西", "福島", "堀", "荒井", "大森", "阿久津", "内藤", "高瀬", "浦山", "落合",
+  "宮島", "浅野", "浜口", "矢島", "瀬川", "坂田", "黒沢", "根岸", "栗栖", "川畑"
 ];
+
 // 女性の読み上位199個 ＆ 漢字候補
 const FEMALE_READINGS_MAP = {
   "えま": ["咲茉", "依舞", "愛真", "絵麻", "えま"],
@@ -244,7 +62,7 @@ const FEMALE_READINGS_MAP = {
   "ゆず": ["柚", "柚子", "優寿", "ゆず"],
   "みれい": ["美玲", "美麗", "未麗", "みれい"],
   "みゆ": ["美優", "未悠", "実優", "心結", "みゆ"],
-  "しおり": ["詩織", "栞", "汐里", "史緒里","しおり"],
+  "しおり": ["詩織", "栞", "汐里", "史緒里", "しおり"],
   "まい": ["麻衣", "舞", "真衣", "まい"],
   "みさき": ["美咲", "実咲", "海咲", "みさき"],
   "まな": ["愛菜", "真菜", "愛", "まな"],
@@ -253,7 +71,7 @@ const FEMALE_READINGS_MAP = {
   "ちひろ": ["千尋", "千裕", "千紘", "ちひろ"],
   "みおり": ["澪莉", "美織", "心織", "みおり"],
   "かんな": ["環奈", "栞奈", "柑奈", "かんな"],
-  "ゆめ": [ "優芽", "結愛", "ゆめ"],
+  "ゆめ": ["優芽", "結愛", "ゆめ"],
   "あやね": ["綾音", "彩音", "絢音", "あやね"],
   "るな": ["瑠奈", "月", "流奈", "るな"],
   "はるか": ["春香", "遥香", "晴香", "悠華", "はるか"],
@@ -271,7 +89,7 @@ const FEMALE_READINGS_MAP = {
   "このか": ["好花", "心香", "このか"],
   "ほなみ": ["穂波", "保奈美", "ほなみ"],
   "ねね": ["寧々", "音々", "ねね"],
-  "うた": ["詩",  "羽多", "うた"],
+  "うた": ["詩", "羽多", "うた"],
   "おとは": ["乙葉", "音羽", "おとは"],
   "ももか": ["百花", "萌々香", "桃香", "ももか"],
   "なな": ["奈々", "菜々", "なな"],
@@ -303,55 +121,56 @@ const FEMALE_READINGS_MAP = {
   "ゆき": ["雪", "由紀", "優希", "ゆき"],
   "りか": ["梨花", "里香", "理香", "りか"],
   "みさ": ["美佐", "海砂", "実沙", "みさ"],
-  "はるの": ["春乃","はるの"],
+  "はるの": ["春乃", "はるの"],
   "たまき": ["環", "珠貴", "たまき"],
   "あや": ["彩", "綾", "絢", "あや"],
   "れな": ["玲奈", "麗奈", "怜菜", "れな"],
-  "あいな": ["愛菜",  "あいな"],
+  "あいな": ["愛菜", "あいな"],
   "あき": ["亜希", "あき"],
-  "あずみ": ["あず美","あずみ"],
+  "あずみ": ["あず美", "あずみ"],
   "あん": ["杏", "あん"],
   "いおり": ["織", "衣織", "いおり"],
   "いづみ": ["泉", "和泉", "いづみ"],
   "うつぎ": ["空芽", "うつぎ"],
   "うらら": ["浦良", "うらら"],
-  "えり": ["恵里",  "えり"],
-  "えみ": ["恵美",  "えみ"],
-  "かえで": ["楓",  "かえで"],
-  "かおり": ["香","香織",  "かおり"],
-  "かおる": ["薫",  "かおる"],
+  "えり": ["恵里", "えり"],
+  "えみ": ["恵美", "えみ"],
+  "かえで": ["楓", "かえで"],
+  "かおり": ["香", "香織", "かおり"],
+  "かおる": ["薫", "かおる"],
   "かげ": ["陽炎", "かげ"],
-  "かな": ["叶",  "かな"],
+  "かな": ["叶", "かな"],
   "きよ": ["清代", "きよ"],
   "くみ": ["久美", "くみ"],
   "くれは": ["呉葉", "くれは"],
   "さき": ["咲希", "さき"],
   "とき": ["季", "時", "とき"],
   "なほ": ["奈穂", "なほ"],
-  "にこ": ["仁子",  "にこ"],
+  "にこ": ["仁子", "にこ"],
   "ふゆ": ["冬", "ふゆ"],
-  "みき": ["美紀",  "みき"],
-  "みな": ["美奈",  "みな"],
+  "みき": ["美紀", "みき"],
+  "みな": ["美奈", "みな"],
   "もか": ["桃花", "もか"],
   "もも": ["桃", "もも"],
-  "ゆあ": ["優亜",  "ゆあ"],
-  "ゆかり": ["ゆかり",  "由香里"],
-  "よい": ["良依",  "よい"],
-  "らら": ["良々",  "らら"],
-  "りさ": ["里沙",  "りさ"],
-  "わか": ["若","和歌",  "わか"],
-  "あい": ["愛",  "あい"],
+  "ゆあ": ["優亜", "ゆあ"],
+  "ゆかり": ["ゆかり", "由香里"],
+  "よい": ["良依", "よい"],
+  "らら": ["良々", "らら"],
+  "りさ": ["里沙", "りさ"],
+  "わか": ["若", "和歌", "わか"],
+  "あい": ["愛", "あい"],
   "ひなの": ["ひなの"],
-  "まや": ["真矢",  "まや"],
+  "まや": ["真矢", "まや"],
   "みう": ["美羽", "みう"],
-  "もこ": ["桃子",  "もこ"],
+  "もこ": ["桃子", "もこ"],
   "わこ": ["和子", "わこ"],
   "うめ": ["梅", "うめ"],
   "あきな": ["秋奈", "あきな"],
   "いさき": ["壮希", "いさき"],
-  "うめこ": ["梅子", "うめこ"],
-  };
-// 14ステータス定義（体力の次に回復力・連携力を追加）
+  "うめこ": ["梅子", "うめこ"]
+};
+
+// 14ステータス定義
 const STATUS_KEYS = [
   { id: 'popularity', name: '人気' },
   { id: 'style',      name: 'スタイル' },
@@ -369,32 +188,26 @@ const STATUS_KEYS = [
   { id: 'coordination', name: '連携力' }
 ];
 
-// レッスンで育成する12個の固定能力（人気と体力値は別枠で扱うため除く）
 const MEMBER_STAT_GROUPS = [
-  { label: '表現',   ids: ['style', 'fashion', 'vocal', 'dance', 'coordination'] },
-  { label: '体調',   ids: ['recovery', 'athletics'] },
+  { label: '表現',    ids: ['style', 'fashion', 'vocal', 'dance', 'coordination'] },
+  { label: '体調',    ids: ['recovery', 'athletics'] },
   { label: '応対力', ids: ['talk', 'sns', 'variety', 'academics', 'crisis'] }
 ];
-// 「表現」5能力＋「体調」2能力＝7能力をアイドル力として定義する
+
 const IDOL_POWER_STATS = MEMBER_STAT_GROUPS
   .filter(group => group.label === '表現' || group.label === '体調')
   .reduce((list, group) => list.concat(group.ids), []);
 
-// スタイル（身長連動）とファッションの下限値
-// スタイルは身長に比例し、身長が伸びたときだけ上がる（下がらない）
 const MEMBER_STYLE_MIN = 55;
 const MEMBER_STYLE_PER_CM = 1.5;
-// ファッションは初期値が高く、下限も60
 const MEMBER_FASHION_MIN = 60;
-// 14〜17歳は確率で身長が年1%伸びる（伸びた分だけスタイルも上がる）
 const HEIGHT_GROWTH_AGE_MIN = 14;
 const HEIGHT_GROWTH_AGE_MAX = 17;
 const HEIGHT_GROWTH_CHANCE = 0.5;
 const HEIGHT_GROWTH_RATE = 0.01;
 
-// 全37会場データ
 const VENUE_DATA = [
-  { name: "函館ドーム",       cap: "S",  ease: "C" },
+  { name: "函館ドーム",      cap: "S",  ease: "C" },
   { name: "札幌アリーナ",     cap: "C",  ease: "B" },
   { name: "パルス真駒内",     cap: "D",  ease: "B" },
   { name: "仙台球場",         cap: "B",  ease: "B" },
@@ -433,28 +246,16 @@ const VENUE_DATA = [
   { name: "那覇アリーナ",     cap: "C",  ease: "B" }
 ];
 
-// 1月あたりに開催できるライブ回数の上限（メインライブを含む）
-// 画面アイコン（外部アセット不要のためインラインSVGで描画する）
 const ICONS = {
-  // グループ：ステージ
   group: '<path d="M4 20h16"/><path d="M6 20V11l6-4 6 4v9"/><path d="M10 20v-4h4v4"/>',
-  // 編成：名簿
   formation: '<circle cx="8" cy="8" r="3"/><path d="M3 20c0-3 2.2-5 5-5s5 2 5 5"/><path d="M15 8h6"/><path d="M15 12h6"/><path d="M15 16h4"/>',
-  // 事務所：建物
   office: '<path d="M4 21V6l7-3 7 3v15"/><path d="M9 21v-4h4v4"/><path d="M8 9h1M8 13h1M13 9h1M13 13h1"/>',
-  // 資金：財布
   funds: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="17" cy="14.5" r="1.4"/>',
-  // 順位：トロフィー
   ranking: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5a2.5 2.5 0 0 0 2.5 2.5M17 6h2.5a2.5 2.5 0 0 1-2.5 2.5"/><path d="M12 14v3"/><path d="M9 20h6"/><path d="M10 17h4l.5 3h-5z"/>',
-  // 記録：帳面
   records: '<path d="M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z"/><path d="M6 3v18"/><path d="M10 8h6M10 12h6"/>',
-  // 強化：上矢印
   upgrade: '<circle cx="12" cy="12" r="8"/><path d="M12 16V8"/><path d="M9 11l3-3 3 3"/>',
-  // ダウングレード：下矢印
   downgrade: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/><path d="M9 13l3 3 3-3"/>',
-  // 費用：コイン
   cost: '<circle cx="12" cy="12" r="8"/><path d="M12 7v10"/><path d="M9.5 10h4M9.5 14h4"/>',
-  // 売却額：返却矢印
   refund: '<circle cx="12" cy="12" r="8"/><path d="M8 12a4 4 0 0 1 6.5-3.1"/><path d="M16 12a4 4 0 0 1-6.5 3.1"/><path d="M14 7v2.5h-2.5M10 17v-2.5h2.5"/>'
 };
 
@@ -464,14 +265,10 @@ function getIconSvg(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
-// 1か月あたりの上限：会場は3つまで、その合計公演数は8公演まで
 const MAX_LIVE_VENUES_PER_MONTH = 3;
 const MAX_LIVE_SHOWS_PER_MONTH = 8;
-// 会場使用料のランク別単価（1日あたり・収容人数あたり）
 const VENUE_FEE_RATES = { SS: 3200, S: 3000, A: 2700, B: 2500, C: 2500, D: 2500 };
-// 長期興行は2日目以降の追加日が安くなる（日数-1）×この係数×1日料金
 const VENUE_EXTRA_DAY_RATE = 0.2;
-// 事務所設備の最大レベル
 const MAX_OFFICE_LEVEL = 10;
 
 const CAPACITY_MAP = { SS: 47500, S: 38500, A: 30000, B: 20000, C: 12500, D: 7500 };
@@ -481,14 +278,13 @@ const CD_BENEFITS = [
   { id: 'web-sign', name: 'ウェブサイン', cost: 4000000 },
   { id: 'real-sign', name: 'リアルサインイベント', cost: 10000000 }
 ];
-// 半年計画で日程を指定できるCD関連イベント（特典イベントとグッズ販売）
+
 const PLAN_EVENT_TYPES = [
   ...CD_BENEFITS.map(benefit => ({ id: benefit.id, name: benefit.name, cost: benefit.cost, kind: 'benefit' })),
   { id: 'goods', name: 'グッズ販売イベント', cost: 0, kind: 'goods' }
 ];
 const MAX_PLAN_EVENTS_PER_MONTH = 3;
 const DEFAULT_PLAN_EVENT_ID = 'web-greeting';
-// カレンダーからライブ日程を振ったときの既定会場（球場・ドームは予約が180日必要なため避ける）
 const DEFAULT_PLAN_VENUE_CAPS = ['B', 'C'];
 const PLAN_CALENDAR_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const SEAT_TYPES = [
@@ -500,17 +296,16 @@ const SEAT_TYPES = [
   { id: 'annotation', name: '注釈', optional: true },
   { id: 'stageBack', name: 'ステージバック', optional: true }
 ];
-// 席種が属する価格グループ（スタンドは全段同額）
+
 const SEAT_PRICE_GROUP = {
   arena: 'arena',
   stand1: 'stand', stand2: 'stand', stand3: 'stand', stand4: 'stand',
   annotation: 'annex', stageBack: 'annex'
 };
-// Bティアを基準にした標準席価格
 const STANDARD_SEAT_PRICE = { arena: 12000, stand: 11000, annex: 7000 };
-// 会場規模ティアの価格倍率（Bティア＝1.0）
 const VENUE_TIER_PRICE_RATE = { SS: 1.15, S: 1.1, A: 1.05, B: 1, C: 0.95, D: 0.9 };
 const VENUE_TIER_DEFAULT_PRICE_RATE = 1;
+
 const OFFICE_FACILITIES = [
   { id: 'lessons', name: 'レッスン', baseCost: 750000, baseMaintenance: 75000, effect: 'レッスン効果を強化' },
   { id: 'dormitory', name: '寮', baseCost: 1200000, baseMaintenance: 100000, effect: '育成時の体力回復を強化' },
@@ -519,6 +314,7 @@ const OFFICE_FACILITIES = [
   { id: 'liveProduction', name: 'ライブ演出', baseCost: 1800000, baseMaintenance: 150000, effect: 'ライブ動員を強化' },
   { id: 'merchandise', name: 'グッズ', baseCost: 1000000, baseMaintenance: 75000, effect: 'ライブでのグッズ収益を強化' }
 ];
+
 const INDIVIDUAL_EVENT_PROFILES = {
   merchandise: { name: 'グッズ', capacity: 160, popularityMultiplier: 2.0, snsMultiplier: 0.25 },
   'web-greeting': { name: 'ウェブ挨拶', capacity: 150, popularityMultiplier: 2.5, snsMultiplier: 0.35 },
@@ -526,13 +322,13 @@ const INDIVIDUAL_EVENT_PROFILES = {
   'web-sign': { name: 'ウェブサイン', capacity: 115, popularityMultiplier: 2.0, snsMultiplier: 0.3 },
   'real-sign': { name: 'リアルサイン', capacity: 55, popularityMultiplier: 1.0, snsMultiplier: 0.1 }
 };
-// 定例音楽番組（放送曜日は固定）
+
 const MUSIC_PROGRAMS = [
   { id: 'song-station', name: 'Song Station', weekday: 5, week: 2 },
   { id: 'ctv', name: 'CTV', weekday: 1, week: 3 },
   { id: 'm-con', name: 'Mコン', weekday: 2, week: 3 }
 ];
-// 年内の大型特番（固定日）。popularityMultiplier は定例番組への出演効果倍率
+
 const SPECIAL_BROADCASTS = [
   { id: 'graduation-sp', name: '卒業SP', month: 3, day: 9, popularityMultiplier: 4, songExperience: 30, appearanceFee: 3000000 },
   { id: 'newlife-sp', name: '新生活SP', month: 4, day: 8, popularityMultiplier: 4, songExperience: 30, appearanceFee: 3000000 },
@@ -541,23 +337,19 @@ const SPECIAL_BROADCASTS = [
   { id: 'christmas-sp', name: 'クリスマスSP', month: 12, day: 23, popularityMultiplier: 5, songExperience: 35, appearanceFee: 4500000 },
   { id: 'newyear-sp', name: '年越しSP', month: 12, day: 31, extraNextDay: true, popularityMultiplier: 8, songExperience: 60, appearanceFee: 10000000 }
 ];
-// 定例音楽番組の出演効果
+
 const REGULAR_PROGRAM_POPULARITY = 3;
 const REGULAR_PROGRAM_SONG_EXPERIENCE = 6;
 const REGULAR_PROGRAM_APPEARANCE_FEE = 300000;
-// 大型特番の出演打診を何週前に告知するか
 const SPECIAL_OFFER_LEAD_DAYS = 28;
-// 年末の大型イベント（赤白・大賞）の実施日
 const KOHAKU_DATE = { month: 12, day: 31 };
 const AWARD_DATE = { month: 12, day: 30 };
 
-// マネージャー制度
-// 効果の適用先はすべて「特別強化」（週間スケジュールの枠数そのものは点名制限なしで自由に組める）
 const MANAGER_SKILLS = [
-  { id: 'leadership',   name: '統率力',         effect: '連携力練習の効果を上げる' },
-  { id: 'scheduling',   name: 'スケジュール管理力', effect: '特別強化できる枠数を増やす' },
-  { id: 'mentalCare',   name: 'メンタルケア',    effect: '体力消費の抑制・疲労回復率の上昇' },
-  { id: 'riskControl',  name: 'リスクマネジメント', effect: '危機回避力の補正' }
+  { id: 'leadership',    name: '統率力',             effect: '連携力練習の効果を上げる' },
+  { id: 'scheduling',    name: 'スケジュール管理力', effect: '特別強化できる枠数を増やす' },
+  { id: 'mentalCare',    name: 'メンタルケア',       effect: '体力消費の抑制・疲労回復率の上昇' },
+  { id: 'riskControl',   name: 'リスクマネジメント', effect: '危機回避力の補正' }
 ];
 const MAX_MANAGER_LEVEL = 10;
 const MANAGER_SKILL_COST_BASE = 120000;
@@ -566,17 +358,13 @@ const MANAGER_HIRE_COST = 2000000;
 const MANAGER_HIRE_LIMIT = 5;
 const MANAGER_YEARLY_BASE = 300000;
 const MANAGER_YEARLY_PER_LEVEL = 15000;
-// マネージャー市場
-const MANAGER_MARKET_CANDIDATE_COUNT = 5;   // 求人人数
-const MANAGER_AGE_MIN = 25;                 // 候補者の年齢下限
-const MANAGER_AGE_MAX = 35;                 // 候補者の年齢上限
-const MANAGER_RESIGN_AGE_MIN = 40;          // 任意退職する年齢の下限
-const MANAGER_RESIGN_AGE_MAX = 45;          // 任意退職する年齢の上限
-const MANAGER_FIRE_MONTHS = 4;              // 解雇時に支払う月数
+const MANAGER_MARKET_CANDIDATE_COUNT = 5;
+const MANAGER_AGE_MIN = 25;
+const MANAGER_AGE_MAX = 35;
+const MANAGER_RESIGN_AGE_MIN = 40;
+const MANAGER_RESIGN_AGE_MAX = 45;
+const MANAGER_FIRE_MONTHS = 4;
 
-// 効果段階：在籍マネージャーの「項目別合計レベル」で判定（人数基準ではない）
-// 合計レベルが各しきい値に達するごとに段階が上がり、倍率も上がる
-// （最大合計は 5名 × Lv10 = 50）
 const MANAGER_LEVEL_TIERS = [
   { label: '極', min: 50, multiplier: 1.30 },
   { label: 'SS', min: 38, multiplier: 1.21 },
@@ -588,32 +376,22 @@ const MANAGER_LEVEL_TIERS = [
   { label: 'E',  min: 0,  multiplier: 1.00 }
 ];
 
-// メンバー年収（個人）
 const MEMBER_SALARY_FAN_FACTOR = 8;
 const MEMBER_SALARY_FAN_DAYS = 365;
 const MEMBER_SALARY_GROUP_GROWTH_FACTOR = 6;
 
-// 週間スケジュール（1週間＝7日×午前/午後＝14枠）
-// 曜日は「起点（水曜）の翌日」から「次の週の水曜の前日」までの順。
-// ゲームは毎週水曜に進むので、この並びが実際の1周に対応する。
 const WEEK_DAY_LABELS = ['木', '金', '土', '日', '月', '火', '水'];
 const WEEK_PERIOD_LABELS = ['午前', '午後'];
-const WEEK_SLOT_COUNT = WEEK_DAY_LABELS.length * WEEK_PERIOD_LABELS.length; // 14
-// 枠インデックス（0-13）から曜日・午前午後を求める
+const WEEK_SLOT_COUNT = WEEK_DAY_LABELS.length * WEEK_PERIOD_LABELS.length;
+
 function getWeekSlotDay(slotIndex) { return Math.floor(slotIndex / WEEK_PERIOD_LABELS.length); }
 function getWeekSlotPeriod(slotIndex) { return slotIndex % WEEK_PERIOD_LABELS.length; }
 function getWeekSlotLabel(slotIndex) {
   return `${WEEK_DAY_LABELS[getWeekSlotDay(slotIndex)]}曜${WEEK_PERIOD_LABELS[getWeekSlotPeriod(slotIndex)]}`;
 }
 
-// 通し練習は疲労が大きいため、1週間で2枠までに制限する
 const FULL_RUN_THROUGH_WEEKLY_LIMIT = 2;
-
-// 午前枠は午後枠の8割（体力回復量・レッスン効果のどちらも）
 const MORNING_SLOT_MULTIPLIER = 0.8;
-
-// 練習1枠ごとの体力消費率（実行直前の残体力に対する割合）
-// 消費量は「通し >= 連携 > 個別 > ダンス > 歌唱 >> 筋力 >= 持久力 >>> リテラシー」
 
 const WEEKLY_SCHEDULE_ITEMS = [
   { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaRatio: 0.45, effect: 'ダンス（＋運動能力・体力）' },
@@ -626,128 +404,92 @@ const WEEKLY_SCHEDULE_ITEMS = [
   { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaRatio: 0.65, groupOnly: true, effect: '連携力' },
   { id: 'meal-party', name: '食事会', social: true, cost: 1000000 },
   { id: 'rest-day', name: '休養', rest: true },
-  // テレビ出演・外部ライブの固定リハーサル枠。プルダウンからは選べない
   { id: 'rehearsal', name: 'リハーサル', fixed: true }
 ];
-// 食事会（社会性イベント。1回あたり100万円）
+
 const MEAL_PARTY_COST = 1000000;
 const MEAL_PARTY_POPULARITY_GAIN = 2;
 const MEAL_PARTY_CRISIS_GAIN = 3;
 const MEAL_PARTY_RECOVERY = 10;
-// グッズ開発の上限・単価
 const MAX_MERCHANDISE_PRODUCTS = 5;
 const GOODS_DEVELOPMENT_COST = 500000;
 const GOODS_DEVELOPMENT_STOCK = 1000;
-// 今週の事務作業（メンバーのレッスンと同じ週にまとめて実行する）
+
 const OFFICE_ACTIONS = [
   { id: 'single-promotion', name: 'シングル販促', short: '週次で減衰', detail: '選抜発表前は今作、発表後は次作を販促します。発売前は販促回数で発売時の売上が上がり、発売後は週ごとに減衰率（発売週8／通常10／過去作100）で売上が積み上がります。' },
   { id: 'live-promotion', name: '次のライブの広報', short: '集客効果Up', detail: '次回ライブの集客効果を上げます。' },
   { id: 'goods-development', name: 'グッズの開発', short: '1種/在庫+', detail: `グッズを1種開発します（在庫+${GOODS_DEVELOPMENT_STOCK.toLocaleString()}個 / 開発費 ${GOODS_DEVELOPMENT_COST.toLocaleString()}円 / 上限${MAX_MERCHANDISE_PRODUCTS}種）。` }
 ];
-// 1週間の休暇（14枠すべてを休養にして、大きな回復を得る）
+
 const FULL_VACATION_RECOVERY = 45;
-// 休養日の規定（1週間＝全日1日＋半休2枠）。足りないとスケジュールを実行できない
 const REQUIRED_FULL_REST_DAYS = 1;
 const REQUIRED_EXTRA_REST_SLOTS = 2;
-// 休養日の設定画面：この体力値まで自動休養（回復後はスケジュール通りに参加）
 const AUTO_REST_STAMINA_TARGET = 80;
-// 初期スケジュールのプリセット（休養4枠＋指定レッスン10枠）
 const DEFAULT_WEEK_SLOTS = [
   'rest-day', 'rest-day', 'vocal-lesson', 'dance-lesson',
   'vocal-lesson', 'dance-lesson', 'literacy', 'rest-day',
   'individual-lesson', 'full-run-through', 'coordination', 'strength-training',
   'endurance-training', 'rest-day'
 ];
-// 特別強化（1名集中）の倍率を掛けられる4能力（歌唱・ダンス・体力・回復力）
-// ※ 頭脳系（学力・トーク・SNS・バラエティ・危機回避）や運動能力・連携力・スタイルは等倍のまま
+
 const SPECIAL_TRAINING_STATS = ['vocal', 'dance', 'stamina', 'recovery'];
-// 個別レッスンで鍛えられる能力（特別強化と同じくこの4能力だけ）
 const INDIVIDUAL_LESSON_STATS = SPECIAL_TRAINING_STATS.slice();
-// グループレッスン1回あたりの基礎経験値（事務所設備で変動。マネージャーはかからない）
-// 14枠化で1週のレッスン回数が増えたため、1回あたりの経験値は従来の約4割に調整している
 const LESSON_BASE_EXP = 80;
-// 特別強化（1名集中）の倍率
 const SPECIAL_TRAINING_MULTIPLIER = 10;
 
-// ==========================================
-// ライブによる経験値（ライブ関連能力値）
-// ==========================================
-// ライブ1公演あたりの基礎経験値（特別強化の10倍を基準にする）
 const LIVE_BASE_EXP = LESSON_BASE_EXP * SPECIAL_TRAINING_MULTIPLIER;
-// 観客数（動員）÷キャパシティ で決まる「埋まり率」による倍率の上限
 const LIVE_FILL_RATE_CAP = 1.5;
-// 会場の「収容しやすさ」（ease）による倍率（S/SS 会場は手ごたえが大きい）
 const LIVE_EASE_MULTIPLIER = { SS: 1.3, S: 1.22, A: 1.15, B: 1.0, C: 0.85, D: 0.7 };
-// 公演日数ごとの倍率（1日＝1.0／日数が多いほど伸びる）
 const LIVE_MULTI_DAY_BONUS = 0.25;
-// ライブで経験値を付与する対象能力と、その配分
 const LIVE_STAT_WEIGHTS = {
-  dance: 1.0,        // ダンス
-  vocal: 0.8,         // 歌唱
-  athletics: 0.5,     // 運動能力
-  coordination: 0.4,  // 連携力
-  stamina: 0.3,       // 体力
-  recovery: 0.5,      // 回復力
+  dance: 1.0,
+  vocal: 0.8,
+  athletics: 0.5,
+  coordination: 0.4,
+  stamina: 0.3,
+  recovery: 0.5,
 };
 
-// 体力値（スタミナゲージ）
 const MAX_STAMINA_VALUE = 100;
 const STAMINA_WARNING_THRESHOLD = 30;
 const STAMINA_BASE_RECOVERY = 6;
 const STAMINA_RECOVERY_PER_STAT = 0.12;
 const STAMINA_REST_RECOVERY_MULTIPLIER = 2.5;
 const SPECIAL_TRAINING_EXTRA_COST = 10;
-// ケガ・体調不良の週次発生率の上限（体力値が0のとき）。
-// 実際の発生率はこれに「体力値の低さ」を掛けて決める。
 const INJURY_BASE_RATE = 0.18;
-// 全治期間の分布（体調不良は1週、ケガは INJURY_ACCIDENT_WEEKS_RANGE の範囲から）
 const INJURY_ILLNESS_WEEKS = 1;
 const INJURY_ACCIDENT_WEEKS_RANGE = [2, 3];
-// ケガと体調不良の確率比（ケガを選ぶ確率）
 const INJURY_ACCIDENT_RATE = 0.5;
-// テレビ出演で固定される枠の体力消費（リハーサル1回／出演1回あたり）
 const REHEARSAL_STAMINA_COST = 4;
 const BROADCAST_STAMINA_COST = 3;
-// 休養1枠あたりの追加回復
 const REST_SLOT_RECOVERY = 8;
-// ライブによる体力消費（会場規模によって変動）
 const LIVE_STAMINA_COST_BASE = 18;
 const LIVE_VENUE_SIZE_FACTORS = { SS: 1.6, S: 1.45, A: 1.3, B: 1.1, C: 0.9, D: 0.75 };
-// ライブ疲労（0〜100）。複数日にまたがるライブや連日では特にたまりやすい
 const MAX_LIVE_FATIGUE = 100;
-const LIVE_FATIGUE_GAIN = 18;                    // 単独のワンデイ公演
-const LIVE_FATIGUE_MULTI_DAY_BONUS = 8;          // 複数日にまたがるライブ
-const LIVE_FATIGUE_CONSECUTIVE_BONUS = 6;        // 前日もライブだった場合
-const LIVE_FATIGUE_RECOVERY_PENALTY = 0.5;       // 疲労が最大でも回復力は50%まで落ちる
-const LIVE_FATIGUE_WEEKLY_DECAY = 20;           // 毎週これだけは解ける（一時的な疲労）
-// その週の自然回復を適用済みか（ライブ週は週間スケジュールを組めないため、ライブ側で代替する）
+const LIVE_FATIGUE_GAIN = 18;
+const LIVE_FATIGUE_MULTI_DAY_BONUS = 8;
+const LIVE_FATIGUE_CONSECUTIVE_BONUS = 6;
+const LIVE_FATIGUE_RECOVERY_PENALTY = 0.5;
+const LIVE_FATIGUE_WEEKLY_DECAY = 20;
+
 let weeklyRecoveryDone = false;
-// 直近にライブを開催した日（連日公演の判定に使う）
 let lastLiveDate = '';
 
 const INITIAL_FUNDS = 100000000;
-// プリセットでCD発売が確定している月（この月のリリース種別は変更できない）
 const PRESET_RELEASE_MONTHS = [2, 6];
 const PRESET_RELEASE_TYPE = 'single';
-// 初期状態のライブを置く月（5〜7月のいずれかからランダムに選ぶ）
 const INITIAL_LIVE_MONTH_MIN = 5;
 const INITIAL_LIVE_MONTH_MAX = 7;
-// 初期状態のライブ日数（土日2days）
 const INITIAL_LIVE_SHOW_DAYS = 2;
-// 初期ライブの会場（常設の定期公演会場）
 const INITIAL_LIVE_VENUE = '原宿体育館';
-// 発売済み楽曲の累積売上が毎週少しずつ増え続ける割合（微小値。発売後もずっと増加する）
 const RELEASED_SONG_WEEKLY_PERSIST_RATE = 0.0006;
-// 比較グラフで並べる直近の楽曲数
 const SALES_COMPARE_SONG_COUNT = 5;
-// 楽曲レベルの経験点制（メンバーと同じ必要経験値の伸び）
 const MAX_SONG_LEVEL = 20;
 const SONG_LEVEL_EXP_BASE = 24;
 const SONG_LEVEL_EXP_GROWTH = 1.12;
-// 初週売上の下方修正係数（1未満で控えめに卖的）
 const RELEASE_FIRST_WEEK_TUNING = 0.92;
 const SONG_TITLES = ['ひかりの約束', 'キミ色サイン', '青空レター', '恋するステップ', '未来へのメロディ', '星屑のリボン', 'まっすぐな夢', '花咲く頃に'];
-// 新世代グループの名前素材（前半語 × 後半語の組み合わせで既存と重複しない名前を引く）
+
 const RIVAL_NAME_HEADS = [
   'ヴァイオレット', 'プリズム', 'ステラ', 'ネオン', 'ダイアモンド',
   'ルナ', 'ソラ', 'ヒカリ', 'カゼ', 'ユメ', 'ミライ', 'ココロ',
@@ -763,8 +505,6 @@ const RIVAL_NAME_TAILS = [
   'アイドル', 'グループ', 'ショー', 'ステージ', 'コレクション'
 ];
 
-
-// ランク判定定義
 function getRankData(val) {
   if (val >= 90) return { rank: 'S', color: '#ff1493', bg: '#ffe4e1' };
   if (val >= 80) return { rank: 'A', color: '#e60000', bg: '#ffebee' };
@@ -774,4 +514,17 @@ function getRankData(val) {
   if (val >= 40) return { rank: 'E', color: '#555555', bg: '#eeeeee' };
   if (val >= 20) return { rank: 'F', color: '#455a64', bg: '#cfd8dc' };
   return { rank: 'G', color: '#8d6e63', bg: '#d7ccc8' };
+}
+
+// ==========================================
+// 能力値経験値システム（Lv.50で5000pt、そこから1.05倍で関数的に増加）
+// ==========================================
+function getStatExpRequired(level) {
+  const currentLevel = Math.max(0, level);
+  if (currentLevel < 50) {
+    return Math.round(100 * Math.pow(1.082, currentLevel));
+  } else {
+    const diff = currentLevel - 50;
+    return Math.round(5000 * Math.pow(1.05, diff));
+  }
 }
