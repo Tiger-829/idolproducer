@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・野球開催バリデーション統合版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・野球開催バリデーション統合版（他グループハイライト非表示対応）
 // ==========================================
 
 let planYearTarget = 1;
@@ -479,7 +479,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
-    const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => !b.hiddenFromPlayer) : [];
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (yearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
@@ -489,11 +488,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
     for (let m = effectiveStartM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
-      const monthRivals = rivals.filter(b => {
+      
+      // 🌟 半年計画カレンダーの下にある「今月のライバル動向」リストには、他グループのライブ・リリースのみを表示（他グループハイライトは除外）
+      const monthRivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => {
+        if (!b || b.hiddenFromPlayer || b.type === 'baseball' || b.type === 'dummy') return false;
         const bDate = b.liveDate || b.date || '';
         const bDates = Array.isArray(b.liveDates) ? b.liveDates : [];
         return bDate.startsWith(targetMonthPrefix) || bDates.some(d => d.startsWith(targetMonthPrefix));
-      });
+      }) : [];
 
       monthRivals.sort((a, b) => {
         const dateA = a.liveDate || a.date || (Array.isArray(a.liveDates) ? a.liveDates[0] : '') || '';
@@ -667,7 +669,9 @@ function toggleMultiSelectMode(month) {
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
-  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => !b.hiddenFromPlayer) : [];
+  
+  // 🌟 半年計画のミニカレンダー上では他グループ公演のハイライト（オレンジ色の表示等）を表示しないように rivals を空にするか除外
+  const rivals = [];
 
   for (let m = planStartM; m <= planEndM; m++) {
     const container = document.getElementById(`embedded-calendar-month-${m}`);
@@ -701,7 +705,6 @@ function renderEmbeddedPlanCalendars() {
 
       const dateObj = new Date(actualYear, m - 1, day, 12);
       const dateKey = toDateKey(dateObj);
-      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 
       const isSelected = planCalendarSelections[m].includes(dateKey);
       const isRelease = getPlanReleaseDate(m) === dateKey;
@@ -709,14 +712,6 @@ function renderEmbeddedPlanCalendars() {
       const isLive = liveEntries.some(slot => slot.liveDates.includes(dateKey));
       const eventDrafts = getPlanMonthEventDrafts(m);
       const isEvent = eventDrafts.some(event => event.date === dateKey);
-
-      const rivalConflicts = rivals.filter(booking => {
-        if (!booking) return false;
-        const bDate = booking.liveDate || booking.date || '';
-        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
-        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
-      });
-      const hasRival = rivalConflicts.length > 0;
 
       let bgStyle = 'background:#fafafa; color:#444; border:1px solid #eee;';
       let indicator = '';
@@ -732,9 +727,6 @@ function renderEmbeddedPlanCalendars() {
       } else if (isEvent) {
         bgStyle = 'background:#fdf0da; color:#8a5a12; border:1px solid #fce3b2;';
         indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:1px auto 0;"></i>';
-      } else if (hasRival) {
-        bgStyle = 'background:#fdf6ec; color:#b8860b; border:1px solid #f7dfbe;';
-        indicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:1px auto 0;"></i>';
       }
 
       daySpan.style.cssText = `display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:24px; font-size:10px; border-radius:4px; ${bgStyle} cursor:pointer; user-select:none;`;
@@ -938,7 +930,6 @@ function updateReleaseDateOptions(month) {
   }
 }
 
-// 🌟 野球開催チェックを含むバリデーション関数
 function validatePlanLiveSlots(month, liveSlots) {
   const usedVenues = new Set();
   const usedDates = new Set();
@@ -963,7 +954,6 @@ function validatePlanLiveSlots(month, liveSlots) {
       }
       usedDates.add(d);
 
-      // 🌟 球場・ドームのプロ野球公式戦開催日チェック
       if (typeof isBaseballGameDay === 'function' && isBaseballGameDay(slot.liveVenue, d)) {
         alert(`${d}の「${slot.liveVenue}」はプロ野球公式戦の開催日のため、ライブを設定できません。別の日程または会場をお選びください。`);
         return false;
