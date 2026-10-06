@@ -1,12 +1,12 @@
 // ==========================================
-// 02-state.js : 全機能完全復元・ライバルスケジュール統合版
+// 02-state.js : 全機能完全復元・ライバルスケジュール・実世界西暦（2026年等）同期版
 // ==========================================
 
 let currentYear = 1;
 let currentMonth = 1;
 let currentWeek = 1; // 1〜4週
 let gameDate = '';
-let calendarYear = 0;
+let calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦を動的に取得・同期
 let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
@@ -82,7 +82,8 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const monthSpan = generateFullYear ? 12 : 6;
   
   const targetYearNum = Number(year) || 1;
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + targetYearNum);
+  const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
+  const actualYear = baseYear + targetYearNum - 1;
 
   const dayWeights = {
     0: 12, // 日
@@ -99,14 +100,12 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       if (team.id === 'player') return;
 
       const power = team.basePower || 50;
-      // ライブの総公演日数を決める
       const baseCountPerHalf = Math.min(30, Math.max(18, Math.round((power / 92) * 26)));
       const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
 
       let generatedDaysCount = 0;
       let safetyCounter = 0;
 
-      // 1. ライバルたちのライブ予定生成（連日公演を極力再現）
       while (generatedDaysCount < targetLiveCount && safetyCounter < 200) {
         safetyCounter++;
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
@@ -116,7 +115,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
         
-        // 開始日の抽選
         let selectedDateObj = null;
         for (let attempt = 0; attempt < 30; attempt++) {
           const randomDay = 1 + Math.floor(Math.random() * lastDay);
@@ -138,17 +136,17 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
         const isConsecutive = Math.random() < 1;
-       let durationDays = 1;
+        let durationDays = 1;
         if (isConsecutive) {
           const rand = Math.random();
           if (rand < 0.50) {
-            durationDays = 2; // 50%の確率で2連
+            durationDays = 2;
           } else if (rand < 0.80) {
-            durationDays = 3; // 30%の確率で3連 (50%〜80%)
+            durationDays = 3;
           } else if (rand < 0.95) {
-            durationDays = 4; // 15%の確率で4連 (80%〜95%)
+            durationDays = 4;
           } else {
-            durationDays = 5; // 5%の確率で5連 (95%〜100%)
+            durationDays = 5;
           }
         }
         const liveDatesArr = [];
@@ -158,7 +156,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
           const targetDate = new Date(selectedDateObj);
           targetDate.setDate(selectedDateObj.getDate() + dIdx);
           
-          // 月をまたぐ場合はループを抜ける
           if (targetDate.getMonth() + 1 !== targetMonth) break;
 
           liveDatesArr.push(toDateKey(targetDate));
@@ -181,7 +178,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         }
       }
 
-      // 2. ライバルたちのCD発売予定生成（水曜日固定）
       const cdReleaseCount = generateFullYear ? 4 : 2;
       for (let j = 0; j < cdReleaseCount; j++) {
         const cdMonthOffset = Math.floor((j * (monthSpan / cdReleaseCount)) + Math.random() * 2);
@@ -211,11 +207,8 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   }
 
   rivalLiveBookings = newRivalBookings;
-  console.log(`【ライバル先行配置完了】(連日公演・曜日重みづけ適用) 総数: ${rivalLiveBookings.length}件`);
 }
 
-
-// 初回起動時は1年分をまとめて生成
 try {
   if (typeof leagueTeams !== 'undefined') {
     generateRivalsAndGeneralSchedule(1, 1, true);
@@ -240,10 +233,11 @@ function getRandomWednesdayKey(year, month) {
 let idolRoster = [];
 
 function createInitialProductionSchedule() {
+  const baseYear = calendarYear || new Date().getFullYear();
   const schedule = {};
-  schedule[`1-2`] = { release: 'single', songName: 'SnowDrops', releaseDate: '2026-02-18', releaseBenefit: 'none', liveVenue: null };
-  schedule[`1-6`] = { release: 'single', songName: 'アジサイと風鈴', releaseDate: '2026-06-17', releaseBenefit: 'none', liveVenue: null };
-  schedule[`1-5`] = { release: 'none', songName: '', liveVenue: INITIAL_LIVE_VENUE || '原宿体育館', liveName: 'Debut Live', liveDate: '2026-05-16', liveDates: ['2026-05-17'], streamDates: ['2026-05-16', '2026-05-17'] };
+  schedule[`1-2`] = { release: 'single', songName: 'SnowDrops', releaseDate: `${baseYear}-02-18`, releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-6`] = { release: 'single', songName: 'アジサイと風鈴', releaseDate: `${baseYear}-06-17`, releaseBenefit: 'none', liveVenue: null };
+  schedule[`1-5`] = { release: 'none', songName: '', liveVenue: INITIAL_LIVE_VENUE || '原宿体育館', liveName: 'Debut Live', liveDate: `${baseYear}-05-16`, liveDates: [`${baseYear}-05-17`], streamDates: [`${baseYear}-05-16`, `${baseYear}-05-17`] };
   return schedule;
 }
 
@@ -259,7 +253,7 @@ function createInitialOfficeUpgrades() {
 }
 
 // ==========================================
-// マネージャーシステム関連（完全復元）
+// マネージャーシステム関連
 // ==========================================
 let managers = [];
 let managerMarketCandidates = [];
@@ -284,7 +278,7 @@ function createManagerCandidate(age = null) {
   return {
     id: `candidate-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     name: createManagerName(),
-    birthYear: (calendarYear || 2026) - managerAge,
+    birthYear: (calendarYear || new Date().getFullYear()) - managerAge,
     age: managerAge,
     skills,
     resignAge: MANAGER_RESIGN_AGE_MIN + Math.floor(Math.random() * (MANAGER_RESIGN_AGE_MAX - MANAGER_RESIGN_AGE_MIN + 1))
@@ -306,7 +300,7 @@ function createManager() {
 
 function getManagerAge(manager) {
   if (!Number.isInteger(manager.birthYear)) return manager.age ?? MANAGER_AGE_MIN;
-  const currentActualYear = calendarYear || (2025 + currentYear);
+  const currentActualYear = calendarYear || new Date().getFullYear();
   return currentActualYear - manager.birthYear;
 }
 
@@ -446,7 +440,7 @@ function getSpecialTrainingRiskReduction() {
 }
 
 // ==========================================
-// ユーティリティ・補助関数（完全復元）
+// ユーティリティ・補助関数
 // ==========================================
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -492,10 +486,182 @@ function formatFanCount(value) {
   const okuDigits = oku < 10 ? 2 : (oku < 100 ? 1 : 0);
   return `${Number(oku.toFixed(okuDigits))}億人`;
 }
-// ==========================================
-// 未定義関数エラー防止用の安全なフォールバック
-// ==========================================
+
+// 🌟 カレンダー同期処理（実システムの西暦ベース）
+function syncGameCalendar() {
+  const date = getGameDateObject();
+  if (!calendarYear) {
+    calendarYear = new Date().getFullYear();
+  }
+  currentMonth = date.getMonth() + 1;
+  currentWeek = Math.ceil(date.getDate() / 7);
+}
+
 function normalizeLeagueTeams(teams) {
   if (!Array.isArray(teams)) return createInitialLeagueTeams();
   return teams;
+}
+
+function initializeNewGameState() {
+  currentYear = 1;
+  currentMonth = 1;
+  currentWeek = 1;
+  calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦に動的同期
+  productionSchedule = createInitialProductionSchedule();
+  gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
+  totalWeeksElapsed = 0;
+  draftCount = 0;
+  currentRosterTab = 'selected';
+  merchandiseProducts = 0;
+  merchandiseStock = 0;
+  merchandiseUnitsSold = 0;
+  merchandiseSellThrough = null;
+  nextLivePromotionPoints = 0;
+  monthlyCdRevenue = 0;
+  monthlyTieUpRevenue = 0;
+  monthlyLedger = createMonthlyLedger();
+  pendingMonthlyReport = null;
+  promoSongId = '';
+  crisisCheckWeekKey = '';
+  crisisEventWeekKey = '';
+  crisisEventType = '';
+  industryOfferCheckWeekKey = '';
+  pendingIndustryOffer = null;
+  specialLiveEvents = [];
+  pendingEquipmentEvent = null;
+  equipmentDowngradeCheckWeekKey = '';
+  pendingCrisisResponse = null;
+  randomEventCheckWeekKey = '';
+  pendingRandomEvent = null;
+  armedRandomEvents = [];
+  pendingSelectionEvent = null;
+  selectionLock = null;
+  lastAnnouncedCenterId = null;
+  shownAbilityMemberIds = new Set();
+  fanClub = null;
+  fanClubFoundedYear = 0;
+  pendingFanClubEvent = null;
+  groupCrisis = 55;
+  officeUpgrades = createInitialOfficeUpgrades();
+  yearlyStats = { sales: 0, audience: 0 };
+  lifetimeSales = 0;
+  salesHistory = [];
+  fansFromSales = 0;
+  funds = INITIAL_FUNDS;
+  leagueTeams = createInitialLeagueTeams();
+  songs = [];
+  pendingPerformanceOffers = [];
+  scheduledPerformances = [];
+  specialOffersSent = [];
+  rivalLiveBookings = [];
+  managers = [createManager()];
+  managerMarketCandidates = [];
+  refreshManagerMarket();
+  weeklySchedule = null;
+  lastWeekSchedule = null;
+  savedCleanWeekSchedule = null;
+  previousYearGroupFansAtYearStart = 0;
+  groupFansAtYearStart = 0;
+  yearEndAwardProcessed = false;
+  yearEndKohakuProcessed = false;
+
+  generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
+
+  idolRoster = [];
+  for (let i = 0; i < 30; i++) {
+    const startAge = Math.floor(Math.random() * 9) + 14;
+    const m = createMember(startAge);
+    m.yearsActive = 0;
+    m.joinAge = startAge;
+    m.isSelected = (i < 16);
+    m.isCenter = (i === 0);
+    idolRoster.push(m);
+  }
+  ensureMemberBirthdays();
+  ensureMemberHeights();
+  ensureMemberVitalState();
+  ensureMemberStyleFashion();
+  syncMemberAges();
+  groupFansAtYearStart = calculateGroupFans();
+  previousYearGroupFansAtYearStart = groupFansAtYearStart;
+}
+
+function applySavedGame(data) {
+  currentYear = data.currentYear || 1;
+  calendarYear = data.calendarYear || new Date().getFullYear();
+  gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);
+  syncGameCalendar();
+  totalWeeksElapsed = data.totalWeeksElapsed || 0;
+  draftCount = data.draftCount || 0;
+  merchandiseProducts = data.merchandiseProducts || 0;
+  merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
+  merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
+  merchandiseSellThrough = data.merchandiseSellThrough ?? null;
+  nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
+  monthlyCdRevenue = data.monthlyCdRevenue || 0;
+  monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
+  monthlyLedger = data.monthlyLedger && Array.isArray(data.monthlyLedger.income)
+    ? { income: data.monthlyLedger.income, expense: data.monthlyLedger.expense || [] }
+    : createMonthlyLedger();
+  pendingMonthlyReport = data.pendingMonthlyReport || null;
+  promoSongId = data.promoSongId || '';
+  crisisCheckWeekKey = data.crisisCheckWeekKey || '';
+  crisisEventWeekKey = data.crisisEventWeekKey || '';
+  crisisEventType = data.crisisEventType || '';
+  pendingCrisisResponse = data.pendingCrisisResponse || null;
+  randomEventCheckWeekKey = data.randomEventCheckWeekKey || '';
+  pendingRandomEvent = restorePendingRandomEvent(data.pendingRandomEvent);
+  armedRandomEvents = Array.isArray(data.armedRandomEvents) ? data.armedRandomEvents : [];
+  pendingSelectionEvent = data.pendingSelectionEvent || null;
+  selectionLock = data.selectionLock || null;
+  lastAnnouncedCenterId = data.lastAnnouncedCenterId || null;
+  fanClub = data.fanClub || null;
+  fanClubFoundedYear = data.fanClubFoundedYear || 0;
+  pendingFanClubEvent = data.pendingFanClubEvent || null;
+  industryOfferCheckWeekKey = data.industryOfferCheckWeekKey || '';
+  pendingIndustryOffer = data.pendingIndustryOffer || null;
+  specialLiveEvents = data.specialLiveEvents || [];
+  pendingEquipmentEvent = data.pendingEquipmentEvent || null;
+  equipmentDowngradeCheckWeekKey = data.equipmentDowngradeCheckWeekKey || '';
+  groupCrisis = data.groupCrisis ?? 55;
+  officeUpgrades = { ...createInitialOfficeUpgrades(), ...(data.officeUpgrades || {}) };
+  funds = data.funds ?? INITIAL_FUNDS;
+  yearlyStats = data.yearlyStats || { sales: 0, audience: 0 };
+  lifetimeSales = Number.isFinite(data.lifetimeSales) ? data.lifetimeSales : (yearlyStats.sales || 0);
+  salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
+  fansFromSales = Number.isFinite(data.fansFromSales) ? data.fansFromSales : getTargetSalesFans();
+  fansFromSales = Math.max(0, Math.min(fansFromSales, getTargetSalesFans()));
+  idolRoster = data.idolRoster || [];
+  ensureMemberBirthdays();
+  ensureMemberHeights();
+  ensureMemberVitalState();
+  ensureMemberStyleFashion();
+  syncMemberAges();
+  productionSchedule = data.productionSchedule || {};
+  leagueTeams = data.leagueTeams || createInitialLeagueTeams();
+  songs = data.songs || [];
+  pendingPerformanceOffers = data.pendingPerformanceOffers || [];
+  scheduledPerformances = data.scheduledPerformances || [];
+  specialOffersSent = data.specialOffersSent || [];
+  rivalLiveBookings = data.rivalLiveBookings || [];
+  managers = Array.isArray(data.managers) && data.managers.length ? data.managers : [createManager()];
+  managers = managers.map(manager => {
+    const birthYear = Number.isInteger(manager.birthYear) ? manager.birthYear : (calendarYear || new Date().getFullYear()) - (manager.age || MANAGER_AGE_MIN);
+    return {
+      ...manager,
+      birthYear,
+      age: manager.age ?? ((calendarYear || new Date().getFullYear()) - birthYear),
+      resignAge: Number.isFinite(manager.resignAge) ? manager.resignAge : (MANAGER_RESIGN_AGE_MIN + Math.floor(Math.random() * (MANAGER_RESIGN_AGE_MAX - MANAGER_RESIGN_AGE_MIN + 1))),
+      skills: Object.fromEntries(MANAGER_SKILLS.map(skill => [skill.id, manager?.skills?.[skill.id] || 1]))
+    };
+  });
+  managerMarketCandidates = Array.isArray(data.managerMarketCandidates) ? data.managerMarketCandidates : [];
+  refreshManagerMarket();
+  groupFansAtYearStart = data.groupFansAtYearStart ?? calculateGroupFans();
+  previousYearGroupFansAtYearStart = data.previousYearGroupFansAtYearStart ?? groupFansAtYearStart;
+  yearEndAwardProcessed = Boolean(data.yearEndAwardProcessed);
+  yearEndKohakuProcessed = Boolean(data.yearEndKohakuProcessed);
+  lastLiveDate = data.lastLiveDate || '';
+  weeklyRecoveryDone = false;
+  normalizeLeagueTeams();
 }
