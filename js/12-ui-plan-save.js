@@ -391,6 +391,9 @@ function refreshPlanEventsContainer(month) {
 // ==========================================
 // 半年計画策定モーダル（月別ブース ＋ 横並び確認用カレンダー）
 // ==========================================
+// ==========================================
+// 半年計画策定モーダル（横並びレイアウト・確認専用カレンダー統合版）
+// ==========================================
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -506,24 +509,24 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
 
-    // 全体レイアウト構築：確認用カレンダーと月別ブースの配置
-    const wrapperDiv = document.createElement('div');
-    wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
+    // 🌟 横並びレイアウト用ラッパー作成
+    const layoutWrapper = document.createElement('div');
+    layoutWrapper.className = 'plan-layout-container';
 
-    // 1. カレンダー確認エリア（6か月分の予定印つきカレンダーを常時表示）
-    const calendarPreviewSection = document.createElement('div');
-    calendarPreviewSection.style.cssText = 'background: #fff; border: 1px solid #eadde1; padding: 10px; border-radius: 6px; margin-bottom: 10px;';
-    calendarPreviewSection.innerHTML = `<div style="font-size: 12px; font-weight: bold; color: var(--primary); margin-bottom: 6px;">📅 半年スケジュール確認カレンダー（予定の印つき）</div>`;
-    
-    const calendarGridContainer = document.createElement('div');
-    calendarGridContainer.id = 'embedded-plan-calendar-grid';
-    calendarGridContainer.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;';
-    calendarPreviewSection.appendChild(calendarGridContainer);
-    wrapperDiv.appendChild(calendarPreviewSection);
+    // 1. 左側（または上部）：6か月確認用カレンダーサイドバー
+    const sidebarDiv = document.createElement('div');
+    sidebarDiv.className = 'plan-calendar-sidebar';
+    sidebarDiv.innerHTML = `
+      <div style="background:#fff; border:1px solid #eadde1; padding:10px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+        <div style="font-size:12px; font-weight:bold; color:var(--primary); margin-bottom:8px; text-align:center;">📅 半年スケジュール確認</div>
+        <div id="embedded-plan-calendar-grid" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+    `;
+    layoutWrapper.appendChild(sidebarDiv);
 
-    // 2. 月別ブース設定エリア
-    const boothsSection = document.createElement('div');
-    boothsSection.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+    // 2. 右側：月別ブース設定エリア
+    const boothsDiv = document.createElement('div');
+    boothsDiv.style.cssText = 'display:flex; flex-direction:column; gap:12px; min-width:0;';
 
     for (let m = startM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
@@ -532,7 +535,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         return bDate.startsWith(targetMonthPrefix);
       });
 
-      // 日付順（昇順）にソート
       monthRivals.sort((a, b) => {
         const dateA = a.liveDate || a.date || (Array.isArray(a.liveDates) ? a.liveDates[0] : '') || '';
         const dateB = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
@@ -636,7 +638,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         </div>
         <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
       `;
-      boothsSection.appendChild(monthBlock);
+      boothsDiv.appendChild(monthBlock);
       updateReleaseDateOptions(m);
       liveSlots.forEach((_, idx) => {
         updateSeatPlanOptions(m, idx);
@@ -644,8 +646,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       });
     }
 
-    wrapperDiv.appendChild(boothsSection);
-    container.appendChild(wrapperDiv);
+    layoutWrapper.appendChild(boothsDiv);
+    container.appendChild(layoutWrapper);
 
     // 確認用カレンダーの描画を実行
     renderEmbeddedPlanCalendar();
@@ -659,7 +661,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 }
 
 // ==========================================
-// 6か月分の「予定確認専用カレンダー」描画関数（干渉ゼロ・マーク付与版）
+// 6か月分の確認専用カレンダー（予定の印つき・クリック干渉ゼロ）
 // ==========================================
 function renderEmbeddedPlanCalendar() {
   const container = document.getElementById('embedded-plan-calendar-grid');
@@ -679,7 +681,7 @@ function renderEmbeddedPlanCalendar() {
     for (let c = 0; c < 42; c++) {
       const day = c - firstWeekday + 1;
       if (day < 1 || day > daysInMonth) {
-        cells += `<span style="min-height:20px;"></span>`;
+        cells += `<span style="min-height:18px;"></span>`;
         continue;
       }
 
@@ -702,16 +704,20 @@ function renderEmbeddedPlanCalendar() {
       const hasRival = rivalConflicts.length > 0;
 
       let bgStyle = 'background:#fafafa; color:#444;';
-      let dotIndicator = '';
+      let indicator = '';
+      
       if (isRelease) {
         bgStyle = 'background:#e2eefc; color:#12447e; font-weight:bold;';
-        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:0 auto;"></i>';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:0 auto;"></i>';
       } else if (isLive) {
         bgStyle = 'background:#e0f1ea; color:#1f5c49; font-weight:bold;';
-        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:0 auto;"></i>';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:0 auto;"></i>';
+      } else if (isEvent) {
+        bgStyle = 'background:#fdf0da; color:#8a5a12;';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:0 auto;"></i>';
       } else if (hasRival) {
         bgStyle = 'background:#fdf6ec; color:#b8860b;';
-        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:0 auto;"></i>';
+        indicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:0 auto;"></i>';
       }
 
       const rivalTitles = rivalConflicts.map(rc => {
@@ -724,16 +730,15 @@ function renderEmbeddedPlanCalendar() {
 
       const titleAttr = rivalTitles ? `title="他グループ:\n${escapeHtml(rivalTitles)}"` : '';
 
-      cells += `<span style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:22px; font-size:9px; border-radius:3px; ${bgStyle} cursor:default;" ${titleAttr}>${day}${dotIndicator}</span>`;
+      cells += `<span style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:20px; font-size:9px; border-radius:3px; ${bgStyle} cursor:default;" ${titleAttr}>${day}${indicator}</span>`;
     }
 
     const monthBox = document.createElement('div');
-    monthBox.style.cssText = 'border: 1px solid #eee; padding: 4px; border-radius: 4px; background: #fff;';
-    monthBox.innerHTML = `<div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 2px; text-align: center;">${actualYear}年${m}月</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;">${cells}</div>`;
+    monthBox.style.cssText = 'border: 1px solid #eee; padding: 4px; border-radius: 4px; background: #fff; margin-bottom: 6px;';
+    monthBox.innerHTML = `<div style="font-size: 10px; font-weight: bold; color: #555; margin-bottom: 2px; text-align: center;">${actualYear}年${m}月</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;">${cells}</div>`;
     container.appendChild(monthBox);
   }
 }
-
 // 旧モーダル用カレンダーのプレースホルダー（エラー防止）
 function openPlanCalendar() {}
 function closePlanCalendar() {}
