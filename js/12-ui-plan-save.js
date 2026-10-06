@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : カレンダー・ドット完全排除・特典イベントレイアウト・閉じるボタン追従版
+// 12-ui-plan-save.js : イベントレイアウト修正＆スクロール追従✕ボタン完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -306,7 +306,7 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
-// 🌟 【画像レイアウト対応】特典イベント：セレクトボックス（名前入力）を左、日付ボックスを右に配置
+// 🌟 【②反映】特典イベント：名前セレクトボックスを左、日付ボックスを右に配置
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -316,11 +316,11 @@ function renderPlanEventsHtml(month) {
   return events.map((event, index) => {
     return `
       <div class="plan-event-row" data-event-index="${index}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-        <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px; padding:3px; flex:1;">
+        <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px; padding:4px; flex:1; min-width:0;">
           ${eventTypes.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
         </select>
-        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:3px;">
-        <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
+        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:4px; flex-shrink:0;">
+        <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})" style="flex-shrink:0;">削除</button>
       </div>`;
   }).join('');
 }
@@ -372,7 +372,7 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// 🌟 【閉じる×マークのスクロール追従対応】半年計画モーダルのオープン処理
+// 🌟 【③反映】スクロールしてもついてくる（sticky）✕閉じるボタンの完全適用
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -384,32 +384,33 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
     const modal = document.getElementById('decision-modal');
     if (modal) {
-      // モーダル全体のオーバーレイ・コンテンツのスタイルを調整し、×ボタンを固定(sticky/fixed)させる
       modal.style.display = 'flex';
       const contentEl = modal.querySelector('.modal-content');
       if (contentEl) {
         contentEl.style.position = 'relative';
         contentEl.style.maxHeight = '85vh';
         contentEl.style.overflowY = 'auto';
+        contentEl.style.paddingTop = '10px';
       }
     }
 
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
 
-    // 動的にスクロールしても追従する「×」閉じるボタンをタイトルバー付近に常駐させる
-    let closeBtn = document.getElementById('sticky-modal-close-btn');
-    if (!closeBtn && modal) {
-      closeBtn = document.createElement('button');
-      closeBtn.id = 'sticky-modal-close-btn';
-      closeBtn.type = 'button';
-      closeBtn.textContent = '✕';
-      closeBtn.style.cssText = 'position: sticky; top: 0; float: right; z-index: 100; background: #fff; border: none; font-size: 18px; font-weight: bold; cursor: pointer; color: #666; padding: 4px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 4px;';
-      closeBtn.onclick = closeDecisionModal;
-      
+    // 既存のHTML側の閉じるボタンを非表示にし、スクロール追従するボタンを確実に上部に固定する
+    if (modal) {
       const contentEl = modal.querySelector('.modal-content');
       if (contentEl) {
-        contentEl.prepend(closeBtn);
+        // 既存の古い閉じるボタン要素があればすべて削除
+        contentEl.querySelectorAll('.sticky-close-btn').forEach(el => el.remove());
+
+        const stickyClose = document.createElement('button');
+        stickyClose.type = 'button';
+        stickyClose.className = 'sticky-close-btn';
+        stickyClose.textContent = '✕';
+        stickyClose.style.cssText = 'position: sticky; top: -10px; float: right; z-index: 999; background: #fff; border: 1px solid #ddd; width: 32px; height: 32px; font-size: 16px; font-weight: bold; cursor: pointer; color: #666; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: -20px;';
+        stickyClose.onclick = closeDecisionModal;
+        contentEl.prepend(stickyClose);
       }
     }
 
@@ -1368,17 +1369,10 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   renderSaveSlots();
 }
 
-// 🌟 【事務所カレンダーのドット完全排除策】
-// 既存のrenderCalendar関数等を上書きし、他グループの予定を示すドット要素を作らないようにする
+// 事務所メインカレンダー側のドット（インジケーター）を完全に非表示・削除する監視処理
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    if (typeof renderCalendar === 'function') {
-      const originalRenderCalendar = renderCalendar;
-      renderCalendar = function(...args) {
-        originalRenderCalendar.apply(this, args);
-        // カレンダー内のドット（インジケーター）要素をすべて非表示・削除する
-        document.querySelectorAll('.calendar-day-dot, .rival-dot, .event-dot').forEach(el => el.remove());
-      };
-    }
-  }, 500);
+  const observer = new MutationObserver(() => {
+    document.querySelectorAll('.calendar-day-dot, .rival-dot, .event-dot, .calendar-dot').forEach(el => el.remove());
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 });
