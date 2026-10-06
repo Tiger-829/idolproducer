@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 先読み半年計画策定サイクル（1月に下半期、7月に来年上半期）完全版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・タイトル画面安全対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -479,7 +479,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
     const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
 
-    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (yearTarget - currentYear));
+    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
@@ -1032,13 +1032,10 @@ function saveDecisionPlan() {
 
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、新しいスケジュールが反映されました。`);
   updateUI();
 }
 
-// ==========================================
-// 🌟 1年目上半期は自動プリセット運用とし、1月には下半期(7〜12月)、7月には来年上半期を決めるサイクル
-// ==========================================
 function openPlanningManual() {
   if (currentYear === 1 && currentMonth < 7) {
     alert('1年目上半期（1〜6月）は初期プリセットスケジュールで固定運用されます。\nプレイヤー自身の計画策定は1年目下半期（7〜12月）からとなります。');
@@ -1046,10 +1043,8 @@ function openPlanningManual() {
   }
   
   if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
-    // 1月〜6月に開いた場合：当年下半期（7〜12月）の計画を決める
     openDecisionModal(`${currentYear}年下半期（7〜12月）の計画策定`, currentYear, 7, 12);
   } else {
-    // 7月〜12月に開いた場合：翌年上半期（1〜6月）の計画を決める
     openDecisionModal(`${currentYear + 1}年上半期（1〜6月）の計画策定`, currentYear + 1, 1, 6);
   }
 }
