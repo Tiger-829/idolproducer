@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・野球開催バリデーション統合版（他グループハイライト非表示対応）
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・一括選択・再抽選防止完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -377,8 +377,9 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = title;
 
+    // 🌟 既にライバルスケジュールが存在する場合は再生成（再抽選）せず、既存のスケジュールをそのまま維持して開く
     try {
-      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      if ((!rivalLiveBookings || rivalLiveBookings.length === 0) && typeof generateRivalsAndGeneralSchedule === 'function') {
         generateRivalsAndGeneralSchedule(yearTarget, 1, true);
       }
     } catch (err) {
@@ -407,7 +408,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             let rawDate = p.releaseDate || '';
             let dateStr = '日程未定';
             if (rawDate) {
-              const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-(\d{2})-(\d{2})/);
+              const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4})-(\d{2})-(\d{2})/);
               if (match) {
                 dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
               } else {
@@ -489,7 +490,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     for (let m = effectiveStartM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
       
-      // 🌟 半年計画カレンダーの下にある「今月のライバル動向」リストには、他グループのライブ・リリースのみを表示（他グループハイライトは除外）
+      // 🌟 半年計画カレンダー下の「今月のライバル動向」リストには他グループの活動のみを表示
       const monthRivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings.filter(b => {
         if (!b || b.hiddenFromPlayer || b.type === 'baseball' || b.type === 'dummy') return false;
         const bDate = b.liveDate || b.date || '';
@@ -670,7 +671,7 @@ function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
-  // 🌟 半年計画のミニカレンダー上では他グループ公演のハイライト（オレンジ色の表示等）を表示しないように rivals を空にするか除外
+  // 🌟 半年計画カレンダー上では他グループ公演やライバルハイライトを一切描画・表示しないように固定
   const rivals = [];
 
   for (let m = planStartM; m <= planEndM; m++) {
@@ -1024,11 +1025,10 @@ function saveDecisionPlan() {
     }
   }
 
-  generateRivalsAndGeneralSchedule(planYearTarget, planStartM);
-
+  // 🌟 保存確定時にもライバルスケジュールは再生成せず、現在のスケジュールを維持する（再抽選の防止）
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、ライバルグループの新しいスケジュールが発表されました。`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   updateUI();
 }
 
@@ -1204,7 +1204,7 @@ function initGame(slot, startFresh) {
   }
 
   if (startFresh) {
-    if (typeof generateRivalsAndGeneralSchedule === 'function') {
+    if (typeof generateRivalsAndGeneralSchedule === 'function' && (!rivalLiveBookings || rivalLiveBookings.length === 0)) {
       generateRivalsAndGeneralSchedule(1, 1, true);
     }
     if (typeof openDecisionModal === 'function') {
