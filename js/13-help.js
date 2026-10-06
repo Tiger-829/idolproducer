@@ -44,13 +44,24 @@ const HELP_SECTIONS = [
       { type: 'ul', items: [
         '練習メニューによって体力の消費量が異なります。残り体力が少ないほど消費も小さくなり、午前の練習は午後より負担が軽くなります。',
         '休養を入れると体力が回復し、休養を多く取るほど回復も大きくなります。',
-        '休養対象はユーザーがメンバーごとに設定します。体力80未満で休養に設定したメンバーは、休養枠などで体力80に達すると休養状態が解除され、その後の練習に参加します。80未満のまま週を終えた場合は、翌週も休養対象として引き継がれます。',
+        '休養対象はメンバーごとに設定できます。あらかじめ休養に設定しておくと、十分な体力が回復した段階で自動的に通常の練習に復帰します。',
         '1週間の休暇を取ると全員が休養し、体力が大きく回復します。経験値は得られません。',
         '固定予定がある週は1週間の休暇をとれません。',
         'テレビ出演がある週は、放送日の午前がリハーサル、午後が出演で固定されます。',
         '<b>歌番組の翌週は、歌番組の「前」の週のスケジュールが最初から入ります。</b>歌番組で潰された枠は空きに戻り、残りの枠はそのまま引き継がれます。',
         '自グループのライブや他グループ公演がある週は「ライブ週」となり、スケジュールは組めません。',
         '受諾したフェス・対バンの週はスケジュールを組めます。前日から当日午前までリハーサル、当日午後は出演、翌日は全日休養で固定されます。',
+      ] },
+    ],
+  },
+  {
+    id: 'planning',
+    title: '半年計画とスケジュール',
+    blocks: [
+      { type: 'p', text: '事務所の年間方針として、シングルやアルバムの発売、大規模なライブ日程をあらかじめ計画します。' },
+      { type: 'ul', items: [
+        '記念すべき最初の半年間は初期の固定スケジュールで進行しますが、その後はプレイヤー自身の判断で自由にライブ会場やリリース日を組み立てられるようになります。',
+        '先を読みながら一つ先の半年の計画をあらかじめ決定していくことで、他グループの動向やプロ野球のペナントレース日程と重ならないように戦略的なスケジュール調整が行えます。',
       ] },
     ],
   },
@@ -121,12 +132,12 @@ const HELP_SECTIONS = [
     title: 'ライブ会場',
     blocks: [
       { type: 'table',
-        head: ['会場規模', '収容人数'],
+        head: ['会場規模', '収容人数イメージ'],
         rows: [
-          ['D', '7,500'], ['C', '12,500'], ['B', '20,000'],
-          ['A', '30,000'], ['S', '38,500'], ['SS', '47,500'],
+          ['D', '小規模ホール'], ['C', '中規模ホール'], ['B', '大規模ホール'],
+          ['A', 'アリーナ'], ['S', '大型アリーナ'], ['SS', 'ドーム級'],
         ] },
-      { type: 'p', text: '<b>D→C→B→A→S→SSの順でファンが会場に足を運びやすくなります。</b>' },
+      { type: 'p', text: '<b>小規模な会場から段階的にステップアップしていくことで、ファンが会場に足を運びやすくなります。</b>' },
       { type: 'table',
         head: ['チケット種別'],
         rows: [
@@ -138,8 +149,7 @@ const HELP_SECTIONS = [
           ['注釈'],
           ['ステージバック'],
         ] },
-      { type: 'p', text: '<b>曜日によって会場の埋まりやすさが異なります。</b>' },
-      { type: 'p', text: '<b>ライブの収容率や会場の規模によって得られる経験点が異なります。</b>' },
+      { type: 'p', text: '<b>曜日や会場の規模によって集客のしやすさや得られる経験点が異なります。</b>' },
     ],
   },
   {
@@ -147,7 +157,7 @@ const HELP_SECTIONS = [
     title: 'ファン数',
     blocks: [
       { type: 'p', text: 'ファン層には3種類あり、<b>コア／ファン／ライト</b>です。' },
-      { type: 'p', text: '<b>コア &gt; ファン &gt; ライト</b>の関係で、ライブ会場によく足を運びます。' },
+      { type: 'p', text: '<b>コア &gt; ファン &gt; ライト</b>の順に熱量が高く、ライブ会場によく足を運びます。' },
     ],
   },
   {
@@ -157,8 +167,8 @@ const HELP_SECTIONS = [
       { type: 'p', text: 'レッスンやライブで体力を消費します。休養や週ごとの回復で体力を戻せます。体力が少ない状態が続くと、ケガや体調不良のリスクが高まり、発生中は練習に参加できません。' },
       { type: 'p', text: 'ケガや体調不良の回復にかかる期間は状態によって異なります。メンバー一覧で回復状況を確認できます。' },
       { type: 'ul', items: [
-        '休養日を設けると、通常より体力が大きく回復します。',
-        'マネージャーのメンタルケアが高いほど、特別強化によるケガや体調不良のリスクが下がります。',
+        'こまめに休養日を設けると、体力を安全に保ちながら活動できます。',
+        'マネージャーのメンタルケアが高いほど、過酷なスケジュールによるケガや体調不良のリスクが下がります。',
         '1週間の休暇を取ると、全員の体力が大きく回復します。',
       ] },
     ],
@@ -172,39 +182,3 @@ const HELP_SECTIONS = [
     ],
   },
 ];
-
-// ヘルプモーダルを開く
-function openHelpModal() {
-  const modal = document.getElementById('help-modal');
-  if (!modal) return;
-  modal.querySelector('.help-body').innerHTML = renderHelpContent();
-  modal.style.display = 'flex';
-}
-
-function closeHelpModal() {
-  const modal = document.getElementById('help-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-// ヘルプ本文をHTML化
-function renderHelpContent() {
-  return HELP_SECTIONS.map(section => `
-    <section class="help-section">
-      <h4 class="help-section-title">${escapeHtml(section.title)}</h4>
-      ${section.blocks.map(renderHelpBlock).join('')}
-    </section>
-  `).join('');
-}
-
-function renderHelpBlock(block) {
-  if (block.type === 'p') return `<p class="help-p">${block.text}</p>`;
-  if (block.type === 'ul') {
-    return `<ul class="help-ul">${block.items.map(item => `<li>${item}</li>`).join('')}</ul>`;
-  }
-  if (block.type === 'table') {
-    const head = block.head ? `<tr>${block.head.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>` : '';
-    const rows = block.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-    return `<table class="help-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
-  }
-  return '';
-}
