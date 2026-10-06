@@ -378,9 +378,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     if (titleEl) titleEl.textContent = title;
 
     try {
-      const isFirstEver = (yearTarget === 1 && startM === 1 && (!rivalLiveBookings || rivalLiveBookings.length === 0));
       if (typeof generateRivalsAndGeneralSchedule === 'function') {
-        generateRivalsAndGeneralSchedule(yearTarget, startM, isFirstEver);
+        generateRivalsAndGeneralSchedule(yearTarget, 1, true);
       }
     } catch (err) {
       console.warn('Rival schedule generation warning:', err);
@@ -576,7 +575,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'event-benefit')" style="padding:6px; font-size:10px; background:#fdf0da; border:1px solid #b8742a; color:#8a5a12; border-radius:4px; font-weight:bold; cursor:pointer;">🎁 特典イベントに設定</button>
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'event-other')" style="padding:6px; font-size:10px; background:#fafafa; border:1px solid #ccc; color:#555; border-radius:4px; font-weight:bold; cursor:pointer;">📌 その他イベントに設定</button>
             <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'release-live')" style="padding:6px; font-size:10px; background:#ede7f6; border:1px solid #4527a0; color:#4527a0; border-radius:4px; font-weight:bold; cursor:pointer;">💿+🎤 CD発売＋ライブ</button>
-            <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'delete')" style="padding:6px; font-size:10px; background:#ffebee; border:1px solid #c62828; color:#c62828; border-radius:4px; font-weight:bold; cursor:pointer;">🗑️ 削除する</button>
+            <button type="button" class="plan-act-btn" onclick="applyScheduleAction(${m}, 'delete')" style="padding:6px; font-size:10px; background:#ffebee; border:1px solid #c62828; color:#c62828; border-radius:4px; font-weight:bold; cursor:pointer;">🗑️️ 削除する</button>
           </div>
           <button type="button" id="multiselect-btn-${m}" onclick="toggleMultiSelectMode(${m})" style="padding:6px; font-size:10px; background:#fafafa; border:1px dashed var(--primary); color:var(--primary); border-radius:4px; font-weight:bold; cursor:pointer;">📦 複数選択モード: OFF (単独クリック)</button>
         </div>
@@ -1040,7 +1039,7 @@ function openPlanningManual() {
   if (currentMonth >= 7) {
     openDecisionModal('翌年1月〜6月の計画策定', currentYear + 1, 1, 6);
   } else {
-    openDecisionModal('当年7月〜12月の計画策定', currentYear, 7, 12);
+    openDecisionModal('当年1月〜6月の計画策定', currentYear, 1, 6);
   }
 }
 
@@ -1208,8 +1207,12 @@ function initGame(slot, startFresh) {
   }
 
   if (startFresh) {
+    // 🌟 新規ゲーム開始時に1年分のライバル予定を確実に生成し、1月〜6月の計画策定からスタート
+    if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      generateRivalsAndGeneralSchedule(1, 1, true);
+    }
     if (typeof openDecisionModal === 'function') {
-      openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
+      openDecisionModal('当年1月〜6月の計画策定', 1, 1, 6);
     }
   } else {
     if (typeof openPendingModal === 'function') {
