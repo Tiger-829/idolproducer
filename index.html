@@ -18,7 +18,6 @@
 </head>
 <body>
 
-<!-- ▼ 画面全体を包み込む親ラッパーを追加 -->
 <div class="app-wrapper">
 
   <main class="title-screen" id="title-screen">
@@ -45,9 +44,8 @@
 
     <nav class="page-nav" id="page-nav" role="tablist" aria-label="ゲームページ"></nav>
 
-    <!-- グループ画面（初期状態は hidden） -->
+    <!-- グループ画面 -->
     <section class="page-panel" id="page-group" role="tabpanel" aria-labelledby="page-tab-group" hidden>
-      <!-- チーム総合力カード -->
       <div class="team-summary-card">
         <div class="team-header">
           <div>
@@ -77,7 +75,7 @@
       </div>
     </section>
 
-    <!-- 編成画面（初期状態は hidden） -->
+    <!-- 編成画面 -->
     <section class="page-panel" id="page-formation" role="tabpanel" aria-labelledby="page-tab-formation" hidden>
       <div class="roster-card">
         <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
@@ -97,7 +95,7 @@
       </div>
     </section>
 
-    <!-- 事務所画面（※初期表示をここに設定ため hidden を削除） -->
+    <!-- 事務所画面 -->
     <section class="page-panel" id="page-office" role="tabpanel" aria-labelledby="page-tab-office">
       <div class="calendar-card" id="calendar-visual"></div>
       <div class="weekly-action-panel" id="weekly-action-panel"></div>
@@ -121,15 +119,14 @@
       </section>
       <!-- アクションボタン -->
       <div class="actions">
-        <button class="danger-btn" style="width:100%; margin-bottom:6px;" onclick="openPlanningCalendar()">📅 半年計画カレンダーを開く（6か月分）</button>
         <div style="display:flex; gap:6px;">
-          <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">半年計画を確認/編集</button>
+          <button class="danger-btn" style="flex:1;" onclick="openPlanningManual()">📅 半年計画を確認/編集</button>
           <button class="danger-btn" style="flex:1;" onclick="returnToTitle()">タイトルへ戻る</button>
         </div>
       </div>
     </section>
 
-    <!-- 資金画面（初期状態は hidden） -->
+    <!-- 資金画面 -->
     <section class="page-panel" id="page-funds" role="tabpanel" aria-labelledby="page-tab-funds" hidden>
       <h2 class="page-title">資金</h2>
       <div class="funds-card">
@@ -154,14 +151,14 @@
       <div class="office-maintenance-note" id="salary-note"></div>
     </section>
 
-    <!-- 順位画面（初期状態は hidden） -->
+    <!-- 順位画面 -->
     <section class="page-panel" id="page-ranking" role="tabpanel" aria-labelledby="page-tab-ranking" hidden>
       <h2 class="page-title">業界順位</h2>
       <div class="ranking-note" id="ranking-note"></div>
       <div class="ranking-list" id="ranking-list"></div>
     </section>
 
-    <!-- 記録画面（初期状態は hidden） -->
+    <!-- 記録画面 -->
     <section class="page-panel" id="page-records" role="tabpanel" aria-labelledby="page-tab-records" hidden>
       <h2 class="page-title">最新の記録</h2>
       
@@ -188,11 +185,10 @@
     </section>
   </div>
 
-</div><!-- ▲ app-wrapper ここまで -->
+</div>
 
 <div class="modal-overlay" id="selection-modal"></div>
 
-<!-- 月次収支報告 -->
 <div class="modal-overlay" id="monthly-report-modal">
   <div class="modal-content" style="max-width: 560px;">
     <h3 class="page-title" style="margin:0 0 8px;" id="monthly-report-title">月間収支報告</h3>
@@ -201,7 +197,6 @@
   </div>
 </div>
 
-<!-- 楽曲ごとの発売後1年間の累積売上推移 -->
 <div class="modal-overlay" id="song-detail-modal">
   <div class="modal-content song-detail-modal-content">
     <h3 class="page-title" style="margin:0 0 8px;" id="song-detail-title">楽曲</h3>
@@ -212,7 +207,6 @@
   </div>
 </div>
 
-<!-- ライブ後の詳細収支（表） -->
 <div class="modal-overlay" id="live-finance-modal">
   <div class="modal-content live-finance-modal-content">
     <h3 class="page-title" style="margin:0 0 8px;">ライブ収支</h3>
@@ -222,7 +216,6 @@
   </div>
 </div>
 
-<!-- ゲーム説明 -->
 <div class="modal-overlay" id="help-modal">
   <div class="modal-content help-modal-content">
     <h3 class="page-title" style="margin:0 0 8px;">ゲーム説明</h3>
@@ -286,50 +279,18 @@
   </div>
 </div>
 
-<!-- 半年計画策定モーダル -->
+<!-- 半年計画策定モーダル（右上に閉じる×ボタンを追加） -->
 <div class="modal-overlay" id="decision-modal">
-  <div class="modal-content">
+  <div class="modal-content" style="position: relative;">
+    <button type="button" onclick="closeDecisionModal()" style="position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 16px; cursor: pointer; color: #666;" aria-label="閉じる">✕</button>
     <h3 id="modal-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画の策定</h3>
     
-    <!-- ▼ 【追加】1つ前の半年分の概略を表示するエリア -->
     <div id="prev-plan-summary" style="margin-bottom: 10px; padding: 8px; background: #fafafa; border: 1px solid #eee; border-radius: 4px; font-size: 11px; color: #555;">
       前回の計画データはありません。
     </div>
     <p style="font-size:11px; color:#666;">各月のシングル/アルバム発売とライブ会場を決定してください。</p>
-    <button class="plan-booth-btn" style="margin:0 0 8px;" onclick="openPlanningCalendar()">📅 6か月分のカレンダーを開く</button>
     <div id="plan-rows"></div>
     <button class="main-btn" style="width:100%; margin-top:12px;" onclick="saveDecisionPlan()">この計画で決定する</button>
-  </div>
-</div>
-
-<!-- 半年計画カレンダー（6か月分） -->
-<div class="modal-overlay" id="plan-calendar-modal" style="z-index: 1000;">
-  <div class="modal-content" style="max-width: 560px;">
-    <h3 id="plan-calendar-title" style="margin-top:0; color:var(--primary); font-size:15px;">半年計画カレンダー</h3>
-    <p class="plan-calendar-lead">
-      日付をタップして選び、上のボタンで<b>CD発売</b>／<b>ライブ</b>／<b>イベント（CD関連）</b>の日程を一括で設定します。<br>
-      選び終えたら「月ごとのブースで詳細設定へ」で、会場・ライブ名・楽曲名などを詰めます。
-    </p>
-    <div class="plan-calendar-toolbar">
-      <div class="plan-calendar-actions">
-        <button type="button" onclick="applyPlanCalendarMark('release')">CD発売に設定</button>
-        <button type="button" onclick="applyPlanCalendarMark('live')">ライブに設定</button>
-        <button type="button" onclick="applyPlanCalendarMark('event')">イベントに設定</button>
-        <button type="ghost" type="button" onclick="applyPlanCalendarMark('clear')">ライブ・イベントを解除</button>
-        <button type="ghost" id="plan-calendar-range-toggle" type="button" onclick="togglePlanCalendarRangeMode()">範囲選択: OFF</button>
-        <button type="ghost" type="button" onclick="clearPlanCalendarSelection()">選択を解除</button>
-      </div>
-      <div class="plan-calendar-selection" id="plan-calendar-selection"></div>
-    </div>
-    <div class="plan-calendar-legend">
-      <span><i style="background:#2f6fb5;"></i>CD発売</span>
-      <span><i style="background:#2f7d63;"></i>ライブ</span>
-      <span><i style="background:#b8742a;"></i>イベント</span>
-      <span><i style="background:#c88738;"></i>他グループ公演</span>
-      <span><i style="background:#6b4fc7;"></i>放送</span>
-    </div>
-    <div class="plan-calendar-grid" id="plan-calendar-grid"></div>
-    <button class="main-btn" style="width:100%; margin-top:12px;" onclick="closePlanCalendar()">月ごとのブースで詳細設定へ</button>
   </div>
 </div>
 
