@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全統合版）
+// 12-ui-plan-save.js : 半年計画・カレンダー・セーブ（完全統合版・確認用カレンダー非干渉化）
 // ==========================================
 
 let planYearTarget = 1;
@@ -79,7 +79,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
       <input type="date" class="show-date-input" id="show-date-${month}-${index}-${dateIndex}"
-        value="${dateKey || ''}" onchange="updateShowDateNote(${month}, ${index})">
+        value="${dateKey || ''}" onchange="updateShowDateNote(${month}, ${index}); if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();">
       <label style="font-size:11px; display:flex; align-items:center; gap:2px; white-space:nowrap; cursor:pointer;">
         <input type="checkbox" class="show-stream-input" id="show-stream-${month}-${index}-${dateIndex}"
           ${isStream ? 'checked' : ''} onchange="updateShowDateNote(${month}, ${index})">
@@ -230,6 +230,10 @@ function updateShowDateNote(month, index) {
   });
 
   note.innerHTML = `公演数: ${dates.length}公演（配信${streamCount}公演）${warning}<br>諸経費(基本): ${formatMoney(exp.baseCost)} / 配信費用: ${formatMoney(exp.streamCost)}（合計 ${formatMoney(exp.totalCost)}）`;
+  
+  if (typeof renderEmbeddedPlanCalendar === 'function') {
+    renderEmbeddedPlanCalendar();
+  }
 }
 
 function addShowDate(month, index) {
@@ -240,6 +244,7 @@ function addShowDate(month, index) {
   tempWrapper.innerHTML = renderShowDateRow(month, index, dateIndex, '', true);
   container.appendChild(tempWrapper.firstElementChild);
   updateShowDateNote(month, index);
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function removeShowDate(month, index, dateIndex) {
@@ -248,6 +253,7 @@ function removeShowDate(month, index, dateIndex) {
   const row = container.querySelector(`.show-date-row[data-show-index="${dateIndex}"]`);
   if (row) row.remove();
   updateShowDateNote(month, index);
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function addLiveSlot(month) {
@@ -276,6 +282,7 @@ function addLiveSlot(month) {
   applyVenueStandardPrices(month, currentCount);
   updateSeatPlanOptions(month, currentCount);
   updateShowDateNote(month, currentCount);
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function removeLiveSlot(month, index) {
@@ -283,6 +290,7 @@ function removeLiveSlot(month, index) {
   if (!container) return;
   const slotEl = container.querySelector(`.live-slot[data-slot-index="${index}"]`);
   if (slotEl) slotEl.remove();
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function applyVenueStandardPrices(month, index) {
@@ -327,7 +335,7 @@ function renderPlanEventsHtml(month) {
         <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px;">
           ${eventTypes.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
         </select>
-        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value)" style="font-size:11px;">
+        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();" style="font-size:11px;">
         <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
       </div>`;
   }).join('');
@@ -355,6 +363,7 @@ function removePlanEvent(month, index) {
     drafts.splice(index, 1);
   }
   refreshPlanEventsContainer(month);
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function updatePlanEventBenefit(month, index, benefitId) {
@@ -369,6 +378,7 @@ function updatePlanEventDate(month, index, dateVal) {
   if (drafts[index]) {
     drafts[index].date = dateVal;
   }
+  if (typeof renderEmbeddedPlanCalendar === 'function') renderEmbeddedPlanCalendar();
 }
 
 function refreshPlanEventsContainer(month) {
@@ -378,7 +388,9 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// 半年計画策定モーダル
+// ==========================================
+// 半年計画策定モーダル（月別ブース ＋ 横並び確認用カレンダー）
+// ==========================================
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -494,6 +506,25 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + yearTarget);
 
+    // 全体レイアウト構築：確認用カレンダーと月別ブースの配置
+    const wrapperDiv = document.createElement('div');
+    wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
+
+    // 1. カレンダー確認エリア（6か月分の予定印つきカレンダーを常時表示）
+    const calendarPreviewSection = document.createElement('div');
+    calendarPreviewSection.style.cssText = 'background: #fff; border: 1px solid #eadde1; padding: 10px; border-radius: 6px; margin-bottom: 10px;';
+    calendarPreviewSection.innerHTML = `<div style="font-size: 12px; font-weight: bold; color: var(--primary); margin-bottom: 6px;">📅 半年スケジュール確認カレンダー（予定の印つき）</div>`;
+    
+    const calendarGridContainer = document.createElement('div');
+    calendarGridContainer.id = 'embedded-plan-calendar-grid';
+    calendarGridContainer.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px;';
+    calendarPreviewSection.appendChild(calendarGridContainer);
+    wrapperDiv.appendChild(calendarPreviewSection);
+
+    // 2. 月別ブース設定エリア
+    const boothsSection = document.createElement('div');
+    boothsSection.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+
     for (let m = startM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
       const monthRivals = rivals.filter(b => {
@@ -501,14 +532,13 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         return bDate.startsWith(targetMonthPrefix);
       });
 
-      // 🌟 ライバル動向を日付順（昇順）にきれいにソート
+      // 日付順（昇順）にソート
       monthRivals.sort((a, b) => {
         const dateA = a.liveDate || a.date || (Array.isArray(a.liveDates) ? a.liveDates[0] : '') || '';
         const dateB = b.liveDate || b.date || (Array.isArray(b.liveDates) ? b.liveDates[0] : '') || '';
         return dateA.localeCompare(dateB);
       });
 
-      // 🌟 月別ブースでのライバル動向一覧（グループ名・会場名・連日表示対応）
       const monthRivalsHtml = monthRivals.length > 0 
         ? `<div style="background:#f9f9f9; border:1px solid #ddd; padding:8px; border-radius:4px; font-size:11px; margin-bottom:8px; max-height:130px; overflow-y:auto;">
              <strong style="color:#d9534f;">📌 今月のライバル動向 (${monthRivals.length}件・日付順)</strong>
@@ -572,7 +602,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         <div class="plan-month-title">${m}月の活動方針</div>
         ${monthRivalsHtml}
         <label class="weekly-member-target" for="sel-rel-${m}">CD発売
-          <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m})" ${isPreset ? 'disabled' : ''}>
+          <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m}); if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();" ${isPreset ? 'disabled' : ''}>
             <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
             <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
             <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
@@ -583,7 +613,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
           </label>
           <label class="weekly-member-target" for="rel-date-${m}">発売日
-            <input type="date" id="rel-date-${m}" value="${defaultRelDate}">
+            <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="if(typeof renderEmbeddedPlanCalendar==='function') renderEmbeddedPlanCalendar();">
           </label>
           <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
             <select id="sel-benefit-${m}">
@@ -606,13 +636,19 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         </div>
         <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
       `;
-      container.appendChild(monthBlock);
+      boothsSection.appendChild(monthBlock);
       updateReleaseDateOptions(m);
       liveSlots.forEach((_, idx) => {
         updateSeatPlanOptions(m, idx);
         updateShowDateNote(m, idx);
       });
     }
+
+    wrapperDiv.appendChild(boothsSection);
+    container.appendChild(wrapperDiv);
+
+    // 確認用カレンダーの描画を実行
+    renderEmbeddedPlanCalendar();
 
     const modal = document.getElementById('decision-modal');
     if (modal) modal.style.display = 'flex';
@@ -621,6 +657,87 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     alert('半年計画画面を開く際にエラーが発生しました。');
   }
 }
+
+// ==========================================
+// 6か月分の「予定確認専用カレンダー」描画関数（干渉ゼロ・マーク付与版）
+// ==========================================
+function renderEmbeddedPlanCalendar() {
+  const container = document.getElementById('embedded-plan-calendar-grid');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
+  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
+  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
+
+  for (let m = planStartM; m <= planEndM; m++) {
+    const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
+    const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
+
+    let cells = weekdays.map(w => `<span style="text-align:center; font-size:9px; color:#777; font-weight:bold;">${w}</span>`).join('');
+
+    for (let c = 0; c < 42; c++) {
+      const day = c - firstWeekday + 1;
+      if (day < 1 || day > daysInMonth) {
+        cells += `<span style="min-height:20px;"></span>`;
+        continue;
+      }
+
+      const dateObj = new Date(actualYear, m - 1, day, 12);
+      const dateKey = toDateKey(dateObj);
+      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+
+      const isRelease = getPlanReleaseDate(m) === dateKey;
+      const liveEntries = readLiveSlotInputs(m);
+      const isLive = liveEntries.some(slot => slot.liveDates.includes(dateKey));
+      const eventDrafts = getPlanMonthEventDrafts(m);
+      const isEvent = eventDrafts.some(event => event.date === dateKey);
+
+      const rivalConflicts = rivals.filter(booking => {
+        if (!booking) return false;
+        const bDate = booking.liveDate || booking.date || '';
+        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
+        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
+      });
+      const hasRival = rivalConflicts.length > 0;
+
+      let bgStyle = 'background:#fafafa; color:#444;';
+      let dotIndicator = '';
+      if (isRelease) {
+        bgStyle = 'background:#e2eefc; color:#12447e; font-weight:bold;';
+        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#12447e; border-radius:50%; margin:0 auto;"></i>';
+      } else if (isLive) {
+        bgStyle = 'background:#e0f1ea; color:#1f5c49; font-weight:bold;';
+        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#1f5c49; border-radius:50%; margin:0 auto;"></i>';
+      } else if (hasRival) {
+        bgStyle = 'background:#fdf6ec; color:#b8860b;';
+        dotIndicator = '<i style="display:block; width:3px; height:3px; background:#c88738; border-radius:50%; margin:0 auto;"></i>';
+      }
+
+      const rivalTitles = rivalConflicts.map(rc => {
+        const gName = rc.groupName || rc.name || rc.teamName || '他グループ';
+        const vName = rc.liveVenue || rc.venue || rc.place || '';
+        const isRel = rc.type === 'release' || (rc.liveName && rc.liveName.includes('リリース'));
+        const kind = isRel ? '【CD発売】' : '【ライブ】';
+        return `[${gName}] ${kind} ${rc.liveName || rc.liveVenue || '公演'} @${vName}`;
+      }).join('\n');
+
+      const titleAttr = rivalTitles ? `title="他グループ:\n${escapeHtml(rivalTitles)}"` : '';
+
+      cells += `<span style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:22px; font-size:9px; border-radius:3px; ${bgStyle} cursor:default;" ${titleAttr}>${day}${dotIndicator}</span>`;
+    }
+
+    const monthBox = document.createElement('div');
+    monthBox.style.cssText = 'border: 1px solid #eee; padding: 4px; border-radius: 4px; background: #fff;';
+    monthBox.innerHTML = `<div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 2px; text-align: center;">${actualYear}年${m}月</div><div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;">${cells}</div>`;
+    container.appendChild(monthBox);
+  }
+}
+
+// 旧モーダル用カレンダーのプレースホルダー（エラー防止）
+function openPlanCalendar() {}
+function closePlanCalendar() {}
+function renderPlanCalendarGrid() {}
 
 function updateReleaseDateOptions(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
@@ -727,7 +844,6 @@ function saveDecisionPlan() {
 
   generateRivalsAndGeneralSchedule(planYearTarget, planStartM);
 
-  closePlanCalendar();
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
   setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定し、ライバルグループの新しいスケジュールが発表されました。`);
@@ -743,221 +859,7 @@ function openPlanningManual() {
 }
 
 function openPlanningCalendar() {
-  const targetYear = currentMonth >= 7 ? currentYear + 1 : currentYear;
-  const startM = currentMonth >= 7 ? 1 : 7;
-  const endM = currentMonth >= 7 ? 6 : 12;
-  openDecisionModal(`${targetYear}年${startM}月〜${endM}月の計画策定`, targetYear, startM, endM);
-  openPlanCalendar();
-}
-
-function openPlanCalendar() {
-  planCalendarMonth = planStartM;
-  planCalendarYear = planYearTarget;
-  planCalendarSelection = [];
-  const modal = document.getElementById('plan-calendar-modal');
-  if (modal) modal.style.display = 'flex';
-  renderPlanCalendarGrid();
-}
-
-function closePlanCalendar() {
-  const modal = document.getElementById('plan-calendar-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-function renderPlanCalendarGrid() {
-  const container = document.getElementById('plan-calendar-grid');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2025 + (planYearTarget - currentYear));
-  const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
-  
-  const rivals = Array.isArray(rivalLiveBookings) ? rivalLiveBookings : [];
-  if (!Array.isArray(planCalendarSelection)) planCalendarSelection = [];
-
-  for (let m = planStartM; m <= planEndM; m++) {
-    const firstWeekday = new Date(actualYear, m - 1, 1, 12).getDay();
-    const daysInMonth = new Date(actualYear, m, 0, 12).getDate();
-
-    const monthSheet = document.createElement('div');
-    monthSheet.className = 'plan-calendar-month';
-    monthSheet.innerHTML = `<strong>${actualYear}年${m}月</strong>`;
-
-    const gridDiv = document.createElement('div');
-    gridDiv.className = 'calendar-grid';
-
-    weekdays.forEach(w => {
-      const wSpan = document.createElement('span');
-      wSpan.className = 'calendar-weekday';
-      wSpan.textContent = w;
-      gridDiv.appendChild(wSpan);
-    });
-
-    for (let c = 0; c < 42; c++) {
-      const day = c - firstWeekday + 1;
-      const daySpan = document.createElement('span');
-
-      if (day < 1 || day > daysInMonth) {
-        daySpan.className = 'calendar-day';
-        daySpan.setAttribute('aria-hidden', 'true');
-        gridDiv.appendChild(daySpan);
-        continue;
-      }
-      
-      const dateObj = new Date(actualYear, m - 1, day, 12);
-      const dateKey = toDateKey(dateObj);
-      const monthDayKey = String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-      
-      const isSelected = planCalendarSelection.includes(dateKey);
-      const isRelease = getPlanReleaseDate(m) === dateKey;
-      const liveEntries = readLiveSlotInputs(m);
-      const isLive = liveEntries.some(slot => slot.liveDates.includes(dateKey));
-      const eventDrafts = getPlanMonthEventDrafts(m);
-      const isEvent = eventDrafts.some(event => event.date === dateKey);
-
-      const rivalConflicts = rivals.filter(booking => {
-        if (!booking) return false;
-        const bDate = booking.liveDate || booking.date || '';
-        const bDates = Array.isArray(booking.liveDates) ? booking.liveDates : [];
-        return bDate === dateKey || bDate.endsWith(monthDayKey) || bDates.includes(dateKey) || bDates.some(d => d.endsWith(monthDayKey));
-      });
-
-      const hasRival = rivalConflicts.length > 0;
-
-      let classList = ['calendar-day'];
-      if (isSelected) classList.push('plan-selected');
-      if (isRelease) classList.push('release-day');
-      if (isLive) classList.push('live-day');
-      if (isEvent) classList.push('plan-event-day');
-      if (hasRival) classList.push('rival-live-day');
-
-      daySpan.className = classList.join(' ');
-      daySpan.textContent = day;
-      
-      // 🌟 クリックが確実に機能しているかを視覚・コンソールで強制確認できるようにする
-      daySpan.style.cursor = 'pointer';
-
-      daySpan.addEventListener('click', (e) => {
-        e.stopPropagation();
-        console.log("🔥 カレンダー日付がクリックされました:", dateKey);
-        togglePlanCalendarDate(dateKey);
-      });
-
-      gridDiv.appendChild(daySpan);
-    }
-
-    monthSheet.appendChild(gridDiv);
-    container.appendChild(monthSheet);
-  }
-}
-
-
-function togglePlanCalendarDate(dateKey) {
-  if (!Array.isArray(planCalendarSelection)) {
-    planCalendarSelection = [];
-  }
-
-  const index = planCalendarSelection.indexOf(dateKey);
-  if (index >= 0) {
-    planCalendarSelection.splice(index, 1);
-  } else {
-    if (planCalendarRangeMode && planCalendarSelection.length > 0) {
-      const last = planCalendarSelection[planCalendarSelection.length - 1];
-      const start = new Date(`${last}T12:00:00`);
-      const end = new Date(`${dateKey}T12:00:00`);
-      if (start > end) {
-        const tmp = new Date(start);
-        start.setTime(end.getTime());
-        end.setTime(tmp.getTime());
-      }
-      const curr = new Date(start);
-      while (curr <= end) {
-        const k = toDateKey(curr);
-        if (!planCalendarSelection.includes(k)) {
-          planCalendarSelection.push(k);
-        }
-        curr.setDate(curr.getDate() + 1);
-      }
-    } else {
-      planCalendarSelection.push(dateKey);
-    }
-  }
-
-  renderPlanCalendarGrid();
-}
-
-function clearPlanCalendarSelection() {
-  planCalendarSelection = [];
-  renderPlanCalendarGrid();
-}
-
-function togglePlanCalendarRangeMode() {
-  planCalendarRangeMode = !planCalendarRangeMode;
-  const btn = document.getElementById('plan-calendar-range-toggle');
-  if (btn) btn.textContent = `範囲選択: ${planCalendarRangeMode ? 'ON' : 'OFF'}`;
-}
-
-function applyPlanCalendarMark(kind) {
-  if (!planCalendarSelection.length) {
-    alert('カレンダー上で日付を選択してください。');
-    return;
-  }
-  planCalendarSelection.forEach(dateKey => {
-    const m = Number(dateKey.slice(5, 7));
-    if (m < planStartM || m > planEndM) return;
-
-    if (kind === 'release') {
-      const relInput = document.getElementById(`rel-date-${m}`);
-      if (relInput) relInput.value = dateKey;
-      const selRel = document.getElementById(`sel-rel-${m}`);
-      if (selRel && selRel.value === 'none') selRel.value = 'single';
-      updateReleaseDateOptions(m);
-    } else if (kind === 'live') {
-      const slots = readLiveSlotInputs(m);
-      if (slots.length > 0) {
-        if (!slots[0].liveDates.includes(dateKey)) {
-          slots[0].liveDates.push(dateKey);
-          slots[0].streamDates.push(dateKey);
-        }
-        const container = document.getElementById(`live-slots-${m}`);
-        if (container) {
-          container.innerHTML = slots.map((s, idx) => renderLiveSlotHtml(m, idx, s)).join('');
-          slots.forEach((_, idx) => {
-            updateSeatPlanOptions(m, idx);
-            updateShowDateNote(m, idx);
-          });
-        }
-      }
-    } else if (kind === 'event') {
-      const drafts = getPlanMonthEventDrafts(m);
-      const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 4;
-      const defaultEventId = typeof DEFAULT_PLAN_EVENT_ID !== 'undefined' ? DEFAULT_PLAN_EVENT_ID : 'handshake';
-      if (drafts.length < maxEvents && !drafts.some(e => e.date === dateKey)) {
-        drafts.push({ benefitId: defaultEventId, date: dateKey, completed: false });
-        refreshPlanEventsContainer(m);
-      }
-    } else if (kind === 'clear') {
-      const slots = readLiveSlotInputs(m);
-      slots.forEach(slot => {
-        slot.liveDates = slot.liveDates.filter(d => d !== dateKey);
-        slot.streamDates = slot.streamDates.filter(d => d !== dateKey);
-      });
-      const container = document.getElementById(`live-slots-${m}`);
-      if (container) {
-        container.innerHTML = slots.map((s, idx) => renderLiveSlotHtml(m, idx, s)).join('');
-        slots.forEach((_, idx) => {
-          updateSeatPlanOptions(m, idx);
-          updateShowDateNote(m, idx);
-        });
-      }
-      const drafts = getPlanMonthEventDrafts(m);
-      planMonthEventDrafts[m] = drafts.filter(e => e.date !== dateKey);
-      refreshPlanEventsContainer(m);
-    }
-  });
-
-  clearPlanCalendarSelection();
-  renderPlanCalendarGrid();
+  openPlanningManual();
 }
 
 // ==========================================
@@ -1080,7 +982,6 @@ function initGame(slot, startFresh) {
           throw new Error('セーブデータの形式が無効です。');
         }
 
-        // 古いデータ構造の不整合を自動補完
         data.rivalLiveBookings = Array.isArray(data.rivalLiveBookings) ? data.rivalLiveBookings : [];
         data.productionSchedule = (data.productionSchedule && typeof data.productionSchedule === 'object') ? data.productionSchedule : {};
         data.idolRoster = Array.isArray(data.idolRoster) ? data.idolRoster : [];
