@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（全機能保持）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー月移動機能統合）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -65,7 +65,6 @@ function renderPageNav(activePage) {
     }).join('');
   }
 
-  // 全タブパネルの表示・非表示を強制同期
   tabs.forEach(tab => {
     const panel = document.getElementById(`page-${tab.id}`);
     if (panel) {
@@ -188,7 +187,6 @@ function renderWeeklyActionPanel() {
     const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
     const editableSpecialLiveEvents = (typeof getEditableSpecialLiveEventsForWeek === 'function') ? getEditableSpecialLiveEventsForWeek(currentDate) : [];
 
-    // 1. ライブ週の判定
     if (nextLiveDate && !editableSpecialLiveEvents.length) {
       const liveDateKey = (typeof toDateKey === 'function') ? toDateKey(nextLiveDate) : '';
       const liveDate = (typeof getGameDateObject === 'function') ? getGameDateObject(liveDateKey) : new Date();
@@ -216,7 +214,6 @@ function renderWeeklyActionPanel() {
       return;
     }
 
-    // 2. 曜日判定（水曜日以外＝3以外なら進行ボタンを表示）
     if (currentDate.getDay() !== 3) {
       const nextWed = (typeof getNextWednesday === 'function') 
         ? getNextWednesday(currentDate) 
@@ -235,7 +232,6 @@ function renderWeeklyActionPanel() {
       return;
     }
 
-    // 3. 水曜日の場合：14枠スケジュール設定UIを出力
     const notes = getWeeklyEventNoteEvents(events);
     const externalLiveNotes = editableSpecialLiveEvents.map(event =>
       `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
@@ -266,7 +262,6 @@ function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
-// スケジュール設定UIコントロール（14枠・個別レッスン10.1倍・休養日設定完全版）
 function renderWeeklyScheduleControls() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = {
@@ -503,18 +498,109 @@ function getIndividualLessonMemberOptions() {
   return center ? [center, ...rest] : rest;
 }
 
-// カレンダー描画（全マス42日展開完全版）
+// ==========================================
+// 事務所タブのカレンダー（予定が決定済みの月まで `<` `>` で行き来可能）
+// ==========================================
+let officeCalendarViewYear = null;
+let officeCalendarViewMonth = null;
+
+function getOfficeCalendarViewDate() {
+  const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
+  if (officeCalendarViewYear === null || officeCalendarViewMonth === null) {
+    officeCalendarViewYear = currentDate.getFullYear();
+    officeCalendarViewMonth = currentDate.getMonth() + 1;
+  }
+  return { year: officeCalendarViewYear, month: officeCalendarViewMonth };
+}
+
+// 予定が決定・登録されている最大の年月を算出する
+function getMaxScheduledYearMonth() {
+  const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
+  let maxVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
+
+  // 1. 自グループのライブ・発売・イベント予定をチェック
+  if (typeof productionSchedule !== 'undefined' && productionSchedule) {
+    Object.entries(productionSchedule).forEach(([key, plan]) => {
+      if (!plan) return;
+      const [y, m] = key.split('-').map(Number);
+      const actualY = calendarYear && calendarYear > 2000 ? calendarYear + (y - currentYear) : y;
+      const val = actualY * 12 + m;
+      if (val > maxVal) maxVal = val;
+
+      // ライブ日程や発売日が存在する場合も考慮
+      if (plan.releaseDate) {
+        const d = new Date(plan.releaseDate);
+        if (!isNaN(d)) {
+          const v = d.getFullYear() * 12 + (d.getMonth() + 1);
+          if (v > maxVal) maxVal = v;
+        }
+      }
+    });
+  }
+
+  // 2. 登録済みの自グループライブエントリをチェック
+  if (typeof getScheduledLiveEntries === 'function') {
+    getScheduledLiveEntries().forEach(entry => {
+      if (entry && entry.date) {
+        const d = new Date(entry.date);
+        if (!isNaN(d)) {
+          const v = d.getFullYear() * 12 + (d.getMonth() + 1);
+          if (v > maxVal) maxVal = v;
+        }
+      }
+    });
+  }
+
+  // 3. ライバルライブの予約をチェック
+  if (typeof rivalLiveBookings !== 'undefined' && Array.isArray(rivalLiveBookings)) {
+    rivalLiveBookings.forEach(booking => {
+      const bDate = booking?.liveDate || booking?.date || '';
+      if (bDate) {
+        const d = new Date(bDate);
+        if (!isNaN(d)) {
+          const v = d.getFullYear() * 12 + (d.getMonth() + 1);
+          if (v > maxVal) maxVal = v;
+        }
+      }
+    });
+  }
+
+  const year = Math.floor((maxVal - 1) / 12);
+  const month = ((maxVal - 1) % 12) + 1;
+  return { year, month };
+}
+
+function shiftOfficeCalendarMonth(delta) {
+  const v = getOfficeCalendarViewDate();
+  const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
+  const minVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
+  
+  const maxYM = getMaxScheduledYearMonth();
+  const maxVal = maxYM.year * 12 + maxYM.month;
+
+  let currentVal = v.year * 12 + v.month + delta;
+  currentVal = Math.max(minVal, Math.min(maxVal, currentVal));
+
+  officeCalendarViewYear = Math.floor((currentVal - 1) / 12);
+  officeCalendarViewMonth = ((currentVal - 1) % 12) + 1;
+
+  renderGameCalendar();
+}
+
 function renderGameCalendar() {
-  const date = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
-  const shouldFlip = Boolean(typeof lastRenderedCalendarDate !== 'undefined' && lastRenderedCalendarDate && lastRenderedCalendarDate !== gameDate);
-  lastRenderedCalendarDate = typeof gameDate !== 'undefined' ? gameDate : '';
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const today = date.getDate();
+  const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
+  const currentVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
+
+  const v = getOfficeCalendarViewDate();
+  const year = v.year;
+  const month = v.month - 1; // 0-indexed
+  const actualMonthNum = v.month;
+
+  const today = (year === currentDate.getFullYear() && month === currentDate.getMonth()) ? currentDate.getDate() : -1;
   const firstWeekday = new Date(year, month, 1, 12).getDay();
   const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
-  const liveDates = new Set();
 
+  const liveDates = new Set();
   if (typeof getScheduledLiveEntries === 'function') {
     getScheduledLiveEntries().forEach(entry => {
       if (entry && !entry.completed && typeof getLiveEntryDateRange === 'function') {
@@ -584,11 +670,23 @@ function renderGameCalendar() {
     cells += `<span class="${classes}"${title ? ` title="${escapeHtml(title)}"` : ''}>${day}</span>`;
   }
 
+  const minVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
+  const maxYM = getMaxScheduledYearMonth();
+  const maxVal = maxYM.year * 12 + maxYM.month;
+  const currentValNum = year * 12 + actualMonthNum;
+
+  const canPrev = currentValNum > minVal;
+  const canNext = currentValNum < maxVal;
+
   const container = document.getElementById('calendar-visual');
   if (container) {
     container.innerHTML = `
-      <div class="calendar-sheet${shouldFlip ? ' calendar-turn' : ''}">
-        <div class="calendar-month-heading"><strong>${year}年${month + 1}月</strong><span>水曜進行</span></div>
+      <div class="calendar-sheet">
+        <div class="calendar-month-heading" style="display:flex; align-items:center; justify-content:space-between;">
+          <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(-1)" ${canPrev ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canPrev ? 'pointer' : 'default'};">＜</button>
+          <strong>${year}年${actualMonthNum}月</strong>
+          <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(1)" ${canNext ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canNext ? 'pointer' : 'default'};">＞</button>
+        </div>
         <div class="calendar-grid">${cells}</div>
       </div>
     `;
