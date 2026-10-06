@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 特典イベントレイアウト・専用モーダル入力完全版
+// 12-ui-plan-save.js : カレンダータップ選択・特典イベント完全修正版
 // ==========================================
 
 let planYearTarget = 1;
@@ -309,7 +309,6 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
-// 🌟 特典イベント一覧行：セレクトボックス（種類）を左、日付を右に配置
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -375,7 +374,6 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
-// 🌟 特典イベント専用モーダル（種類・イベント名・日程の3項目構成）
 function openBenefitDetailModal(month, dates) {
   pendingBenefitMonth = month;
   pendingBenefitDates = [...dates];
@@ -861,86 +859,38 @@ function renderEmbeddedPlanCalendars() {
   }
 }
 
+// 🌟 【修正】カレンダーのタップは「選択（ハイライト）」の切り替えのみに変更（勝手にライブ日等にならない）
 function handleEmbeddedCalendarClick(month, dateKey) {
   const isMulti = planMultiSelectModes[month];
   if (!Array.isArray(planCalendarSelections[month])) planCalendarSelections[month] = [];
 
-  if (isMulti) {
-    const idx = planCalendarSelections[month].indexOf(dateKey);
-    if (idx >= 0) {
-      planCalendarSelections[month].splice(idx, 1);
+  const idx = planCalendarSelections[month].indexOf(dateKey);
+  if (idx >= 0) {
+    planCalendarSelections[month].splice(idx, 1);
+  } else {
+    if (!isMulti) {
+      planCalendarSelections[month] = [dateKey];
     } else {
       planCalendarSelections[month].push(dateKey);
     }
-    renderEmbeddedPlanCalendars();
-  } else {
-    toggleEmbeddedCalendarDate(month, dateKey);
   }
+  renderEmbeddedPlanCalendars();
 }
 
 function toggleEmbeddedCalendarDate(month, dateKey) {
-  const slots = readLiveSlotInputs(month);
-  if (slots.length > 0) {
-    const slot = slots[0];
-    if (!Array.isArray(slot.liveDates)) slot.liveDates = [];
-    if (!Array.isArray(slot.streamDates)) slot.streamDates = [];
-
-    const idx = slot.liveDates.indexOf(dateKey);
-    if (idx >= 0) {
-      slot.liveDates.splice(idx, 1);
-      slot.streamDates = slot.streamDates.filter(d => d !== dateKey);
-    } else {
-      slot.liveDates.push(dateKey);
-      slot.streamDates.push(dateKey);
-      slot.liveDates.sort();
-    }
-
-    const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
-    if (showDatesContainer) {
-      showDatesContainer.innerHTML = slot.liveDates.map((dKey, dIdx) => 
-        renderShowDateRow(month, 0, dIdx, dKey, slot.streamDates.includes(dKey))
-      ).join('');
-    }
-    updateShowDateNote(month, 0);
-    renderEmbeddedPlanCalendars();
-  } else {
-    addLiveSlot(month);
-    const slotsNew = readLiveSlotInputs(month);
-    if (slotsNew.length > 0) {
-      slotsNew[0].liveDates = [dateKey];
-      slotsNew[0].streamDates = [dateKey];
-      const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
-      if (showDatesContainer) {
-        showDatesContainer.innerHTML = renderShowDateRow(month, 0, 0, dateKey, true);
-      }
-      updateShowDateNote(month, 0);
-      renderEmbeddedPlanCalendars();
-    }
-  }
+  handleEmbeddedCalendarClick(month, dateKey);
 }
 
 function applyScheduleAction(month, actionType) {
   const isMulti = planMultiSelectModes[month];
   const selections = planCalendarSelections[month] || [];
 
-  let targetDates = [];
-
-  if (isMulti) {
-    // 複数選択モードの場合：選ばれているすべての डेट を対象にする
-    if (selections.length === 0) {
-      alert('カレンダー上で対象の日付を選択してください。');
-      return;
-    }
-    targetDates = [...selections];
-  } else {
-    // 🌟 【修正】単独モードの場合：カレンダーでタップして選択した日付があればそれを優先、なければデフォルトの水曜日
-    if (selections.length > 0) {
-      targetDates = [selections[0]];
-    } else {
-      const defaultDate = getPlanReleaseDefaultWednesday(month);
-      targetDates = [defaultDate];
-    }
+  if (selections.length === 0) {
+    alert('カレンダー上で対象の日付をタップして選択してください。');
+    return;
   }
+
+  let targetDates = [...selections];
 
   if (actionType === 'live') {
     const slots = readLiveSlotInputs(month);
@@ -978,7 +928,7 @@ function applyScheduleAction(month, actionType) {
       updateReleaseDateOptions(month);
     }
   } else if (actionType === 'event-benefit') {
-    // 🌟 単独モードでも複数選択モードでも、選んだ日付をそのまま特典イベント設定モーダルに渡す
+    // 🌟 選択した日付をそのまま特典イベント設定モーダルへ渡す
     openBenefitDetailModal(month, targetDates);
     return;
   } else if (actionType === 'event-other') {
@@ -1055,7 +1005,6 @@ function applyScheduleAction(month, actionType) {
   renderEmbeddedPlanCalendars();
 }
 
-
 function openPlanCalendar() {}
 function closePlanCalendar() {}
 function renderPlanCalendarGrid() {}
@@ -1097,6 +1046,16 @@ function validatePlanLiveSlots(month, liveSlots) {
         return false;
       }
       usedDates.add(d);
+
+      const parts = d.split('-');
+      if (parts.length === 3) {
+        const m = parseInt(parts[1], 10);
+        const dayNum = parseInt(parts[2], 10);
+        if ((m === 12 && dayNum >= 26) || (m === 1 && dayNum <= 11)) {
+          alert(`${d}は年末年始の活動休止期間（12月26日〜1月11日）のため、ライブを設定できません。別の日程をお選びください。`);
+          return false;
+        }
+      }
 
       if (typeof isBaseballGameDay === 'function' && isBaseballGameDay(slot.liveVenue, d)) {
         alert(`${d}の「${slot.liveVenue}」はプロ野球公式戦の開催日のため、ライブを設定できません。別の日程または会場をお選びください。`);
@@ -1341,6 +1300,10 @@ function openTitleScreen() {
 function returnToTitle() {
   activeSaveSlot = null;
   openTitleScreen();
+}
+
+function initGroup(slot, startFresh) {
+  initGame(slot, startFresh);
 }
 
 function initGame(slot, startFresh) {
