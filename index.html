@@ -189,6 +189,31 @@
 
 <div class="modal-overlay" id="selection-modal"></div>
 
+<!-- 🌟 新規ゲーム初期設定モーダル -->
+<div class="modal-overlay" id="setup-game-modal" style="display: none; align-items: center; justify-content: center;">
+  <div class="modal-content" style="max-width: 440px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:16px;">事務所・グループ初期設定</h3>
+    <p style="font-size:11px; color:#666; margin-bottom:12px;">これからのアイドル活動の第一歩となる名称を決めてください。</p>
+    
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <label style="font-size:12px; font-weight:bold; color:#333;">グループ名
+        <input type="text" id="input-setup-groupname" maxlength="20" value="乃木坂46" style="width:100%; padding:6px; margin-top:4px; box-sizing:border-box; font-size:12px;">
+      </label>
+      <label style="font-size:12px; font-weight:bold; color:#333;">1stシングル曲名
+        <input type="text" id="input-setup-1st-song" maxlength="24" value="ぐるぐるカーテン" style="width:100%; padding:6px; margin-top:4px; box-sizing:border-box; font-size:12px;">
+      </label>
+      <label style="font-size:12px; font-weight:bold; color:#333;">2ndシングル曲名
+        <input type="text" id="input-setup-2nd-song" maxlength="24" value="おいでシャンプー" style="width:100%; padding:6px; margin-top:4px; box-sizing:border-box; font-size:12px;">
+      </label>
+      <label style="font-size:12px; font-weight:bold; color:#333;">ファーストライブ名
+        <input type="text" id="input-setup-live-name" maxlength="40" value="デビュー記念お披露目ライブ" style="width:100%; padding:6px; margin-top:4px; box-sizing:border-box; font-size:12px;">
+      </label>
+    </div>
+
+    <button class="main-btn" style="width:100%; margin-top:16px;" onclick="submitGameSetup()">この内容でプロデュースを開始する</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="monthly-report-modal">
   <div class="modal-content" style="max-width: 560px;">
     <h3 class="page-title" style="margin:0 0 8px;" id="monthly-report-title">月間収支報告</h3>
