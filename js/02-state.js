@@ -1,5 +1,5 @@
 // ==========================================
-// 02-state.js : 全機能完全統合版（プリセット水曜・土日スナップ対応）
+// 02-state.js : 曜日重みづけ・連日公演・会場定義・プリセットスナップ完全統合版
 // ==========================================
 
 let currentYear = 1;
@@ -72,7 +72,7 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// 🌟 ライバルスケジュール自動生成（連日公演・会場名定義完全対応版）
+// 🌟 ライバルスケジュール自動生成（曜日重みづけ・連日公演・会場名定義完全版）
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
@@ -81,6 +81,17 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const targetYearNum = Number(year) || 1;
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
   const actualYear = baseYear + targetYearNum - 1;
+
+  // 🌟 土日・金曜にライブが入りやすくする曜日重みづけ（0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土）
+  const dayWeights = {
+    0: 12, // 日
+    6: 12, // 土
+    5: 8,  // 金
+    2: 5,  // 火
+    3: 5,  // 水
+    4: 3,  // 木
+    1: 1   // 月
+  };
 
   if (Array.isArray(leagueTeams)) {
     leagueTeams.forEach(team => {
@@ -93,6 +104,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       let generatedToursCount = 0;
       let safetyCounter = 0;
 
+      // 1. ライバルのライブツアー予定の生成
       while (generatedToursCount < targetLiveCount && safetyCounter < 400) {
         safetyCounter++;
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
@@ -101,14 +113,33 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const bookingYear = actualYear + targetYearOffset;
 
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
-        const randomDay = 1 + Math.floor(Math.random() * Math.max(1, lastDay - 3));
-        const selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
+        
+        // 🌟 曜日重みづけを反映した日付抽選ロジック
+        let selectedDateObj = null;
+        for (let attempt = 0; attempt < 35; attempt++) {
+          const randomDay = 1 + Math.floor(Math.random() * lastDay);
+          const dObj = new Date(bookingYear, targetMonth - 1, randomDay);
+          const dayOfWeek = dObj.getDay();
+          const weight = dayWeights[dayOfWeek] || 1;
 
+          if (Math.random() * 15 < weight) {
+            selectedDateObj = dObj;
+            break;
+          }
+        }
+
+        if (!selectedDateObj) {
+          const randomDay = 1 + Math.floor(Math.random() * lastDay);
+          selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
+        }
+
+        // VENUE_DATA から正式な会場名を抽出
         const venuePool = (typeof VENUE_DATA !== 'undefined' && Array.isArray(VENUE_DATA)) ? VENUE_DATA : [{ name: '市民会館' }];
         const chosenVenueObj = venuePool[Math.floor(Math.random() * venuePool.length)];
         const venueName = (typeof chosenVenueObj === 'string') ? chosenVenueObj : (chosenVenueObj?.name || '市民会館');
 
-        const durationDays = 2 + Math.floor(Math.random() * 3); // 2, 3, 4日
+        // 2〜4日間の連日公演
+        const durationDays = 2 + Math.floor(Math.random() * 3);
 
         const liveDatesArr = [];
         for (let dIdx = 0; dIdx < durationDays; dIdx++) {
@@ -139,6 +170,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         }
       }
 
+      // 2. ライバルのCDリリース予定の生成
       const cdReleaseCount = generateFullYear ? 4 : 2;
       for (let j = 0; j < cdReleaseCount; j++) {
         const cdMonthOffset = Math.floor((j * (monthSpan / cdReleaseCount)) + Math.random() * 2);
@@ -584,6 +616,7 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
+  // 🌟 新規ゲーム開始時に曜日重みづけを反映した1年分のライバルスケジュールを生成
   generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
 
   idolRoster = [];
