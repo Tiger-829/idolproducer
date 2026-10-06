@@ -4,7 +4,7 @@
 
 let currentYear = 1;
 let currentMonth = 1;
-let currentWeek = 1; // 1〜4週
+let currentWeek = 1;
 let gameDate = '';
 let calendarYear = new Date().getFullYear();
 let lastRenderedCalendarDate = '';
@@ -79,15 +79,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
   const actualYear = baseYear + targetYearNum - 1;
 
-  const dayWeights = {
-    0: 12, // 日
-    6: 12, // 土
-    5: 8,  // 金
-    2: 5,  // 火
-    3: 5,  // 水
-    4: 3,  // 木
-    1: 1   // 月
-  };
+  const dayWeights = { 0: 12, 6: 12, 5: 8, 2: 5, 3: 5, 4: 3, 1: 1 };
 
   if (Array.isArray(leagueTeams) && typeof VENUE_DATA !== 'undefined') {
     leagueTeams.forEach(team => {
@@ -100,7 +92,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
       let generatedDaysCount = 0;
       let safetyCounter = 0;
 
-      while (generatedDaysCount < targetLiveCount && safetyCounter < 200) {
+      while (generatedDaysCount < targetLiveCount && safetyCounter < 300) {
         safetyCounter++;
         const randomMonthOffset = Math.floor(Math.random() * monthSpan);
         const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
@@ -108,7 +100,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         const bookingYear = actualYear + targetYearOffset;
 
         const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
-        
         let selectedDateObj = null;
         for (let attempt = 0; attempt < 30; attempt++) {
           const randomDay = 1 + Math.floor(Math.random() * lastDay);
@@ -128,7 +119,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         }
 
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
-
         const isConsecutive = Math.random() < 0.35;
         let durationDays = 1;
         if (isConsecutive) {
@@ -485,11 +475,9 @@ function initializeNewGameState() {
   currentYear = 1;
   currentMonth = 1;
   currentWeek = 1;
-  calendarYear = new Date().getFullYear(); // 実世界の西暦（2026年）に同期
-  
+  calendarYear = new Date().getFullYear();
   productionSchedule = createInitialProductionSchedule();
   gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
-  
   totalWeeksElapsed = 0;
   draftCount = 0;
   currentRosterTab = 'selected';
@@ -546,7 +534,7 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
-  // 🌟【最重要】新規ゲーム開始時に、初月から12か月分（1年分フル）のライバルスケジュールを強制的にランダム生成する
+  // 🌟 新規ゲーム開始時に1年分（12か月）のライバルスケジュールを確実にランダム生成
   generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
 
   idolRoster = [];
@@ -567,7 +555,6 @@ function initializeNewGameState() {
   groupFansAtYearStart = calculateGroupFans();
   previousYearGroupFansAtYearStart = groupFansAtYearStart;
 }
-
 
 function applySavedGame(data) {
   currentYear = data.currentYear || 1;
