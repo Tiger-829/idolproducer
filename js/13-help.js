@@ -1,7 +1,5 @@
 // ==========================================
 // ゲーム内ヘルプ（設定画面）
-// README.md からプレイヤー向けに整理した説明データを参照する。
-// 仕様が変更されたらこのデータも更新すること。
 // ==========================================
 const HELP_SECTIONS = [
   {
@@ -128,6 +126,7 @@ const HELP_SECTIONS = [
     ],
   },
   {
+    {
     id: 'live',
     title: 'ライブ会場',
     blocks: [
@@ -148,6 +147,7 @@ const HELP_SECTIONS = [
           ['4Fスタンド'],
           ['注釈'],
           ['ステージバック'],
+          ['配信(設定した場合)'],
         ] },
       { type: 'p', text: '<b>曜日や会場の規模によって集客のしやすさや得られる経験点が異なります。</b>' },
     ],
@@ -182,3 +182,44 @@ const HELP_SECTIONS = [
     ],
   },
 ];
+
+// ヘルプモーダルを開く関数
+function openHelpModal() {
+  const modal = document.getElementById('help-modal');
+  if (!modal) return;
+  const body = modal.querySelector('.help-body');
+  if (body) {
+    body.innerHTML = renderHelpContent();
+  }
+  modal.style.display = 'flex';
+}
+
+// ヘルプモーダルを閉じる関数
+function closeHelpModal() {
+  const modal = document.getElementById('help-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// ヘルプ本文をHTML化する関数
+function renderHelpContent() {
+  return HELP_SECTIONS.map(section => `
+    <section class="help-section">
+      <h4 class="help-section-title">${escapeHtml(section.title)}</h4>
+      ${section.blocks.map(renderHelpBlock).join('')}
+    </section>
+  `).join('');
+}
+
+// ブロックごとのHTML生成
+function renderHelpBlock(block) {
+  if (block.type === 'p') return `<p class="help-p">${block.text}</p>`;
+  if (block.type === 'ul') {
+    return `<ul class="help-ul">${block.items.map(item => `<li>${item}</li>`).join('')}</ul>`;
+  }
+  if (block.type === 'table') {
+    const head = block.head ? `<tr>${block.head.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>` : '';
+    const rows = block.rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+    return `<table class="help-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+  }
+  return '';
+}
