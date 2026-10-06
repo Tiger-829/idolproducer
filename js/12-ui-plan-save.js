@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・初期設定統合版
+// 12-ui-plan-save.js : 半年計画・カレンダー操作・初期設定・全機能統合最終完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -12,9 +12,9 @@ let planCalendarSelections = {};
 // 🌟 新規ゲーム初期設定用のカスタム保持変数
 let pendingActiveSlot = null;
 let customGroupName = "スタースコープ";
-let customFirstSong = "雪どけ";
-let customSecondSong = "なつみかん";
-let customFirstLiveName = "Debut Live";
+let customFirstSong = "はじまりの光";
+let customSecondSong = "青春の軌跡";
+let customFirstLiveName = "1stデビューライブ";
 
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
@@ -1033,6 +1033,7 @@ function saveDecisionPlan() {
   updateUI();
 }
 
+// 🌟 1月には7〜12月、7月には翌年上半期のスケジュールを組むサイクル制御
 function openPlanningManual() {
   if (currentYear === 1 && currentMonth < 7) {
     alert('1年目上半期（1〜6月）は初期プリセットスケジュールで固定運用されます。\nプレイヤー自身の計画策定は1年目下半期（7〜12月）からとなります。');
@@ -1040,8 +1041,22 @@ function openPlanningManual() {
   }
   
   if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
+    try {
+      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+        generateRivalsAndGeneralSchedule(currentYear, 7, false);
+      }
+    } catch (e) {
+      console.warn('Rival schedule generation warning (July-Dec):', e);
+    }
     openDecisionModal(`${currentYear}年下半期（7〜12月）の計画策定`, currentYear, 7, 12);
   } else {
+    try {
+      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+        generateRivalsAndGeneralSchedule(currentYear + 1, 1, false);
+      }
+    } catch (e) {
+      console.warn('Rival schedule generation warning (Next Jan-Jun):', e);
+    }
     openDecisionModal(`${currentYear + 1}年上半期（1〜6月）の計画策定`, currentYear + 1, 1, 6);
   }
 }
@@ -1051,7 +1066,7 @@ function openPlanningCalendar() {
 }
 
 // ==========================================
-// 🌟 タイトル画面・セーブ枠管理・新規開始フロー
+// 🌟 タイトル画面・セーブ枠管理・新規開始（プロンプト入力方式）
 // ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
@@ -1123,7 +1138,7 @@ function continueSavedGame(slot) {
   initGame(slot, false);
 }
 
-// 🌟 新規開始ボタンを押したときの処理（まず初期設定モーダルを開く）
+// 🌟 確実に入力を挟むプロンプト方式の新規開始
 function startNewGame(slot) {
   const slotKey = saveSlotKey(slot);
   if (localStorage.getItem(slotKey)) {
@@ -1131,34 +1146,26 @@ function startNewGame(slot) {
       return;
     }
   }
+
+  const group = prompt("プロデュースするグループ名を入力してください:", "スタースコープ");
+  if (group === null) return;
+  if (group.trim()) customGroupName = group.trim();
+
+  const song1 = prompt("1stシングルの曲名を入力してください:", "はじまりの光");
+  if (song1 === null) return;
+  if (song1.trim()) customFirstSong = song1.trim();
+
+  const song2 = prompt("2ndシングルの曲名を入力してください:", "青春の軌跡");
+  if (song2 === null) return;
+  if (song2.trim()) customSecondSong = song2.trim();
+
+  const live = prompt("ファーストライブの名称を入力してください:", "1stデビューライブ");
+  if (live === null) return;
+  if (live.trim()) customFirstLiveName = live.trim();
+
   pendingActiveSlot = slot;
-  const setupModal = document.getElementById('setup-game-modal');
-  if (setupModal) {
-    setupModal.style.display = 'flex';
-  } else {
-    initGame(slot, true);
-  }
-}
-
-// 🌟 初期設定モーダルで「プロデュース開始」を押した時の処理
-function submitGameSetup() {
-  const gNameInput = document.getElementById('input-setup-groupname');
-  const song1Input = document.getElementById('input-setup-1st-song');
-  const song2Input = document.getElementById('input-setup-2nd-song');
-  const liveInput = document.getElementById('input-setup-live-name');
-
-  if (gNameInput && gNameInput.value.trim()) customGroupName = gNameInput.value.trim();
-  if (song1Input && song1Input.value.trim()) customFirstSong = song1Input.value.trim();
-  if (song2Input && song2Input.value.trim()) customSecondSong = song2Input.value.trim();
-  if (liveInput && liveInput.value.trim()) customFirstLiveName = liveInput.value.trim();
-
-  const setupModal = document.getElementById('setup-game-modal');
-  if (setupModal) setupModal.style.display = 'none';
-
-  if (pendingActiveSlot !== null) {
-    initGame(pendingActiveSlot, true);
-    pendingActiveSlot = null;
-  }
+  initGame(slot, true);
+  pendingActiveSlot = null;
 }
 
 function deleteSaveSlot(slot) {
@@ -1191,7 +1198,8 @@ function initGame(slot, startFresh) {
     if (typeof initializeNewGameState === 'function') {
       initializeNewGameState();
     }
-    // 🌟 入力されたカスタム値を初期状態（グループ名・1st/2ndシングル・ファーストライブ名）に反映
+    
+    // カスタム名称の適用
     if (typeof groupName !== 'undefined') {
       groupName = customGroupName;
     }
@@ -1205,6 +1213,11 @@ function initGame(slot, startFresh) {
       if (productionSchedule['1-2']) {
         productionSchedule['1-2'].songName = customSecondSong;
       }
+    }
+
+    // 🌟 【ゲーム開始時】1年分（1〜12月）のライバル・野球スケジュールを一括生成
+    if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      generateRivalsAndGeneralSchedule(1, 1, true);
     }
   } else {
     const raw = localStorage.getItem(saveSlotKey(slot));
@@ -1258,9 +1271,7 @@ function initGame(slot, startFresh) {
   }
 
   if (startFresh) {
-    if (typeof generateRivalsAndGeneralSchedule === 'function' && (!rivalLiveBookings || rivalLiveBookings.length === 0)) {
-      generateRivalsAndGeneralSchedule(1, 1, true);
-    }
+    // 既に上で生成済みのため重複生成防止
   } else {
     if (typeof openPendingModal === 'function') {
       openPendingModal();
