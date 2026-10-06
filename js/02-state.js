@@ -1,12 +1,12 @@
 // ==========================================
-// 02-state.js : 全機能完全復元・ライバルスケジュール・実世界西暦（2026年等）同期版
+// 02-state.js : 全機能完全復元・ライバルスケジュール・実世界西暦（2026年）同期版
 // ==========================================
 
 let currentYear = 1;
 let currentMonth = 1;
 let currentWeek = 1; // 1〜4週
 let gameDate = '';
-let calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦を動的に取得・同期
+let calendarYear = new Date().getFullYear(); // 🌟 実世界の西暦（2026年等）を動的同期
 let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
@@ -75,7 +75,7 @@ let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
 // ==========================================
-// ライバルスケジュール自動生成（連日公演・曜日重みづけ完全対応版）
+// ライバルスケジュール自動生成（連日公演・曜日重みづけ・初年度対応版）
 // ==========================================
 function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = false) {
   const newRivalBookings = [];
@@ -135,42 +135,34 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
 
         const venue = VENUE_DATA[Math.floor(Math.random() * VENUE_DATA.length)];
 
-        const isConsecutive = Math.random() < 1;
+        const isConsecutive = Math.random() < 0.35;
         let durationDays = 1;
         if (isConsecutive) {
           const rand = Math.random();
-          if (rand < 0.50) {
-            durationDays = 2;
-          } else if (rand < 0.80) {
-            durationDays = 3;
-          } else if (rand < 0.95) {
-            durationDays = 4;
-          } else {
-            durationDays = 5;
-          }
+          if (rand < 0.50) durationDays = 2;
+          else if (rand < 0.80) durationDays = 3;
+          else if (rand < 0.95) durationDays = 4;
+          else durationDays = 5;
         }
+
         const liveDatesArr = [];
         const baseLiveName = `${team.name} ${venue.name} 公演`;
 
         for (let dIdx = 0; dIdx < durationDays; dIdx++) {
           const targetDate = new Date(selectedDateObj);
           targetDate.setDate(selectedDateObj.getDate() + dIdx);
-          
           if (targetDate.getMonth() + 1 !== targetMonth) break;
-
           liveDatesArr.push(toDateKey(targetDate));
         }
 
         if (liveDatesArr.length > 0) {
           generatedDaysCount += liveDatesArr.length;
-          const firstDateStr = liveDatesArr[0];
-
           newRivalBookings.push({
             groupId: team.id,
             groupName: team.name,
             liveVenue: venue.name,
             liveName: baseLiveName,
-            liveDate: firstDateStr,
+            liveDate: liveDatesArr[0],
             liveDates: liveDatesArr,
             status: 'confirmed',
             type: 'live'
@@ -565,6 +557,7 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
+  // 🌟 初年度のライバルスケジュール（上半期・下半期を含む1年分）を確実にランダムセット
   generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
 
   idolRoster = [];
