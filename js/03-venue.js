@@ -16,7 +16,6 @@ const INFO_MEDIA = {
     id: 'web', name: 'アイドルWebメディア', isWeb: true, kind: 'both',
     fame: 4, fans: 0.08, fee: 0, label: 'サイト'
   },
- 
   stacon: {
     id: 'stacon', name: 'スタコン', isWeb: true, kind: 'release',
     fame: 5, fans: 0.12, fee: 0, label: 'ファンサイト'
@@ -26,12 +25,16 @@ const INFO_MEDIA = {
     fame: 5, fans: 0.10, fee: 0, label: 'ニュースサイト'
   }
 };
+
 // 各メディアの放送日倍率（何日後に放送／掲載されるか）
 const INFO_MEDIA_DELAY = {
   thehour: 2, gutenmorgen: 1, web: 1, stacon: 1, kahoo: 1
 };
 // 情報メディアで得られる楽曲経験値
 const INFO_MEDIA_SONG_EXPERIENCE = 20;
+
+// 🌟 メディア出演・報道時に各メンバーに付与する経験値の量（5000ポイント）
+const INFO_MEDIA_STAT_EXP_REWARD = 5000;
 
 // 現在のセンター名（年齢つき）
 function getCurrentCenterText() {
@@ -48,12 +51,10 @@ function buildInfoMediaArticle(media, data) {
   const d = data || {};
   if (media.kind === 'release' || (media.kind === 'both' && d.releaseType)) {
     const type = d.releaseType === 'album' ? 'アルバム' : 'シングル';
-    // 序数（1st / 2nd / 3rd / 4th …）
     const ORDINAL_SUFFIX = { 1: 'st', 2: 'nd', 3: 'rd' };
     const suffix = ORDINAL_SUFFIX[d.releaseNth] || 'th';
     const nth = d.releaseNth ? `${d.releaseNth}${suffix}` : '';
     const sales = (d.sales || 0).toLocaleString();
-    // 未入力の日は「発売日を後日発表」の表現に落とす
     const dateText = d.releaseDate ? `${d.releaseDate}発売` : '発売';
     const parts = [];
     if (media.id === 'gutenmorgen') {
@@ -66,15 +67,12 @@ function buildInfoMediaArticle(media, data) {
     }
     return parts.join('');
   }
-  // ライブ情報
   const days = d.showDays || 1;
   const audience = (d.audience || 0).toLocaleString();
   if (media.id === 'kahoo') {
-    // kahoo news はライブ日数と動員数を報道する
     return `${d.liveName || 'ライブ'}は${days}日間開催され、${audience}人が動員したと報道されました。`;
   }
   if (media.id === 'thehour') {
-    // The Hour は「場所／期間／動員」を伝える
     const venue = d.venueName || '会場';
     const from = d.startDate ? `${d.startDate}から` : '';
     return `${venue}で${from}${days}日間開催し、計${audience}人が参戦。`;
@@ -85,7 +83,6 @@ function buildInfoMediaArticle(media, data) {
 
 // メディアへの掲載／放送を予約する
 function scheduleInfoMedia(kind, payload) {
-  // kind に対応しうるメディアを抽取する
   const candidates = Object.values(INFO_MEDIA).filter(m =>
     m.kind === kind || m.kind === 'both'
   );
@@ -130,25 +127,37 @@ function scheduleInfoMedia(kind, payload) {
   return scheduledPerformances[scheduledPerformances.length - 1];
 }
 
-// 情報メディアの放送／掲載を処理する
+// 情報メディアの放送／掲載を処理する（🌟 人気の代わりに5000経験点を付与）
 function processInfoMedia(performance) {
   const media = INFO_MEDIA[performance.mediaId] || INFO_MEDIA.web;
-  const summary = calculateTeamAverages();
-  const gain = performance.fameGain || Math.round(media.fame * (0.7 + summary.overall / 100));
-  adjustTargetPopularity(gain);
+  
+  // 🌟 選抜メンバー全員（またはロスター全員）に各能力経験値を5000ずつ付与
+  const selected = idolRoster.filter(member => member.isSelected);
+  const participants = selected.length ? selected : idolRoster;
+  
+  let totalExpGained = 0;
+  participants.forEach(member => {
+    // STATUS_KEYSに定義されているすべての能力に対して5000経験点を加算
+    if (typeof STATUS_KEYS !== 'undefined') {
+      STATUS_KEYS.forEach(k => {
+        addMemberStatExp(member, k.id, INFO_MEDIA_STAT_EXP_REWARD);
+        totalExpGained += INFO_MEDIA_STAT_EXP_REWARD;
+      });
+    }
+  });
+
   const fee = performance.fee || 0;
   if (fee) funds += fee;
   if (performance.songId) {
     const song = songs.find(item => item.id === performance.songId);
     if (song) addSongExperience(song, INFO_MEDIA_SONG_EXPERIENCE);
   }
-  // Gets new fans from media exposure
+  
   fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + (performance.bonusFans || 0));
   const article = buildInfoMediaArticle(media, performance);
-  const result = `（人気 +${gain} / 新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
+  const result = `（メンバー全員の各能力に経験点 +${INFO_MEDIA_STAT_EXP_REWARD.toLocaleString()}pt / 新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
   setLog(`【${media.label}】${article}${result}`);
 }
-
 // 1か月の計画から、メインライブ＋追加ライブの開催情報を列挙する
 // （旧セーブで保存された単一ライブ形式もそのまま扱える）
 function getMonthLiveEntries(plan) {
