@@ -2,6 +2,15 @@
 // 情報メディア（実績を報道する番組・サイト）
 // ライブ後・CD発売後にメディアが掲載され、実績が告知される
 // ==========================================
+
+// 🌟 最優先で関数を定義し、参照エラーを完全に防ぐ
+// ライブの日数を安全な範囲（1〜5日）に正規化する関数
+function normalizeLiveDays(value) {
+  const days = Number.parseInt(value, 10);
+  const validOptions = typeof LIVE_DAY_OPTIONS !== 'undefined' ? LIVE_DAY_OPTIONS : [1, 2, 3, 4, 5];
+  return validOptions.includes(days) ? days : 1;
+}
+
 // メディア定義：fans=新規ファン獲得係数, fee=出演料/記事料
 const INFO_MEDIA = {
   thehour: {
@@ -130,7 +139,7 @@ function scheduleInfoMedia(kind, payload) {
   return scheduledPerformances[scheduledPerformances.length - 1];
 }
 
-// 情報メディアの放送／掲載を処理する（🌟 経験点付与は裏で行い、ログからは除外）
+// 情報メディアの放送／掲載を処理する
 function processInfoMedia(performance) {
   const media = INFO_MEDIA[performance.mediaId] || INFO_MEDIA.web;
   
@@ -152,14 +161,11 @@ function processInfoMedia(performance) {
   
   fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales + (performance.bonusFans || 0));
   const article = buildInfoMediaArticle(media, performance);
-  
-  // 🌟 ログからは経験点の表記を削除し、新規ファンとギャラのみに整理
   const result = `（新規ファン +${(performance.bonusFans || 0).toLocaleString()}人${fee ? ` / ${performance.mediaLabel}料 ${formatMoney(fee)}` : ''}）`;
   setLog(`【${media.label}】${article}${result}`);
 }
 
 // 1か月の計画から、メインライブ＋追加ライブの開催情報を列挙する
-// （旧セーブで保存された単一ライブ形式もそのまま扱える）
 function getMonthLiveEntries(plan) {
   if (!plan) return [];
   const entries = [];
@@ -211,9 +217,6 @@ function getVenueFeePerShow(venue) {
   return Math.floor(CAPACITY_MAP[venue.cap] * rate);
 }
 
-// 会場使用料 = ランクの1日料金 + (日数-1)×0.2×ランクの1日料金
-// 公演日程から会場使用料の曜日割引率を決める
-// 日曜を含む=元値 / 日曜なし・土曜を含む=0.95倍 / 金曜が最終日=0.8倍 / それ以外=0.75倍
 function getVenueWeekdayDiscount(dates) {
   const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
   if (!list.length) return 1;
@@ -224,7 +227,6 @@ function getVenueWeekdayDiscount(dates) {
   return 0.75;
 }
 
-// 会場使用料 = 曜日割引後の1日料金 + (日数-1)×0.2×曜日割引後の1日料金
 function getVenueRentalFee(venue, days, dates = null) {
   const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
   const count = list.length ? list.length : Math.max(1, normalizeLiveDays(days));
@@ -232,11 +234,9 @@ function getVenueRentalFee(venue, days, dates = null) {
   return Math.round(discounted + (count - 1) * VENUE_EXTRA_DAY_RATE * discounted);
 }
 
-// 1つの会場枠が持つ公演日一覧（1公演=1日）
 function getLiveEntryShowDates(entry) {
   const primary = toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month));
   const extras = Array.isArray(entry.liveDates) ? entry.liveDates : [];
-  // メイン公演日と重複する日は除外する
   const dates = extras.filter(key => typeof key === 'string' && key && key !== primary);
   return [primary, ...dates];
 }
@@ -263,7 +263,6 @@ function markLiveEntryCompleted(entry) {
   if (live) live.liveCompleted = true;
 }
 
-// スケジュール全体（両年分）のライブを日付つきで列挙
 function getScheduledLiveEntries() {
   const entries = [];
   Object.entries(productionSchedule).forEach(([key, plan]) => {
@@ -281,8 +280,6 @@ function getScheduledLiveEntries() {
   return entries;
 }
 
-// 自分のライブと、同じ会場・同じ日程の重複がないか確認する
-// ignorePlanKey は編集中の月（保存前の旧計画）を除外するために使う
 function findOwnLiveConflict(liveVenue, liveDate, ignorePlanKey = null) {
   return getScheduledLiveEntries().find(entry =>
     !entry.completed
@@ -334,14 +331,11 @@ function getLastWednesday(year, monthIndex) {
   return date;
 }
 
-// Rival tour bookings. Requirement 5: a rival may hold several shows in one month.
-// 競合チームの公演予約を生成する。venueDates で公演日を並べることで連日公演も表現する。
 function ensureRivalLiveBookings(gameYear, month) {
   const actualYear = calendarYear + (gameYear - currentYear);
   leagueTeams.filter(team => team.id !== 'player').forEach(team => {
     const monthKey = `${actualYear}-${month}`;
     if (rivalLiveBookings.some(booking => booking.groupId === team.id && booking.monthKey === monthKey)) return;
-    // 開催頻度：影響力が高いほど高い
     const frequency = team.basePower >= 90 ? 0.75
       : team.basePower >= 80 ? 0.6
       : team.basePower >= 70 ? 0.45
@@ -349,10 +343,8 @@ function ensureRivalLiveBookings(gameYear, month) {
     if (Math.random() >= frequency) return;
 
     const isBigTeam = team.basePower >= 80;
-    // 公演回数：強者为多（1〜4公演）
     const maxShows = isBigTeam ? 4 : 2;
     const showCount = 1 + Math.floor(Math.random() * maxShows);
-    // 連日公演の確率
     const isConsecutive = Math.random() < 0.35;
     const consecutiveDays = isConsecutive ? Math.min(showCount, 2 + Math.floor(Math.random() * 3)) : 1;
 
@@ -363,7 +355,6 @@ function ensureRivalLiveBookings(gameYear, month) {
     const lastDay = new Date(actualYear, month, 0).getDate();
     const startDay = Math.floor(Math.random() * Math.max(1, Math.min(28, lastDay) - consecutiveDays + 1)) + 1;
 
-    // 公演日を並べる（同じ会場で連日開催）
     const venueDates = [];
     for (let i = 0; i < showCount; i++) {
       const day = isConsecutive ? startDay + (i % consecutiveDays) : startDay + i;
@@ -389,7 +380,6 @@ function ensureRivalLiveBookings(gameYear, month) {
 }
 
 function findRivalVenueConflict(venueName, dateKey) {
-  // 連日公演を含むすべての公演日が対象
   return rivalLiveBookings.find(booking =>
     booking.venue === venueName && (booking.venueDates || [booking.liveDate]).includes(dateKey)
   ) || null;
@@ -403,13 +393,6 @@ function syncGameCalendar() {
   calendarYear = date.getFullYear();
   currentMonth = date.getMonth() + 1;
   currentWeek = Math.ceil(date.getDate() / 7);
-}
-// ライブの日数を安全な範囲（1〜5日、またはプレビュー用の最大3日など）に正規化する関数
-function normalizeLiveDays(value) {
-  const days = Number.parseInt(value, 10);
-  // 日数オプション（1, 2, 3, 4, 5）のいずれかであればそのまま、違えば1を返す
-  const validOptions = typeof LIVE_DAY_OPTIONS !== 'undefined' ? LIVE_DAY_OPTIONS : [1, 2, 3, 4, 5];
-  return validOptions.includes(days) ? days : 1;
 }
 
 function migrateLegacyGameDate(year, month, week) {
