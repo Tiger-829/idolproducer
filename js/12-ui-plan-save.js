@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 半年計画・カレンダー操作・初期設定・全機能統合最終完全版
+// 12-ui-plan-save.js : 開始直後計画策定・ドット非表示対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -9,7 +9,6 @@ let planMonthEventDrafts = {};
 let planMultiSelectModes = {}; 
 let planCalendarSelections = {}; 
 
-// 🌟 新規ゲーム初期設定用のカスタム保持変数
 let pendingActiveSlot = null;
 let customGroupName = "スタースコープ";
 let customFirstSong = "はじまりの光";
@@ -672,6 +671,7 @@ function toggleMultiSelectMode(month) {
   renderEmbeddedPlanCalendars();
 }
 
+// 🌟 【ドット非表示対応】他グループの予定合図(ドット)を表示しないカレンダー描画
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
@@ -731,6 +731,7 @@ function renderEmbeddedPlanCalendars() {
         bgStyle = 'background:#fdf0da; color:#8a5a12; border:1px solid #fce3b2;';
         indicator = '<i style="display:block; width:3px; height:3px; background:#b8742a; border-radius:50%; margin:1px auto 0;"></i>';
       }
+      // ※他グループの予定によるドットインジケータ表示処理は除外しているため、他社の予定で勝手にドットがつくことはありません。
 
       daySpan.style.cssText = `display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:24px; font-size:10px; border-radius:4px; ${bgStyle} cursor:pointer; user-select:none;`;
       daySpan.innerHTML = `${day}${indicator}`;
@@ -984,7 +985,7 @@ function saveDecisionPlan() {
   const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
 
   for (let m = planStartM; m <= planEndM; m++) {
-    const release = isPresetReleaseMonth(m) ? presetRelType : document.getElementById(`sel-rel-${m}`).value;
+    const release = document.getElementById(`sel-rel-${m}`).value;
     const songName = document.getElementById(`song-name-${m}`).value.trim();
     const planKey = `${planYearTarget}-${m}`;
     const previousPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
@@ -1033,13 +1034,7 @@ function saveDecisionPlan() {
   updateUI();
 }
 
-// 🌟 1月には7〜12月、7月には翌年上半期のスケジュールを組むサイクル制御
 function openPlanningManual() {
-  if (currentYear === 1 && currentMonth < 7) {
-    alert('1年目上半期（1〜6月）は初期プリセットスケジュールで固定運用されます。\nプレイヤー自身の計画策定は1年目下半期（7〜12月）からとなります。');
-    return;
-  }
-  
   if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
     try {
       if (typeof generateRivalsAndGeneralSchedule === 'function') {
@@ -1066,7 +1061,7 @@ function openPlanningCalendar() {
 }
 
 // ==========================================
-// 🌟 タイトル画面・セーブ枠管理・新規開始（プロンプト入力方式）
+// セーブ枠管理・新規開始フロー
 // ==========================================
 function getSaveSlotSummary(slotKey) {
   try {
@@ -1138,7 +1133,6 @@ function continueSavedGame(slot) {
   initGame(slot, false);
 }
 
-// 🌟 確実に入力を挟むプロンプト方式の新規開始
 function startNewGame(slot) {
   const slotKey = saveSlotKey(slot);
   if (localStorage.getItem(slotKey)) {
@@ -1199,7 +1193,6 @@ function initGame(slot, startFresh) {
       initializeNewGameState();
     }
     
-    // カスタム名称の適用
     if (typeof groupName !== 'undefined') {
       groupName = customGroupName;
     }
@@ -1215,7 +1208,6 @@ function initGame(slot, startFresh) {
       }
     }
 
-    // 🌟 【ゲーム開始時】1年分（1〜12月）のライバル・野球スケジュールを一括生成
     if (typeof generateRivalsAndGeneralSchedule === 'function') {
       generateRivalsAndGeneralSchedule(1, 1, true);
     }
@@ -1270,8 +1262,9 @@ function initGame(slot, startFresh) {
     console.warn('Initial updateUI warning:', e);
   }
 
+  // 🌟 【新規機能】ゲーム開始直後に、すぐに1年目下半期（7〜12月）のスケジュールを組む画面を開く
   if (startFresh) {
-    // 既に上で生成済みのため重複生成防止
+    openPlanningManual();
   } else {
     if (typeof openPendingModal === 'function') {
       openPendingModal();
