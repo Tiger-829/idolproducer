@@ -506,14 +506,14 @@ const RIVAL_NAME_TAILS = [
 ];
 
 function getRankData(val) {
-  if (val >= 90) return { rank: 'S', color: '#ff1493', bg: '#ffe4e1' };
-  if (val >= 80) return { rank: 'A', color: '#e60000', bg: '#ffebee' };
-  if (val >= 70) return { rank: 'B', color: '#ff8c00', bg: '#fff3e0' };
-  if (val >= 60) return { rank: 'C', color: '#2e7d32', bg: '#e8f5e9' };
-  if (val >= 50) return { rank: 'D', color: '#0277bd', bg: '#e1f5fe' };
-  if (val >= 40) return { rank: 'E', color: '#555555', bg: '#eeeeee' };
-  if (val >= 20) return { rank: 'F', color: '#455a64', bg: '#cfd8dc' };
-  return { rank: 'G', color: '#8d6e63', bg: '#d7ccc8' };
+  if (val >= 90) return { rank: 'S', color: '#ff1493', bg: '#ffe4e1' }; // ディープピンク
+  if (val >= 80) return { rank: 'A', color: '#ff00ff', bg: '#fce4ec' }; // マゼンタ
+  if (val >= 70) return { rank: 'B', color: '#ff0000', bg: '#ffebee' }; // レッド
+  if (val >= 60) return { rank: 'C', color: '#ff7f50', bg: '#fff0e6' }; // コーラル
+  if (val >= 50) return { rank: 'D', color: '#b8970b', bg: '#fffde7' }; // イエロー（視認性考慮）
+  if (val >= 40) return { rank: 'E', color: '#8bc34a', bg: '#f1f8e9' }; // グリーンイエロー
+  if (val >= 20) return { rank: 'F', color: '#00bfff', bg: '#e1f5fe' }; // ディープスカイブルー
+  return { rank: 'G', color: '#666666', bg: '#f0f0f0' };               // ダークグレー
 }
 
 // ==========================================
