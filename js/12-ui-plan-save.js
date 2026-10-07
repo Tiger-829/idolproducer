@@ -434,9 +434,7 @@ function openBenefitDetailModal(month, dates) {
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
         <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
-        <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">イベント名
-          <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-        </label>
+        
         <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">紐づくCD
           <select id="benefit-modal-cd" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;"></select>
         </label>
