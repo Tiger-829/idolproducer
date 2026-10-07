@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 具体的な予定表示＆変更・ペナルティ対応完全版
+// 12-ui-plan-save.js : 設定欄動的表示（予定があるときのみ出現）対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -78,6 +78,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
     </div>`;
 }
 
+// 🌟 ライブスロット描画（設定されている公演日が存在するときのみ詳細コントロールを表示）
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
   const seatPrices = slot.seatPrices || {};
@@ -86,46 +87,51 @@ function renderLiveSlotHtml(month, index, slot) {
   const slotVenue = venues.find(v => v.name === slot.liveVenue) || null;
   const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : (slot.liveDates || []));
   const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  const hasDates = Array.isArray(slot.liveDates) && slot.liveDates.length > 0;
 
   return `
-    <div class="live-slot" data-slot-index="${index}">
-      <div class="live-slot-head">
-        <span>ライブ${index + 1}${isPrimary ? '（定期公演）' : ''}</span>
+    <div class="live-slot" data-slot-index="${index}" style="border:1px solid #eadde1; padding:8px; border-radius:6px; margin-bottom:6px; background:#fff;">
+      <div class="live-slot-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-size:12px; font-weight:bold; color:var(--primary);">ライブ枠 ${index + 1}${isPrimary ? '（定期公演）' : ''}</span>
         ${isPrimary ? '' : `<button class="danger-btn" type="button" onclick="removeLiveSlot(${month},${index})">削除</button>`}
       </div>
       <label class="weekly-member-target" for="sel-ven-${month}-${index}">会場
-        <select id="sel-ven-${month}-${index}" onchange="applyVenueStandardPrices(${month}, ${index}); updateSeatPlanOptions(${month}, ${index}); updateLiveDateOptions(${month}, ${index}); updateShowDateNote(${month}, ${index})">
-          <option value="">ライブなし</option>
+        <select id="sel-ven-${month}-${index}" onchange="applyVenueStandardPrices(${month}, ${index}); updateSeatPlanOptions(${month}, ${index}); updateLiveDateOptions(${month}, ${index}); updateShowDateNote(${month}, ${index})" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
+          <option value="">会場を選択</option>
           ${venues.map(v => `<option value="${v.name}" ${slot.liveVenue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
         </select>
       </label>
-      <label class="weekly-member-target" for="live-name-${month}-${index}">ライブ名
-        <input type="text" id="live-name-${month}-${index}" maxlength="40" value="${escapeHtml(slot.liveName || '')}" placeholder="例: 春の全国ツアー">
-      </label>
-      <div style="margin-top:6px; font-size:11px;">
-        <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
-        <div id="show-dates-${month}-${index}" class="show-date-list">
-           ${(slot.liveDates || []).map((dateKey, dateIndex) => 
-            renderShowDateRow(month, index, dateIndex, dateKey, streamDates.has(dateKey))
-          ).join('')}
+
+      <!-- 🌟 カレンダー等で公演日が設定されたときのみこの詳細設定欄が出現する -->
+      <div id="live-details-container-${month}-${index}" style="display: ${hasDates ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
+        <label class="weekly-member-target" for="live-name-${month}-${index}">ライブ名
+          <input type="text" id="live-name-${month}-${index}" maxlength="40" value="${escapeHtml(slot.liveName || '')}" placeholder="例: 春の全国ツアー" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
+        </label>
+        <div style="margin-top:6px; font-size:11px;">
+          <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
+          <div id="show-dates-${month}-${index}" class="show-date-list">
+             ${(slot.liveDates || []).map((dateKey, dateIndex) => 
+              renderShowDateRow(month, index, dateIndex, dateKey, streamDates.has(dateKey))
+            ).join('')}
+          </div>
+          <div class="show-date-actions" style="margin-top:4px;">
+            <button class="plan-add-show-btn" type="button" onclick="addShowDate(${month}, ${index})">＋公演日を追加</button>
+          </div>
+          <div id="show-date-note-${month}-${index}" class="show-date-note" style="margin-top:4px; font-size:10px; color:#666;"></div>
         </div>
-        <div class="show-date-actions">
-          <button class="plan-add-show-btn" type="button" onclick="addShowDate(${month}, ${index})">＋公演日を追加</button>
-        </div>
-        <div id="show-date-note-${month}-${index}" class="show-date-note"></div>
+        <details class="seat-settings" style="margin-top:6px;">
+          <summary style="font-size:11px; cursor:pointer; font-weight:bold;">席種・チケット価格</summary>
+          <div class="seat-settings-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:6px;">
+            ${seatTypes.map(seat => {
+              const price = seatPrices[seat.id] ?? getStandardSeatPrice(slotVenue, seat.id);
+              const availability = seat.optional
+                ? `<label class="seat-availability" style="font-size:10px;"><input type="checkbox" id="seat-option-${month}-${index}-${seat.id}" ${seatOptions[seat.id] ? 'checked' : ''}>設置する</label>`
+                : '';
+              return `<div class="seat-price-field" id="seat-row-${month}-${index}-${seat.id}" style="font-size:10px;"><label for="seat-price-${month}-${index}-${seat.id}" style="display:block;">${seat.name}（円）</label><input type="number" id="seat-price-${month}-${index}-${seat.id}" min="0" step="500" value="${price}" style="width:100%; padding:4px; font-size:10px; box-sizing:border-box;">${availability}</div>`;
+            }).join('')}
+          </div>
+        </details>
       </div>
-      <details class="seat-settings">
-        <summary>席種・チケット価格</summary>
-        <div class="seat-settings-grid">
-          ${seatTypes.map(seat => {
-            const price = seatPrices[seat.id] ?? getStandardSeatPrice(slotVenue, seat.id);
-            const availability = seat.optional
-              ? `<label class="seat-availability"><input type="checkbox" id="seat-option-${month}-${index}-${seat.id}" ${seatOptions[seat.id] ? 'checked' : ''}>設置する</label>`
-              : '';
-            return `<div class="seat-price-field" id="seat-row-${month}-${index}-${seat.id}"><label for="seat-price-${month}-${index}-${seat.id}">${seat.name}（円）</label><input type="number" id="seat-price-${month}-${index}-${seat.id}" min="0" step="500" value="${price}">${availability}</div>`;
-          }).join('')}
-        </div>
-      </details>
     </div>
   `;
 }
@@ -138,20 +144,8 @@ function readLiveSlotInputs(month) {
 
   return Array.from(container.querySelectorAll('.live-slot')).map(slotEl => {
     const index = Number(slotEl.dataset.slotIndex);
-    const seatPrices = {};
-    const seatOptions = {};
-    const slotVenue = venues.find(v => v.name === document.getElementById(`sel-ven-${month}-${index}`)?.value) || null;
-
-    seatTypes.forEach(seat => {
-      const priceInput = document.getElementById(`seat-price-${month}-${index}-${seat.id}`);
-      const price = Number.parseInt(priceInput ? priceInput.value : '', 10);
-      seatPrices[seat.id] = Number.isFinite(price) && price >= 0 ? price : getStandardSeatPrice(slotVenue, seat.id);
-      if (seat.optional) {
-        const optionInput = document.getElementById(`seat-option-${month}-${index}-${seat.id}`);
-        seatOptions[seat.id] = Boolean(optionInput && optionInput.checked);
-      }
-    });
-
+    const venueVal = (document.getElementById(`sel-ven-${month}-${index}`) || {}).value || '';
+    
     const dateInputs = slotEl.querySelectorAll('.show-date-input');
     const streamInputs = slotEl.querySelectorAll('.show-stream-input');
     const liveDates = [];
@@ -167,8 +161,24 @@ function readLiveSlotInputs(month) {
       }
     });
 
+    if (!venueVal && liveDates.length === 0) return null;
+
+    const seatPrices = {};
+    const seatOptions = {};
+    const slotVenue = venues.find(v => v.name === venueVal) || null;
+
+    seatTypes.forEach(seat => {
+      const priceInput = document.getElementById(`seat-price-${month}-${index}-${seat.id}`);
+      const price = Number.parseInt(priceInput ? priceInput.value : '', 10);
+      seatPrices[seat.id] = Number.isFinite(price) && price >= 0 ? price : getStandardSeatPrice(slotVenue, seat.id);
+      if (seat.optional) {
+        const optionInput = document.getElementById(`seat-option-${month}-${index}-${seat.id}`);
+        seatOptions[seat.id] = Boolean(optionInput && optionInput.checked);
+      }
+    });
+
     return {
-      liveVenue: (document.getElementById(`sel-ven-${month}-${index}`) || {}).value || '',
+      liveVenue: venueVal,
       liveName: (document.getElementById(`live-name-${month}-${index}`) || {}).value?.trim() || '',
       liveDate: liveDates[0] || '',
       liveDates: liveDates,
@@ -176,7 +186,7 @@ function readLiveSlotInputs(month) {
       seatPrices,
       seatOptions
     };
-  });
+  }).filter(Boolean);
 }
 
 function updateShowDateNote(month, index) {
@@ -251,11 +261,9 @@ function addLiveSlot(month) {
     alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
     return;
   }
-  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
-  const defaultVenue = venues.find(v => v.cap === 'C') || venues[0] || { name: '市民会館', cap: 'C', ease: 1 };
   const newSlot = {
-    liveVenue: defaultVenue.name,
-    liveName: defaultVenue.name,
+    liveVenue: '',
+    liveName: '',
     liveDate: '',
     liveDates: [],
     streamDates: [],
@@ -265,9 +273,6 @@ function addLiveSlot(month) {
   const tempWrapper = document.createElement('div');
   tempWrapper.innerHTML = renderLiveSlotHtml(month, currentCount, newSlot);
   container.appendChild(tempWrapper.firstElementChild);
-  applyVenueStandardPrices(month, currentCount);
-  updateSeatPlanOptions(month, currentCount);
-  updateShowDateNote(month, currentCount);
   renderEmbeddedPlanCalendars();
 }
 
@@ -312,7 +317,7 @@ function updateLiveDateOptions(month, index) {
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
-    return '<div class="plan-event-empty" style="font-size:11px; color:#888; margin:4px 0;">予定されているイベントはありません。</div>';
+    return ''; // 🌟 イベントがない場合は何も表示しない（すっきりさせる）
   }
   const eventTypes = typeof PLAN_EVENT_TYPES !== 'undefined' ? PLAN_EVENT_TYPES : [];
   return events.map((event, index) => {
@@ -386,15 +391,20 @@ function openBenefitDetailModal(month, dates) {
     modalEl.style.cssText = 'display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:10000;';
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
-        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの日程の確認</h3>
-                  </label>
-
-        
-          <label style="font-size:11px; font-weight:bold; color:#333;">日程（選択中）
-            <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
-          </label>
-        </div>
-
+        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
+        <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
+          <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+            <option value="handshake">個別握手会</option>
+            <option value="autograph">サイン会</option>
+            <option value="online">オンラインお話し会</option>
+          </select>
+        </label>
+        <label style="font-size:11px; font-weight:bold; color:#333; margin-top:8px; display:block;">イベント名
+          <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+        </label>
+        <label style="font-size:11px; font-weight:bold; color:#333; margin-top:8px; display:block;">日程（選択中）
+          <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
+        </label>
         <div style="display:flex; gap:8px; margin-top:16px;">
           <button class="main-btn" style="flex:1; padding:8px;" onclick="submitBenefitDetailModal()">確定して登録</button>
           <button class="danger-btn" style="flex:1; padding:8px;" onclick="closeBenefitDetailModal()">キャンセル</button>
@@ -449,7 +459,6 @@ function submitBenefitDetailModal() {
 
   refreshPlanEventsContainer(pendingBenefitMonth);
 
-  // 🌟 【追加】登録完了後に選択状態をクリアしてハイライトを消す
   if (planCalendarSelections[pendingBenefitMonth]) {
     planCalendarSelections[pendingBenefitMonth] = [];
   }
@@ -457,7 +466,7 @@ function submitBenefitDetailModal() {
   renderEmbeddedPlanCalendars();
   closeBenefitDetailModal();
 }
-// 🌟 【新規】変更・キャンセルペナルティ算出（1か月前未満は変更・キャンセル不可）
+
 function validateChangeOrCancel(targetDateStr) {
   if (!targetDateStr) return true;
   const targetDate = new Date(`${targetDateStr}T12:00:00`);
@@ -477,7 +486,7 @@ function processDeferredPlanExpenses() {
   }
   if (deferredBenefitCost > 0) {
     funds -= deferredBenefitCost;
-    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
+    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落とした。`);
     deferredBenefitCost = 0;
   }
 }
@@ -529,7 +538,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       console.warn('Rival schedule generation warning:', err);
     }
 
-    // 🌟 【改善】サマリーに具体的な予定内容（CD発売・ライブ名・イベント名）を明示
     const summaryBox = document.getElementById('prev-plan-summary');
     if (summaryBox) {
       let currentY = typeof currentYear !== 'undefined' ? currentYear : 1;
@@ -658,15 +666,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         streamDates: e.streamDates || e.liveDates || [],
         seatPrices: e.seatPrices || {},
         seatOptions: e.seatOptions || {}
-      })) : [{
-        liveVenue: '',
-        liveName: '',
-        liveDate: '',
-        liveDates: [],
-        streamDates: [],
-        seatPrices: {},
-        seatOptions: {}
-      }];
+      })) : [];
 
       const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
 
@@ -718,7 +718,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           </label>
           <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
             <select id="sel-benefit-${m}">
-              
+              <option value="none">特典なし</option>
               ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
             </select>
           </label>
@@ -735,7 +735,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         <div class="live-slot-list" id="live-slots-${m}" style="margin-top:10px;">
           ${liveSlots.map((slot, idx) => renderLiveSlotHtml(m, idx, slot)).join('')}
         </div>
-        <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋追加の会場を設定</button>
+        <button class="plan-add-show-btn" type="button" style="margin-top:6px;" onclick="addLiveSlot(${m})">＋会場を設定・追加</button>
       `;
       monthWrapper.appendChild(boothCard);
 
@@ -877,12 +877,7 @@ function applyScheduleAction(month, actionType) {
 
   let targetDates = [...selections];
 
-  // 🌟 【変更・キャンセル前チェック】1か月前未満の日付が含まれている場合はブロック
   for (const d of targetDates) {
-    const planKey = `${planYearTarget}-${month}`;
-    const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
-    
-    // 既存の予定日を変更・削除する場合の1か月前制限
     if (actionType === 'delete' || actionType === 'release' || actionType === 'live') {
       if (!validateChangeOrCancel(d)) return;
     }
@@ -906,6 +901,10 @@ function applyScheduleAction(month, actionType) {
         }
       });
       slot.liveDates.sort();
+
+      // 🌟 日付が追加されたら詳細ブロックを表示状態にする
+      const detailsContainer = document.getElementById(`live-details-container-${month}-0`);
+      if (detailsContainer) detailsContainer.style.display = 'block';
 
       const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
       if (showDatesContainer) {
@@ -961,6 +960,10 @@ function applyScheduleAction(month, actionType) {
           }
         });
         slot.liveDates.sort();
+
+        const detailsContainer = document.getElementById(`live-details-container-${month}-0`);
+        if (detailsContainer) detailsContainer.style.display = 'block';
+
         const showDatesContainer = document.getElementById(`show-dates-${month}-0`);
         if (showDatesContainer) {
           showDatesContainer.innerHTML = slot.liveDates.map((dKey, dIdx) => 
@@ -1083,7 +1086,7 @@ function saveDecisionPlan() {
     const songName = document.getElementById(`song-name-${m}`).value.trim();
     const planKey = `${planYearTarget}-${m}`;
     const previousPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
-    const liveSlots = readLiveSlotInputs(m).filter(slot => slot.liveVenue).slice(0, maxVenues);
+    const liveSlots = readLiveSlotInputs(m).filter(slot => slot.liveVenue || (slot.liveDates && slot.liveDates.length > 0)).slice(0, maxVenues);
 
     if (liveSlots.length > maxVenues) {
       alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
