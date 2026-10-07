@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : イベント会場押え・詳細管理完全統合版
+// 12-ui-plan-save.js : 特典イベント名セレクト選択＆会場管理統合版
 // ==========================================
 
 let planYearTarget = 1;
@@ -14,6 +14,15 @@ let customGroupName = "スタースコープ";
 let customFirstSong = "はじまりの光";
 let customSecondSong = "青春の軌跡";
 let customFirstLiveName = "1stデビューライブ";
+
+// 🌟 特典イベントの選択肢（ドロップダウン用）
+const BENEFIT_EVENT_TYPE_OPTIONS = [
+  { id: 'individual-handshake', name: '個別握手会' },
+  { id: 'national-handshake', name: '全国握手会' },
+  { id: 'mini-live-handshake', name: 'ミニライブ＆握手会' },
+  { id: 'autograph-session', name: 'オンラインサイン会' },
+  { id: 'release-event', name: 'CD発売記念イベント' }
+];
 
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
@@ -182,11 +191,12 @@ function renderLiveSlotHtml(month, index, slot) {
   `;
 }
 
-// 🌟 特典・その他イベントもライブと同形式（会場・名前・日程・配信・価格設定）で管理するスロットHTML
+// 🌟 特典イベント枠（名前はドロップダウン選択式 ＋ 会場・日程・価格管理）
 function renderEventSlotHtml(month, index, event) {
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const cdList = getPlayerCdReleaseList();
   const currentCdId = event.targetCdId || (cdList[0] ? cdList[0].id : '');
+  const currentEventName = event.name || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
   const eventVenue = venues.find(v => v.name === event.venue) || null;
   const seatPrices = event.seatPrices || {};
   const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
@@ -197,12 +207,14 @@ function renderEventSlotHtml(month, index, event) {
   return `
     <div class="plan-event-slot" data-event-slot-index="${index}" style="border:1px solid #eadde1; padding:8px; border-radius:6px; margin-bottom:6px; background:#fdf8f9;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <span style="font-size:12px; font-weight:bold; color:#b8742a;">🎁 イベント枠 ${index + 1}</span>
+        <span style="font-size:12px; font-weight:bold; color:#b8742a;">🎁 特典イベント枠 ${index + 1}</span>
         <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
       </div>
 
-      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">イベント名
-        <input type="text" class="event-name-input" id="event-name-${month}-${index}" value="${escapeHtml(event.name || '個別握手会')}" placeholder="例: 全国握手会" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
+      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">イベント種類（名称）
+        <select id="event-name-${month}-${index}" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
+          ${BENEFIT_EVENT_TYPE_OPTIONS.map(opt => `<option value="${opt.name}" ${currentEventName === opt.name ? 'selected' : ''}>${opt.name}</option>`).join('')}
+        </select>
       </label>
 
       <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">会場
@@ -336,7 +348,7 @@ function readEventSlotInputs(month) {
 
   return Array.from(container.querySelectorAll('.plan-event-slot')).map(slotEl => {
     const index = Number(slotEl.dataset.eventSlotIndex);
-    const eventName = (document.getElementById(`event-name-${month}-${index}`) || {}).value?.trim() || '個別握手会';
+    const eventName = (document.getElementById(`event-name-${month}-${index}`) || {}).value || '個別握手会';
     const venueVal = (document.getElementById(`event-ven-${month}-${index}`) || {}).value || '';
     const targetCdId = (document.getElementById(`event-cd-${month}-${index}`) || {}).value || 'cd_default';
 
@@ -507,7 +519,7 @@ function addPlanEvent(month) {
   }
   const cdList = getPlayerCdReleaseList();
   drafts.push({
-    name: '個別握手会',
+    name: BENEFIT_EVENT_TYPE_OPTIONS[0].name,
     venue: '',
     date: '',
     dates: [],
@@ -628,7 +640,6 @@ function applyScheduleAction(month, actionType) {
       if (releaseFields) releaseFields.style.display = 'block';
     }
   } else if (actionType === 'event-benefit' || actionType === 'event-other') {
-    // 🌟 特典・その他イベント：イベントスロットに直接日付を追加
     let eventSlots = readEventSlotInputs(month);
     if (eventSlots.length === 0) {
       addPlanEvent(month);
