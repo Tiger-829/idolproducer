@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : ペナルティ料・後払い精算・確定月管理統合版
+// 12-ui-plan-save.js : 具体的な予定表示＆変更・ペナルティ対応完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -464,40 +464,20 @@ function submitBenefitDetailModal() {
   closeBenefitDetailModal();
 }
 
-// 🌟 【新規機能】変更・キャンセル手続きペナルティ計算ロジック
-function calculatePenaltyCost(targetDateStr, isCancel = true) {
-  if (!targetDateStr) return 0;
-  // 対象の日付に対して、残り日数が30日（1か月）未満の場合は変更・キャンセル不可とするチェック
-const targetDate = new Date(`${targetDateStr}T12:00:00`);
-const currentGameDate = getGameDateObject();
-const diffDays = Math.round((targetDate - currentGameDate) / 86400000);
-
-if (diffDays <= 30) {
-  alert('実施予定日の1か月前を切っているため、キャンセルおよび変更手続きを行うことはできません。');
-  return false; // または処理を中断
-}
-  // 特典イベント1日程あたりの基準予想費用を2000万円とする
-  const baseExpectedCost = 20000000;
-  let rate = 0.4; // 半年より前ならキャンセル40%、変更20%
+// 🌟 【新規】変更・キャンセルペナルティ算出（1か月前未満は変更・キャンセル不可）
+function validateChangeOrCancel(targetDateStr) {
+  if (!targetDateStr) return true;
+  const targetDate = new Date(`${targetDateStr}T12:00:00`);
+  const currentGameDate = getGameDateObject();
+  const diffDays = Math.round((targetDate - currentGameDate) / 86400000);
 
   if (diffDays <= 30) {
-    // 1か月以内（または過去）
-    rate = isCancel ? 0.8 : 0.5;
-  } else if (diffDays <= 90) {
-    // 3か月以内
-    rate = isCancel ? 0.8 : 0.5;
-  } else if (diffDays <= 180) {
-    // 半年以内（3か月〜半年）
-    rate = isCancel ? 0.6 : 0.4;
-  } else {
-    // 半年より前
-    rate = isCancel ? 0.4 : 0.2;
+    alert(`実施予定日（${targetDateStr}）の1か月前を切っているため、変更およびキャンセルを行うことはできません。`);
+    return false;
   }
-
-  return Math.round(baseExpectedCost * rate);
+  return true;
 }
 
-// 🌟 【新規機能】次回の予定決定タイミングでの前回期間分の後払い精算処理
 function processDeferredPlanExpenses() {
   if (typeof deferredBenefitCost === 'undefined') {
     window.deferredBenefitCost = 0;
@@ -556,7 +536,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       console.warn('Rival schedule generation warning:', err);
     }
 
-    // 🌟 【予定参照UIの変更】今月（現在のゲーム内月）から確定済みの予定月までをスムーズに確認できるサマリー表示
+    // 🌟 【改善】サマリーに具体的な予定内容（CD発売・ライブ名・イベント名）を明示
     const summaryBox = document.getElementById('prev-plan-summary');
     if (summaryBox) {
       let currentY = typeof currentYear !== 'undefined' ? currentYear : 1;
@@ -569,8 +549,37 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           const pKey = `${y}-${m}`;
           if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
             const p = productionSchedule[pKey];
-            if ((p.release && p.release !== 'none') || (p.liveDates && p.liveDates.length > 0) || (p.planEvents && p.planEvents.length > 0)) {
-              upcomingSchedules.push(`・${y}年${m}月: 予定あり（変更には時期に応じたペナルティが必要です）`);
+            
+            let details = [];
+            if (p.release && p.release !== 'none') {
+              let relType = p.release === 'album' ? 'アルバム' : 'シングル';
+              let sName = p.songName ? `「${p.songName}」` : '';
+              let rDate = p.releaseDate ? `(${p.releaseDate}発売)` : '';
+              details.push(`💿 ${relType}${sName}${rDate}`);
+            }
+
+            let lNames = [];
+            if (p.liveName) lNames.push(p.liveName);
+            else if (p.liveVenue) lNames.push(p.liveVenue);
+            if (Array.isArray(p.additionalLives)) {
+              p.additionalLives.forEach(al => {
+                if (al.liveName) lNames.push(al.liveName);
+                else if (al.liveVenue) lNames.push(al.liveVenue);
+              });
+            }
+            if (lNames.length > 0) {
+              details.push(`🎤 ライブ[${lNames.join(', ')}]`);
+            }
+
+            if (Array.isArray(p.planEvents) && p.planEvents.length > 0) {
+              let eventNames = p.planEvents.map(e => e.name || '特典イベント').filter(Boolean);
+              if (eventNames.length > 0) {
+                details.push(`🎁 イベント[${eventNames.join(', ')}]`);
+              }
+            }
+
+            if (details.length > 0) {
+              upcomingSchedules.push(`・${y}年${m}月: ${details.join(' / ')}`);
             }
           }
         }
@@ -578,7 +587,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
 
       summaryBox.innerHTML = `
         <strong>【現在の進行状況と確定済み予定の参照（${currentY}年${currentM}月〜）】</strong><br>
-        ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在確定している将来の特記事項はありません。'}
+        ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在確定している将来の予定はありません。'}
       `;
     }
     
@@ -875,6 +884,17 @@ function applyScheduleAction(month, actionType) {
 
   let targetDates = [...selections];
 
+  // 🌟 【変更・キャンセル前チェック】1か月前未満の日付が含まれている場合はブロック
+  for (const d of targetDates) {
+    const planKey = `${planYearTarget}-${month}`;
+    const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
+    
+    // 既存の予定日を変更・削除する場合の1か月前制限
+    if (actionType === 'delete' || actionType === 'release' || actionType === 'live') {
+      if (!validateChangeOrCancel(d)) return;
+    }
+  }
+
   if (actionType === 'live') {
     const slots = readLiveSlotInputs(month);
     if (slots.length === 0) {
@@ -1061,7 +1081,6 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
-// 🌟 【修正】決定時に即時引き落としではなく、次回精算用にdeferredBenefitCostへ加算するように変更
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
   let newBenefitCost = 0;
@@ -1117,7 +1136,6 @@ function saveDecisionPlan() {
     }
   }
 
-  // 🌟 前回分の後払い精算を実行しつつ、今回の新規費用を次の精算用に保持する
   processDeferredPlanExpenses();
   if (typeof deferredBenefitCost === 'undefined') window.deferredBenefitCost = 0;
   window.deferredBenefitCost += newBenefitCost;
