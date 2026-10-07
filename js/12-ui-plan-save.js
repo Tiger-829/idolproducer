@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : カレンダータップ選択・特典イベント完全修正版
+// 12-ui-plan-save.js : ペナルティ料・後払い精算・確定月管理統合版
 // ==========================================
 
 let planYearTarget = 1;
@@ -386,7 +386,22 @@ function openBenefitDetailModal(month, dates) {
     modalEl.style.cssText = 'display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:10000;';
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
-        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの日程確認</h3>
+        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
+        <p style="font-size:11px; color:#666; margin-bottom:12px;">選択した日程に対する特典イベントの情報を構成してください。</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
+            <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+              <option value="handshake">個別握手会</option>
+              <option value="autograph">サイン会</option>
+              <option value="online">オンラインお話し会</option>
+            </select>
+          </label>
+
+          <label style="font-size:11px; font-weight:bold; color:#333;">イベント名
+            <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+          </label>
+
           <label style="font-size:11px; font-weight:bold; color:#333;">日程（選択中）
             <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
           </label>
@@ -449,6 +464,51 @@ function submitBenefitDetailModal() {
   closeBenefitDetailModal();
 }
 
+// 🌟 【新規機能】変更・キャンセル手続きペナルティ計算ロジック
+function calculatePenaltyCost(targetDateStr, isCancel = true) {
+  if (!targetDateStr) return 0;
+  // 対象の日付に対して、残り日数が30日（1か月）未満の場合は変更・キャンセル不可とするチェック
+const targetDate = new Date(`${targetDateStr}T12:00:00`);
+const currentGameDate = getGameDateObject();
+const diffDays = Math.round((targetDate - currentGameDate) / 86400000);
+
+if (diffDays <= 30) {
+  alert('実施予定日の1か月前を切っているため、キャンセルおよび変更手続きを行うことはできません。');
+  return false; // または処理を中断
+}
+  // 特典イベント1日程あたりの基準予想費用を2000万円とする
+  const baseExpectedCost = 20000000;
+  let rate = 0.4; // 半年より前ならキャンセル40%、変更20%
+
+  if (diffDays <= 30) {
+    // 1か月以内（または過去）
+    rate = isCancel ? 0.8 : 0.5;
+  } else if (diffDays <= 90) {
+    // 3か月以内
+    rate = isCancel ? 0.8 : 0.5;
+  } else if (diffDays <= 180) {
+    // 半年以内（3か月〜半年）
+    rate = isCancel ? 0.6 : 0.4;
+  } else {
+    // 半年より前
+    rate = isCancel ? 0.4 : 0.2;
+  }
+
+  return Math.round(baseExpectedCost * rate);
+}
+
+// 🌟 【新規機能】次回の予定決定タイミングでの前回期間分の後払い精算処理
+function processDeferredPlanExpenses() {
+  if (typeof deferredBenefitCost === 'undefined') {
+    window.deferredBenefitCost = 0;
+  }
+  if (deferredBenefitCost > 0) {
+    funds -= deferredBenefitCost;
+    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
+    deferredBenefitCost = 0;
+  }
+}
+
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -496,91 +556,30 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       console.warn('Rival schedule generation warning:', err);
     }
 
+    // 🌟 【予定参照UIの変更】今月（現在のゲーム内月）から確定済みの予定月までをスムーズに確認できるサマリー表示
     const summaryBox = document.getElementById('prev-plan-summary');
     if (summaryBox) {
-      let prevStart = startM === 7 ? 1 : 7;
-      let prevYear = startM === 7 ? yearTarget : yearTarget - 1;
+      let currentY = typeof currentYear !== 'undefined' ? currentYear : 1;
+      let currentM = typeof currentMonth !== 'undefined' ? currentMonth : 1;
       
-      let releaseDetails = [];
-      let liveDetails = [];
-      let releaseOrderCount = 0;
-
-      for (let m = prevStart; m <= (prevStart === 1 ? 6 : 12); m++) {
-        const pKey = `${prevYear}-${m}`;
-        if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
-          const p = productionSchedule[pKey];
-          
-          if (p.release && p.release !== 'none') {
-            releaseOrderCount++;
-            let ordinal = releaseOrderCount === 1 ? '1st' : releaseOrderCount === 2 ? '2nd' : releaseOrderCount === 3 ? '3rd' : `${releaseOrderCount}th`;
-            let relTypeName = p.release === 'album' ? 'アルバム' : 'シングル';
-            
-            let rawDate = p.releaseDate || '';
-            let dateStr = '日程未定';
-            if (rawDate) {
-              const match = rawDate.match(/(\d{1,2})-(\d{1,2})$/) || rawDate.match(/\d{4}-\d{2}-\d{2}/);
-              if (match) {
-                dateStr = `${parseInt(match[1])}月${parseInt(match[2])}日`;
-              } else {
-                dateStr = rawDate;
-              }
-            } else if (typeof getPlanReleaseDefaultWednesday === 'function') {
-              const defDate = getPlanReleaseDefaultWednesday(m);
-              if (defDate) {
-                const matchDef = defDate.match(/(\d{1,2})-(\d{1,2})$/) || defDate.match(/\d{4}-\d{2}-\d{2}/);
-                if (matchDef) dateStr = `${parseInt(matchDef[1])}月${parseInt(matchDef[2])}日`;
-              }
+      let upcomingSchedules = [];
+      for (let y = currentY; y <= currentY + 1; y++) {
+        for (let m = 1; m <= 12; m++) {
+          if (y === currentY && m < currentM) continue;
+          const pKey = `${y}-${m}`;
+          if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
+            const p = productionSchedule[pKey];
+            if ((p.release && p.release !== 'none') || (p.liveDates && p.liveDates.length > 0) || (p.planEvents && p.planEvents.length > 0)) {
+              upcomingSchedules.push(`・${y}年${m}月: 予定あり（変更には時期に応じたペナルティが必要です）`);
             }
-
-            let songTitle = p.songName ? `「${p.songName}」` : '';
-            releaseDetails.push(`・${m}月: ${ordinal} ${relTypeName}${songTitle} (${dateStr}発売)`);
-          }
-          
-          let dates = [];
-          if (p.liveDate) dates.push(p.liveDate);
-          if (Array.isArray(p.liveDates)) dates = dates.concat(p.liveDates);
-          if (p.date) dates.push(p.date);
-
-          if (m === 5 && dates.length === 0) {
-            dates = ['2026-05-16', '2026-05-17'];
-          }
-
-          dates = [...new Set(dates)].filter(Boolean);
-
-          if (dates.length > 0 || p.liveVenue || p.liveName) {
-            let formattedDates = dates.map(d => {
-              const match = d.match(/(\d{1,2})-(\d{1,2})$/) || d.match(/\d{4}-\d{2}-\d{2}/);
-              if (match) {
-                return `${parseInt(match[1])}月${parseInt(match[2])}日`;
-              }
-              return d;
-            });
-
-            let dateStr = formattedDates.length > 0 ? formattedDates.join(', ') : '日程未定';
-            let lName = p.liveName || p.liveVenue || '記念ライブ';
-
-            liveDetails.push(`・${m}月: ${lName} (${dateStr})`);
           }
         }
       }
 
-      if (releaseDetails.length > 0 || liveDetails.length > 0) {
-        let releaseHtml = releaseDetails.length > 0 
-          ? `<strong>【CD発売】</strong><br>` + releaseDetails.join('<br>')
-          : `<strong>【CD発売】</strong><br>・なし`;
-
-        let liveDetailsHtml = liveDetails.length > 0 
-          ? `<br><strong>【ライブ予定】</strong><br>` + liveDetails.join('<br>')
-          : `<br><strong>【ライブ予定】</strong><br>・なし`;
-
-        summaryBox.innerHTML = `
-          <strong>【直近の半期の振り返り（${prevYear}年${prevStart === 1 ? '上半期：1〜6月' : '下半期：7〜12月'}）】</strong><br>
-          ${releaseHtml}<br>
-          ${liveDetailsHtml}
-        `;
-      } else {
-        summaryBox.innerHTML = `<strong>【直近の半期の振り返り】</strong><br>今回は記念すべき最初の半年計画、または前回の記録がありません。`;
-      }
+      summaryBox.innerHTML = `
+        <strong>【現在の進行状況と確定済み予定の参照（${currentY}年${currentM}月〜）】</strong><br>
+        ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在確定している将来の特記事項はありません。'}
+      `;
     }
     
     const container = document.getElementById('plan-rows');
@@ -844,7 +843,6 @@ function renderEmbeddedPlanCalendars() {
   }
 }
 
-// 🌟 【修正】カレンダーのタップは「選択（ハイライト）」の切り替えのみに変更（勝手にライブ日等にならない）
 function handleEmbeddedCalendarClick(month, dateKey) {
   const isMulti = planMultiSelectModes[month];
   if (!Array.isArray(planCalendarSelections[month])) planCalendarSelections[month] = [];
@@ -913,7 +911,6 @@ function applyScheduleAction(month, actionType) {
       updateReleaseDateOptions(month);
     }
   } else if (actionType === 'event-benefit') {
-    // 🌟 選択した日付をそのまま特典イベント設定モーダルへ渡す
     openBenefitDetailModal(month, targetDates);
     return;
   } else if (actionType === 'event-other') {
@@ -1064,9 +1061,10 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
+// 🌟 【修正】決定時に即時引き落としではなく、次回精算用にdeferredBenefitCostへ加算するように変更
 function saveDecisionPlan() {
   const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
-  let totalBenefitCost = 0;
+  let newBenefitCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
@@ -1084,7 +1082,7 @@ function saveDecisionPlan() {
     const drafts = getPlanMonthEventDrafts(m);
     drafts.forEach(event => {
       if (event && event.date) {
-        totalBenefitCost += 20000000;
+        newBenefitCost += 20000000;
       }
     });
 
@@ -1119,15 +1117,14 @@ function saveDecisionPlan() {
     }
   }
 
-  if (totalBenefitCost > 0) {
-    if (typeof funds !== 'undefined') {
-      funds -= totalBenefitCost;
-    }
-  }
+  // 🌟 前回分の後払い精算を実行しつつ、今回の新規費用を次の精算用に保持する
+  processDeferredPlanExpenses();
+  if (typeof deferredBenefitCost === 'undefined') window.deferredBenefitCost = 0;
+  window.deferredBenefitCost += newBenefitCost;
 
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（特典イベント経費合計: ${formatMoney(totalBenefitCost)}）`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（今回設定された特典イベント経費: ${formatMoney(newBenefitCost)} ※次回精算）`);
   updateUI();
 }
 
@@ -1285,10 +1282,6 @@ function openTitleScreen() {
 function returnToTitle() {
   activeSaveSlot = null;
   openTitleScreen();
-}
-
-function initGroup(slot, startFresh) {
-  initGame(slot, startFresh);
 }
 
 function initGame(slot, startFresh) {
