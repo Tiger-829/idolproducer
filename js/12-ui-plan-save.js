@@ -353,7 +353,6 @@ function renderPlanEventsHtml(month) {
     return `
       <div class="plan-event-row" data-event-index="${index}" style="display:flex; flex-direction:column; gap:4px; padding:6px; background:#fdf8f9; border:1px solid #eadde1; border-radius:4px; margin-bottom:6px;">
         <div style="display:flex; align-items:center; gap:6px;">
-          <input type="text" class="plan-event-name-input" value="${escapeHtml(event.name || '個別握手会')}" onchange="updatePlanEventName(${month}, ${index}, this.value)" placeholder="イベント名" style="font-size:11px; padding:4px; flex:1; box-sizing:border-box;">
           <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:4px; flex-shrink:0;">
           <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})" style="flex-shrink:0;">削除</button>
         </div>
