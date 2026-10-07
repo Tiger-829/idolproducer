@@ -204,6 +204,7 @@ function readLiveSlotInputs(month) {
       const val = dInput.value;
       if (val) {
         liveDates.push(val);
+        // 🌟 ここで「配信あり」にチェックが入っているかを正しく判定して配列に格納する
         if (streamInputs[dIdx] && streamInputs[dIdx].checked) {
           streamDates.push(val);
         }
@@ -231,12 +232,13 @@ function readLiveSlotInputs(month) {
       liveName: (document.getElementById(`live-name-${month}-${index}`) || {}).value?.trim() || '',
       liveDate: liveDates[0] || '',
       liveDates: liveDates,
-      streamDates: streamDates,
+      streamDates: streamDates, // 🌟 配信日の配列を確実に渡す
       seatPrices,
       seatOptions
     };
   }).filter(Boolean);
 }
+
 
 function updateShowDateNote(month, index) {
   const note = document.getElementById(`show-date-note-${month}-${index}`);
