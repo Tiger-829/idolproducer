@@ -92,7 +92,13 @@ function getPlayerCdReleaseList() {
   const cdList = [];
   let count = 0;
   
+  // 1. まずこれまで確定・保存されているCDをスキャン
   for (let y = 1; y <= planYearTarget; y++) {
+    // 🌟 実際のゲーム内年（calendarYearからの差分を考慮した年数）を計算
+    const displayYear = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') 
+      ? calendarYear + (y - currentYear) 
+      : y;
+
     const maxM = (y === planYearTarget) ? planEndM : 12;
     for (let m = 1; m <= maxM; m++) {
       const pKey = `${y}-${m}`;
@@ -105,15 +111,20 @@ function getPlayerCdReleaseList() {
         const sName = plan.songName ? `「${plan.songName}」` : '';
         cdList.push({
           id: `cd_${y}_${m}`,
-          label: `${ordinal} ${typeStr}${sName} (${y}年${m}月)`
+          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月)` // 🌟 y の代わりに displayYear を使用
         });
       }
     }
   }
 
+  // 2. 現在開いている半年計画モーダル内で、まだ保存前だけど新しく「CD発売」に設定されている月があれば候補に追加
   for (let m = planStartM; m <= planEndM; m++) {
     const selRel = document.getElementById(`sel-rel-${m}`);
     if (selRel && selRel.value !== 'none') {
+      const displayYear = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') 
+        ? calendarYear + (planYearTarget - currentYear) 
+        : planYearTarget;
+
       const existingId = `cd_${planYearTarget}_${m}`;
       if (!cdList.some(cd => cd.id === existingId)) {
         count++;
@@ -124,7 +135,7 @@ function getPlayerCdReleaseList() {
         
         cdList.push({
           id: existingId,
-          label: `${ordinal} ${typeStr}${sName} (${planYearTarget}年${m}月 [編集中])`
+          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月 [編集中])` // 🌟 displayYear を使用
         });
       }
     }
@@ -135,6 +146,7 @@ function getPlayerCdReleaseList() {
   }
   return cdList;
 }
+
 
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, prefix = 'show') {
   const onChangeHandler = prefix === 'show' 
@@ -1537,3 +1549,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   observer.observe(document.body, { childList: true, subtree: true });
 });
+
+
