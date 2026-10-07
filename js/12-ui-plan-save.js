@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 上限変更＆会場制限・費用連動完全版
+// 12-ui-plan-save.js : 構文・安全対策完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -15,7 +15,6 @@ let customFirstSong = "はじまりの光";
 let customSecondSong = "青春の軌跡";
 let customFirstLiveName = "1stデビューライブ";
 
-// 🌟 特典イベントの選択肢とベース費用定義
 const BENEFIT_EVENT_TYPE_OPTIONS = [
   { id: 'online-meeguri', name: 'オンラインミーグリ', baseCost: 3000000 },
   { id: 'online-sign', name: 'オンラインサイン会', baseCost: 6000000 },
@@ -223,7 +222,6 @@ function renderLiveSlotHtml(month, index, slot) {
 
 function renderEventSlotHtml(month, index, event) {
   const allVenues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
-  // 🌟 特典イベントは名前に「パルス」が含まれる会場のみ抽出
   const venues = allVenues.filter(v => v.name.includes('パルス'));
 
   const cdList = getPlayerCdReleaseList();
@@ -400,7 +398,6 @@ function readEventSlotInputs(month) {
 
     if (!venueVal && dates.length === 0) return null;
 
-    // 🌟 特典イベントの会場バリデーション（パルス関連のみ）
     const venueObj = venues.find(v => v.name === venueVal);
     if (venueObj && !venueObj.name.includes('パルス')) {
       alert(`特典イベントには「パルス」に関連する会場のみ設定できます。`);
@@ -512,7 +509,6 @@ function addLiveSlot(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
   const currentCount = container.querySelectorAll('.live-slot').length;
-  // 🌟 ライブの月上限を 8 に変更
   const maxVenues = 8;
   if (currentCount >= maxVenues) {
     alert(`1か月あたりのライブ会場は最大${maxVenues}会場までです。`);
@@ -575,7 +571,6 @@ function renderPlanEventsHtml(month) {
 
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
-  // 🌟 イベントの月上限を 6 に変更
   const maxEvents = 6;
   if (drafts.length >= maxEvents) {
     alert(`1か月あたりのイベント枠は最大${maxEvents}件までです。`);
@@ -1278,7 +1273,10 @@ function saveDecisionPlan() {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
   setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（今回設定されたイベント経費: ${formatMoney(newBenefitCost)} ※次回精算）`);
-  updateUI();
+  
+  if (typeof updateUI === 'function') {
+    updateUI();
+  }
 }
 
 function openPlanningManual() {
@@ -1509,7 +1507,9 @@ function initGame(slot, startFresh) {
   }
 
   try {
-    updateUI();
+    if (typeof updateUI === 'function') {
+      updateUI();
+    }
   } catch (e) {
     console.warn('Initial updateUI warning:', e);
   }
