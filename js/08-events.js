@@ -1419,6 +1419,37 @@ function showLiveDetailedFinanceModal(report) {
 
   modal.style.display = 'flex';
 }
+// 🌟 会場ランク・公演数・配信数に応じたライブ諸経費と配信費用の計算関数（配信費用の上限1,200万円・下限450万円設定）
+function calculateLiveExpenses(venueCap, totalShows, streamShows) {
+  // 会場ランクごとの基本諸経費の基準単価
+  const baseCostPerShow = {
+    'SS': 8000000,
+    'S': 5000000,
+    'A': 3000000,
+    'B': 1500000,
+    'C': 800000,
+    'D': 400000
+  }[venueCap] || 1000000;
+
+  const baseCost = baseCostPerShow * Math.max(1, totalShows);
+
+  // 配信費用：配信を行う場合、基本計算を行った上で最小4,500,000円〜最大12,000,000円の範囲に収める
+  let streamCost = 0;
+  if (streamShows > 0) {
+    const rawStreamCost = 5000000 * Math.max(1, streamShows); // 基準となる配信費用
+    // 最小4,500,000円 (4,500,000) から 最大12,000,000円 (12,000,000) にクランプ
+    streamCost = Math.max(4500000, Math.min(12000000, rawStreamCost));
+  }
+
+  const totalCost = baseCost + streamCost;
+
+  return {
+    baseCost: baseCost,
+    streamCost: streamCost,
+    totalCost: totalCost
+  };
+}
+
 
 window.closeLiveFinanceModal = function() {
   const modal = document.getElementById('live-finance-modal');
