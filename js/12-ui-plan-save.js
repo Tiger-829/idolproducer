@@ -386,17 +386,8 @@ function openBenefitDetailModal(month, dates) {
     modalEl.style.cssText = 'display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:10000;';
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
-        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
-        <p style="font-size:11px; color:#666; margin-bottom:12px;">選択した日程に対する特典イベントの情報を構成してください。</p>
-        
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
-            <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-              <option value="handshake">個別握手会</option>
-              <option value="autograph">サイン会</option>
-              <option value="online">オンラインお話し会</option>
-            </select>
-          </label>
+        <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの日程の確認</h3>
+                  </label>
 
           <label style="font-size:11px; font-weight:bold; color:#333;">イベント名
             <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
