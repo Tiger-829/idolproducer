@@ -262,7 +262,26 @@ let shownAbilityMemberIds = new Set();
 function toggleMemberAbilities(memberId) {
   if (shownAbilityMemberIds.has(memberId)) shownAbilityMemberIds.delete(memberId);
   else shownAbilityMemberIds.add(memberId);
+  
+  // 1. 現在開いているメンバーの details 要素をすべて特定してIDや識別子を保存しておく
+  const listUI = document.getElementById('roster-list-ui');
+  const openedIds = [];
+  if (listUI) {
+    listUI.querySelectorAll('.member-details').forEach((el, idx) => {
+      if (el.open) openedIds.push(idx);
+    });
+  }
+
+  // 2. 再描画実行
   renderRosterList();
+
+  // 3. 再描画直後に、先ほど開いていたインデックスの details を再び開く
+  if (listUI) {
+    const newDetails = listUI.querySelectorAll('.member-details');
+    openedIds.forEach(idx => {
+      if (newDetails[idx]) newDetails[idx].open = true;
+    });
+  }
 }
 
 function renderRosterList() {
