@@ -507,7 +507,7 @@ function addLiveSlot(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
   const currentCount = container.querySelectorAll('.live-slot').length;
-  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
+  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 8;
   if (currentCount >= maxVenues) {
     alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
     return;
@@ -569,7 +569,7 @@ function renderPlanEventsHtml(month) {
 
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
-  const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 4;
+  const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 6;
   if (drafts.length >= maxEvents) {
     alert(`1か月あたりのイベントは最大${maxEvents}件までです。`);
     return;
@@ -1207,7 +1207,7 @@ function validatePlanLiveSlots(month, liveSlots) {
 }
 
 function saveDecisionPlan() {
-  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 2;
+  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 8;
   let newBenefitCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
