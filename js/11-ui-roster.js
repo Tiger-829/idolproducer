@@ -297,8 +297,8 @@ function renderRosterList() {
     const abilitiesShown = shownAbilityMemberIds.has(m.id);
 
     listUI.innerHTML += `
-      <details class="member-details">
-        <summary class="member-row member-summary">
+      <details class="member-details" ${m._isOpen ? 'open' : ''}>
+        <summary class="member-row member-summary" onclick="onMemberSummaryClick(event, ${m.id})">
           <div class="member-summary-main">
             <div class="member-name-line">
               <span class="member-name-toggle">${escapeHtml(formatMemberDisplayName(m))}</span>
@@ -357,9 +357,8 @@ function renderRosterList() {
         </div>
       </details>
     `;
-  });
-}
 
+    
 function setLog(msg) {
   if (!Array.isArray(logHistory)) logHistory = [];
   logHistory.unshift({ date: gameDate, text: String(msg) });
