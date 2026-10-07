@@ -448,10 +448,15 @@ function submitBenefitDetailModal() {
   });
 
   refreshPlanEventsContainer(pendingBenefitMonth);
+
+  // 🌟 【追加】登録完了後に選択状態をクリアしてハイライトを消す
+  if (planCalendarSelections[pendingBenefitMonth]) {
+    planCalendarSelections[pendingBenefitMonth] = [];
+  }
+
   renderEmbeddedPlanCalendars();
   closeBenefitDetailModal();
 }
-
 // 🌟 【新規】変更・キャンセルペナルティ算出（1か月前未満は変更・キャンセル不可）
 function validateChangeOrCancel(targetDateStr) {
   if (!targetDateStr) return true;
