@@ -718,7 +718,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           </label>
           <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
             <select id="sel-benefit-${m}">
-              <option value="none">特典なし</option>
+              
               ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
             </select>
           </label>
