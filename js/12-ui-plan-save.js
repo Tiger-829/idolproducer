@@ -375,7 +375,6 @@ function addPlanEvent(month) {
   }
   const cdList = getPlayerCdReleaseList();
   drafts.push({
-    name: '個別握手会',
     date: '',
     targetCdId: cdList[0] ? cdList[0].id : 'cd_default',
     completed: false
