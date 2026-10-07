@@ -201,7 +201,7 @@ function renderWeeklyActionPanel() {
       panel.innerHTML = `
         <h2 class="page-title">今週の行動</h2>
         <div class="weekly-event-note"><strong>ライブ週</strong><ul>
-          <li>${escapeHtml(`${liveLabel}にライブがあるため、週間スケジュールは組めません。`)}</li>
+          <li>${escapeHtml(`${liveLabel}にライブが行われたため、ライブ前はリハーサルを行い、ライブ後には休養を取りました。`)}</li>
           ${liveDetail ? `<li>${escapeHtml(`公演: ${liveDetail}`)}</li>` : ''}
           ${renderWeeklyEventItems(events)}
         </ul></div>
@@ -434,11 +434,8 @@ function renderWeeklyScheduleControls() {
     <!-- 個別レッスン（特別強化統合） -->
     <div class="schedule-block">
       <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
-      <div class="schedule-note">
-        選択したメンバー1名の指定能力に <strong>${mult}倍</strong> の経験値が入ります。
-      </div>
       <div class="schedule-note" style="color: #2e7d32;">
-        ※対象外のメンバーは練習を行わず、<strong>午前・午後の枠に合わせて休養（体力回復）</strong>します。
+        ※対象外のメンバーは練習を行わず、<strong>休養</strong>します。
       </div>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <select style="flex:1;" aria-label="個別レッスンの対象メンバー" onchange="setWeeklyScheduleField('individualMemberId', Number(this.value))">
@@ -449,18 +446,18 @@ function renderWeeklyScheduleControls() {
         </select>
       </div>
       <div class="schedule-note" style="margin-top:6px;">
-        設定中: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を${mult}倍で強化
+        設定中: <strong>${escapeHtml(selectedMemberName)}</strong> の <strong>${escapeHtml(selectedStatName)}</strong> を特別強化
       </div>
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。体力${autoRestTarget}で練習に復帰</small></div>
+      <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。所定の体力まで回復すると自動で練習に復帰します。</small></div>
       ${restSuggestion}
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
 
     <div class="schedule-block">
-      <div class="schedule-block-title">今週の事務作業 <small>レッスンと同じ週に実行（未選択なら行わない）</small></div>
+      <div class="schedule-block-title">今週の事務作業 <small>レッスンの裏側で進行</small></div>
       <div class="rest-toggle-grid">
         <button type="button" class="rest-toggle office${selectedOfficeAction ? '' : ' active'}"
           onclick="selectOfficeAction('')">何もしない</button>
@@ -807,10 +804,10 @@ function downgradeOfficeFacility(facilityId) {
     return;
   }
   const refund = getOfficeDowngradeRefund(facility, level);
-  if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n売却額: ${formatMoney(refund)}\n（能力は低下し、週間維持費も下がります）`)) return;
+  if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n払い戻し額: ${formatMoney(refund)}\n（能力は低下し、週間維持費も下がります）`)) return;
   if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level - 1;
   funds += refund;
-  setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
+  setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（払い戻し額 ${formatMoney(refund)}）。`);
   updateUI();
 }
 
@@ -845,7 +842,7 @@ function renderOfficeUpgrades() {
         <div class="facility-actions">
           <div class="facility-action-label">
             ${isMax ? '最大レベル' : `強化<br>${formatMoney(upgradeCost)}`}
-            ${level > 1 ? `<br>売却<br>+${formatMoney(refund)}` : ''}
+            ${level > 1 ? `<br>払い戻し<br>+${formatMoney(refund)}` : ''}
           </div>
           <button class="icon-round-btn up" type="button"
             onclick="upgradeOfficeFacility('${facility.id}')"
@@ -855,7 +852,7 @@ function renderOfficeUpgrades() {
           ${level > 1
             ? `<button class="icon-round-btn down" type="button"
                 onclick="downgradeOfficeFacility('${facility.id}')"
-                title="${facility.name}をLv.${level - 1}にダウングレード（売却額 ${formatMoney(refund)}）"
+                title="${facility.name}をLv.${level - 1}にダウングレード（払い戻し額 ${formatMoney(refund)}）"
                 aria-label="${facility.name}をLv.${level - 1}にダウングレード">${safeGetIconSvg('downgrade')}</button>`
             : ''}
         </div>
