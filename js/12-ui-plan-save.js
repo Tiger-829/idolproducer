@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : ライブ日程・色付け同期修正版
+// 12-ui-plan-save.js : チケット価格・配信設定完全復活版
 // ==========================================
 
 let planYearTarget = 1;
@@ -91,6 +91,7 @@ function getPlayerCdReleaseList() {
   return cdList;
 }
 
+// 🌟 配信ありチェックボックス付きの公演日ロウ描画
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -105,6 +106,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
     </div>`;
 }
 
+// 🌟 チケット価格（席種）・配信設定を完全復活させたライブスロット描画
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
   const seatPrices = slot.seatPrices || {};
@@ -146,6 +148,8 @@ function renderLiveSlotHtml(month, index, slot) {
           </div>
           <div id="show-date-note-${month}-${index}" class="show-date-note" style="margin-top:4px; font-size:10px; color:#666;"></div>
         </div>
+
+        <!-- 🌟 チケット価格・席種設定アコーディオン -->
         <details class="seat-settings" style="margin-top:6px;">
           <summary style="font-size:11px; cursor:pointer; font-weight:bold;">席種・チケット価格</summary>
           <div class="seat-settings-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:6px;">
@@ -181,7 +185,6 @@ function onVenueSelectChange(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
-// 🌟 ライブスロットの入力を正確に読み取る（カレンダー色付け判定にも直結）
 function readLiveSlotInputs(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return [];
@@ -360,6 +363,7 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
+// 🌟 名前入力ボックスを廃止し、日付とCD紐付け選択のみにした特典イベント一覧描画
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
@@ -371,7 +375,7 @@ function renderPlanEventsHtml(month) {
     return `
       <div class="plan-event-row" data-event-index="${index}" style="display:flex; flex-direction:column; gap:4px; padding:6px; background:#fdf8f9; border:1px solid #eadde1; border-radius:4px; margin-bottom:6px;">
         <div style="display:flex; align-items:center; gap:6px;">
-          <input type="text" class="plan-event-name-input" value="${escapeHtml(event.name || '個別握手会')}" onchange="updatePlanEventName(${month}, ${index}, this.value)" placeholder="イベント名" style="font-size:11px; padding:4px; flex:1; box-sizing:border-box;">
+          <span style="font-size:11px; font-weight:bold; color:#555; flex:1;">🎁 特典イベント</span>
           <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:4px; flex-shrink:0;">
           <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})" style="flex-shrink:0;">削除</button>
         </div>
@@ -411,13 +415,6 @@ function removePlanEvent(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
-function updatePlanEventName(month, index, val) {
-  const drafts = getPlanMonthEventDrafts(month);
-  if (drafts[index]) {
-    drafts[index].name = val.trim();
-  }
-}
-
 function updatePlanEventDate(month, index, dateVal) {
   const drafts = getPlanMonthEventDrafts(month);
   if (drafts[index]) {
@@ -453,9 +450,6 @@ function openBenefitDetailModal(month, dates) {
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
         <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
-        <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">イベント名
-          <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-        </label>
         <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">紐づくCD
           <select id="benefit-modal-cd" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;"></select>
         </label>
@@ -498,21 +492,18 @@ function submitBenefitDetailModal() {
     return;
   }
 
-  const nameInput = document.getElementById('benefit-modal-name');
   const cdSelect = document.getElementById('benefit-modal-cd');
-  
-  const eventName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : '個別握手会';
   const targetCdId = cdSelect ? cdSelect.value : 'cd_default';
 
   const drafts = getPlanMonthEventDrafts(pendingBenefitMonth);
   pendingBenefitDates.forEach(d => {
     const existing = drafts.find(e => e.date === d);
     if (existing) {
-      existing.name = eventName;
+      existing.name = '個別握手会';
       existing.targetCdId = targetCdId;
     } else {
       drafts.push({
-        name: eventName,
+        name: '個別握手会',
         date: d,
         targetCdId: targetCdId,
         completed: false
@@ -946,7 +937,6 @@ function toggleEmbeddedCalendarDate(month, dateKey) {
   handleEmbeddedCalendarClick(month, dateKey);
 }
 
-// 🌟 ライブ設定アクション時にスロットが自動生成され、カレンダーの色付けも即時連動するよう修正
 function applyScheduleAction(month, actionType) {
   const isMulti = planMultiSelectModes[month];
   const selections = planCalendarSelections[month] || [];
@@ -984,7 +974,6 @@ function applyScheduleAction(month, actionType) {
 
         const showDatesContainer = document.getElementById(`show-dates-${month}-${slotIndex}`);
         if (showDatesContainer) {
-          // 既存の日付に新規選択された日付をマージ
           const existingDateInputs = Array.from(showDatesContainer.querySelectorAll('.show-date-input')).map(i => i.value).filter(Boolean);
           const combinedDates = Array.from(new Set([...existingDateInputs, ...targetDates])).sort();
 
@@ -1021,17 +1010,14 @@ function applyScheduleAction(month, actionType) {
     openBenefitDetailModal(month, targetDates);
     return;
   } else if (actionType === 'event-other') {
-    const eventName = prompt('その他イベントの名前を入力してください:', 'メディア出演・取材');
-    if (eventName) {
-      const drafts = getPlanMonthEventDrafts(month);
-      const cdList = getPlayerCdReleaseList();
-      targetDates.forEach(d => {
-        if (!drafts.some(e => e.date === d)) {
-          drafts.push({ name: eventName, date: d, targetCdId: cdList[0] ? cdList[0].id : 'cd_default', completed: false });
-        }
-      });
-      refreshPlanEventsContainer(month);
-    }
+    const drafts = getPlanMonthEventDrafts(month);
+    const cdList = getPlayerCdReleaseList();
+    targetDates.forEach(d => {
+      if (!drafts.some(e => e.date === d)) {
+        drafts.push({ name: '個別握手会', date: d, targetCdId: cdList[0] ? cdList[0].id : 'cd_default', completed: false });
+      }
+    });
+    refreshPlanEventsContainer(month);
   } else if (actionType === 'delete') {
     targetDates.forEach(d => {
       const container = document.getElementById(`live-slots-${month}`);
