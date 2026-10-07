@@ -389,10 +389,7 @@ function openBenefitDetailModal(month, dates) {
         <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの日程の確認</h3>
                   </label>
 
-          <label style="font-size:11px; font-weight:bold; color:#333;">イベント名
-            <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-          </label>
-
+        
           <label style="font-size:11px; font-weight:bold; color:#333;">日程（選択中）
             <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
           </label>
