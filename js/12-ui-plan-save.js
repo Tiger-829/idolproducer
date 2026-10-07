@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 設定欄動的表示（予定があるときのみ出現）対応版
+// 12-ui-plan-save.js : CD・ライブ動的表示＆独立型CD紐付け特典イベント完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -64,6 +64,35 @@ function getPlanReleaseDefaultWednesday(month) {
   return toDateKey(d);
 }
 
+// 🌟 これまでにプレイヤーが計画したCDの一覧（例: 1stシングル、2ndシングル など）を取得するヘルパー
+function getPlayerCdReleaseList() {
+  const cdList = [];
+  let count = 0;
+  // 1年目から対象ターゲット月までのproductionScheduleをスキャン
+  for (let y = 1; y <= planYearTarget; y++) {
+    const maxM = (y === planYearTarget) ? planEndM : 12;
+    for (let m = 1; m <= maxM; m++) {
+      const pKey = `${y}-${m}`;
+      const plan = (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) ? productionSchedule[pKey] : {};
+      const relVal = plan.release;
+      if (relVal && relVal !== 'none') {
+        count++;
+        const ordinal = count === 1 ? '1st' : count === 2 ? '2nd' : count === 3 ? '3rd' : `${count}th`;
+        const typeStr = relVal === 'album' ? 'アルバム' : 'シングル';
+        const sName = plan.songName ? `「${plan.songName}」` : '';
+        cdList.push({
+          id: `cd_${y}_${m}`,
+          label: `${ordinal} ${typeStr}${sName} (${y}年${m}月)`
+        });
+      }
+    }
+  }
+  if (cdList.length === 0) {
+    cdList.push({ id: 'cd_default', label: '1st シングル (標準)' });
+  }
+  return cdList;
+}
+
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
   return `
     <div class="show-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -78,7 +107,6 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true) {
     </div>`;
 }
 
-// 🌟 ライブスロット描画（設定されている公演日が存在するときのみ詳細コントロールを表示）
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
   const seatPrices = slot.seatPrices || {};
@@ -102,7 +130,6 @@ function renderLiveSlotHtml(month, index, slot) {
         </select>
       </label>
 
-      <!-- 🌟 カレンダー等で公演日が設定されたときのみこの詳細設定欄が出現する -->
       <div id="live-details-container-${month}-${index}" style="display: ${hasDates ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
         <label class="weekly-member-target" for="live-name-${month}-${index}">ライブ名
           <input type="text" id="live-name-${month}-${index}" maxlength="40" value="${escapeHtml(slot.liveName || '')}" placeholder="例: 春の全国ツアー" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
@@ -314,20 +341,28 @@ function updateLiveDateOptions(month, index) {
   updateShowDateNote(month, index);
 }
 
+// 🌟 特典イベント一覧行：どのCDに紐づくかも表示
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) {
-    return ''; // 🌟 イベントがない場合は何も表示しない（すっきりさせる）
+    return '';
   }
-  const eventTypes = typeof PLAN_EVENT_TYPES !== 'undefined' ? PLAN_EVENT_TYPES : [];
+  const cdList = getPlayerCdReleaseList();
   return events.map((event, index) => {
+    const currentCdId = event.targetCdId || (cdList[0] ? cdList[0].id : '');
     return `
-      <div class="plan-event-row" data-event-index="${index}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-        <select class="plan-event-type-select" onchange="updatePlanEventBenefit(${month}, ${index}, this.value)" style="font-size:11px; padding:4px; flex:1; min-width:0;">
-          ${eventTypes.map(type => `<option value="${type.id}" ${type.id === event.benefitId ? 'selected' : ''}>${type.name}${type.cost ? ` (${formatMoney(type.cost)})` : ''}</option>`).join('')}
-        </select>
-        <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:4px; flex-shrink:0;">
-        <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})" style="flex-shrink:0;">削除</button>
+      <div class="plan-event-row" data-event-index="${index}" style="display:flex; flex-direction:column; gap:4px; padding:6px; background:#fdf8f9; border:1px solid #eadde1; border-radius:4px; margin-bottom:6px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="text" class="plan-event-name-input" value="${escapeHtml(event.name || '個別握手会')}" onchange="updatePlanEventName(${month}, ${index}, this.value)" placeholder="イベント名" style="font-size:11px; padding:4px; flex:1; box-sizing:border-box;">
+          <input type="date" class="plan-event-date-input" value="${event.date || ''}" onchange="updatePlanEventDate(${month}, ${index}, this.value); renderEmbeddedPlanCalendars();" style="font-size:11px; padding:4px; flex-shrink:0;">
+          <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})" style="flex-shrink:0;">削除</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:10px; color:#555;">
+          <span>紐づくCD:</span>
+          <select onchange="updatePlanEventCd(${month}, ${index}, this.value)" style="font-size:10px; padding:2px; flex:1;">
+            ${cdList.map(cd => `<option value="${cd.id}" ${cd.id === currentCdId ? 'selected' : ''}>${cd.label}</option>`).join('')}
+          </select>
+        </div>
       </div>`;
   }).join('');
 }
@@ -339,10 +374,11 @@ function addPlanEvent(month) {
     alert(`1か月あたりのイベントは最大${maxEvents}件までです。`);
     return;
   }
-  const defaultEventId = typeof DEFAULT_PLAN_EVENT_ID !== 'undefined' ? DEFAULT_PLAN_EVENT_ID : 'handshake';
+  const cdList = getPlayerCdReleaseList();
   drafts.push({
-    benefitId: defaultEventId,
+    name: '個別握手会',
     date: '',
+    targetCdId: cdList[0] ? cdList[0].id : 'cd_default',
     completed: false
   });
   refreshPlanEventsContainer(month);
@@ -357,10 +393,10 @@ function removePlanEvent(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
-function updatePlanEventBenefit(month, index, benefitId) {
+function updatePlanEventName(month, index, val) {
   const drafts = getPlanMonthEventDrafts(month);
   if (drafts[index]) {
-    drafts[index].benefitId = benefitId;
+    drafts[index].name = val.trim();
   }
 }
 
@@ -372,6 +408,13 @@ function updatePlanEventDate(month, index, dateVal) {
   renderEmbeddedPlanCalendars();
 }
 
+function updatePlanEventCd(month, index, cdId) {
+  const drafts = getPlanMonthEventDrafts(month);
+  if (drafts[index]) {
+    drafts[index].targetCdId = cdId;
+  }
+}
+
 function refreshPlanEventsContainer(month) {
   const container = document.getElementById(`plan-events-${month}`);
   if (container) {
@@ -379,6 +422,7 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
+// 🌟 カレンダー等で日付が選ばれて特典イベント設定を開くとき、CD紐付け選択も含める
 function openBenefitDetailModal(month, dates) {
   pendingBenefitMonth = month;
   pendingBenefitDates = [...dates];
@@ -392,17 +436,13 @@ function openBenefitDetailModal(month, dates) {
     modalEl.innerHTML = `
       <div class="modal-content" style="max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); position:relative;">
         <h3 class="page-title" style="margin-top:0; color:var(--primary); font-size:15px;">特典イベントの設定</h3>
-        <label style="font-size:11px; font-weight:bold; color:#333;">種類（カテゴリ）
-          <select id="benefit-modal-type" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
-            <option value="handshake">個別握手会</option>
-            <option value="autograph">サイン会</option>
-            <option value="online">オンラインお話し会</option>
-          </select>
-        </label>
-        <label style="font-size:11px; font-weight:bold; color:#333; margin-top:8px; display:block;">イベント名
+        <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">イベント名
           <input type="text" id="benefit-modal-name" maxlength="30" value="個別握手会" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
         </label>
-        <label style="font-size:11px; font-weight:bold; color:#333; margin-top:8px; display:block;">日程（選択中）
+        <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">紐づくCD
+          <select id="benefit-modal-cd" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;"></select>
+        </label>
+        <label style="font-size:11px; font-weight:bold; color:#333; display:block; margin-bottom:8px;">日程（選択中）
           <div id="benefit-modal-dates-display" style="font-weight:normal; font-size:12px; padding:6px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; margin-top:3px;"></div>
         </label>
         <div style="display:flex; gap:8px; margin-top:16px;">
@@ -412,6 +452,12 @@ function openBenefitDetailModal(month, dates) {
       </div>
     `;
     document.body.appendChild(modalEl);
+  }
+
+  const cdSelect = document.getElementById('benefit-modal-cd');
+  if (cdSelect) {
+    const cdList = getPlayerCdReleaseList();
+    cdSelect.innerHTML = cdList.map(cd => `<option value="${cd.id}">${cd.label}</option>`).join('');
   }
 
   const displayEl = document.getElementById('benefit-modal-dates-display');
@@ -435,23 +481,23 @@ function submitBenefitDetailModal() {
     return;
   }
 
-  const typeSelect = document.getElementById('benefit-modal-type');
   const nameInput = document.getElementById('benefit-modal-name');
+  const cdSelect = document.getElementById('benefit-modal-cd');
   
-  const benefitId = typeSelect ? typeSelect.value : 'handshake';
   const eventName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : '特典イベント';
+  const targetCdId = cdSelect ? cdSelect.value : 'cd_default';
 
   const drafts = getPlanMonthEventDrafts(pendingBenefitMonth);
   pendingBenefitDates.forEach(d => {
     const existing = drafts.find(e => e.date === d);
     if (existing) {
-      existing.benefitId = benefitId;
       existing.name = eventName;
+      existing.targetCdId = targetCdId;
     } else {
       drafts.push({
-        benefitId: benefitId,
         name: eventName,
         date: d,
+        targetCdId: targetCdId,
         completed: false
       });
     }
@@ -486,7 +532,7 @@ function processDeferredPlanExpenses() {
   }
   if (deferredBenefitCost > 0) {
     funds -= deferredBenefitCost;
-    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落とした。`);
+    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
     deferredBenefitCost = 0;
   }
 }
@@ -669,6 +715,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       })) : [];
 
       const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
+      const hasRelease = releaseValue !== 'none';
 
       const monthWrapper = document.createElement('div');
       monthWrapper.className = 'plan-month-wrapper';
@@ -703,28 +750,30 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         <div class="plan-month-title">${m}月の活動方針</div>
         ${monthRivalsHtml}
         <label class="weekly-member-target" for="sel-rel-${m}">CD発売
-          <select id="sel-rel-${m}" onchange="updateReleaseDateOptions(${m}); renderEmbeddedPlanCalendars();" ${isPreset ? 'disabled' : ''}>
+          <select id="sel-rel-${m}" onchange="onReleaseSelectChange(${m})" style="width:100%; padding:6px; font-size:11px; margin-top:3px;" ${isPreset ? 'disabled' : ''}>
             <option value="none" ${releaseValue === 'none' ? 'selected' : ''}>発売なし</option>
             <option value="single" ${releaseValue === 'single' ? 'selected' : ''}>シングル発売</option>
             <option value="album" ${releaseValue === 'album' ? 'selected' : ''}>アルバム発売</option>
           </select>
         </label>
-        <div id="release-fields-${m}">
+        
+        <!-- 🌟 CD発売が設定されたときのみこの詳細設定欄が現れる -->
+        <div id="release-fields-${m}" style="display: ${hasRelease ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
           <label class="weekly-member-target" for="song-name-${m}">楽曲名
-            <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名">
+            <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
           </label>
           <label class="weekly-member-target" for="rel-date-${m}">発売日
-            <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="renderEmbeddedPlanCalendars();">
+            <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="renderEmbeddedPlanCalendars();" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
           </label>
           <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
-            <select id="sel-benefit-${m}">
+            <select id="sel-benefit-${m}" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
               <option value="none">特典なし</option>
               ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
             </select>
           </label>
         </div>
 
-        <div style="margin-top:8px;">
+        <div style="margin-top:10px;">
           <div style="font-size:12px; font-weight:bold; color:#333;">CD関連イベント（特典会・物販）</div>
           <div id="plan-events-${m}" class="plan-event-list">
             ${renderPlanEventsHtml(m)}
@@ -742,7 +791,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       wrapperDiv.appendChild(monthWrapper);
       container.appendChild(wrapperDiv);
 
-      updateReleaseDateOptions(m);
       liveSlots.forEach((_, idx) => {
         updateSeatPlanOptions(m, idx);
         updateShowDateNote(m, idx);
@@ -754,6 +802,22 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     console.error('openDecisionModal error:', e);
     alert('半年計画画面を開く際にエラーが発生しました。');
   }
+}
+
+function onReleaseSelectChange(month) {
+  const selRel = document.getElementById(`sel-rel-${month}`);
+  const fields = document.getElementById(`release-fields-${month}`);
+  const hasRelease = selRel && selRel.value !== 'none';
+  if (fields) {
+    fields.style.display = hasRelease ? 'block' : 'none';
+  }
+  if (hasRelease) {
+    const relInput = document.getElementById(`rel-date-${month}`);
+    if (relInput && !relInput.value) {
+      relInput.value = getPlanReleaseDefaultWednesday(month);
+    }
+  }
+  renderEmbeddedPlanCalendars();
 }
 
 function closeDecisionModal() {
@@ -902,7 +966,6 @@ function applyScheduleAction(month, actionType) {
       });
       slot.liveDates.sort();
 
-      // 🌟 日付が追加されたら詳細ブロックを表示状態にする
       const detailsContainer = document.getElementById(`live-details-container-${month}-0`);
       if (detailsContainer) detailsContainer.style.display = 'block';
 
@@ -917,10 +980,13 @@ function applyScheduleAction(month, actionType) {
   } else if (actionType === 'release') {
     const relInput = document.getElementById(`rel-date-${month}`);
     const selRel = document.getElementById(`sel-rel-${month}`);
+    const releaseFields = document.getElementById(`release-fields-${month}`);
     if (relInput && targetDates.length > 0) {
       relInput.value = targetDates[0];
-      if (selRel && selRel.value === 'none') selRel.value = 'single';
-      updateReleaseDateOptions(month);
+      if (selRel && selRel.value === 'none') {
+        selRel.value = 'single';
+      }
+      if (releaseFields) releaseFields.style.display = 'block';
     }
   } else if (actionType === 'event-benefit') {
     openBenefitDetailModal(month, targetDates);
@@ -929,9 +995,10 @@ function applyScheduleAction(month, actionType) {
     const eventName = prompt('その他イベントの名前を入力してください:', 'メディア出演・取材');
     if (eventName) {
       const drafts = getPlanMonthEventDrafts(month);
+      const cdList = getPlayerCdReleaseList();
       targetDates.forEach(d => {
         if (!drafts.some(e => e.date === d)) {
-          drafts.push({ benefitId: 'other', name: eventName, date: d, completed: false });
+          drafts.push({ name: eventName, date: d, targetCdId: cdList[0] ? cdList[0].id : 'cd_default', completed: false });
         }
       });
       refreshPlanEventsContainer(month);
@@ -940,10 +1007,11 @@ function applyScheduleAction(month, actionType) {
     if (targetDates.length > 0) {
       const relInput = document.getElementById(`rel-date-${month}`);
       const selRel = document.getElementById(`sel-rel-${month}`);
+      const releaseFields = document.getElementById(`release-fields-${month}`);
       if (relInput) {
         relInput.value = targetDates[0];
         if (selRel && selRel.value === 'none') selRel.value = 'single';
-        updateReleaseDateOptions(month);
+        if (releaseFields) releaseFields.style.display = 'block';
       }
       const slots = readLiveSlotInputs(month);
       if (slots.length === 0) addLiveSlot(month);
@@ -1007,20 +1075,6 @@ function openPlanCalendar() {}
 function closePlanCalendar() {}
 function renderPlanCalendarGrid() {}
 
-function updateReleaseDateOptions(month) {
-  const selRel = document.getElementById(`sel-rel-${month}`);
-  const fields = document.getElementById(`release-fields-${month}`);
-  if (!fields) return;
-  const isReleasing = selRel && selRel.value !== 'none';
-  fields.style.display = isReleasing ? 'block' : 'none';
-  if (isReleasing) {
-    const relInput = document.getElementById(`rel-date-${month}`);
-    if (relInput && !relInput.value) {
-      relInput.value = getPlanReleaseDefaultWednesday(month);
-    }
-  }
-}
-
 function validatePlanLiveSlots(month, liveSlots) {
   const usedVenues = new Set();
   const usedDates = new Set();
@@ -1083,7 +1137,7 @@ function saveDecisionPlan() {
 
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
-    const songName = document.getElementById(`song-name-${m}`).value.trim();
+    const songName = document.getElementById(`song-name-${m}`)?.value.trim() || '';
     const planKey = `${planYearTarget}-${m}`;
     const previousPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : {};
     const liveSlots = readLiveSlotInputs(m).filter(slot => slot.liveVenue || (slot.liveDates && slot.liveDates.length > 0)).slice(0, maxVenues);
