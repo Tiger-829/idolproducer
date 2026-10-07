@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 特典イベント個別費用・会場使用料連動版
+// 12-ui-plan-save.js : 上限変更＆会場制限・費用連動完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -69,7 +69,6 @@ function getPlanReleaseDefaultWednesday(month) {
   return toDateKey(d);
 }
 
-// 🌟 特典イベントの費用計算（ベース費用 ＋ 会場使用料 * (日数 + 1)）
 function calculateEventExpenses(eventName, venue, dates) {
   const option = BENEFIT_EVENT_TYPE_OPTIONS.find(opt => opt.name === eventName) || BENEFIT_EVENT_TYPE_OPTIONS[0];
   const baseCost = option.baseCost;
@@ -92,9 +91,7 @@ function getPlayerCdReleaseList() {
   const cdList = [];
   let count = 0;
   
-  // 1. まずこれまで確定・保存されているCDをスキャン
   for (let y = 1; y <= planYearTarget; y++) {
-    // 🌟 実際のゲーム内年（calendarYearからの差分を考慮した年数）を計算
     const displayYear = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') 
       ? calendarYear + (y - currentYear) 
       : y;
@@ -111,13 +108,12 @@ function getPlayerCdReleaseList() {
         const sName = plan.songName ? `「${plan.songName}」` : '';
         cdList.push({
           id: `cd_${y}_${m}`,
-          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月)` // 🌟 y の代わりに displayYear を使用
+          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月)`
         });
       }
     }
   }
 
-  // 2. 現在開いている半年計画モーダル内で、まだ保存前だけど新しく「CD発売」に設定されている月があれば候補に追加
   for (let m = planStartM; m <= planEndM; m++) {
     const selRel = document.getElementById(`sel-rel-${m}`);
     if (selRel && selRel.value !== 'none') {
@@ -135,7 +131,7 @@ function getPlayerCdReleaseList() {
         
         cdList.push({
           id: existingId,
-          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月 [編集中])` // 🌟 displayYear を使用
+          label: `${ordinal} ${typeStr}${sName} (${displayYear}年${m}月 [編集中])`
         });
       }
     }
@@ -146,7 +142,6 @@ function getPlayerCdReleaseList() {
   }
   return cdList;
 }
-
 
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, prefix = 'show') {
   const onChangeHandler = prefix === 'show' 
@@ -227,11 +222,14 @@ function renderLiveSlotHtml(month, index, slot) {
 }
 
 function renderEventSlotHtml(month, index, event) {
-  const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  const allVenues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+  // 🌟 特典イベントは名前に「パルス」が含まれる会場のみ抽出
+  const venues = allVenues.filter(v => v.name.includes('パルス'));
+
   const cdList = getPlayerCdReleaseList();
   const currentCdId = event.targetCdId || (cdList[0] ? cdList[0].id : '');
   const currentEventName = event.name || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
-  const eventVenue = venues.find(v => v.name === event.venue) || null;
+  const eventVenue = allVenues.find(v => v.name === event.venue) || null;
   const seatPrices = event.seatPrices || {};
   const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
   const hasDates = Array.isArray(event.dates) && event.dates.length > 0;
@@ -251,7 +249,7 @@ function renderEventSlotHtml(month, index, event) {
         </select>
       </label>
 
-      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">会場
+      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">会場 (パルス関連のみ)
         <select id="event-ven-${month}-${index}" onchange="onEventVenueSelectChange(${month}, ${index})" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
           <option value="">会場を選択</option>
           ${venues.map(v => `<option value="${v.name}" ${event.venue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
@@ -402,8 +400,15 @@ function readEventSlotInputs(month) {
 
     if (!venueVal && dates.length === 0) return null;
 
+    // 🌟 特典イベントの会場バリデーション（パルス関連のみ）
+    const venueObj = venues.find(v => v.name === venueVal);
+    if (venueObj && !venueObj.name.includes('パルス')) {
+      alert(`特典イベントには「パルス」に関連する会場のみ設定できます。`);
+      return null;
+    }
+
     const seatPrices = {};
-    const slotVenue = venues.find(v => v.name === venueVal) || null;
+    const slotVenue = venueObj || null;
     seatTypes.forEach(seat => {
       const priceInput = document.getElementById(`event-seat-price-${month}-${index}-${seat.id}`);
       const price = Number.parseInt(priceInput ? priceInput.value : '', 10);
@@ -507,9 +512,10 @@ function addLiveSlot(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
   const currentCount = container.querySelectorAll('.live-slot').length;
-  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 8;
+  // 🌟 ライブの月上限を 8 に変更
+  const maxVenues = 8;
   if (currentCount >= maxVenues) {
-    alert(`1か月あたりの会場は最大${maxVenues}会場までです。`);
+    alert(`1か月あたりのライブ会場は最大${maxVenues}会場までです。`);
     return;
   }
   const newSlot = {
@@ -569,9 +575,10 @@ function renderPlanEventsHtml(month) {
 
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
-  const maxEvents = typeof MAX_PLAN_EVENTS_PER_MONTH !== 'undefined' ? MAX_PLAN_EVENTS_PER_MONTH : 6;
+  // 🌟 イベントの月上限を 6 に変更
+  const maxEvents = 6;
   if (drafts.length >= maxEvents) {
-    alert(`1か月あたりのイベントは最大${maxEvents}件までです。`);
+    alert(`1か月あたりのイベント枠は最大${maxEvents}件までです。`);
     return;
   }
   const cdList = getPlayerCdReleaseList();
@@ -622,7 +629,7 @@ function processDeferredPlanExpenses() {
   }
   if (deferredBenefitCost > 0) {
     funds -= deferredBenefitCost;
-    setLog(`【費用精算】前回の予定期間にかかった特典イベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
+    setLog(`【費用精算】前回の予定期間にかかったイベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
     deferredBenefitCost = 0;
   }
 }
@@ -1207,7 +1214,7 @@ function validatePlanLiveSlots(month, liveSlots) {
 }
 
 function saveDecisionPlan() {
-  const maxVenues = typeof MAX_LIVE_VENUES_PER_MONTH !== 'undefined' ? MAX_LIVE_VENUES_PER_MONTH : 8;
+  const maxVenues = 8;
   let newBenefitCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
@@ -1549,5 +1556,3 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   observer.observe(document.body, { childList: true, subtree: true });
 });
-
-
