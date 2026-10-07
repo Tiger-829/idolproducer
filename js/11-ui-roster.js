@@ -341,10 +341,18 @@ function renderRosterList() {
                   if (!status) return '';
                   const value = m.stats[statId] || 0;
                   const progress = typeof getStatExpProgress === 'function' ? getStatExpProgress(m, statId) : 0;
+                  
+                  // 🌟 各能力値のランクとカラーを取得
+                  const statRankInfo = typeof getRankData === 'function' ? getRankData(value) : { rank: '', color: '#333' };
+
                   return `
                     <div class="member-stat">
                       <span>${status.name}</span>
-                      <strong>${value}</strong>${progress > 0 && value < 100
+                      <!-- 🌟 アルファベットと数値を指定の色で「A 81」のように並べて表示 -->
+                      <strong style="color: ${statRankInfo.color};">
+                        ${statRankInfo.rank}${value}
+                      </strong>
+                      ${progress > 0 && value < 100
                         ? `<i class="stat-exp-bar"><b style="width:${Math.round(progress * 100)}%"></b></i>`
                         : ''}
                     </div>
@@ -357,7 +365,6 @@ function renderRosterList() {
         </div>
       </details>
     `;
-
     
 function setLog(msg) {
   if (!Array.isArray(logHistory)) logHistory = [];
