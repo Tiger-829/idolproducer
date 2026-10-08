@@ -169,7 +169,17 @@
     if (!payloadText || typeof payloadText !== 'string') return '';
     const qrApi = globalScope && globalScope.QRCode;
     if (!qrApi || typeof qrApi.toDataURL !== 'function') return '';
-    const settings = Object.assign({ width: 220, margin: 1, color: { dark: '#1f1f1f', light: '#ffffff' } }, options);
+
+    const viewportWidth = globalScope && globalScope.window ? globalScope.window.innerWidth || 0 : 0;
+    const isMobileViewport = viewportWidth > 0 && viewportWidth <= 480;
+    const defaultWidth = isMobileViewport ? Math.min(240, Math.max(180, viewportWidth - 48)) : 260;
+    const settings = Object.assign({
+      width: defaultWidth,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#1f1f1f', light: '#ffffff' }
+    }, options);
+
     try {
       const qrUrl = await qrApi.toDataURL(payloadText, settings);
       return typeof qrUrl === 'string' ? qrUrl : '';
