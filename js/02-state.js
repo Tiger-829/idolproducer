@@ -643,7 +643,7 @@ function normalizeLeagueTeams(teams) {
   return teams;
 }
 
-function initializeNewGameState() {
+function initializeNewGameStateBase() {
   currentYear = 1;
   currentMonth = 1;
   currentWeek = 1;
@@ -723,7 +723,7 @@ function initializeNewGameState() {
   previousYearGroupFansAtYearStart = groupFansAtYearStart;
 }
 
-function applySavedGame(data) {
+function applySavedGameBase(data) {
   currentYear = data.currentYear || 1;
   calendarYear = data.calendarYear || new Date().getFullYear();
   gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);

@@ -26,6 +26,23 @@
       <p>セーブデータを選択してください</p>
     </header>
     <div class="save-slots" id="save-slots"></div>
+
+    <div class="save-sync-panel" style="margin: 18px auto 0; max-width: 760px; background: rgba(255,255,255,0.7); border: 1px solid #f0d5e3; border-radius: 8px; padding: 12px; box-sizing: border-box;">
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px;">
+        <label style="flex:1; min-width: 180px; font-size: 11px; color:#555; font-weight: bold;">
+          同期用ユーザーID
+          <input id="save-sync-user-id" type="text" maxlength="32" placeholder="例: user-name" style="width:100%; margin-top:4px; box-sizing:border-box; padding:6px; border:1px solid #d8d8d8; border-radius:4px; font-size:12px;">
+        </label>
+        <button id="save-sync-export-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期コード生成</button>
+        <button id="save-sync-copy-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">コピー</button>
+      </div>
+      <textarea id="save-sync-json-output" rows="8" readonly placeholder="同期コードがここに表示されます。別端末に貼り付けて取り込みます。" style="width:100%; box-sizing:border-box; resize:vertical; border:1px solid #e3d6df; border-radius:6px; padding:8px; font-size:11px; background:#fffafc; color:#333;"></textarea>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+        <button id="save-sync-import-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期コードを反映</button>
+        <button id="save-sync-download-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">JSONを保存</button>
+      </div>
+    </div>
+
     <div class="title-actions">
       <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
     </div>
@@ -335,6 +352,7 @@
 <script src="./js/12-ui-plan-save.js?v=4"></script>
 <script src="./js/13-help.js?v=4"></script>
 <script src="./js/14-ui-records.js?v=4"></script>
+<script src="./js/15-save-sync.js?v=4"></script>
 
 </body>
 </html>

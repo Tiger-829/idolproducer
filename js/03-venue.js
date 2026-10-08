@@ -380,16 +380,6 @@ function findRivalVenueConflict(venueName, dateKey) {
   ) || null;
 }
 
-function syncGameCalendar() {
-  const date = getGameDateObject();
-  if (calendarYear && date.getFullYear() !== calendarYear) {
-    currentYear += date.getFullYear() - calendarYear;
-  }
-  calendarYear = date.getFullYear();
-  currentMonth = date.getMonth() + 1;
-  currentWeek = Math.ceil(date.getDate() / 7);
-}
-
 function migrateLegacyGameDate(year, month, week) {
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
   const firstWednesday = getFirstWednesday(baseYear + (year - 1), month - 1);

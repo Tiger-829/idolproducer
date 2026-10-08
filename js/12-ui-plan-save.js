@@ -1245,7 +1245,7 @@ function saveDecisionPlan() {
       liveName: primary ? (primary.liveName || primary.liveVenue) : null,
       liveDate: primary ? (primary.liveDate || null) : null,
       liveDates: primary ? primary.liveDates : [],
-      streamDates: primary ? primary.streamDates : [],
+      streamDates: primary ? (Array.isArray(primary.streamDates) ? primary.streamDates : []) : [],
       releaseBenefit: release === 'none' ? 'none' : document.getElementById(`sel-benefit-${m}`).value,
       seatPrices: primary ? primary.seatPrices : {},
       seatOptions: primary ? primary.seatOptions : {},
@@ -1254,7 +1254,7 @@ function saveDecisionPlan() {
         liveName: slot.liveName || slot.liveVenue,
         liveDate: slot.liveDate || null,
         liveDates: slot.liveDates,
-        streamDates: slot.streamDates,
+        streamDates: Array.isArray(slot.streamDates) ? slot.streamDates : [],
         seatPrices: slot.seatPrices,
         seatOptions: slot.seatOptions
       }))
