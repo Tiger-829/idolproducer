@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー予定ポップアップ・記録グラフ対応）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（ファン数グラフ完結対応）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -89,13 +89,12 @@ function switchPage(page) {
 }
 
 // ==========================================
-// 📊 記録タブ（ファン数推移グラフ）描画処理
+// 📊 記録タブ（ファン数推移グラフ）10.js完結描画処理
 // ==========================================
 function renderRecordsPanel() {
   const panel = document.getElementById('page-records');
   if (!panel) return;
 
-  // 記録パネル内の基本HTML構造（キャンバス要素を含む）を動的生成、または既存のものを利用
   panel.innerHTML = `
     <h2 class="page-title">グループの記録・推移</h2>
     <div class="schedule-block">
@@ -104,15 +103,15 @@ function renderRecordsPanel() {
         <canvas id="fanHistoryChart"></canvas>
       </div>
       <div class="schedule-note" style="margin-top: 12px;">
-        ※毎週のサイクル進行時に自動記録され、1年（52週）を超えた古いデータは自動で整理されます。
+        ※毎週の週間サイクル進行時に自動記録され、1年（52週）を超えた古いデータは自動で整理されます。
       </div>
     </div>
   `;
 
-  // Chart.js を用いた折れ線グラフの描画
   try {
-    const ctx = document.getElementById('fanHistoryChart');
-    if (!ctx) return;
+    const canvas = document.getElementById('fanHistoryChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
     // player.fanHistory からデータを取得（なければ空配列）
     const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
@@ -122,11 +121,12 @@ function renderRecordsPanel() {
     const labels = historyData.map(item => item.date);
     const dataValues = historyData.map(item => item.fans);
 
-    // 既にグラフインスタンスが存在する場合は破棄して再描画
+    // 既にグローバル領域にChartインスタンスがあれば破棄
     if (window.fanChartInstance instanceof Chart) {
       window.fanChartInstance.destroy();
     }
 
+    // Chart.jsによる折れ線グラフの構築
     window.fanChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
@@ -404,7 +404,8 @@ function renderWeeklyScheduleControls() {
     { id: 'dance', name: 'ダンスレッスン' },
     { id: 'individual-lesson', name: '個別レッスン' },
     { id: 'rest-day', name: '休養' },
-    { id: 'meal-party', name: '食事会' }
+    { id: 'meal-party', name: '食事会' },
+    { id: 'goods-production', name: 'グッズ制作' }
   ];
 
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
@@ -493,7 +494,7 @@ function renderWeeklyScheduleControls() {
     { id: 'goods-development', name: 'グッズ開発' }
   ];
   const selectedOfficeAction = officeActions.find(action => action.id === weeklySchedule.officeAction) || null;
-  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 20;
   const officeToggles = officeActions.map(action => {
     const isSelected = Boolean(selectedOfficeAction) && selectedOfficeAction.id === action.id;
     const atLimit = action.id === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd;
@@ -508,9 +509,6 @@ function renderWeeklyScheduleControls() {
         escapeHtml(`${getGameDateObject(item.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}「${item.names.join('・')}」`)
       ).join('、')}</div>`
     : '';
-
-  const mult = typeof SPECIAL_INDIVIDUAL_MULTIPLIER !== 'undefined' ? SPECIAL_INDIVIDUAL_MULTIPLIER : 10.1;
-  const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
 
   return `
     <div class="schedule-block">
@@ -565,7 +563,6 @@ function renderWeeklyScheduleControls() {
   `;
 }
 
-// IndividualLessonメンバーOptionsを取得する。
 function getIndividualLessonMemberOptions() {
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
   const available = roster.filter(member => member && !member.injury);
@@ -588,7 +585,6 @@ function getIndividualLessonMemberOptions() {
 let officeCalendarViewYear = null;
 let officeCalendarViewMonth = null;
 
-// 事務所カレンダーView日付を取得する。
 function getOfficeCalendarViewDate() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   if (officeCalendarViewYear === null || officeCalendarViewMonth === null) {
@@ -598,7 +594,6 @@ function getOfficeCalendarViewDate() {
   return { year: officeCalendarViewYear, month: officeCalendarViewMonth };
 }
 
-// MaxScheduled年月を取得する。
 function getMaxScheduledYearMonth() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   let maxVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
@@ -651,7 +646,6 @@ function getMaxScheduledYearMonth() {
   return { year, month };
 }
 
-// shift事務所カレンダー月を処理する。
 function shiftOfficeCalendarMonth(delta) {
   const v = getOfficeCalendarViewDate();
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
@@ -668,7 +662,6 @@ function shiftOfficeCalendarMonth(delta) {
   renderGameCalendar();
 }
 
-// イベント日付を取得する。
 function getEventsForDate(dateKey) {
   const events = [];
 
@@ -735,7 +728,6 @@ function getEventsForDate(dateKey) {
   return events;
 }
 
-// カレンダー日Clickを処理する。
 function handleCalendarDayClick(dateKey) {
   if (!dateKey) return;
   const events = getEventsForDate(dateKey);
@@ -753,7 +745,6 @@ function handleCalendarDayClick(dateKey) {
   }
 }
 
-// 試合カレンダーを描画する。
 function renderGameCalendar() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   const v = getOfficeCalendarViewDate();
@@ -861,19 +852,16 @@ function renderGameCalendar() {
 if (typeof OFFICE_COST_GROWTH === 'undefined') window.OFFICE_COST_GROWTH = 1.9;
 if (typeof OFFICE_MAINTENANCE_GROWTH === 'undefined') window.OFFICE_MAINTENANCE_GROWTH = 1.6;
 
-// 事務所アップグレードCostを取得する。
 function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (!facility || !facility.baseCost) return 0;
   return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
 }
 
-// 事務所MaintenanceCostを取得する。
 function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
   if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
   return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
 }
 
-// アップグレード事務所Facilityを処理する。
 function upgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
@@ -892,13 +880,11 @@ function upgradeOfficeFacility(facilityId) {
   updateUI();
 }
 
-// 事務所DowngradeRefundを取得する。
 function getOfficeDowngradeRefund(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (level <= 1) return 0;
   return Math.round(getOfficeUpgradeCost(facility, level - 1) * 0.5);
 }
 
-// downgrade事務所Facilityを処理する。
 function downgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
@@ -916,7 +902,6 @@ function downgradeOfficeFacility(facilityId) {
   updateUI();
 }
 
-// maintain事務所Facilitiesを処理する。
 function maintainOfficeFacilities() {
   if (typeof OFFICE_FACILITIES === 'undefined' || !Array.isArray(OFFICE_FACILITIES)) return;
   const cost = OFFICE_FACILITIES.reduce((total, facility) =>
@@ -927,7 +912,6 @@ function maintainOfficeFacilities() {
   if (funds < 0) setLog(`【維持費】事務所設備の週維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
 }
 
-// 事務所アップグレードを描画する。
 function renderOfficeUpgrades() {
   const list = document.getElementById('office-upgrades-ui');
   if (!list || typeof OFFICE_FACILITIES === 'undefined') return;
@@ -968,7 +952,6 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
-// マネージャーパネルを描画する。
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -1063,7 +1046,6 @@ function renderManagerPanel() {
   }).join('');
 }
 
-// マネージャーMarketパネルを描画する。
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
@@ -1113,7 +1095,6 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
-// 給与パネルを描画する。
 function renderSalaryPanel() {
   const setText = (id, value) => {
     const element = document.getElementById(id);
@@ -1124,10 +1105,10 @@ function renderSalaryPanel() {
   const total = memberSalary + managerSalary;
 
   const rosterCount = Array.isArray(idolRoster) ? idolRoster.length : 0;
-  const mgrCount = Array.isArray(managers) ? managers.filter(Boolean).length : 0;
+  const mgrCount = Array.isArray(managers) ? managers.filter(Boolean) : [];
 
   setText('txt-member-count', String(rosterCount));
-  setText('txt-manager-count', String(mgrCount));
+  setText('txt-manager-count', String(mgrCount.length));
   setText('txt-member-salary', formatMoney(memberSalary));
   setText('txt-manager-salary', formatMoney(managerSalary));
   setText('txt-total-salary', formatMoney(total));
