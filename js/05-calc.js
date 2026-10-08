@@ -133,6 +133,28 @@ function updateWeeklyGroupFans() {
 function calculateGroupFans() {
   return Math.min(GROUP_FAN_MAX, getStatSeedFans() + Math.round(fansFromSales));
 }
+// 週ごとのファン数履歴を記録し、1年分（最大52週）を超えた古いデータを自動削除する関数
+function recordWeeklyFanHistory(currentDate, currentFans) {
+  // プレイヤーデータに履歴配列がなければ初期化
+  if (!player.fanHistory) {
+    player.fanHistory = [];
+  }
+
+  // 直近の記録と日付が被っていなければ、新しい週のデータを追加
+  const lastEntry = player.fanHistory[player.fanHistory.length - 1];
+  if (!lastEntry || lastEntry.date !== currentDate) {
+    player.fanHistory.push({
+      date: currentDate,
+      fans: currentFans
+    });
+  }
+
+  // 方法A：シンプルに「直近52週分（1年分）」のデータ数で制限して古いものを削除
+  const MAX_WEEKS = 52;
+  if (player.fanHistory.length > MAX_WEEKS) {
+    player.fanHistory.shift(); // 先頭（一番古いデータ）を削除
+  }
+}
 
 // 売上を計上し、ファン成長にも反映させる
 function addGroupSales(copies) {
