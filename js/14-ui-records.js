@@ -6,9 +6,9 @@
 function renderRecordsPanel() {
   renderSalesTrendChart();        // ① 過去5作CD売上の推移
   renderFanHistoryTrendChart();   // ③ 過去1年のファン数推移（千人単位）
-  renderFirstWeekRanking();       // ② 初週売上ランキング（曲名・発売日・枚数）
   renderSongList();               // ④ 楽曲一覧
   renderLiveMaxAudienceRanking(); // ⑤ ライブ1日当たりの最大動員数ランキング
+  renderFirstWeekRanking();       // ② 初週売上ランキング（曲名・発売日・枚数）
   renderRecordsHelpBlock();       // ⑥ ページ最下部のヘルプボタンエリア（一箇所に統合）
 }
 
