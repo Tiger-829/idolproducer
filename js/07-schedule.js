@@ -1451,7 +1451,7 @@ function applyOfficeAction(actionId) {
   if (actionId === 'goods-development') {
     const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
     const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
-    const devStock = typeof GOODS_DEVELOPMENT_STOCK !== 'undefined' ? GOODS_DEVELOPMENT_STOCK : 1000;
+    const devStock = typeof GOODS_DEVELOPMENT_STOCK !== 'undefined' ? GOODS_DEVELOPMENT_STOCK : calculateGroupFans()*8;
 
     if (typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd) {
       return `グッズ開発（上限${maxProd}種のため未実施）`;
