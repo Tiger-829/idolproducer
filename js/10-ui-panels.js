@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー予定ポップアップ対応）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（カレンダー予定ポップアップ・記録グラフ対応）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -85,6 +85,86 @@ function switchPage(page) {
   renderPageNav(page);
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
     try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
+  }
+}
+
+// ==========================================
+// 📊 記録タブ（ファン数推移グラフ）描画処理
+// ==========================================
+function renderRecordsPanel() {
+  const panel = document.getElementById('page-records');
+  if (!panel) return;
+
+  // 記録パネル内の基本HTML構造（キャンバス要素を含む）を動的生成、または既存のものを利用
+  panel.innerHTML = `
+    <h2 class="page-title">グループの記録・推移</h2>
+    <div class="schedule-block">
+      <div class="schedule-block-title">過去1年のファン数推移 <small>週次集計（直近52週）</small></div>
+      <div style="position: relative; width: 100%; height: 320px; margin-top: 12px;">
+        <canvas id="fanHistoryChart"></canvas>
+      </div>
+      <div class="schedule-note" style="margin-top: 12px;">
+        ※毎週のサイクル進行時に自動記録され、1年（52週）を超えた古いデータは自動で整理されます。
+      </div>
+    </div>
+  `;
+
+  // Chart.js を用いた折れ線グラフの描画
+  try {
+    const ctx = document.getElementById('fanHistoryChart');
+    if (!ctx) return;
+
+    // player.fanHistory からデータを取得（なければ空配列）
+    const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
+      ? player.fanHistory
+      : [];
+
+    const labels = historyData.map(item => item.date);
+    const dataValues = historyData.map(item => item.fans);
+
+    // 既にグラフインスタンスが存在する場合は破棄して再描画
+    if (window.fanChartInstance instanceof Chart) {
+      window.fanChartInstance.destroy();
+    }
+
+    window.fanChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'グループファン数',
+          data: dataValues,
+          borderColor: '#2e7d32',
+          backgroundColor: 'rgba(46, 125, 50, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.1,
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString() + '人';
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('Fan history chart render error:', err);
   }
 }
 
@@ -327,7 +407,6 @@ function renderWeeklyScheduleControls() {
     { id: 'meal-party', name: '食事会' }
   ];
 
-  // itemOptionsを処理する。
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed).map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
@@ -1036,7 +1115,6 @@ function renderManagerMarketPanel() {
 
 // 給与パネルを描画する。
 function renderSalaryPanel() {
-  // テキストを設定する。
   const setText = (id, value) => {
     const element = document.getElementById(id);
     if (element) element.textContent = value;
