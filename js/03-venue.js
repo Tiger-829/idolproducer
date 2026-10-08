@@ -218,6 +218,7 @@ function getMonthLiveEntries(plan) {
       liveDate: plan.liveDate || null,
       liveDays: normalizeLiveDays(plan.liveDays),
       liveDates: Array.isArray(plan.liveDates) ? plan.liveDates : [],
+      streamDates: Array.isArray(plan.streamDates) ? plan.streamDates : [],
       seatPrices: plan.seatPrices || {},
       seatOptions: plan.seatOptions || {},
       completed: Boolean(plan.liveCompleted)
@@ -236,6 +237,7 @@ function getMonthLiveEntries(plan) {
       liveDate: live.liveDate || null,
       liveDays: normalizeLiveDays(live.liveDays),
       liveDates: Array.isArray(live.liveDates) ? live.liveDates : [],
+      streamDates: Array.isArray(live.streamDates) ? live.streamDates : [],
       seatPrices: live.seatPrices || {},
       seatOptions: live.seatOptions || {},
       completed: Boolean(live.liveCompleted)
