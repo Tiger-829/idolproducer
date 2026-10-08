@@ -881,9 +881,9 @@ function executeKohaku() {
         STATUS_KEYS.forEach(k => addMemberStatExp(member, k.id, 15000));
       }
     });
-    setLog(`【赤白歌合戦】上位2枠に入り、出演できました（メンバー全員の全能力に経験点+15,000pt）。`);
+    setLog(`【赤白歌合戦】出演決定。`);
   } else {
-    setLog('【赤白歌合戦】上位2枠には入れず、出演できませんでした。');
+    setLog('【赤白歌合戦】選出されませんでした。');
   }
 }
 
