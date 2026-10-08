@@ -17,7 +17,6 @@ let pendingReports = [];
 // 1. スケジュール確定
 // ==========================================
 
-// 週次スケジュールを整備する。
 function ensureWeeklySchedule() {
   if (typeof weeklySchedule === 'undefined' || !weeklySchedule || typeof weeklySchedule !== 'object') {
     window.weeklySchedule = {};
@@ -25,7 +24,6 @@ function ensureWeeklySchedule() {
   return window.weeklySchedule;
 }
 
-// 週次スケジュールを確定。
 function confirmWeeklySchedule() {
   try {
     const today = getGameDateObject();
@@ -41,7 +39,6 @@ function confirmWeeklySchedule() {
     markMusicPreparations();
     applyWeeklySchedule();
 
-    // 次の停止地点（月末・千秋楽・水曜日）まで自動進行
     advanceUntilNextSchedulePoint();
   } catch (error) {
     console.error("【進行エラー】", error);
@@ -49,7 +46,6 @@ function confirmWeeklySchedule() {
   }
 }
 
-// 画面側の「水曜日まで進行」「イベントまで進行」ボタンからの共通エントリーポイント
 function advanceOneWeek() {
   try {
     advanceUntilNextSchedulePoint();
@@ -64,26 +60,23 @@ function advanceOneWeek() {
 // ==========================================
 function advanceUntilNextSchedulePoint() {
   let currentDate = getGameDateObject();
-  let loopSafety = 0; // 無限ループ保護（最大60日）
+  let loopSafety = 0;
 
   while (loopSafety++ < 60) {
     const nextDate = new Date(currentDate);
     nextDate.setDate(nextDate.getDate() + 1);
 
-    // 1日分の世界進行
     processDailyFlow(currentDate, nextDate);
 
     currentDate = nextDate;
     gameDate = toDateKey(currentDate);
     syncGameCalendar();
 
-    // 停止条件（キュー蓄積・月末・水曜日）に達したか判定
     if (shouldStopProgress(currentDate)) {
       break;
     }
   }
 
-  // 停止後のUI更新＆保留モーダル表示
   resetWeeklySchedule();
   updateWeeklyGroupFans();
   updateUI();
@@ -94,15 +87,12 @@ function advanceUntilNextSchedulePoint() {
 // 3. 停止判定
 // ==========================================
 function shouldStopProgress(date) {
-  // ① 進行中に「ライブ収支」や「月次決算」がキューに積まれたら即座に停止
   if (pendingReports && pendingReports.length > 0) {
     return true;
   }
-  // ② 月末（最終日）に到達した場合：月次決算モーダルのため停止
   if (isMonthEnd(date)) {
     return true;
   }
-  // ③ 次の編成・スケジュール設定日（水曜日）に到達した場合：編成のため停止
   if (date.getDay() === 3) {
     return true;
   }
@@ -110,7 +100,7 @@ function shouldStopProgress(date) {
 }
 
 // ==========================================
-// 4. 日次進行（1日単位のイベント処理）
+// 4. 日次進行
 // ==========================================
 function processDailyFlow(fromDate, toDate) {
   const toDateStr = toDateKey(toDate);
@@ -136,24 +126,11 @@ function processDailyFlow(fromDate, toDate) {
   processMonthlyClosing(fromDate, toDate);
 }
 
-// ==========================================
-// 5. ライブ共通処理
-// ==========================================
 function processLiveEvents(fromDate, toDate) {
   processPlayerLives(fromDate, toDate);
   processEventLives(fromDate, toDate);
 }
 
-// ==========================================
-// 6. 自前ライブ新諸経費計算
-// ==========================================
-/**
- * 自前ライブの諸経費（基本＋配信追加費用）を計算
- * @param {string} cap - 会場キャパシティ ('SS', 'S', 'A', 'B', 'C', 'D')
- * @param {number} totalDays - 総公演日数 (d)
- * @param {number} streamDays - 配信実施日数 (d_stream)
- * @returns {{ baseCost: number, streamCost: number, totalCost: number }} (単位: 円)
- */
 function calculateLiveExpenses(cap, totalDays, streamDays) {
   const d = Math.max(1, Number(totalDays) || 1);
   const dStream = Math.max(0, Number(streamDays) || 0);
@@ -187,7 +164,6 @@ function processPlayerLives(fromDate, toDate) {
     const finalDateStr = showDates[showDates.length - 1];
     const finalDateObj = getGameDateObject(finalDateStr);
 
-    // 最終公演日（千秋楽／単独公演日）に到達した瞬間に全日程分を精算
     if (finalDateObj > fromDate && finalDateObj <= toDate) {
       const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
       if (!v) return;
@@ -254,8 +230,22 @@ function processPlayerLives(fromDate, toDate) {
         }
       });
 
-      const goods = sellMerchandiseAtLive();
-      const grossRevenue = grandTotalTicketRevenue + goods.revenue + grandTotalStreamRevenue;
+      // グッズ売上計算（新計算式適用）
+      // 売り上げ = min(5000 * (初日ファン数 * 3 - 決定時ファン数 * 2), 5000 * STOCK)
+      // 在庫減少（ライブ後の在庫） = max(STOCK - (初日ファン数 * 3 + 決定時ファン数 * 2), 0)
+      const firstDayFans = calculateGroupFans();
+      const determinedFans = Number.isFinite(entry.determinedFans) ? entry.determinedFans : firstDayFans;
+      const currentStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
+
+      const salesCap = 5000 * (firstDayFans * 3 - determinedFans * 2);
+      const stockCap = 5000 * currentStock;
+      const goodsRevenue = Math.max(0, Math.min(salesCap, stockCap));
+      const unitsSoldCalc = Math.round(goodsRevenue / 5000);
+
+      merchandiseStock = Math.max(0, currentStock - (firstDayFans * 3 + determinedFans * 2));
+      merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;
+
+      const grossRevenue = grandTotalTicketRevenue + goodsRevenue + grandTotalStreamRevenue;
       const profit = grossRevenue - expenses.totalCost;
 
       funds += profit;
@@ -282,8 +272,8 @@ function processPlayerLives(fromDate, toDate) {
         seatDetails: seatDetails,
         totalAudience: grandTotalAudience,
         ticketRevenue: grandTotalTicketRevenue,
-        merchandiseRevenue: goods.revenue,
-        merchandiseSold: goods.unitsSold,
+        merchandiseRevenue: goodsRevenue,
+        merchandiseSold: unitsSoldCalc,
         streamDaysCount: streamDaysCount,
         streamDates: [...streamDateSet],
         streamBuyers: grandTotalStreamBuyers,
@@ -306,9 +296,6 @@ function processPlayerLives(fromDate, toDate) {
   });
 }
 
-// ==========================================
-// 8. イベントライブ（フェス・特番・外部招待）
-// ==========================================
 function processEventLives(fromDate, toDate) {
   if (!Array.isArray(specialLiveEvents)) return;
 
@@ -377,9 +364,6 @@ function hasFinishedPlayerLive(date) {
   });
 }
 
-// ==========================================
-// 10. モーダル待機キュー消化
-// ==========================================
 function openPendingModal() {
   if (pendingReports && pendingReports.length > 0) {
     const item = pendingReports.shift();
@@ -407,9 +391,6 @@ function openPendingModal() {
   if (Array.isArray(pendingPerformanceOffers) && pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
-// ==========================================
-// 11. サブフロー・ヘルパー処理
-// ==========================================
 function processBirthdays(fromDate, toDate) {
   if (typeof processMemberBirthdays === 'function') {
     processMemberBirthdays(fromDate, toDate);
@@ -484,7 +465,9 @@ function processReleaseEvents(reachDateStr) {
   }
 }
 
-// 週次サイクルを処理し、ファン数の履歴（直近52週分）を自動記録
+// ==========================================
+// 11. 週次サイクルと自動処理
+// ==========================================
 function processWeeklyCycle(toDate) {
   totalWeeksElapsed++;
 
@@ -524,7 +507,25 @@ function processWeeklyCycle(toDate) {
 
   maintainOfficeFacilities();
 
-  // ★【追加機能】週ごとのファン数履歴を記録し、1年（52週）を超えた古いデータを自動削除
+  // 1年（52週）以上経過したグッズの自動減衰処理
+  if (Array.isArray(merchandiseItems) && merchandiseItems.length > 0) {
+    const currentDateObj = getGameDateObject();
+    const oneYearAgo = new Date(currentDateObj);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    const beforeCount = merchandiseItems.length;
+    merchandiseItems = merchandiseItems.filter(item => {
+      if (!item || !item.createdAt) return false;
+      const createdDate = new Date(item.createdAt);
+      return createdDate >= oneYearAgo;
+    });
+    merchandiseProducts = merchandiseItems.length;
+    const decreased = beforeCount - merchandiseProducts;
+    if (decreased > 0) {
+      setLog(`【グッズ更新】開発から1年以上経過したグッズ ${decreased}種が人気低迷のためラインナップから外れました（現在 ${merchandiseProducts}種）。`);
+    }
+  }
+
   recordWeeklyFanHistory(gameDate, calculateGroupFans());
 
   if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
@@ -532,27 +533,6 @@ function processWeeklyCycle(toDate) {
   }
 
   checkYearlyTransition();
-}
-
-// 週ごとのファン数履歴を記録するヘルパー関数
-function recordWeeklyFanHistory(currentDate, currentFans) {
-  if (typeof player === 'undefined' || !player) return;
-  if (!player.fanHistory) {
-    player.fanHistory = [];
-  }
-
-  const lastEntry = player.fanHistory[player.fanHistory.length - 1];
-  if (!lastEntry || lastEntry.date !== currentDate) {
-    player.fanHistory.push({
-      date: currentDate,
-      fans: currentFans
-    });
-  }
-
-  const MAX_WEEKS = 52; // 直近1年（52週分）
-  if (player.fanHistory.length > MAX_WEEKS) {
-    player.fanHistory.shift(); // 古いデータを削除
-  }
 }
 
 function checkYearlyTransition() {
@@ -917,12 +897,19 @@ function getWeekMealPartyCount() {
   return weeklySchedule.slots.filter(slotId => slotId === 'meal-party').length;
 }
 
+// グッズ制作スロットの数をカウントする関数
+function getWeekGoodsProductionCount() {
+  ensureWeeklySchedule();
+  if (weeklySchedule.vacation) return 0;
+  return weeklySchedule.slots.filter(slotId => slotId === 'goods-production').length;
+}
+
 function getWeekLessonCount() {
   ensureWeeklySchedule();
   if (weeklySchedule.vacation) return 0;
   const fixed = getWeekFixedSlots();
   return weeklySchedule.slots.filter((slotId, index) =>
-    !fixed.has(index) && slotId && slotId !== 'rest-day' && slotId !== 'meal-party'
+    !fixed.has(index) && slotId && slotId !== 'rest-day' && slotId !== 'meal-party' && slotId !== 'goods-production'
   ).length;
 }
 
@@ -957,7 +944,7 @@ function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null
   if (!member || member.injury) return { exp: 0, levels: 0 };
   if (typeof WEEKLY_SCHEDULE_ITEMS === 'undefined') return { exp: 0, levels: 0 };
   const item = WEEKLY_SCHEDULE_ITEMS.find(entry => entry.id === itemId);
-  if (!item || item.rest) return { exp: 0, levels: 0 };
+  if (!item || item.rest || item.production) return { exp: 0, levels: 0 };
 
   const baseExp = getWeeklyLessonExperience() * slotEffect;
   const primaryStat = itemId === 'individual-lesson'
@@ -1004,11 +991,29 @@ function validateWeeklySchedule() {
     }
   }
 
-  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
-  const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
+  const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 20;
+  const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 1000000;
   if (weeklySchedule.officeAction === 'goods-development' && typeof merchandiseProducts !== 'undefined' && merchandiseProducts < maxProd && devCost > funds) {
     alert(`グッズの開発費 ${formatMoney(devCost)} が資金を超えています。`);
     return false;
+  }
+
+  // グッズ制作事務作業・枠のバリデーション・費用精算
+  const goodsProdCount = getWeekGoodsProductionCount();
+  if (goodsProdCount > 0) {
+    const activeMembersCount = (Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length;
+    const currentProdTypes = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
+    const productionCostPerSlot = 3000 * (activeMembersCount * Math.max(1, currentProdTypes) * 100);
+    const totalProdCost = goodsProdCount * productionCostPerSlot;
+
+    if (funds < totalProdCost) {
+      alert(`グッズ制作の費用 ${formatMoney(totalProdCost)} が資金を超えています。`);
+      return false;
+    }
+    funds -= totalProdCost;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense(`グッズ制作（${goodsProdCount}枠）`, totalProdCost);
+    }
   }
 
   const rest = getWeekRestBreakdown();
@@ -1072,7 +1077,7 @@ function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
 
       if ((fixed && fixed.kind === 'rest-day') || (!fixed && slotId === 'rest-day')) {
         stamina += slotRecovery;
-      } else if (!fixed && slotId === 'meal-party') {
+      } else if (!fixed && (slotId === 'meal-party' || slotId === 'goods-production')) {
         stamina += mealRecovery;
       }
 
@@ -1095,6 +1100,17 @@ function applyWeeklySchedule() {
   const fixedSlots = getWeekFixedSlots();
 
   const officeMessage = applyOfficeAction(weeklySchedule.officeAction);
+
+  // グッズ制作による在庫増加の適用処理
+  const goodsProdCount = getWeekGoodsProductionCount();
+  let goodsProducedTotalCount = 0;
+  if (goodsProdCount > 0) {
+    const activeMembersCount = participants.filter(m => m && !m.injury).length;
+    const currentProdTypes = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
+    const unitsPerSlot = activeMembersCount * Math.max(1, currentProdTypes) * 100;
+    goodsProducedTotalCount = goodsProdCount * unitsPerSlot;
+    merchandiseStock = (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0) + goodsProducedTotalCount;
+  }
 
   const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
   if (weeklySchedule.vacation) {
@@ -1168,7 +1184,7 @@ function applyWeeklySchedule() {
         remainingStamina = Math.min(maxStamina, remainingStamina + restSlotRec);
         return;
       }
-      if (slotId === 'meal-party') {
+      if (slotId === 'meal-party' || slotId === 'goods-production') {
         remainingStamina = Math.min(maxStamina, remainingStamina + mealRec);
         return;
       }
@@ -1220,7 +1236,7 @@ function applyWeeklySchedule() {
     let recovery = (typeof getMemberWeeklyRecovery === 'function') ? getMemberWeeklyRecovery(member, stayedRestingAllWeek) : 20;
     const restSlotCount = weeklySchedule.slots.filter(s => s === 'rest-day').length;
     recovery += restSlotCount * restSlotRec;
-    recovery += getWeekMealPartyCount() * mealRec;
+    recovery += (getWeekMealPartyCount() + getWeekGoodsProductionCount()) * mealRec;
     if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, recovery);
 
     if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
@@ -1271,6 +1287,13 @@ function applyWeeklySchedule() {
   const mealCount = getWeekMealPartyCount();
   const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
   if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * mealCostSingle)}）`);
+  if (goodsProdCount > 0) {
+    const activeMembersCount = participants.filter(m => m && !m.injury).length;
+    const currentProdTypes = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
+    const slotCost = 3000 * (activeMembersCount * Math.max(1, currentProdTypes) * 100);
+    parts.push(`グッズ制作 ${goodsProdCount}回（費用 ${formatMoney(goodsProdCount * slotCost)} / 在庫 +${goodsProducedTotalCount.toLocaleString()}個）`);
+  }
+
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
   if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
   if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
@@ -1381,6 +1404,7 @@ function formatMultiplier(value) {
   return (Math.round(value * 1000) / 1000).toFixed(2).replace(/\.?0+$/, '');
 }
 
+// 事務所アクション：グッズ開発（在庫は増やさず種類のみ+1、上限20）
 function applyOfficeAction(actionId) {
   if (actionId === 'single-promotion') {
     if (typeof getSinglePromotionTarget !== 'function') return '';
@@ -1403,18 +1427,22 @@ function applyOfficeAction(actionId) {
     return `ライブ広報（次回ライブの集客効果 累計+${nextLivePromotionPoints}）`;
   }
   if (actionId === 'goods-development') {
-    const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 10;
-    const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 3000000;
-    const devStock = typeof GOODS_DEVELOPMENT_STOCK !== 'undefined' ? GOODS_DEVELOPMENT_STOCK : calculateGroupFans()*8;
+    const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 20;
+    const devCost = typeof GOODS_DEVELOPMENT_COST !== 'undefined' ? GOODS_DEVELOPMENT_COST : 1000000;
 
-    if (typeof merchandiseProducts !== 'undefined' && merchandiseProducts >= maxProd) {
+    if (!Array.isArray(merchandiseItems)) merchandiseItems = [];
+    merchandiseProducts = merchandiseItems.length;
+
+    if (merchandiseProducts >= maxProd) {
       return `グッズ開発（上限${maxProd}種のため未実施）`;
     }
-    if (typeof merchandiseProducts !== 'undefined') merchandiseProducts++;
-    if (typeof merchandiseStock !== 'undefined') merchandiseStock += devStock;
+
+    merchandiseItems.push({ createdAt: gameDate });
+    merchandiseProducts = merchandiseItems.length;
+
     funds -= devCost;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('グッズ開発', devCost);
-    return `グッズ開発（全${merchandiseProducts}種 / 在庫${merchandiseStock.toLocaleString()}個 / -${formatMoney(devCost)}）`;
+    return `グッズ開発（全${merchandiseProducts}種 / 在庫変動なし / -${formatMoney(devCost)}）`;
   }
   return '';
 }
