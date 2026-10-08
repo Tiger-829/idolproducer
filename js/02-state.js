@@ -11,10 +11,14 @@ let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
 let currentRosterTab = 'selected';
+
+// グッズ管理変数
 let merchandiseProducts = 0;
 let merchandiseStock = 0;
 let merchandiseUnitsSold = 0;
 let merchandiseSellThrough = null;
+let merchandiseItems = []; // 各グッズの開発日時等を管理する配列 [{ createdAt: gameDate, ... }]
+
 let nextLivePromotionPoints = 0;
 let monthlyCdRevenue = 0;
 let monthlyTieUpRevenue = 0;
@@ -120,7 +124,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const venuePool = (typeof VENUE_DATA !== 'undefined' && Array.isArray(VENUE_DATA)) ? VENUE_DATA : [{ name: '市民会館', cap: 'B' }];
   const globalBusyDates = new Set();
 
-  // 1. プロ野球公式戦による球場・ドームの予約ブロック
   for (let mOffset = 0; mOffset < (generateFullYear ? 12 : 6); mOffset++) {
     const targetMonth = ((startMonth - 1 + mOffset) % 12) + 1;
     const targetYearOffset = Math.floor((startMonth - 1 + mOffset) / 12);
@@ -140,7 +143,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
     });
   }
 
-  // 2. メインライバルグループ（5チーム）のスケジュール生成
   if (Array.isArray(leagueTeams)) {
     leagueTeams.forEach(team => {
       if (team.id === 'player') return;
@@ -225,7 +227,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
         }
       }
 
-      // CDリリース
       const cdReleaseCount = generateFullYear ? 4 : 2;
       for (let j = 0; j < cdReleaseCount; j++) {
         const cdMonthOffset = Math.floor((j * (monthSpan / cdReleaseCount)) + Math.random() * 2);
@@ -262,7 +263,6 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
     });
   }
 
-  // 3. ダミーグループ（100個）による会場の埋め立て（プレイヤー画面には非表示＝hiddenFromPlayer: true）
   const dummyGroupCount = 100;
   for (let dIdx = 0; dIdx < dummyGroupCount; dIdx++) {
     const randomMonthOffset = Math.floor(Math.random() * monthSpan);
@@ -692,6 +692,7 @@ function initializeNewGameStateBase() {
   merchandiseStock = 0;
   merchandiseUnitsSold = 0;
   merchandiseSellThrough = null;
+  merchandiseItems = [];
   nextLivePromotionPoints = 0;
   monthlyCdRevenue = 0;
   monthlyTieUpRevenue = 0;
@@ -770,6 +771,7 @@ function applySavedGameBase(data) {
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
   merchandiseSellThrough = data.merchandiseSellThrough ?? null;
+  merchandiseItems = Array.isArray(data.merchandiseItems) ? data.merchandiseItems : [];
   nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
   monthlyCdRevenue = data.monthlyCdRevenue || 0;
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
