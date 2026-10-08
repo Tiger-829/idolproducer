@@ -5,6 +5,7 @@
 // 3. アイドル生成ロジック
 // ==========================================
 
+// アイドル名前を生成する。
 function generateIdolName() {
   const surname = SURNAMES_TOP200[Math.floor(Math.random() * SURNAMES_TOP200.length)];
   const readKeys = Object.keys(FEMALE_READINGS_MAP);
@@ -14,6 +15,7 @@ function generateIdolName() {
   return { fullName: `${surname} ${given}`, reading };
 }
 
+// ランダムステータスを生成する。
 function generateRandomStats(biasPolicy = null, memberHeight = null) {
   const stats = {};
   STATUS_KEYS.forEach(k => {
@@ -144,6 +146,7 @@ function raiseMemberFashion(member, amount) {
   member.stats.fashion = Math.min(100, Math.max(MEMBER_FASHION_MIN, (member.stats.fashion || 0) + amount));
 }
 
+// メンバーBirthdaysを整備する。
 function ensureMemberBirthdays() {
   idolRoster.forEach(member => {
     if (!member.stats) member.stats = {};
@@ -204,6 +207,7 @@ function syncMemberAges(onDate = getGameDateObject()) {
   });
 }
 
+// メンバーを作成する。
 function createMember(age = null, policy = null, birthYear = null) {
   const nameData = generateIdolName();
   const idolAge = age || (Math.floor(Math.random() * 8) + 13); // 13〜20
@@ -244,6 +248,7 @@ function createMember(age = null, policy = null, birthYear = null) {
   };
 }
 
+// initializeNew試合Stateを処理する。
 function initializeNewGameState() {
   currentYear = 1;
   currentMonth = 1;
@@ -330,6 +335,7 @@ function initializeNewGameState() {
   previousYearGroupFansAtYearStart = groupFansAtYearStart;
 }
 
+// Saved試合を適用。
 function applySavedGame(data) {
   currentYear = data.currentYear || 1;
   gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);

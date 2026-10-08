@@ -33,6 +33,7 @@ function openSelectionSetup() {
   openSelectionModal();
 }
 
+// 選抜SelectedID群を取得する。
 function getSelectionSelectedIds() {
   if (!pendingSelectionEvent) return new Set();
   return new Set(pendingSelectionEvent.selectedIds || []);
@@ -98,6 +99,7 @@ function confirmSelection() {
   updateUI();
 }
 
+// 選抜を取消。
 function cancelSelection() {
   pendingSelectionEvent = null;
   document.getElementById('selection-modal').style.display = 'none';
@@ -139,6 +141,7 @@ function sortSelectionMembers(members) {
   });
 }
 
+// 選抜モーダルの内容を描画する。
 function renderSelectionModal() {
   const event = pendingSelectionEvent;
   if (!event) return;
@@ -212,12 +215,14 @@ function renderSelectionModal() {
   `;
 }
 
+// 選抜モーダルを開く。
 function openSelectionModal() {
   if (!pendingSelectionEvent) return;
   renderSelectionModal();
   document.getElementById('selection-modal').style.display = 'flex';
 }
 
+// 楽曲オファーモーダルを開く。
 function openMusicOfferModal() {
   const rows = document.getElementById('music-offer-rows');
   rows.innerHTML = pendingPerformanceOffers.map(offer => {
@@ -250,6 +255,7 @@ function openMusicOfferModal() {
   document.getElementById('music-offer-modal').style.display = 'flex';
 }
 
+// Musicオファーを解決する。
 function resolveMusicOffers() {
   const accepted = [];
   for (const offer of pendingPerformanceOffers) {
@@ -382,6 +388,7 @@ function processYearEndAgingAndGraduation() {
   if (graduatedCount > 0) unlockSelection('メンバーの卒業');
 }
 
+// promptGraduation計画を処理する。
 function promptGraduationPlan(member) {
   const choice = Number.parseInt(prompt(
     `【卒業プラン】${member.name}の卒業方法を選んでください。\n2: 常設ライブ内でセレモニー\n3: 常設ライブに卒業コンサートを追加\n4: 単独の卒業コンサート\n5: 卒業グッズを制作`,
@@ -390,6 +397,7 @@ function promptGraduationPlan(member) {
   return Number.isInteger(choice) && choice >= 2 && choice <= 5 ? choice : 2;
 }
 
+// Graduation会場を選択する。
 function selectGraduationVenue(feeRate) {
   const defaultIndex = Math.max(0, VENUE_DATA.findIndex(venue => venue.name === '原宿体育館'));
   const venueOptions = VENUE_DATA.map((venue, index) =>
@@ -400,6 +408,7 @@ function selectGraduationVenue(feeRate) {
   return VENUE_DATA[index];
 }
 
+// Graduation計画を実行する。
 function runGraduationPlan(member, choice, regularVenueName) {
   if (choice === 5) {
     const copies = Math.max(1, Math.floor(calculateMemberFans(member) * 0.1));
@@ -579,6 +588,7 @@ function startDraftLotteryChoice() {
   openDraftModal();
 }
 
+// プレイヤーチームOverallを取得する。
 function getPlayerTeamOverall() {
   return calculateTeamAverages().overall;
 }
@@ -598,6 +608,7 @@ function buildDraftStandings() {
   return { ranked, pickOrder };
 }
 
+// ドラフトライバル名前を取得する。
 function getDraftRivalNames(excludeCount) {
   return buildDraftStandings().ranked
     .filter(team => !team.isPlayer)
@@ -610,6 +621,7 @@ const DRAFT_CANDIDATES_PER_TEAM = 20;
 const DRAFT_MIN_AGE = 14;
 const DRAFT_MAX_AGE = 20;
 
+// ドラフトチームCountを取得する。
 function getDraftTeamCount() {
   return Math.max(1, leagueTeams.length);
 }
@@ -658,6 +670,7 @@ function buildDraftCandidatePool() {
 }
 
 
+// ドラフトMeetingを開始する。
 function startDraftMeeting() {
   draftCount++;
   if (draftCount % 2 === 0) {
@@ -687,6 +700,7 @@ function startDraftMeeting() {
   openDraftModal();
 }
 
+// ドラフトモーダルを開く。
 function openDraftModal() {
   if (!draftState) return;
   const state = draftState;
@@ -739,6 +753,7 @@ function openDraftPractice() {
   startPracticeDraft();
 }
 
+// ドラフトStandingsを描画する。
 function renderDraftStandings() {
   const state = draftState;
   const rows = state.ranked.map(team => `
@@ -944,6 +959,7 @@ function buildDraftLotteryOrder() {
   return rotated;
 }
 
+// ドラフトPickを解決する。
 function resolveDraftPick(candidateIndex) {
   const state = draftState;
   if (!state || state.phase !== 'picking') return;
@@ -972,6 +988,7 @@ function resolveDraftPick(candidateIndex) {
   advanceDraftRound();
 }
 
+// ドラフトSignメンバーを処理する。
 function draftSignMember(member) {
   member.isDraftCandidate = false;
   // 疑似体験では実際の名簿に加えない
@@ -1086,6 +1103,7 @@ function advanceDraftLottery() {
   renderDraftLotteryStep();
 }
 
+// ドラフト抽選を解決する。
 function resolveDraftLottery() {
   const state = draftState;
   if (!state || state.phase !== 'lottery') return;
@@ -1115,6 +1133,7 @@ function resolveDraftLottery() {
   }
 }
 
+// ドラフトRoundを進行する。
 function advanceDraftRound() {
   const state = draftState;
   // 同じ巡のうちに他チームも指名する（指名順は下位から上位）
@@ -1126,6 +1145,7 @@ function advanceDraftRound() {
 }
 
 
+// ドラフトDoneStepを描画する。
 function renderDraftDoneStep() {
   const state = draftState;
   const total = state.acquired.length;
@@ -1140,6 +1160,7 @@ function renderDraftDoneStep() {
     '<button class="main-btn" type="button" onclick="closeDraftModal()">ドラフトを終了する</button>';
 }
 
+// ドラフトモーダルを閉じる。
 function closeDraftModal() {
   document.getElementById('draft-modal').style.display = 'none';
   const acquired = draftState ? draftState.acquired.length : 0;

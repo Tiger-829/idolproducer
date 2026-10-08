@@ -5,6 +5,7 @@
 // 4. 計算 ＆ 総合力ロジック
 // ==========================================
 
+// チームAveragesを計算する。
 function calculateTeamAverages() {
   const active = idolRoster.filter(m => m.isSelected);
   const targets = active.length > 0 ? active : idolRoster;
@@ -35,6 +36,7 @@ function calculateTeamAverages() {
   return { averages, overall: finalScore, rankData, centerName: center ? center.name : 'なし' };
 }
 
+// SingleOverallを計算する。
 function calculateSingleOverall(stats) {
   const sum = Object.values(stats).reduce((a, b) => a + b, 0);
   return Math.round(sum / Object.keys(stats).length);
@@ -69,10 +71,12 @@ function calculateMemberFans(member) {
   );
 }
 
+// メンバーイベント売上概要を取得する。
 function getMemberEventSalesSummary(member) {
   const history = Array.isArray(member.eventSalesHistory) ? member.eventSalesHistory : [];
   const recentGoods = history.filter(event => event.eventType === 'merchandise').slice(-3);
   const recentBenefits = history.filter(event => event.eventType !== 'merchandise').slice(-3);
+  // averageを処理する。
   const average = events => events.length
     ? Math.round(events.reduce((total, event) => total + event.sellThrough, 0) / events.length * 100)
     : null;
@@ -125,6 +129,7 @@ function updateWeeklyGroupFans() {
   fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales);
 }
 
+// グループファンを計算する。
 function calculateGroupFans() {
   return Math.min(GROUP_FAN_MAX, getStatSeedFans() + Math.round(fansFromSales));
 }
@@ -210,6 +215,7 @@ function getFanTierIntensity() {
 // 階層の配分（情勢で変動するが、大小関係は常に コア＜ファン＜＝ライト）
 function getFanTierShares() {
   const intensity = getFanTierIntensity();
+  // mixを処理する。
   const mix = range => range.min + (range.max - range.min) * intensity;
   const core = mix(FAN_TIER_SHARE_RANGE.core);
   const fan = mix(FAN_TIER_SHARE_RANGE.fan);
@@ -482,6 +488,7 @@ function getMemberAnnualSalary(member) {
   );
 }
 
+// メンバー月次給与を取得する。
 function getMemberMonthlySalary(member) {
   return getMemberAnnualSalary(member) / 12;
 }
@@ -501,11 +508,13 @@ function getTotalMonthlySalary() {
 // ==========================================
 const CRISIS_FINE_BASE = 2000000;
 
+// 危機Severityを取得する。
 function getCrisisSeverity() {
   // 危機回避力が低いほど深刻度が高い（1.0〜2.0倍）
   return 1 + (100 - calculateGroupCrisisResilience()) / 100;
 }
 
+// SelectedPopularityを調整する。
 function adjustSelectedPopularity(delta) {
   idolRoster.forEach(member => {
     if (!member.isSelected) return;
@@ -513,6 +522,7 @@ function adjustSelectedPopularity(delta) {
   });
 }
 
+// 危機ResponseOptionsを取得する。
 function getCrisisResponseOptions() {
   const fine = Math.round(CRISIS_FINE_BASE * getCrisisSeverity());
   return [
@@ -556,6 +566,7 @@ function getCrisisResponseOptions() {
   ];
 }
 
+// 危機Responseモーダルを開く。
 function openCrisisResponseModal() {
   if (!pendingCrisisResponse) return;
   const type = pendingCrisisResponse.type;
@@ -570,6 +581,7 @@ function openCrisisResponseModal() {
   document.getElementById('crisis-response-modal').style.display = 'flex';
 }
 
+// 危機Responseを解決する。
 function resolveCrisisResponse(optionId) {
   if (!pendingCrisisResponse) return;
   const type = pendingCrisisResponse.type;

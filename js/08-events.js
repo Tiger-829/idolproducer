@@ -112,6 +112,7 @@ function applyEquipmentUpgrade(context) {
   setLog(`【設備強化】${facility.name}をLv.${level + 1}に強化しました（開発費 ${formatMoney(cost)}）。`);
 }
 
+// AllPopularityを調整する。
 function adjustAllPopularity(delta) {
   idolRoster.forEach(member => {
     member.stats.popularity = Math.max(0, Math.min(100, (member.stats.popularity || 0) + delta));
@@ -127,12 +128,14 @@ function adjustTargetPopularity(delta) {
   });
 }
 
+// SelectedSNSを調整する。
 function adjustSelectedSns(delta) {
   idolRoster.forEach(member => {
     if (member.isSelected) member.stats.sns = Math.max(0, Math.min(100, (member.stats.sns || 0) + delta));
   });
 }
 
+// イベントTemplateを埋めるする。
 function fillEventTemplate(text, context) {
   return String(text)
     .replace(/\$\{gain\}/g, formatMoney(context.gain))
@@ -196,6 +199,7 @@ function triggerArmedRandomEvent(todayKey) {
   if (built) pendingRandomEvent = built;
 }
 
+// ランダムイベントを抽選する。
 function rollRandomEvent() {
   if (getGameDateObject().getDay() !== 3) return;
   if (pendingRandomEvent || pendingCrisisResponse) return;
@@ -218,6 +222,7 @@ function rollRandomEvent() {
   armedRandomEvents.push({ eventId: event.id, targetDate: toDateKey(target) });
 }
 
+// ランダムイベントのモーダルを開く。
 function openRandomEventModal() {
   if (!pendingRandomEvent) return;
   const event = pendingRandomEvent;
@@ -236,6 +241,7 @@ function openRandomEventModal() {
   document.getElementById('random-event-modal').style.display = 'flex';
 }
 
+// ランダムイベントを解決する。
 function resolveRandomEvent(choiceIndex) {
   if (!pendingRandomEvent) return;
   const event = pendingRandomEvent;
@@ -256,10 +262,12 @@ const FANCLUB_TIERS = [
   { id: 'premium', name: 'プレミアム', fee: 3000, benefit: '会報・先行配信・握手会参加権' }
 ];
 
+// ファンクラブメンバーTargetを取得する。
 function getFanClubMemberTarget(tier) {
   return Math.max(0, Math.round(calculateGroupFans() * (0.25 - tier.fee / 20000)));
 }
 
+// ファンクラブのモーダルを開く。
 function openFanClubModal() {
   if (!pendingFanClubEvent) return;
   const event = pendingFanClubEvent;
@@ -278,11 +286,13 @@ function openFanClubModal() {
   document.getElementById('fanclub-modal').style.display = 'flex';
 }
 
+// ファンクラブ状態テキストを取得する。
 function getFanClubStatusText() {
   if (!fanClub) return '<div style="color:#777;">ファンクラブは未設立です</div>';
   return `<div>現在の会費: <strong>${formatMoney(fanClub.fee)}/月</strong> / 会員数: <strong>${Number(fanClub.members || 0).toLocaleString()}人</strong> / 毎月の収入: <strong>${formatMoney(fanClub.members * fanClub.fee)}</strong></div>`;
 }
 
+// ファンクラブを解決する。
 function resolveFanClub(tierIndex) {
   if (!pendingFanClubEvent) return;
   const event = pendingFanClubEvent;
@@ -308,6 +318,7 @@ function resolveFanClub(tierIndex) {
   updateUI();
 }
 
+// ファンクラブ年間イベントを確認する。
 function checkFanClubYearlyEvent() {
   if (pendingFanClubEvent) return;
   if (currentYear < 2) return;
@@ -319,6 +330,7 @@ function checkFanClubYearlyEvent() {
   };
 }
 
+// ファンクラブ月次収入を適用。
 function applyFanClubMonthlyIncome() {
   if (!fanClub || !fanClub.members) return 0;
   const income = fanClub.members * fanClub.fee;
@@ -327,6 +339,7 @@ function applyFanClubMonthlyIncome() {
   return income;
 }
 
+// 月次CDRevenueを追加する。
 function addMonthlyCdRevenue(grossRevenue) {
   const revenue = Math.round(grossRevenue * CD_REVENUE_MONTHLY_SHARE);
   monthlyCdRevenue += revenue;
@@ -362,6 +375,7 @@ function rollMonthlyTieUps() {
   return results;
 }
 
+// 月次収入を清算する。
 function settleMonthlyIncome() {
   const cdRevenue = monthlyCdRevenue;
   monthlyCdRevenue = 0;
@@ -394,6 +408,7 @@ function settleMonthlyIncome() {
   return { cdRevenue, tieUpRevenue, fanClubIncome, salary: salary.total };
 }
 
+// 月次給与を適用。
 function applyMonthlySalary() {
   const memberSalary = getTotalMemberMonthlySalary();
   const managerSalary = getTotalManagerMonthlySalary();
@@ -406,6 +421,7 @@ function applyMonthlySalary() {
   return { memberSalary, managerSalary, total };
 }
 
+// 保留中のモーダルを開く。
 function openPendingModal() {
   if (pendingMonthlyReport) return openPendingMonthlyReport();
   if (pendingSelectionEvent) return openSelectionModal();
@@ -416,6 +432,7 @@ function openPendingModal() {
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
+// 月次収入を記録する。
 function recordMonthlyIncome(label, amount) {
   const value = Math.round(Number(amount) || 0);
   if (!value) return 0;
@@ -424,6 +441,7 @@ function recordMonthlyIncome(label, amount) {
   return value;
 }
 
+// 月次支出を記録する。
 function recordMonthlyExpense(label, amount) {
   const value = Math.round(Number(amount) || 0);
   if (!value) return 0;
@@ -432,14 +450,17 @@ function recordMonthlyExpense(label, amount) {
   return value;
 }
 
+// 月次台帳を合計する。
 function sumMonthlyLedger(list) {
   return (list || []).reduce((total, entry) => total + (entry.amount || 0), 0);
 }
 
+// 月終了日付を判定する。
 function isMonthEndDate(date = getGameDateObject()) {
   return date.getDate() === getDaysInMonth(date.getFullYear(), date.getMonth() + 1);
 }
 
+// 月次レポートのモーダルを表示する。
 function showMonthlyReportModal(report) {
   const modal = document.getElementById('monthly-report-modal');
   const body = document.getElementById('monthly-report-body');
@@ -488,12 +509,14 @@ function showMonthlyReportModal(report) {
   modal.style.display = 'flex';
 }
 
+// 月次レポートモーダルを閉じる。
 function closeMonthlyReportModal() {
   const modal = document.getElementById('monthly-report-modal');
   if (modal) modal.style.display = 'none';
   pendingMonthlyReport = null;
 }
 
+// 月次台帳を確定。
 function finalizeMonthlyLedger(year, month) {
   const report = {
     year,
@@ -506,6 +529,7 @@ function finalizeMonthlyLedger(year, month) {
   return report;
 }
 
+// 保留中月次レポートを開く。
 function openPendingMonthlyReport() {
   if (!pendingMonthlyReport) return false;
   showMonthlyReportModal(pendingMonthlyReport);
@@ -514,6 +538,7 @@ function openPendingMonthlyReport() {
 
 const LIVE_PARTICIPATION_MULTIPLIER = 1.67;
 
+// 階層ParticipationRateを取得する。
 function getTierParticipationRate(kind) {
   const rates = FAN_TIER_PARTICIPATION[kind] || FAN_TIER_PARTICIPATION.live;
   const shares = getFanTierShares();
@@ -522,10 +547,12 @@ function getTierParticipationRate(kind) {
 }
 
 const FAN_TIER_NEUTRAL_PARTICIPATION = 0.40;
+// イベントParticipationFactorを取得する。
 function getEventParticipationFactor() {
   return getTierParticipationRate('event') / FAN_TIER_NEUTRAL_PARTICIPATION;
 }
 
+// IndividualイベントSaleを記録する。
 function recordIndividualEventSale(member, eventType, available) {
   const profile = INDIVIDUAL_EVENT_PROFILES[eventType];
   if (!profile || available <= 0) return { available: 0, unitsSold: 0, sellThrough: null };
@@ -547,6 +574,7 @@ function recordIndividualEventSale(member, eventType, available) {
   return { available, unitsSold, sellThrough };
 }
 
+// リリースBenefit売上を記録する。
 function recordReleaseBenefitSales(benefitId) {
   const participants = idolRoster.filter(member => member.isSelected);
   const results = participants.map(member =>
@@ -557,6 +585,7 @@ function recordReleaseBenefitSales(benefitId) {
   return { available, unitsSold, sellThrough: available ? unitsSold / available : 0 };
 }
 
+// sellMerchandiseライブを処理する。
 function sellMerchandiseAtLive() {
   if (merchandiseProducts <= 0 || merchandiseStock <= 0) {
     merchandiseSellThrough = merchandiseProducts > 0 ? 0 : null;
@@ -583,21 +612,25 @@ function sellMerchandiseAtLive() {
   return { unitsSold, revenue: unitsSold * 2500 };
 }
 
+// 計画リリースTriggerキーを取得する。
 function getPlanReleaseTriggerKey(plan, year, monthIndex) {
   if (plan && plan.releaseDate) return plan.releaseDate;
   return toDateKey(getLastWednesday(year, monthIndex));
 }
 
+// 計画リリースDueを判定する。
 function isPlanReleaseDue(plan, reachDate = gameDate) {
   if (!plan || !plan.release || plan.release === 'none' || plan.releaseCompleted) return false;
   const target = getPlanReleaseTriggerKey(plan, calendarYear, currentMonth - 1);
   return reachDate >= target;
 }
 
+// 計画イベントDueを判定する。
 function isPlanEventDue(entry, reachDate = gameDate) {
   return !entry.event.completed && reachDate >= entry.event.date;
 }
 
+// 計画イベントEntriesを取得する。
 function getPlanEventEntries() {
   const entries = [];
   Object.entries(productionSchedule).forEach(([planKey, plan]) => {
@@ -610,6 +643,7 @@ function getPlanEventEntries() {
   return entries;
 }
 
+// 計画イベントを処理する。
 function processPlanEvents(reachDate = gameDate) {
   getPlanEventEntries().forEach(entry => {
     if (!isPlanEventDue(entry, reachDate)) return;
@@ -630,6 +664,7 @@ function processPlanEvents(reachDate = gameDate) {
   });
 }
 
+// 月次リリースライブを処理する。
 function processMonthlyReleaseAndLive(reachDate = gameDate) {
   const planKey = `${currentYear}-${currentMonth}`;
   const plan = productionSchedule[planKey] || null;
@@ -812,6 +847,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
   processSpecialLiveEvents(reachDate);
 }
 
+// 年終了イベントを処理する。
 function processYearEndEvents(reachDate = gameDate) {
   const startDate = getGameDateObject();
   const limitDate = getGameDateObject(reachDate);
@@ -851,6 +887,7 @@ function executeKohaku() {
   }
 }
 
+// Specialライブイベントを処理する。
 function processSpecialLiveEvents(reachDate = gameDate) {
   const startDate = getGameDateObject();
   const limitDate = getGameDateObject(reachDate);
@@ -886,15 +923,18 @@ const LIVE_WEEKDAY_DEFAULT_WEIGHT = 0.7;
 const GRADUATION_LIVE_RATE = 0.95;
 const LIVE_FINALE_RATE = 0.9;
 
+// 会場階層Rateを取得する。
 function getVenueTierRate(venue) {
   return VENUE_TIER_RATE[venue?.cap] ?? VENUE_TIER_DEFAULT_RATE;
 }
 
+// ライブ日Weightを取得する。
 function getLiveDayWeight(date) {
   if (!date || typeof date.getDay !== 'function') return LIVE_WEEKDAY_DEFAULT_WEIGHT;
   return LIVE_WEEKDAY_WEIGHT[date.getDay()] ?? LIVE_WEEKDAY_DEFAULT_WEIGHT;
 }
 
+// ライブFinanceモーダルを表示する。
 function showLiveFinanceModal(rows) {
   const modal = document.getElementById('live-finance-modal');
   if (!modal || !rows.length) return;
@@ -910,7 +950,9 @@ function showLiveFinanceModal(rows) {
     profit: sum.profit + r.profit
   }), zero);
 
+  // yensを処理する。
   const yens = v => `${v > 0 ? '+' : ''}${formatMoney(v)}`;
+  // minusを処理する。
   const minus = v => `-${formatMoney(v)}`;
   const body = modal.querySelector('.live-finance-body');
   body.innerHTML = `
@@ -956,11 +998,13 @@ function showLiveFinanceModal(rows) {
   modal.style.display = 'flex';
 }
 
+// ライブFinanceモーダルを閉じる。
 function closeLiveFinanceModal() {
   const modal = document.getElementById('live-finance-modal');
   if (modal) modal.style.display = 'none';
 }
 
+// ライブ観客Demandを取得する。
 function getLiveAudienceDemand(venue, date = getGameDateObject(), specialRate = null, priceFactor = 1) {
   const weight = specialRate ?? getLiveDayWeight(date);
   const rate = getVenueTierRate(venue) * priceFactor;
@@ -972,23 +1016,27 @@ const STREAM_PRODUCTION_COST = 100000000;
 const STREAM_BUYER_RATE = { 0: 0.9, 6: 0.9, 1: 0.8, 5: 0.8, 2: 0.85, 3: 0.85, 4: 0.85 };
 const STREAM_BUYER_DEFAULT_RATE = 0.85;
 
+// 配信BuyerRateを取得する。
 function getStreamBuyerRate(date = getGameDateObject()) {
   if (!date || typeof date.getDay !== 'function') return STREAM_BUYER_DEFAULT_RATE;
   return STREAM_BUYER_RATE[date.getDay()] ?? STREAM_BUYER_DEFAULT_RATE;
 }
 
+// 配信TicketBuyersを取得する。
 function getStreamTicketBuyers(date = getGameDateObject()) {
   const fans = calculateGroupFans();
   const liveRate = getTierParticipationRate('live');
   return Math.floor(fans * (1 - liveRate) * getStreamBuyerRate(date));
 }
 
+// Effective席価格を取得する。
 function getEffectiveSeatPrice(venue, entry, seat) {
   const configured = Number(entry?.seatPrices?.[seat.id]);
   if (Number.isFinite(configured) && configured > 0) return configured;
   return getStandardSeatPrice(venue, seat.id);
 }
 
+// 価格DemandFactorを取得する。
 function getPriceDemandFactor(venue, entry) {
   const seats = getLiveSeatCapacities(venue, entry?.seatOptions || {});
   let configuredTotal = 0;
@@ -1001,10 +1049,12 @@ function getPriceDemandFactor(venue, entry) {
   return Math.max(0.1, Math.min(5, standardTotal / configuredTotal));
 }
 
+// ライブ日ラベルを取得する。
 function getLiveDayLabel(days) {
   return LIVE_DAY_LABELS[days] || LIVE_DAY_LABELS[1];
 }
 
+// ライブ席Capacitiesを取得する。
 function getLiveSeatCapacities(venue, seatOptions = {}) {
   const capacity = CAPACITY_MAP[venue.cap];
   const isDome = venue.name.includes('ドーム');
@@ -1030,6 +1080,7 @@ function getLiveSeatCapacities(venue, seatOptions = {}) {
     });
 }
 
+// Scheduled楽曲を整備する。
 function ensureScheduledSong(year, month, plan) {
   let song = songs.find(item => item.id === plan.songId);
   if (!song) {
@@ -1047,11 +1098,13 @@ function ensureScheduledSong(year, month, plan) {
   return song;
 }
 
+// 楽曲Level経験値Requiredを取得する。
 function getSongLevelExpRequired(level) {
   const base = Math.max(0, (level || 1) - 1);
   return Math.round(SONG_LEVEL_EXP_BASE * Math.pow(SONG_LEVEL_EXP_GROWTH, base));
 }
 
+// 楽曲経験値を追加する。
 function addSongExperience(song, amount) {
   if (!song || !Number.isFinite(amount) || amount <= 0) return 0;
   if (!Number.isFinite(song.experience)) song.experience = 0;
@@ -1072,6 +1125,7 @@ function addSongExperience(song, amount) {
   return gained;
 }
 
+// 楽曲Level経験値Progressを取得する。
 function getSongLevelExpProgress(song) {
   if (!song || !Number.isFinite(song.level)) return 0;
   if (song.level >= MAX_SONG_LEVEL) return 1;
@@ -1080,6 +1134,7 @@ function getSongLevelExpProgress(song) {
 }
 
 const SONG_UNIT_PRICE = { single: 300, album: 600 };
+// 楽曲Unit価格を取得する。
 function getSongUnitPrice(song) {
   return SONG_UNIT_PRICE[song?.releaseType] || SONG_UNIT_PRICE.single;
 }
@@ -1095,6 +1150,7 @@ const TIE_UPS = [
   { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1.1, popularityGain: 1, songExperience: 10 }
 ];
 
+// プロモーションCumulative売上を取得する。
 function getPromotionCumulativeSales(baseSales, divisors) {
   const base = Math.max(0, Math.round(Number(baseSales) || 0));
   if (!base || !Array.isArray(divisors) || !divisors.length) return 0;
@@ -1108,11 +1164,13 @@ function getPromotionCumulativeSales(baseSales, divisors) {
   return Math.ceil(total - 1e-6);
 }
 
+// 育成楽曲を処理する。
 function trainSongs(summary) {
   const weeklyExperience = Math.max(1, Math.round((summary.averages.vocal + summary.averages.dance) / 40));
   songs.forEach(song => addSongExperience(song, weeklyExperience));
 }
 
+// NthWeekday月を取得する。
 function getNthWeekdayOfMonth(year, month, weekday, week) {
   let count = 0;
   const lastDay = getDaysInMonth(year, month);
@@ -1125,11 +1183,13 @@ function getNthWeekdayOfMonth(year, month, weekday, week) {
   return null;
 }
 
+// Fixed日付月を取得する。
 function getFixedDateOfMonth(year, month, day) {
   const clampedDay = Math.min(day, getDaysInMonth(year, month));
   return toDateKey(new Date(year, month - 1, clampedDay, 12));
 }
 
+// SpecialBroadcast日付を取得する。
 function getSpecialBroadcastDate(broadcast, year) {
   if (Number.isFinite(broadcast.weekday) && Number.isFinite(broadcast.week)) {
     return getNthWeekdayOfMonth(year, broadcast.month, broadcast.weekday, broadcast.week);
@@ -1137,11 +1197,13 @@ function getSpecialBroadcastDate(broadcast, year) {
   return getFixedDateOfMonth(year, broadcast.month, broadcast.day);
 }
 
+// SpecialBroadcast試合日付を取得する。
 function getSpecialBroadcastGameDate(broadcast, year) {
   const dateKey = getSpecialBroadcastDate(broadcast, year);
   return dateKey ? getGameDateObject(dateKey) : null;
 }
 
+// NearestProgram日付を探す。
 function findNearestProgramDate(year, month) {
   const latestReleased = [...songs]
     .filter(song => song.released)
@@ -1153,6 +1215,7 @@ function findNearestProgramDate(year, month) {
   return draftSong ? draftSong.id : null;
 }
 
+// MusicProgramオファーを確認する。
 function checkMusicProgramOffers() {
   if (!isFirstWednesdayOfMonth()) return;
 
@@ -1179,6 +1242,7 @@ function checkMusicProgramOffers() {
   }
 }
 
+// SpecialBroadcastオファーを確認する。
 function checkSpecialBroadcastOffers() {
   const currentGameDate = getGameDateObject();
   SPECIAL_BROADCASTS.forEach(broadcast => {
@@ -1259,6 +1323,7 @@ function processScheduledPerformances(reachDate = null) {
   if (logs.length) setLog(logs.join(' '));
 }
 
+// SenbatsuTriggerを確認する。
 function checkSenbatsuTrigger() {
   if (!isFirstWednesdayOfMonth()) return;
   if (pendingSelectionEvent) return;
@@ -1283,6 +1348,7 @@ function checkSenbatsuTrigger() {
   });
 }
 
+// 選抜イベントを作成する。
 function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, releaseType = null } = {}) {
   const currentSelected = idolRoster.filter(member => member.isSelected);
   const currentCenter = idolRoster.find(member => member.isCenter);
@@ -1301,11 +1367,14 @@ function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, release
   };
 }
 
+// ライブDetailedFinanceモーダルを表示する。
 function showLiveDetailedFinanceModal(report) {
   const modal = document.getElementById('live-finance-modal');
   if (!modal || !report) return;
 
+  // yensを処理する。
   const yens = v => `${v >= 0 ? '+' : ''}${formatMoney(v)}`;
+  // minusを処理する。
   const minus = v => `-${formatMoney(v)}`;
 
   const seatRows = (report.seatDetails || []).map(seat => {

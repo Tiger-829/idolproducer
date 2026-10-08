@@ -180,6 +180,7 @@ const HELP_SECTIONS = [
   }
 ];
 
+// ヘルプモーダルを開く。
 function openHelpModal() {
   const modal = document.getElementById('help-modal');
   if (!modal) return;
@@ -190,11 +191,13 @@ function openHelpModal() {
   modal.style.display = 'flex';
 }
 
+// ヘルプモーダルを閉じる。
 function closeHelpModal() {
   const modal = document.getElementById('help-modal');
   if (modal) modal.style.display = 'none';
 }
 
+// ヘルプContentを描画する。
 function renderHelpContent() {
   return HELP_SECTIONS.map(function(section) {
     return '<section class="help-section">' +
@@ -204,6 +207,7 @@ function renderHelpContent() {
   }).join('');
 }
 
+// ヘルプBlockを描画する。
 function renderHelpBlock(block) {
   if (block.type === 'p') {
     return '<p class="help-p">' + block.text + '</p>';

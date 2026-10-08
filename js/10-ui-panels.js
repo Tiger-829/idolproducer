@@ -21,6 +21,7 @@ if (typeof currentPageTab === 'undefined') {
   window.currentPageTab = window.DEFAULT_PAGE || 'office';
 }
 
+// safeGetIconSVGを処理する。
 function safeGetIconSvg(iconName) {
   if (typeof getIconSvg === 'function') {
     try {
@@ -41,6 +42,7 @@ function safeGetIconSvg(iconName) {
   return `<span class="fallback-icon" style="margin-right:4px;">${iconMap[iconName] || '●'}</span>`;
 }
 
+// ページナビゲーションを描画する。
 function renderPageNav(activePage) {
   const tabs = (typeof PAGE_TABS !== 'undefined') ? PAGE_TABS : window.PAGE_TABS;
   const def = (typeof DEFAULT_PAGE !== 'undefined') ? DEFAULT_PAGE : 'office';
@@ -77,6 +79,7 @@ function renderPageNav(activePage) {
   });
 }
 
+// Pageを切替する。
 function switchPage(page) {
   currentPageTab = page;
   renderPageNav(page);
@@ -85,12 +88,14 @@ function switchPage(page) {
   }
 }
 
+// ライバルチームパワーを取得する。
 function getRivalTeamPower(team) {
   const base = team?.basePower || 0;
   const growth = (team?.sales || 0) / 200000;
   return Math.max(10, Math.round(base + growth));
 }
 
+// プレイヤーチームステータスを同期する。
 function syncPlayerTeamStats() {
   if (!Array.isArray(leagueTeams)) return;
   const pTeam = leagueTeams.find(team => team && team.id === 'player');
@@ -101,6 +106,7 @@ function syncPlayerTeamStats() {
   pTeam.basePower = typeof getPlayerTeamOverall === 'function' ? getPlayerTeamOverall() : 50;
 }
 
+// プレイヤーライブ公演を件数計算する。
 function countPlayerLiveShows() {
   let count = 0;
   if (typeof getScheduledLiveEntries !== 'function') return 0;
@@ -112,6 +118,7 @@ function countPlayerLiveShows() {
   return count;
 }
 
+// リーグランキングを取得する。
 function getLeagueRanking() {
   syncPlayerTeamStats();
   if (!Array.isArray(leagueTeams)) return [];
@@ -134,12 +141,14 @@ function getLeagueRanking() {
     .map((team, index) => ({ ...team, rank: index + 1 }));
 }
 
+// プレイヤー順位を取得する。
 function getPlayerRank() {
   const ranking = getLeagueRanking();
   const me = ranking.find(team => team.isPlayer);
   return me ? { rank: me.rank, total: ranking.length, power: me.power, top: ranking[0] } : null;
 }
 
+// ランキングパネルを描画する。
 function renderRankingPanel() {
   const list = document.getElementById('ranking-list');
   const note = document.getElementById('ranking-note');
@@ -168,6 +177,7 @@ function renderRankingPanel() {
   }).join('');
 }
 
+// 週次Actionパネルを描画する。
 function renderWeeklyActionPanel() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
@@ -250,14 +260,17 @@ function renderWeeklyActionPanel() {
   }
 }
 
+// 週次イベントメモイベントを取得する。
 function getWeeklyEventNoteEvents(events) {
   return (events || []).filter(event => !String(event).startsWith('他グループのライブ'));
 }
 
+// 週次イベントItemsを描画する。
 function renderWeeklyEventItems(events) {
   return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
+// 週次スケジュールControlsを描画する。
 function renderWeeklyScheduleControls() {
   if (!weeklySchedule || !Array.isArray(weeklySchedule.slots)) {
     weeklySchedule = {
@@ -314,6 +327,7 @@ function renderWeeklyScheduleControls() {
     { id: 'meal-party', name: '食事会' }
   ];
 
+  // itemOptionsを処理する。
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed).map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
@@ -472,6 +486,7 @@ function renderWeeklyScheduleControls() {
   `;
 }
 
+// IndividualLessonメンバーOptionsを取得する。
 function getIndividualLessonMemberOptions() {
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
   const available = roster.filter(member => member && !member.injury);
@@ -494,6 +509,7 @@ function getIndividualLessonMemberOptions() {
 let officeCalendarViewYear = null;
 let officeCalendarViewMonth = null;
 
+// 事務所カレンダーView日付を取得する。
 function getOfficeCalendarViewDate() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   if (officeCalendarViewYear === null || officeCalendarViewMonth === null) {
@@ -503,6 +519,7 @@ function getOfficeCalendarViewDate() {
   return { year: officeCalendarViewYear, month: officeCalendarViewMonth };
 }
 
+// MaxScheduled年月を取得する。
 function getMaxScheduledYearMonth() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   let maxVal = currentDate.getFullYear() * 12 + (currentDate.getMonth() + 1);
@@ -555,6 +572,7 @@ function getMaxScheduledYearMonth() {
   return { year, month };
 }
 
+// shift事務所カレンダー月を処理する。
 function shiftOfficeCalendarMonth(delta) {
   const v = getOfficeCalendarViewDate();
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
@@ -571,6 +589,7 @@ function shiftOfficeCalendarMonth(delta) {
   renderGameCalendar();
 }
 
+// イベント日付を取得する。
 function getEventsForDate(dateKey) {
   const events = [];
 
@@ -637,6 +656,7 @@ function getEventsForDate(dateKey) {
   return events;
 }
 
+// カレンダー日Clickを処理する。
 function handleCalendarDayClick(dateKey) {
   if (!dateKey) return;
   const events = getEventsForDate(dateKey);
@@ -654,6 +674,7 @@ function handleCalendarDayClick(dateKey) {
   }
 }
 
+// 試合カレンダーを描画する。
 function renderGameCalendar() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
   const v = getOfficeCalendarViewDate();
@@ -761,16 +782,19 @@ function renderGameCalendar() {
 if (typeof OFFICE_COST_GROWTH === 'undefined') window.OFFICE_COST_GROWTH = 1.9;
 if (typeof OFFICE_MAINTENANCE_GROWTH === 'undefined') window.OFFICE_MAINTENANCE_GROWTH = 1.6;
 
+// 事務所アップグレードCostを取得する。
 function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (!facility || !facility.baseCost) return 0;
   return Math.round(facility.baseCost * (OFFICE_COST_GROWTH ** level));
 }
 
+// 事務所MaintenanceCostを取得する。
 function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
   if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
   return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
 }
 
+// アップグレード事務所Facilityを処理する。
 function upgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
@@ -789,11 +813,13 @@ function upgradeOfficeFacility(facilityId) {
   updateUI();
 }
 
+// 事務所DowngradeRefundを取得する。
 function getOfficeDowngradeRefund(facility, level = (officeUpgrades?.[facility?.id] ?? 0)) {
   if (level <= 1) return 0;
   return Math.round(getOfficeUpgradeCost(facility, level - 1) * 0.5);
 }
 
+// downgrade事務所Facilityを処理する。
 function downgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
   const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
@@ -811,6 +837,7 @@ function downgradeOfficeFacility(facilityId) {
   updateUI();
 }
 
+// maintain事務所Facilitiesを処理する。
 function maintainOfficeFacilities() {
   if (typeof OFFICE_FACILITIES === 'undefined' || !Array.isArray(OFFICE_FACILITIES)) return;
   const cost = OFFICE_FACILITIES.reduce((total, facility) =>
@@ -821,6 +848,7 @@ function maintainOfficeFacilities() {
   if (funds < 0) setLog(`【維持費】事務所設備の週維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
 }
 
+// 事務所アップグレードを描画する。
 function renderOfficeUpgrades() {
   const list = document.getElementById('office-upgrades-ui');
   if (!list || typeof OFFICE_FACILITIES === 'undefined') return;
@@ -861,6 +889,7 @@ function renderOfficeUpgrades() {
   }).join('');
 }
 
+// マネージャーパネルを描画する。
 function renderManagerPanel() {
   const list = document.getElementById('manager-list-ui');
   if (!list) return;
@@ -955,6 +984,7 @@ function renderManagerPanel() {
   }).join('');
 }
 
+// マネージャーMarketパネルを描画する。
 function renderManagerMarketPanel() {
   const list = document.getElementById('manager-market-ui');
   if (!list) return;
@@ -1004,7 +1034,9 @@ function renderManagerMarketPanel() {
   }).join('');
 }
 
+// 給与パネルを描画する。
 function renderSalaryPanel() {
+  // テキストを設定する。
   const setText = (id, value) => {
     const element = document.getElementById(id);
     if (element) element.textContent = value;

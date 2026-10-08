@@ -259,6 +259,7 @@ const ICONS = {
   refund: '<circle cx="12" cy="12" r="8"/><path d="M8 12a4 4 0 0 1 6.5-3.1"/><path d="M16 12a4 4 0 0 1-6.5 3.1"/><path d="M14 7v2.5h-2.5M10 17v-2.5h2.5"/>'
 };
 
+// IconSVGを取得する。
 function getIconSvg(name) {
   const body = ICONS[name];
   if (!body) return '';
@@ -384,8 +385,11 @@ const WEEK_DAY_LABELS = ['木', '金', '土', '日', '月', '火', '水'];
 const WEEK_PERIOD_LABELS = ['午前', '午後'];
 const WEEK_SLOT_COUNT = WEEK_DAY_LABELS.length * WEEK_PERIOD_LABELS.length;
 
+// 週枠日を取得する。
 function getWeekSlotDay(slotIndex) { return Math.floor(slotIndex / WEEK_PERIOD_LABELS.length); }
+// 週枠Periodを取得する。
 function getWeekSlotPeriod(slotIndex) { return slotIndex % WEEK_PERIOD_LABELS.length; }
+// 週枠ラベルを取得する。
 function getWeekSlotLabel(slotIndex) {
   return `${WEEK_DAY_LABELS[getWeekSlotDay(slotIndex)]}曜${WEEK_PERIOD_LABELS[getWeekSlotPeriod(slotIndex)]}`;
 }
@@ -505,6 +509,7 @@ const RIVAL_NAME_TAILS = [
   'アイドル', 'グループ', 'ショー', 'ステージ', 'コレクション'
 ];
 
+// 順位データを取得する。
 function getRankData(val) {
   if (val >= 90) return { rank: 'S', color: '#ff1493', bg: '#ffe4e1' }; // ディープピンク
   if (val >= 80) return { rank: 'A', color: '#ff00ff', bg: '#fce4ec' }; // マゼンタ

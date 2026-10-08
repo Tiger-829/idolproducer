@@ -13,6 +13,7 @@ function escapeHtml(value) {
   })[character]);
 }
 
+// 日付文字列をキー化する。
 function toDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -20,10 +21,12 @@ function toDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
+// 試合日付Objectを取得する。
 function getGameDateObject(value = gameDate) {
   return new Date(`${value}T12:00:00`);
 }
 
+// 最初Wednesdayを取得する。
 function getFirstWednesday(year, monthIndex = 0) {
   const date = new Date(year, monthIndex, 1, 12);
   const offset = (3 - date.getDay() + 7) % 7;
@@ -31,6 +34,7 @@ function getFirstWednesday(year, monthIndex = 0) {
   return date;
 }
 
+// Wednesdayを次へ進行する。
 function getNextWednesday(date) {
   const nextDate = new Date(date);
   const daysUntilWednesday = (3 - nextDate.getDay() + 7) % 7 || 7;
@@ -38,6 +42,7 @@ function getNextWednesday(date) {
   return nextDate;
 }
 
+// 週Anchor日付を取得する。
 function getWeekAnchorDate(date = getGameDateObject()) {
   const anchor = new Date(date);
   const daysSinceWednesday = (anchor.getDay() - 3 + 7) % 7;
@@ -45,6 +50,7 @@ function getWeekAnchorDate(date = getGameDateObject()) {
   return anchor;
 }
 
+// 最後Wednesdayを取得する。
 function getLastWednesday(year, monthIndex) {
   const date = new Date(year, monthIndex + 1, 0, 12);
   const daysSinceWednesday = (date.getDay() - 3 + 7) % 7;
@@ -93,6 +99,7 @@ const INFO_MEDIA_EXP_REWARDS = {
   popularity: 5000
 };
 
+// 現在のセンター案の説明文を取得する。
 function getCurrentCenterText() {
   const targets = idolRoster.filter(member => member.isSelected);
   const pool = targets.length ? targets : idolRoster;
@@ -102,6 +109,7 @@ function getCurrentCenterText() {
   return age === '' ? center.name : `${center.name}（${age}歳）`;
 }
 
+// 情報メディア記事を組み立てする。
 function buildInfoMediaArticle(media, data) {
   const d = data || {};
   if (media.kind === 'release' || (media.kind === 'both' && d.releaseType)) {
@@ -136,6 +144,7 @@ function buildInfoMediaArticle(media, data) {
   return `ライブ「${d.liveName || ''}」が${venue}${days}日間開催され、動員${audience}人。`;
 }
 
+// スケジュール情報メディアを処理する。
 function scheduleInfoMedia(kind, payload) {
   const candidates = Object.values(INFO_MEDIA).filter(m =>
     m.kind === kind || m.kind === 'both'
@@ -180,6 +189,7 @@ function scheduleInfoMedia(kind, payload) {
   return scheduledPerformances[scheduledPerformances.length - 1];
 }
 
+// 情報メディアを処理する。
 function processInfoMedia(performance) {
   const media = INFO_MEDIA[performance.mediaId] || INFO_MEDIA.web;
   
@@ -205,6 +215,7 @@ function processInfoMedia(performance) {
   setLog(`【${media.label}】${article}${result}`);
 }
 
+// 月ライブEntriesを取得する。
 function getMonthLiveEntries(plan) {
   if (!plan) return [];
   const entries = [];
@@ -246,16 +257,19 @@ function getMonthLiveEntries(plan) {
   return entries;
 }
 
+// ライブEntry日付を取得する。
 function getLiveEntryDate(entry, year, month) {
   if (entry.liveDate) return getGameDateObject(entry.liveDate);
   return getLastWednesday(year, month - 1);
 }
 
+// 会場FeePer公演を取得する。
 function getVenueFeePerShow(venue) {
   const rate = VENUE_FEE_RATES[venue.cap] ?? 2500;
   return Math.floor(CAPACITY_MAP[venue.cap] * rate);
 }
 
+// 会場WeekdayDiscountを取得する。
 function getVenueWeekdayDiscount(dates) {
   const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
   if (!list.length) return 1;
@@ -266,6 +280,7 @@ function getVenueWeekdayDiscount(dates) {
   return 0.75;
 }
 
+// 会場RentalFeeを取得する。
 function getVenueRentalFee(venue, days, dates = null) {
   const list = Array.isArray(dates) ? dates.filter(Boolean) : [];
   const count = list.length ? list.length : Math.max(1, normalizeLiveDays(days));
@@ -273,6 +288,7 @@ function getVenueRentalFee(venue, days, dates = null) {
   return Math.round(discounted + (count - 1) * VENUE_EXTRA_DAY_RATE * discounted);
 }
 
+// ライブEntry公演日付を取得する。
 function getLiveEntryShowDates(entry) {
   const primary = toDateKey(getLiveEntryDate(entry, entry.calendarYear, entry.month));
   const extras = Array.isArray(entry.liveDates) ? entry.liveDates : [];
@@ -280,6 +296,7 @@ function getLiveEntryShowDates(entry) {
   return [primary, ...dates];
 }
 
+// ライブEntry日付Rangeを取得する。
 function getLiveEntryDateRange(entry) {
   const start = getLiveEntryDate(entry, entry.calendarYear, entry.month);
   const days = normalizeLiveDays(entry.liveDays);
@@ -292,6 +309,7 @@ function getLiveEntryDateRange(entry) {
   return dates;
 }
 
+// markライブEntryCompletedを処理する。
 function markLiveEntryCompleted(entry) {
   if (entry.isPrimary) {
     entry.plan.liveCompleted = true;
@@ -302,6 +320,7 @@ function markLiveEntryCompleted(entry) {
   if (live) live.liveCompleted = true;
 }
 
+// ScheduledライブEntriesを取得する。
 function getScheduledLiveEntries() {
   const entries = [];
   Object.entries(productionSchedule).forEach(([key, plan]) => {
@@ -319,6 +338,7 @@ function getScheduledLiveEntries() {
   return entries;
 }
 
+// OwnライブConflictを探す。
 function findOwnLiveConflict(liveVenue, liveDate, ignorePlanKey = null) {
   return getScheduledLiveEntries().find(entry =>
     !entry.completed
@@ -328,6 +348,7 @@ function findOwnLiveConflict(liveVenue, liveDate, ignorePlanKey = null) {
   ) || null;
 }
 
+// ライバルライブ予約を整備する。
 function ensureRivalLiveBookings(gameYear, month) {
   const actualYear = calendarYear + (gameYear - currentYear);
   leagueTeams.filter(team => team.id !== 'player').forEach(team => {
@@ -376,12 +397,14 @@ function ensureRivalLiveBookings(gameYear, month) {
   });
 }
 
+// ライバル会場Conflictを探す。
 function findRivalVenueConflict(venueName, dateKey) {
   return rivalLiveBookings.find(booking =>
     booking.venue === venueName && (booking.venueDates || [booking.liveDate]).includes(dateKey)
   ) || null;
 }
 
+// migrateLegacy試合日付を処理する。
 function migrateLegacyGameDate(year, month, week) {
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
   const firstWednesday = getFirstWednesday(baseYear + (year - 1), month - 1);

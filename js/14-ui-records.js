@@ -31,7 +31,9 @@ function buildLineChartSvg(points, options = {}) {
   const max = Math.max(...values, 1);
   const innerW = width - padding.left - padding.right;
   const innerH = height - padding.top - padding.bottom;
+  // xを処理する。
   const xAt = index => padding.left + (index / (list.length - 1)) * innerW;
+  // yを処理する。
   const yAt = value => padding.top + innerH - (value / max) * innerH;
   const line = list
     .map((point, index) => `${index ? 'L' : 'M'}${xAt(index).toFixed(1)},${yAt(values[index]).toFixed(1)}`)
@@ -140,6 +142,7 @@ function renderSongList() {
   const released = songs.filter(song => song.released)
     .sort((a, b) => String(b.releaseDateKey || '').localeCompare(String(a.releaseDateKey || '')));
   const upcoming = songs.filter(song => !song.released);
+  // Itemを描画する。
   const renderItem = song => `
     <button type="button" class="song-row${song.released ? '' : ' is-upcoming'}"
       onclick="openSongDetail('${escapeHtml(song.id)}')">
@@ -195,6 +198,7 @@ function openSongDetail(songId) {
   modal.style.display = 'flex';
 }
 
+// 楽曲Detailモーダルを閉じる。
 function closeSongDetailModal() {
   const modal = document.getElementById('song-detail-modal');
   if (modal) modal.style.display = 'none';

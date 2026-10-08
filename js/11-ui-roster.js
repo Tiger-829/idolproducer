@@ -2,7 +2,9 @@
 // 11-ui-roster.js : UI描画（完全防護版）
 // ==========================================
 
+// UIを更新する。
 function updateUI() {
+  // テキストを設定する。
   const setText = (id, text) => {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
@@ -70,6 +72,7 @@ function updateUI() {
     const tierEl = document.getElementById('txt-group-fan-tiers');
     if (tierEl && fanTiers) {
       const share = fanTiers.shares;
+      // pctを処理する。
       const pct = value => Math.round(value * 100);
       const liveRate = typeof getTierParticipationRate === 'function' ? getTierParticipationRate('live') : 0.1;
       const segs = [
@@ -167,6 +170,7 @@ function updateUI() {
   }
 }
 
+// ロースターTabを切替する。
 function switchRosterTab(tab) {
   currentRosterTab = tab;
   const selBtn = document.getElementById('tab-btn-sel');
@@ -176,6 +180,7 @@ function switchRosterTab(tab) {
   renderRosterList();
 }
 
+// 楽曲ライブラリを描画する。
 function renderSongLibrary() {
   const listUI = document.getElementById('song-list-ui');
   if (!listUI) return;
@@ -205,6 +210,7 @@ function renderSongLibrary() {
     }).join('');
 }
 
+// メンバーDisplay名前を整形する。
 function formatMemberDisplayName(member) {
   const name = String(member?.name || '');
   const reading = String(member?.reading || '');
@@ -215,6 +221,7 @@ function formatMemberDisplayName(member) {
   return hasKanaInName ? name : `${name}（${reading}）`;
 }
 
+// ロースター名前Barを描画する。
 function renderRosterNameBar() {
   const bar = document.getElementById('roster-namebar-ui');
   if (!bar) return;
@@ -259,6 +266,7 @@ function renderRosterNameBar() {
 }
 
 let shownAbilityMemberIds = new Set();
+// メンバーAbilitiesを切り替えする。
 function toggleMemberAbilities(memberId) {
   if (shownAbilityMemberIds.has(memberId)) shownAbilityMemberIds.delete(memberId);
   else shownAbilityMemberIds.add(memberId);
@@ -284,6 +292,7 @@ function toggleMemberAbilities(memberId) {
   }
 }
 
+// ロースター一覧を描画する。
 function renderRosterList() {
   const listUI = document.getElementById('roster-list-ui');
   if (!listUI) return;
@@ -385,6 +394,7 @@ function renderRosterList() {
   });
 }
 
+// Logを設定する。
 function setLog(msg) {
   if (!Array.isArray(logHistory)) logHistory = [];
   logHistory.unshift({ date: gameDate, text: String(msg) });

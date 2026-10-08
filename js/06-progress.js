@@ -22,6 +22,7 @@ function getBirthdayMembersBetween(startDate, endDate) {
   return birthdays;
 }
 
+// メンバーBirthdaysを処理する。
 function processMemberBirthdays(startDate, endDate) {
   const birthdayMembers = getBirthdayMembersBetween(startDate, endDate);
   // 年齢の更新は syncMemberAges が生年月日から行うため、ここではログのみ
@@ -30,14 +31,17 @@ function processMemberBirthdays(startDate, endDate) {
   }
 }
 
+// 現在週キーを取得する。
 function getCurrentWeekKey() {
   return gameDate;
 }
 
+// 最初Wednesday月を判定する。
 function isFirstWednesdayOfMonth(date = getGameDateObject()) {
   return date.getDay() === 3 && date.getDate() <= 7;
 }
 
+// 最後Wednesday月を判定する。
 function isLastWednesdayOfMonth(date = getGameDateObject()) {
   return date.getDay() === 3 && date.getTime() === getLastWednesday(date.getFullYear(), date.getMonth()).getTime();
 }
@@ -72,6 +76,7 @@ function getEditableSpecialLiveEventsForWeek(date = getGameDateObject()) {
   });
 }
 
+// グループライブ日付を次へ進行する。
 function findNextGroupLiveDate(startDate, endDate) {
   let nextLiveDate = null;
   getScheduledLiveEntries().forEach(entry => {
@@ -87,6 +92,7 @@ function findNextGroupLiveDate(startDate, endDate) {
   return nextLiveDate;
 }
 
+// 週次危機イベントを抽選する。
 function rollWeeklyCrisisEvent() {
   const weekKey = getCurrentWeekKey();
   if (crisisCheckWeekKey === weekKey) return;
@@ -101,6 +107,7 @@ function rollWeeklyCrisisEvent() {
   }
 }
 
+// グループ危機Resilienceを計算する。
 function calculateGroupCrisisResilience() {
   const selectedMembers = idolRoster.filter(member => member.isSelected);
   const targets = selectedMembers.length ? selectedMembers : idolRoster;
@@ -113,6 +120,7 @@ function calculateGroupCrisisResilience() {
   return Math.min(100, Math.round(groupCrisis * 0.6 + averageSns * 0.4 + dataBonus + snsBonus));
 }
 
+// 週次Industryオファーを抽選する。
 function rollWeeklyIndustryOffer() {
   if (getGameDateObject().getDay() !== 3) return;
   const weekKey = getCurrentWeekKey();
@@ -232,6 +240,7 @@ function openEquipmentEventModal() {
   document.getElementById('equipment-event-modal').style.display = 'flex';
 }
 
+// 装備イベントを解決する。
 function resolveEquipmentEvent(accept) {
   if (!pendingEquipmentEvent) return;
   const event = pendingEquipmentEvent;
@@ -252,6 +261,7 @@ function resolveEquipmentEvent(accept) {
   if (pendingPerformanceOffers.length) openMusicOfferModal();
 }
 
+// Industryオファーを解決する。
 function resolveIndustryOffer() {
   if (!pendingIndustryOffer) return;
   const offer = pendingIndustryOffer;
@@ -264,6 +274,7 @@ function resolveIndustryOffer() {
   setLog(`【出演決定】${offer.name}を受諾しました（${offer.liveDate}）。`);
 }
 
+// 現在週イベントを取得する。
 function getCurrentWeekEvents() {
   const currentDate = getGameDateObject();
   if (currentDate.getDay() === 3) {
@@ -335,6 +346,7 @@ function getCurrentWeekEvents() {
   return events;
 }
 
+// UpcomingSingle計画を探す。
 function findUpcomingSinglePlan() {
   return Object.entries(productionSchedule)
     .map(([key, plan]) => {

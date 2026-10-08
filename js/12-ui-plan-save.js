@@ -22,15 +22,18 @@ const BENEFIT_EVENT_TYPE_OPTIONS = [
   { id: 'real-sign', name: 'リアルサイン会', baseCost: 10000000 }
 ];
 
+// Presetリリース月を判定する。
 function isPresetReleaseMonth(month) {
   return planYearTarget === 1 && typeof PRESET_RELEASE_MONTHS !== 'undefined' && PRESET_RELEASE_MONTHS.includes(month);
 }
 
+// 計画カレンダー日付を取得する。
 function getPlanCalendarDate(month, day) {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   return new Date(actualYear, month - 1, day, 12);
 }
 
+// 計画月イベントDraftsを取得する。
 function getPlanMonthEventDrafts(month) {
   if (!Array.isArray(planMonthEventDrafts[month])) {
     const planKey = `${planYearTarget}-${month}`;
@@ -42,10 +45,12 @@ function getPlanMonthEventDrafts(month) {
   return planMonthEventDrafts[month];
 }
 
+// 計画リリース日付を取得する。
 function getPlanReleaseDate(month) {
   return (document.getElementById(`rel-date-${month}`) || {}).value || '';
 }
 
+// Standard席価格を取得する。
 function getStandardSeatPrice(venue, seatId) {
   if (!venue || typeof SEAT_PRICE_GROUP === 'undefined' || typeof STANDARD_SEAT_PRICE === 'undefined') return 0;
   const group = SEAT_PRICE_GROUP[seatId];
@@ -56,6 +61,7 @@ function getStandardSeatPrice(venue, seatId) {
   return Math.round(base * rate);
 }
 
+// リリース日のデフォルト水曜を返す。
 function getPlanReleaseDefaultWednesday(month) {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   if (typeof getLastWednesday === 'function') {
@@ -68,6 +74,7 @@ function getPlanReleaseDefaultWednesday(month) {
   return toDateKey(d);
 }
 
+// イベントExpensesを計算する。
 function calculateEventExpenses(eventName, venue, dates) {
   const option = BENEFIT_EVENT_TYPE_OPTIONS.find(opt => opt.name === eventName) || BENEFIT_EVENT_TYPE_OPTIONS[0];
   const baseCost = option.baseCost;
@@ -86,6 +93,7 @@ function calculateEventExpenses(eventName, venue, dates) {
   };
 }
 
+// プレイヤーCDリリース一覧を取得する。
 function getPlayerCdReleaseList() {
   const cdList = [];
   let count = 0;
@@ -142,6 +150,7 @@ function getPlayerCdReleaseList() {
   return cdList;
 }
 
+// 日付Rowを表示する。
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, prefix = 'show') {
   const onChangeHandler = prefix === 'show' 
     ? `updateShowDateNote(${month}, ${index});` 
@@ -161,6 +170,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, pr
     </div>`;
 }
 
+// ライブ枠HTMLを描画する。
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
   const seatPrices = slot.seatPrices || {};
@@ -220,6 +230,7 @@ function renderLiveSlotHtml(month, index, slot) {
   `;
 }
 
+// イベント枠HTMLを描画する。
 function renderEventSlotHtml(month, index, event) {
   const allVenues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const venues = allVenues.filter(v => v.name.includes('パルス'));
@@ -289,6 +300,7 @@ function renderEventSlotHtml(month, index, event) {
   `;
 }
 
+// 会場SelectChangeを処理する。
 function onVenueSelectChange(month, index) {
   const selVen = document.getElementById(`sel-ven-${month}-${index}`);
   const detailsContainer = document.getElementById(`live-details-container-${month}-${index}`);
@@ -306,6 +318,7 @@ function onVenueSelectChange(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// イベント会場SelectChangeを処理する。
 function onEventVenueSelectChange(month, index) {
   const selVen = document.getElementById(`event-ven-${month}-${index}`);
   const detailsContainer = document.getElementById(`event-details-container-${month}-${index}`);
@@ -321,6 +334,7 @@ function onEventVenueSelectChange(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// ライブ枠Inputsを取得する。
 function readLiveSlotInputs(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return [];
@@ -374,6 +388,7 @@ function readLiveSlotInputs(month) {
   }).filter(Boolean);
 }
 
+// イベント枠Inputsを取得する。
 function readEventSlotInputs(month) {
   const container = document.getElementById(`plan-events-${month}`);
   if (!container) return [];
@@ -424,6 +439,7 @@ function readEventSlotInputs(month) {
   }).filter(Boolean);
 }
 
+// 日付メモを表示する。
 function updateShowDateNote(month, index) {
   const note = document.getElementById(`show-date-note-${month}-${index}`);
   if (!note) return;
@@ -456,6 +472,7 @@ function updateShowDateNote(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// イベント日付メモを更新する。
 function updateEventDateNote(month, index) {
   const note = document.getElementById(`event-date-note-${month}-${index}`);
   if (!note) return;
@@ -479,6 +496,7 @@ function updateEventDateNote(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// 日付を表示する。
 function addShowDate(month, index, prefix = 'show') {
   const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-show-dates-${month}-${index}`);
   if (!container) return;
@@ -491,10 +509,12 @@ function addShowDate(month, index, prefix = 'show') {
   renderEmbeddedPlanCalendars();
 }
 
+// イベント公演日付を追加する。
 function addEventShowDate(month, index) {
   addShowDate(month, index, 'event-show');
 }
 
+// 日付を表示する。
 function removeShowDate(month, index, dateIndex, prefix = 'show') {
   const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-show-dates-${month}-${index}`);
   if (!container) return;
@@ -505,6 +525,7 @@ function removeShowDate(month, index, dateIndex, prefix = 'show') {
   renderEmbeddedPlanCalendars();
 }
 
+// ライブ枠を追加する。
 function addLiveSlot(month) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
@@ -529,6 +550,7 @@ function addLiveSlot(month) {
   renderEmbeddedPlanCalendars();
 }
 
+// ライブ枠を削除する。
 function removeLiveSlot(month, index) {
   const container = document.getElementById(`live-slots-${month}`);
   if (!container) return;
@@ -537,6 +559,7 @@ function removeLiveSlot(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// 会場Standard価格を適用。
 function applyVenueStandardPrices(month, index) {
   const selVen = document.getElementById(`sel-ven-${month}-${index}`);
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
@@ -548,6 +571,7 @@ function applyVenueStandardPrices(month, index) {
   });
 }
 
+// 席計画Optionsを更新する。
 function updateSeatPlanOptions(month, index) {
   const selVen = document.getElementById(`sel-ven-${month}-${index}`);
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
@@ -563,12 +587,14 @@ function updateSeatPlanOptions(month, index) {
   });
 }
 
+// 計画イベントHTMLを描画する。
 function renderPlanEventsHtml(month) {
   const events = getPlanMonthEventDrafts(month);
   if (!events.length) return '';
   return events.map((event, index) => renderEventSlotHtml(month, index, event)).join('');
 }
 
+// 計画イベントを追加する。
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
   const maxEvents = 6;
@@ -589,6 +615,7 @@ function addPlanEvent(month) {
   refreshPlanEventsContainer(month);
 }
 
+// 計画イベントを削除する。
 function removePlanEvent(month, index) {
   const drafts = getPlanMonthEventDrafts(month);
   if (index >= 0 && index < drafts.length) {
@@ -598,6 +625,7 @@ function removePlanEvent(month, index) {
   renderEmbeddedPlanCalendars();
 }
 
+// refresh計画イベントContainerを処理する。
 function refreshPlanEventsContainer(month) {
   const container = document.getElementById(`plan-events-${month}`);
   if (container) {
@@ -605,6 +633,7 @@ function refreshPlanEventsContainer(month) {
   }
 }
 
+// ChangeCancelを検証する。
 function validateChangeOrCancel(targetDateStr) {
   if (!targetDateStr) return true;
   const targetDate = new Date(`${targetDateStr}T12:00:00`);
@@ -618,6 +647,7 @@ function validateChangeOrCancel(targetDateStr) {
   return true;
 }
 
+// Deferred計画Expensesを処理する。
 function processDeferredPlanExpenses() {
   if (typeof deferredBenefitCost === 'undefined') {
     window.deferredBenefitCost = 0;
@@ -629,6 +659,7 @@ function processDeferredPlanExpenses() {
   }
 }
 
+// スケジュールActionを適用。
 function applyScheduleAction(month, actionType) {
   const selections = planCalendarSelections[month] || [];
 
@@ -763,6 +794,7 @@ function applyScheduleAction(month, actionType) {
   renderEmbeddedPlanCalendars();
 }
 
+// Decisionモーダルを開く。
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
     planYearTarget = yearTarget;
@@ -1026,6 +1058,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
   }
 }
 
+// リリースSelectChangeを処理する。
 function onReleaseSelectChange(month) {
   const selRel = document.getElementById(`sel-rel-${month}`);
   const fields = document.getElementById(`release-fields-${month}`);
@@ -1042,11 +1075,13 @@ function onReleaseSelectChange(month) {
   renderEmbeddedPlanCalendars();
 }
 
+// Decisionモーダルを閉じる。
 function closeDecisionModal() {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
 }
 
+// MultiSelectModeを切り替えする。
 function toggleMultiSelectMode(month) {
   planMultiSelectModes[month] = !planMultiSelectModes[month];
   if (!planMultiSelectModes[month]) {
@@ -1060,6 +1095,7 @@ function toggleMultiSelectMode(month) {
   renderEmbeddedPlanCalendars();
 }
 
+// Embedded計画Calendarsを描画する。
 function renderEmbeddedPlanCalendars() {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
@@ -1131,6 +1167,7 @@ function renderEmbeddedPlanCalendars() {
   }
 }
 
+// EmbeddedカレンダーClickを処理する。
 function handleEmbeddedCalendarClick(month, dateKey) {
   const isMulti = planMultiSelectModes[month];
   if (!Array.isArray(planCalendarSelections[month])) planCalendarSelections[month] = [];
@@ -1148,10 +1185,12 @@ function handleEmbeddedCalendarClick(month, dateKey) {
   renderEmbeddedPlanCalendars();
 }
 
+// Embeddedカレンダー日付を切り替えする。
 function toggleEmbeddedCalendarDate(month, dateKey) {
   handleEmbeddedCalendarClick(month, dateKey);
 }
 
+// 計画ライブ枠を検証する。
 function validatePlanLiveSlots(month, liveSlots) {
   const usedVenues = new Set();
   const usedDates = new Set();
@@ -1208,6 +1247,7 @@ function validatePlanLiveSlots(month, liveSlots) {
   return true;
 }
 
+// Decision計画を保存する。
 function saveDecisionPlan() {
   const maxVenues = 8;
   let newBenefitCost = 0;
@@ -1279,6 +1319,7 @@ function saveDecisionPlan() {
   }
 }
 
+// Planningマニュアルを開く。
 function openPlanningManual() {
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
   if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
@@ -1302,10 +1343,12 @@ function openPlanningManual() {
   }
 }
 
+// Planningカレンダーを開く。
 function openPlanningCalendar() {
   openPlanningManual();
 }
 
+// 枠概要を保存する。
 function getSaveSlotSummary(slotKey) {
   try {
     const raw = localStorage.getItem(slotKey);
@@ -1325,6 +1368,7 @@ function getSaveSlotSummary(slotKey) {
   }
 }
 
+// 枠キーを保存する。
 function saveSlotKey(slot, userId = null) {
   if (typeof window !== 'undefined' && window.saveDataManager && typeof window.saveDataManager.makeSaveSlotKey === 'function') {
     return window.saveDataManager.makeSaveSlotKey(slot, userId || window.saveDataManager.getUserId());
@@ -1335,6 +1379,7 @@ function saveSlotKey(slot, userId = null) {
   return `idol_manager_save_slot_${normalizedUserId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')}_${slot}`;
 }
 
+// 枠を保存する。
 function renderSaveSlots() {
   const container = document.getElementById('save-slots');
   if (!container) return;
@@ -1378,10 +1423,12 @@ function renderSaveSlots() {
   }
 }
 
+// continueSaved試合を処理する。
 function continueSavedGame(slot) {
   initGame(slot, false);
 }
 
+// New試合を開始する。
 function startNewGame(slot) {
   const slotKey = saveSlotKey(slot);
   if (localStorage.getItem(slotKey)) {
@@ -1398,6 +1445,7 @@ function startNewGame(slot) {
   }
 }
 
+// 試合セットアップ計画を送信する。
 function submitGameSetupAndPlan() {
   const gNameInput = document.getElementById('input-setup-groupname');
   const song1Input = document.getElementById('input-setup-1st-song');
@@ -1418,6 +1466,7 @@ function submitGameSetupAndPlan() {
   }
 }
 
+// delete保存枠を処理する。
 function deleteSaveSlot(slot) {
   if (!confirm(`セーブ枠 ${slot} のデータを完全に削除しますか？\nこの操作は取り消せません。`)) {
     return;
@@ -1426,6 +1475,7 @@ function deleteSaveSlot(slot) {
   renderSaveSlots();
 }
 
+// タイトルScreenを開く。
 function openTitleScreen() {
   const gScreen = document.getElementById('game-screen');
   const tScreen = document.getElementById('title-screen');
@@ -1434,11 +1484,13 @@ function openTitleScreen() {
   renderSaveSlots();
 }
 
+// returnタイトルを処理する。
 function returnToTitle() {
   activeSaveSlot = null;
   openTitleScreen();
 }
 
+// init試合を処理する。
 function initGame(slot, startFresh) {
   const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
   if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
@@ -1529,6 +1581,7 @@ function initGame(slot, startFresh) {
   }
 }
 
+// migrateLegacy保存を処理する。
 function migrateLegacySave() {
   const legacySave = localStorage.getItem(LEGACY_SAVE_KEY);
   if (!legacySave) return;

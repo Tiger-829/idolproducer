@@ -2,6 +2,7 @@
   const SAVE_SLOT_PREFIX = 'idol_manager_save_slot_';
   const USER_ID_KEY = 'idol_manager_user_id';
 
+  // safeStorageを処理する。
   function safeStorage() {
     try {
       if (!globalScope || !globalScope.localStorage) return null;
@@ -14,6 +15,7 @@
     }
   }
 
+  // UserIDを整形する。
   function normalizeUserId(value) {
     const raw = String(value == null ? '' : value).trim();
     if (!raw) return 'guest-user';
@@ -21,16 +23,19 @@
     return (normalized || 'guest-user').slice(0, 64);
   }
 
+  // Storageを取得する。
   function getStorage() {
     return safeStorage();
   }
 
+  // UserIDを取得する。
   function getUserId(storage = getStorage()) {
     if (!storage) return 'guest-user';
     const stored = storage.getItem(USER_ID_KEY);
     return normalizeUserId(stored || 'guest-user');
   }
 
+  // UserIDを設定する。
   function setUserId(userId, storage = getStorage()) {
     const nextUserId = normalizeUserId(userId || getUserId(storage));
     if (!storage) return nextUserId;
@@ -38,12 +43,14 @@
     return nextUserId;
   }
 
+  // 枠キーを保存する。
   function makeSaveSlotKey(slot, userId = getUserId()) {
     const slotNumber = Number(slot);
     if (!Number.isInteger(slotNumber) || slotNumber < 1) return null;
     return `${SAVE_SLOT_PREFIX}${normalizeUserId(userId || getUserId())}_${slotNumber}`;
   }
 
+  // migrateLegacyUser保存枠を処理する。
   function migrateLegacyUserSaveSlots(storage = getStorage()) {
     if (!storage) return false;
 
@@ -73,6 +80,7 @@
     return migrated.length > 0;
   }
 
+  // collect保存枠を処理する。
   function collectSaveSlots(storage = getStorage()) {
     const map = {};
     if (!storage) return map;
@@ -99,6 +107,7 @@
     return map;
   }
 
+  // User保存Bundleを組み立てする。
   function buildUserSaveBundle({ userId, saveSlots } = {}) {
     const targetUserId = normalizeUserId(userId || getUserId());
     const targetSaveSlots = saveSlots && typeof saveSlots === 'object' ? saveSlots : collectSaveSlots();
@@ -120,14 +129,17 @@
     };
   }
 
+  // exportUser保存Bundleを処理する。
   function exportUserSaveBundle(options = {}) {
     return buildUserSaveBundle(options);
   }
 
+  // exportUser保存Bundleテキストを処理する。
   function exportUserSaveBundleText(options = {}) {
     return JSON.stringify(exportUserSaveBundle(options));
   }
 
+  // importUser保存Bundleを処理する。
   function importUserSaveBundle(payload, storage = getStorage()) {
     const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
     if (!parsed || typeof parsed !== 'object') throw new Error('セーブデータの形式が無効です。');
@@ -157,19 +169,23 @@
     return { userId: targetUserId, importedSlots };
   }
 
+  // export現在User保存Bundleを処理する。
   function exportCurrentUserSaveBundle(storage = getStorage()) {
     return exportUserSaveBundle({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
+  // export現在User保存Bundleテキストを処理する。
   function exportCurrentUserSaveBundleText(storage = getStorage()) {
     return exportUserSaveBundleText({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
+  // FirebaseConfigを取得する。
   function getFirebaseConfig() {
     const config = globalScope && globalScope.FIREBASE_CONFIG;
     return config && typeof config === 'object' ? config : null;
   }
 
+  // FirebaseAppを取得する。
   function getFirebaseApp() {
     const firebaseNamespace = globalScope && globalScope.firebase;
     const config = getFirebaseConfig();
@@ -185,6 +201,7 @@
     }
   }
 
+  // FirebaseDbを取得する。
   function getFirebaseDb() {
     const firebaseNamespace = globalScope && globalScope.firebase;
     const app = getFirebaseApp();
@@ -272,6 +289,7 @@
     }
   }
 
+  // UserQr状態を保存する。
   function setSaveUserQrStatus(message, isError = true) {
     const statusEl = document && document.getElementById('save-user-qr-status');
     if (!statusEl) return;
@@ -323,6 +341,7 @@
     return payload;
   }
 
+  // share現在User保存Bundleを処理する。
   function shareCurrentUserSaveBundle() {
     const payload = exportCurrentUserSaveBundleText();
     if (!payload) {
@@ -357,6 +376,7 @@
     }
   }
 
+  // copy現在User保存BundleClipboardを処理する。
   function copyCurrentUserSaveBundleToClipboard() {
     const payload = exportCurrentUserSaveBundleText();
     if (!payload) {
@@ -391,6 +411,7 @@
     return true;
   }
 
+  // importUser保存BundleFieldを処理する。
   function importUserSaveBundleFromField() {
     const field = document && document.getElementById('save-user-bundle-output');
     if (!field || !field.value.trim()) {
@@ -412,6 +433,7 @@
     }
   }
 
+  // bindタイトルUserIdentityを処理する。
   function bindTitleUserIdentity() {
     if (!document) return getUserId();
 
@@ -426,6 +448,7 @@
     const syncInput = document.getElementById('save-sync-user-id');
     const syncValue = getUserId();
 
+    // UserIDを適用。
     const applyUserId = (nextValue) => {
       const normalized = normalizeUserId(nextValue || syncValue);
       setUserId(normalized, storage);
@@ -469,6 +492,7 @@
     return getUserId(storage);
   }
 
+  // register保存同期UIを処理する。
   function registerSaveSyncUi() {
     if (!document) return;
     bindTitleUserIdentity();
