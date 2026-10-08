@@ -37,6 +37,8 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
         <button id="save-user-share-btn" class="main-btn" type="button">共有</button>
         <button id="save-user-copy-btn" class="ghost-btn" type="button">コピー</button>
+        <button id="save-user-firebase-save-btn" class="ghost-btn" type="button">Firebaseに保存</button>
+        <button id="save-user-firebase-load-btn" class="ghost-btn" type="button">Firebaseから読む</button>
         <button id="save-user-qr-btn" class="ghost-btn" type="button">QRを表示</button>
         <button id="save-user-import-btn" class="ghost-btn" type="button">文字列を反映</button>
       </div>
@@ -343,6 +345,20 @@
 </div>
 
   
+<script>
+  window.FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
+    apiKey: 'AIzaSyCHcliL1PmjfvDlaY6ieOnPZ42Y_VMVgC0',
+    authDomain: 'idolproducer-e146b.firebaseapp.com',
+    databaseURL: 'https://idolproducer-e146b-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'idolproducer-e146b',
+    storageBucket: 'idolproducer-e146b.firebasestorage.app',
+    messagingSenderId: '322747249878',
+    appId: '1:322747249878:web:323e9227208b2c4a5c8577',
+    measurementId: 'G-RZR8KEW7WN'
+  };
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="./js/00-shortcut.js?v=4"></script>
 <script src="./js/01-constants.js?v=4"></script>
 <script src="./js/02-state.js?v=4"></script>

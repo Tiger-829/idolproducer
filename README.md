@@ -26,6 +26,26 @@
 
 データは手動でやり取りする前提で、サーバーを使わない静的サイトの構成に合わせています。
 
+### Firebase による紐づけ同期
+
+Firebase を使う場合は、`index.html` の先頭にある `window.FIREBASE_CONFIG` を自分のプロジェクト設定に置き換えます。
+
+```html
+<script>
+  window.FIREBASE_CONFIG = {
+    apiKey: 'YOUR_API_KEY',
+    authDomain: 'YOUR_PROJECT.firebaseapp.com',
+    projectId: 'YOUR_PROJECT_ID',
+    storageBucket: 'YOUR_PROJECT.appspot.com',
+    messagingSenderId: '000000000000',
+    appId: 'YOUR_APP_ID'
+  };
+</script>
+```
+
+その後、タイトル画面の「Firebaseに保存」または「Firebaseから読む」ボタンを使って同期できます。
+Firebase の設定が未完了なら、ボタンは失敗時のメッセージを出して終了します。
+
 ## 開発環境
 
 ### 起動方法

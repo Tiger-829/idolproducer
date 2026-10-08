@@ -165,6 +165,82 @@
     return exportUserSaveBundleText({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
+  function getFirebaseConfig() {
+    const config = globalScope && globalScope.FIREBASE_CONFIG;
+    return config && typeof config === 'object' ? config : null;
+  }
+
+  function getFirebaseApp() {
+    const firebaseNamespace = globalScope && globalScope.firebase;
+    const config = getFirebaseConfig();
+    if (!firebaseNamespace || !config || !firebaseNamespace.initializeApp) return null;
+
+    try {
+      if (firebaseNamespace.apps && firebaseNamespace.apps.length) return firebaseNamespace.apps[0];
+      return firebaseNamespace.initializeApp(config);
+    } catch (error) {
+      console.warn('Firebase初期化に失敗しました:', error);
+      if (firebaseNamespace.apps && firebaseNamespace.apps.length) return firebaseNamespace.apps[0];
+      return null;
+    }
+  }
+
+  function getFirebaseDb() {
+    const firebaseNamespace = globalScope && globalScope.firebase;
+    const app = getFirebaseApp();
+    if (!firebaseNamespace || !app || typeof firebaseNamespace.firestore !== 'function') return null;
+
+    try {
+      return firebaseNamespace.firestore(app);
+    } catch (error) {
+      console.warn('Firestore接続に失敗しました:', error);
+      return null;
+    }
+  }
+
+  async function saveCurrentUserSaveToFirebase(options = {}) {
+    const db = getFirebaseDb();
+    const targetUserId = normalizeUserId(options.userId || getUserId());
+    if (!db) {
+      throw new Error('Firebaseの設定が未完了です。window.FIREBASE_CONFIG を設定してください。');
+    }
+
+    const bundle = exportUserSaveBundle({
+      userId: targetUserId,
+      saveSlots: options.saveSlots || collectSaveSlots()
+    });
+    const docRef = db.collection(options.collection || 'users').doc(targetUserId);
+    await docRef.set({
+      userId: targetUserId,
+      bundle,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    return { userId: targetUserId, bundle };
+  }
+
+  async function loadCurrentUserSaveFromFirebase(options = {}) {
+    const db = getFirebaseDb();
+    const targetUserId = normalizeUserId(options.userId || getUserId());
+    if (!db) {
+      throw new Error('Firebaseの設定が未完了です。window.FIREBASE_CONFIG を設定してください。');
+    }
+
+    const docRef = db.collection(options.collection || 'users').doc(targetUserId);
+    const snapshot = await docRef.get();
+    if (!snapshot || !snapshot.exists) {
+      return null;
+    }
+
+    const data = snapshot.data() || {};
+    const bundle = data.bundle || data;
+    const result = importUserSaveBundle(bundle);
+    if (typeof renderSaveSlots === 'function') {
+      renderSaveSlots();
+    }
+    return result;
+  }
+
   async function generateQrCodeDataUrl(payloadText, options = {}) {
     if (!payloadText || typeof payloadText !== 'string') return '';
     const qrApi = globalScope && globalScope.QRCode;
@@ -254,6 +330,13 @@
       return false;
     }
 
+    const MAX_SHARE_TEXT_LENGTH = 12000;
+    if (payload.length > MAX_SHARE_TEXT_LENGTH) {
+      copyCurrentUserSaveBundleToClipboard();
+      alert('保存データが長すぎて共有APIへ渡せないため、文字列をクリップボードにコピーしました。手動で転送してください。');
+      return false;
+    }
+
     if (!globalScope || !globalScope.navigator || !globalScope.navigator.share) {
       updateCurrentUserQrCode();
       alert('この端末では共有APIが使えないため、QRコードを表示して他端末で読み取ってください。');
@@ -263,8 +346,7 @@
     try {
       globalScope.navigator.share({
         title: 'アイドルプロデューサー セーブデータ',
-        text: `ユーザー「${getUserId()}」のセーブデータ`,
-        url: `data:application/json,${encodeURIComponent(payload)}`
+        text: `${payload}`
       });
       return true;
     } catch (error) {
@@ -405,6 +487,36 @@
       });
     }
 
+    const firebaseSaveButton = document.getElementById('save-user-firebase-save-btn');
+    if (firebaseSaveButton) {
+      firebaseSaveButton.addEventListener('click', async () => {
+        try {
+          const result = await saveCurrentUserSaveToFirebase();
+          alert(`ユーザー「${result.userId}」のセーブを Firebase に保存しました。`);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Firebaseへの保存に失敗しました。');
+        }
+      });
+    }
+
+    const firebaseLoadButton = document.getElementById('save-user-firebase-load-btn');
+    if (firebaseLoadButton) {
+      firebaseLoadButton.addEventListener('click', async () => {
+        try {
+          const result = await loadCurrentUserSaveFromFirebase();
+          if (!result) {
+            alert('Firebase に保存データがありません。');
+            return;
+          }
+          alert(`ユーザー「${result.userId}」のセーブを Firebase から読み込みました。`);
+        } catch (error) {
+          console.error(error);
+          alert(error.message || 'Firebaseからの読み込みに失敗しました。');
+        }
+      });
+    }
+
     const qrButton = document.getElementById('save-user-qr-btn');
     if (qrButton) {
       qrButton.addEventListener('click', async () => {
@@ -455,6 +567,11 @@
     importUserSaveBundle,
     exportCurrentUserSaveBundle,
     exportCurrentUserSaveBundleText,
+    getFirebaseConfig,
+    getFirebaseApp,
+    getFirebaseDb,
+    saveCurrentUserSaveToFirebase,
+    loadCurrentUserSaveFromFirebase,
     generateQrCodeDataUrl,
     updateCurrentUserQrCode,
     shareCurrentUserSaveBundle,

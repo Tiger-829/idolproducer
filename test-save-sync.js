@@ -83,6 +83,66 @@ assert.deepStrictEqual(saveDataManager.collectSaveSlots(globalThis.localStorage)
   2: sampleSlots[2]
 });
 
+const largeSaveSlot = {
+  currentYear: 7,
+  currentMonth: 11,
+  currentWeek: 3,
+  funds: 999999999,
+  idolRoster: Array.from({ length: 40 }, (_, index) => ({
+    name: `大島${index + 1}`,
+    skillLevels: { vocal: 60 + index, dance: 60 + index, visual: 60 + index, appeal: 60 + index },
+    notes: '長いセーブデータの共有テスト用データ'.repeat(12)
+  }))
+};
+const largeShareOptions = { userId, saveSlots: { 1: largeSaveSlot } };
+const largePayload = saveDataManager.exportUserSaveBundleText(largeShareOptions);
+assert.ok(largePayload.length > 5000);
+
+saveDataManager.setUserId(userId, globalThis.localStorage);
+globalThis.localStorage.setItem('idol_manager_save_slot_user-demo-001_1', JSON.stringify(largeSaveSlot));
+
+let capturedShareArgs = null;
+let copiedText = null;
+Object.defineProperty(globalThis, 'alert', { value: () => {}, configurable: true, writable: true });
+Object.defineProperty(globalThis, 'document', {
+  value: {
+    getElementById() {
+      return {
+        value: '',
+        focus() {},
+        select() {},
+        style: {},
+        setAttribute() {},
+        removeAttribute() {},
+        addEventListener() {}
+      };
+    }
+  },
+  configurable: true,
+  writable: true
+});
+Object.defineProperty(globalThis, 'navigator', {
+  value: {
+    share(args) {
+      capturedShareArgs = args;
+      return true;
+    },
+    clipboard: {
+      writeText(value) {
+        copiedText = value;
+        return Promise.resolve();
+      }
+    }
+  },
+  configurable: true,
+  writable: true
+});
+
+const shareResult = saveDataManager.shareCurrentUserSaveBundle();
+assert.strictEqual(shareResult, false);
+assert.strictEqual(capturedShareArgs, null);
+assert.strictEqual(copiedText, saveDataManager.exportCurrentUserSaveBundleText());
+
 globalThis.localStorage.clear();
 saveDataManager.setUserId('username-scope');
 globalThis.localStorage.setItem('idol_manager_save_slot_username-scope_1', JSON.stringify(sampleSlots[1]));
