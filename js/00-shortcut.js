@@ -61,11 +61,13 @@ document.addEventListener('keydown', (e) => {
         break;
       case 'shift': // Ctrl + shift : ページ・モーダルの最上部までスクロール
         e.preventDefault();
-        const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content');
+      // 開いているモーダルの中身、またはページ全体を最上部にスクロール
+        const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content, #decision-modal');
         if (activeModal) {
           activeModal.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;        
         }
         break;
       case 'enter': // Ctrl + Enter : 計画を策定する（半年計画モーダル内などでの決定）
