@@ -1325,8 +1325,14 @@ function getSaveSlotSummary(slotKey) {
   }
 }
 
-function saveSlotKey(slot) {
-  return `idol_manager_save_slot_${slot}`;
+function saveSlotKey(slot, userId = null) {
+  if (typeof window !== 'undefined' && window.saveDataManager && typeof window.saveDataManager.makeSaveSlotKey === 'function') {
+    return window.saveDataManager.makeSaveSlotKey(slot, userId || window.saveDataManager.getUserId());
+  }
+
+  const activeUserId = userId || localStorage.getItem('idol_manager_user_id') || 'guest-user';
+  const normalizedUserId = String(activeUserId).trim() || 'guest-user';
+  return `idol_manager_save_slot_${normalizedUserId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')}_${slot}`;
 }
 
 function renderSaveSlots() {

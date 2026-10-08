@@ -38,15 +38,53 @@
     return nextUserId;
   }
 
-  function collectSaveSlots(storage = getStorage()) {
-    const map = {};
-    if (!storage) return map;
+  function makeSaveSlotKey(slot, userId = getUserId()) {
+    const slotNumber = Number(slot);
+    if (!Number.isInteger(slotNumber) || slotNumber < 1) return null;
+    return `${SAVE_SLOT_PREFIX}${normalizeUserId(userId || getUserId())}_${slotNumber}`;
+  }
+
+  function migrateLegacyUserSaveSlots(storage = getStorage()) {
+    if (!storage) return false;
+
+    const targetUserId = getUserId(storage);
+    const userPrefix = `${SAVE_SLOT_PREFIX}${targetUserId}_`;
+    const migrated = [];
 
     for (let index = 0; index < storage.length; index += 1) {
       const key = storage.key(index);
       if (!key || !key.startsWith(SAVE_SLOT_PREFIX)) continue;
+      if (key.startsWith(userPrefix)) continue;
 
-      const slotLabel = key.replace(SAVE_SLOT_PREFIX, '');
+      const slotLabel = key.slice(SAVE_SLOT_PREFIX.length);
+      const slotNumber = Number(slotLabel);
+      if (!Number.isInteger(slotNumber) || slotNumber < 1) continue;
+
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      const targetKey = makeSaveSlotKey(slotNumber, targetUserId);
+      if (targetKey && !storage.getItem(targetKey)) {
+        storage.setItem(targetKey, raw);
+      }
+      storage.removeItem(key);
+      migrated.push(key);
+    }
+
+    return migrated.length > 0;
+  }
+
+  function collectSaveSlots(storage = getStorage()) {
+    const map = {};
+    if (!storage) return map;
+
+    const activeUserId = getUserId(storage);
+    const userPrefix = `${SAVE_SLOT_PREFIX}${activeUserId}_`;
+
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (!key || !key.startsWith(userPrefix)) continue;
+
+      const slotLabel = key.slice(userPrefix.length);
       const slotNumber = Number(slotLabel);
       if (!Number.isInteger(slotNumber) || slotNumber < 1) continue;
 
@@ -105,7 +143,10 @@
         importedSlots += 1;
         return;
       }
-      storage.setItem(`${SAVE_SLOT_PREFIX}${slotNumber}`, JSON.stringify(value));
+      const saveKey = makeSaveSlotKey(slotNumber, targetUserId);
+      if (saveKey) {
+        storage.setItem(saveKey, JSON.stringify(value));
+      }
       importedSlots += 1;
     });
 
@@ -195,6 +236,7 @@
     if (!legacyValue && storage) {
       storage.setItem(USER_ID_KEY, 'guest-user');
     }
+    if (storage) migrateLegacyUserSaveSlots(storage);
 
     const titleInput = document.getElementById('title-user-name');
     const syncInput = document.getElementById('save-sync-user-id');
@@ -202,14 +244,26 @@
 
     const applyUserId = (nextValue) => {
       const normalized = normalizeUserId(nextValue || syncValue);
-      setUserId(normalized);
+      setUserId(normalized, storage);
       if (titleInput) titleInput.value = normalized;
       if (syncInput) syncInput.value = normalized;
+      if (typeof renderSaveSlots === 'function') {
+        renderSaveSlots();
+      }
       return normalized;
     };
 
+    if (!legacyValue || legacyValue === 'guest-user') {
+      const promptValue = typeof window !== 'undefined' && typeof window.prompt === 'function'
+        ? window.prompt('ユーザー名を入力してください。保存データはこのユーザー名で管理されます。', '')
+        : '';
+      if (promptValue !== null && String(promptValue).trim()) {
+        applyUserId(promptValue);
+      }
+    }
+
     if (titleInput) {
-      titleInput.value = syncValue;
+      titleInput.value = getUserId(storage);
       titleInput.addEventListener('change', (event) => {
         applyUserId(event.target.value);
       });
@@ -219,7 +273,7 @@
     }
 
     if (syncInput) {
-      syncInput.value = syncValue;
+      syncInput.value = getUserId(storage);
       syncInput.addEventListener('change', (event) => {
         applyUserId(event.target.value);
       });
@@ -228,7 +282,7 @@
       });
     }
 
-    return getUserId();
+    return getUserId(storage);
   }
 
   function registerSaveSyncUi() {
@@ -238,9 +292,12 @@
     if (userInput) {
       userInput.value = getUserId();
       userInput.addEventListener('change', (event) => {
-        setUserId(event.target.value);
+        const normalized = setUserId(event.target.value);
         const titleInput = document.getElementById('title-user-name');
-        if (titleInput) titleInput.value = getUserId();
+        if (titleInput) titleInput.value = normalized;
+        if (typeof renderSaveSlots === 'function') {
+          renderSaveSlots();
+        }
       });
     }
 
@@ -307,6 +364,8 @@
       USER_ID: USER_ID_KEY,
       SAVE_SLOT_PREFIX: SAVE_SLOT_PREFIX
     }),
+    makeSaveSlotKey,
+    migrateLegacyUserSaveSlots,
     normalizeUserId,
     getUserId,
     setUserId,
@@ -324,6 +383,7 @@
   };
 
   globalScope.saveDataManager = api;
+  globalScope.makeSaveSlotKey = makeSaveSlotKey;
 
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {

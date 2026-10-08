@@ -2,6 +2,32 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
+const localStorageMock = (() => {
+  const store = new Map();
+  return {
+    getItem(key) {
+      return store.has(key) ? String(store.get(key)) : null;
+    },
+    setItem(key, value) {
+      store.set(String(key), String(value));
+    },
+    removeItem(key) {
+      store.delete(String(key));
+    },
+    clear() {
+      store.clear();
+    },
+    key(index) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    get length() {
+      return store.size;
+    }
+  };
+})();
+
+globalThis.localStorage = localStorageMock;
+
 const { saveDataManager } = require('./js/15-save-sync.js');
 
 const source = fs.readFileSync('./js/03-venue.js', 'utf8');
@@ -48,6 +74,17 @@ assert.strictEqual(parsed.saves[2].funds, 1500000);
 assert.deepStrictEqual(saveDataManager.importSyncPayload(parsed), { userId, importedSlots: 2 });
 assert.strictEqual(typeof saveDataManager.importSyncPayloadFromFile, 'function');
 assert.strictEqual(typeof saveDataManager.bindTitleUserIdentity, 'function');
+
+globalThis.localStorage.clear();
+saveDataManager.setUserId('username-scope');
+globalThis.localStorage.setItem('idol_manager_save_slot_username-scope_1', JSON.stringify(sampleSlots[1]));
+globalThis.localStorage.setItem('idol_manager_save_slot_username-scope_2', JSON.stringify(sampleSlots[2]));
+globalThis.localStorage.setItem('idol_manager_save_slot_other-user_1', JSON.stringify({ currentYear: 9 }));
+assert.deepStrictEqual(saveDataManager.collectSaveSlots(globalThis.localStorage), {
+  1: sampleSlots[1],
+  2: sampleSlots[2]
+});
+assert.strictEqual(saveDataManager.getUserId(globalThis.localStorage), 'username-scope');
 
 const plan = {
   liveVenue: '東京ドーム',
