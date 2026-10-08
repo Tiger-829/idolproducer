@@ -144,8 +144,7 @@ function rollWeeklyIndustryOffer() {
   };
 }
 
-// 設備強化の打診で候補になる設備（ランダムイベント「設備強化の打診」で使う）
-// 要件10: 他グループと比較し、明显落后于同业界平均水准的设备会被提名为改善对象
+// 設備強化の打診で候補になる設備（寮・グッズ技術・ライブ演出の追加対応版）
 function getEquipmentUpgradeCandidates() {
   const weekKey = getCurrentWeekKey();
   const candidates = [];
@@ -156,6 +155,33 @@ function getEquipmentUpgradeCandidates() {
     : currentScore;
   const strongestRival = rivalTeams.reduce((strongest, team) => Math.max(strongest, team.basePower), 0);
 
+  // 1. メンバーの体力が低い状態が続いている場合（メンバー寮の改善）
+  const lowStaminaCount = (Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury && (m.staminaValue ?? 100) < 50).length;
+  if (lowStaminaCount >= 3 || (crisisEventType === 'sns-scandal' && crisisEventWeekKey === weekKey)) {
+    candidates.push({ 
+      facilityId: 'dormitory', 
+      reason: 'メンバーの体力が低い状態が続いています。メンバー寮を改善しましょう。' 
+    });
+  }
+
+  // 2. グッズ完売率が低い場合の判定（新しいグッズ製造技術の導入）
+  if (Number.isFinite(merchandiseSellThrough) && merchandiseSellThrough < 0.6) {
+    candidates.push({ 
+      facilityId: 'merchandise', 
+      reason: '市場に新しいグッズ製造技術が広まっています導入しますか。' 
+    });
+  }
+
+  // 3. ライブの動員や実績が伸び悩んでいる場合の判定（ライブ演出チームの増員）
+  const recentLives = Array.isArray(window.liveHistory) ? window.liveHistory.slice(-2) : [];
+  const lowLivePerformance = recentLives.some(l => l.dailyAudience < 5000);
+  if (lowLivePerformance || currentScore + 5 < rivalAverage) {
+    candidates.push({ 
+      facilityId: 'liveProduction', 
+      reason: 'ライブ演出に対して一部ファンの中が不満を持っています。ライブ演出チームを増員しますか。' 
+    });
+  }
+
   if (crisisEventType === 'sns-scandal' && crisisEventWeekKey === weekKey) {
     candidates.push({ facilityId: 'snsTraining', reason: 'SNSスキャンダルを受け、メンバーのSNS教育が必要です。' });
   }
@@ -163,7 +189,7 @@ function getEquipmentUpgradeCandidates() {
     candidates.push({ facilityId: 'analytics', reason: `グッズの直近完売率が${Math.round(merchandiseSellThrough * 100)}%です。販売データの分析が必要です。` });
   }
   if (currentScore + 8 < rivalAverage) {
-    candidates.push({ facilityId: 'lessons', reason: '他グループよりアイドル能力が低く、レッスン環境の強化が必要です。' });
+    candidates.push({ facilityId: 'lessons', reason: '流行に取り残されないためにはレッスン環境の強化が必要です。' });
   }
   if (strongestRival > currentScore + 12) {
     candidates.push({ facilityId: 'analytics', reason: '他グループの影響力が強く、市場データの分析が必要です。' });
@@ -174,7 +200,7 @@ function getEquipmentUpgradeCandidates() {
     (officeUpgrades[f.id] || 0) < MAX_OFFICE_LEVEL && (officeUpgrades[f.id] || 0) + 1 < myAverageLevel
   );
   if (behindRivals && currentScore + 3 < rivalAverage) {
-    candidates.push({ facilityId: behindRivals.id, reason: `${behindRivals.name}のレベルが明显落后于同业界平均水准，需要改善。` });
+    candidates.push({ facilityId: behindRivals.id, reason: `${behindRivals.name}の強化をおすすめします。` });
   }
 
   const active = candidates.filter(candidate => (officeUpgrades[candidate.facilityId] || 0) < MAX_OFFICE_LEVEL);
