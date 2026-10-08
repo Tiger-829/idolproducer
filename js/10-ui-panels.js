@@ -88,61 +88,7 @@ function switchPage(page) {
   }
 }
 
-// ==========================================
-// 📊 記録タブ（ファン数推移グラフ）10.js完結描画処理
-// ==========================================
 
-function renderRecordsPanel() {
-  console.log("★ renderRecordsPanel が正常に実行されました！"); // ← ここでログが出るか確認
-  const panel = document.getElementById('page-records');
-  if (!panel) {
-    console.warn("⚠ #page-records が見つかりません！");
-    return;
-  }
-  // player.fanHistory からデータを取得（なければ空配列）
-  const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
-    ? player.fanHistory
-    : [];
-
-  // 履歴データを新しい順、または古い順に並び替え（ここでは新しい順に表示）
-  const sortedHistory = [...historyData].reverse();
-
-  const historyRows = sortedHistory.length > 0
-    ? sortedHistory.map(item => `
-        <tr>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.date)}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #2e7d32;">
-            ${Number(item.fans).toLocaleString()} 人
-          </td>
-        </tr>
-      `).join('')
-    : '<tr><td colspan="2" style="padding: 16px; text-align: center; color: #888;">まだファン数の履歴データがありません。<br>週間サイクルが進むと自動で記録されます。</td></tr>';
-
-  panel.innerHTML = `
-    <h2 class="page-title">グループの記録・推移</h2>
-    <div class="schedule-block">
-      <div class="schedule-block-title">過去1年のファン数推移 <small>週次集計（直近52週）</small></div>
-      
-      <div style="margin-top: 12px; max-height: 350px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-          <thead>
-            <tr style="background: #f5f5f5; text-align: left; position: sticky; top: 0;">
-              <th style="padding: 10px 12px; border-bottom: 2px solid #ddd;">日付（週次）</th>
-              <th style="padding: 10px 12px; border-bottom: 2px solid #ddd; text-align: right;">グループファン数</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${historyRows}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="schedule-note" style="margin-top: 12px;">
-        ※毎週の週間サイクル進行時に自動記録され、1年（52週）を超えた古いデータは自動で整理されます。
-      </div>
-    </div>
-  `;
-}
 
 // ライバルチームパワーを取得する。
 function getRivalTeamPower(team) {
