@@ -31,26 +31,22 @@
         <input id="title-user-name" type="text" maxlength="32" placeholder="例: user-name" style="width:100%; margin-top:4px; box-sizing:border-box; padding:6px; border:1px solid #d8d8d8; border-radius:4px; font-size:12px;">
       </label>
     </div>
-    <div class="save-slots" id="save-slots"></div>
 
-    <div class="save-sync-panel" style="margin: 18px auto 0; max-width: 760px; background: rgba(255,255,255,0.7); border: 1px solid #f0d5e3; border-radius: 8px; padding: 12px; box-sizing: border-box;">
-      <div style="font-size:11px; color:#666; margin-bottom:10px; line-height:1.5;">同じユーザーIDで、同期ファイルを保存して別端末で選ぶだけでセーブを受け渡せます。テキスト貼り付けも残しています。</div>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px;">
-        <label style="flex:1; min-width: 180px; font-size: 11px; color:#555; font-weight: bold;">
-          同期用ユーザーID
-          <input id="save-sync-user-id" type="text" maxlength="32" placeholder="例: user-name" style="width:100%; margin-top:4px; box-sizing:border-box; padding:6px; border:1px solid #d8d8d8; border-radius:4px; font-size:12px;">
-        </label>
-        <button id="save-sync-export-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期ファイル生成</button>
-        <button id="save-sync-copy-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">コピー</button>
+    <div class="save-sync-panel" style="margin: 0 auto 16px; max-width: 520px; background: rgba(255,255,255,0.7); border: 1px solid #f0d5e3; border-radius: 8px; padding: 12px; box-sizing: border-box;">
+      <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:8px;">QRでセーブを転送</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <button id="save-user-share-btn" class="main-btn" type="button">共有</button>
+        <button id="save-user-copy-btn" class="ghost-btn" type="button">コピー</button>
+        <button id="save-user-qr-btn" class="ghost-btn" type="button">QRを表示</button>
+        <button id="save-user-import-btn" class="ghost-btn" type="button">文字列を反映</button>
       </div>
-      <textarea id="save-sync-json-output" rows="8" readonly placeholder="同期ファイルの内容がここに表示されます。別端末でファイルを開いて取り込めます。" style="width:100%; box-sizing:border-box; resize:vertical; border:1px solid #e3d6df; border-radius:6px; padding:8px; font-size:11px; background:#fffafc; color:#333;"></textarea>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-        <button id="save-sync-upload-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期ファイルを選ぶ</button>
-        <button id="save-sync-import-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">コードを反映</button>
-        <button id="save-sync-download-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">JSONを保存</button>
+      <textarea id="save-user-bundle-output" rows="8" placeholder="QR読み取り結果や、他の端末から受け取った保存データをここに貼り付ければ反映できます。" style="width:100%; box-sizing:border-box; resize:vertical; border:1px solid #e3d6df; border-radius:6px; padding:8px; font-size:11px; background:#fffafc; color:#333;"></textarea>
+      <div style="margin-top:10px; display:flex; justify-content:center;">
+        <img id="save-user-qr-image" alt="save qr" style="max-width:220px; width:100%; display:none; border:1px solid #e7d6df; background:white; border-radius:8px; padding:8px;" />
       </div>
-      <input id="save-sync-file-input" type="file" accept=".json,application/json" style="display:none;">
     </div>
+
+    <div class="save-slots" id="save-slots"></div>
 
     <div class="title-actions">
       <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
@@ -361,6 +357,7 @@
 <script src="./js/12-ui-plan-save.js?v=4"></script>
 <script src="./js/13-help.js?v=4"></script>
 <script src="./js/14-ui-records.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="./js/15-save-sync.js?v=4"></script>
 
 </body>

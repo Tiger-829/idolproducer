@@ -99,13 +99,13 @@
     return map;
   }
 
-  function buildSyncEnvelope({ userId, saveSlots } = {}) {
+  function buildUserSaveBundle({ userId, saveSlots } = {}) {
     const targetUserId = normalizeUserId(userId || getUserId());
     const targetSaveSlots = saveSlots && typeof saveSlots === 'object' ? saveSlots : collectSaveSlots();
 
     return {
       version: 1,
-      type: 'idolproducer-save-sync',
+      type: 'idolproducer-user-save-bundle',
       userId: targetUserId,
       exportedAt: Date.now(),
       saves: Object.keys(targetSaveSlots).reduce((result, slotKey) => {
@@ -120,14 +120,18 @@
     };
   }
 
-  function exportSyncPayload(options = {}) {
-    return JSON.stringify(buildSyncEnvelope(options), null, 2);
+  function exportUserSaveBundle(options = {}) {
+    return buildUserSaveBundle(options);
   }
 
-  function importSyncPayload(payload, storage = getStorage()) {
+  function exportUserSaveBundleText(options = {}) {
+    return JSON.stringify(exportUserSaveBundle(options), null, 2);
+  }
+
+  function importUserSaveBundle(payload, storage = getStorage()) {
     const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    if (!parsed || typeof parsed !== 'object') throw new Error('同期データの形式が無効です。');
-    if (parsed.type !== 'idolproducer-save-sync') throw new Error('同期データの形式が不正です。');
+    if (!parsed || typeof parsed !== 'object') throw new Error('セーブデータの形式が無効です。');
+    if (parsed.type !== 'idolproducer-user-save-bundle') throw new Error('セーブデータの形式が不正です。');
 
     const targetUserId = normalizeUserId(parsed.userId || getUserId(storage));
     setUserId(targetUserId, storage);
@@ -153,77 +157,118 @@
     return { userId: targetUserId, importedSlots };
   }
 
-  function importSyncPayloadFromText(payloadText, storage = getStorage()) {
-    const trimmed = typeof payloadText === 'string' ? payloadText.trim() : '';
-    if (!trimmed) {
-      throw new Error('同期コードが空です。');
-    }
-
-    const result = importSyncPayload(trimmed, storage);
-    if (typeof renderSaveSlots === 'function') {
-      renderSaveSlots();
-    }
-    return result;
+  function exportCurrentUserSaveBundle(storage = getStorage()) {
+    return exportUserSaveBundle({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
-  async function importSyncPayloadFromFile(file, storage = getStorage()) {
-    if (!file) return null;
-
-    const text = typeof file.text === 'function'
-      ? await file.text()
-      : await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ''));
-          reader.onerror = () => reject(new Error('同期ファイルの読み込みに失敗しました。'));
-          reader.readAsText(file);
-        });
-
-    return importSyncPayloadFromText(text, storage);
+  function exportCurrentUserSaveBundleText(storage = getStorage()) {
+    return exportUserSaveBundleText({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
-  function writeSyncPayloadToField() {
-    const field = document && document.getElementById('save-sync-json-output');
+  function generateQrCodeDataUrl(payloadText, options = {}) {
+    if (!payloadText || typeof payloadText !== 'string') return '';
+    const qrApi = globalScope && globalScope.QRCode;
+    if (!qrApi || typeof qrApi.toDataURL !== 'function') return '';
+    const settings = Object.assign({ width: 220, margin: 1, color: { dark: '#1f1f1f', light: '#ffffff' } }, options);
+    return qrApi.toDataURL(payloadText, settings);
+  }
+
+  function updateCurrentUserQrCode() {
+    const qrImage = document && document.getElementById('save-user-qr-image');
+    const field = document && document.getElementById('save-user-bundle-output');
     if (!field) return '';
-    const payload = exportSyncPayload({ userId: getUserId() });
+
+    const payload = exportCurrentUserSaveBundleText();
     field.value = payload;
+
+    if (qrImage) {
+      const qrUrl = generateQrCodeDataUrl(payload);
+      qrImage.src = qrUrl || '';
+      qrImage.style.display = qrUrl ? 'block' : 'none';
+    }
+
     return payload;
   }
 
-  function copySyncPayloadToClipboard() {
-    const payload = writeSyncPayloadToField();
+  function shareCurrentUserSaveBundle() {
+    const payload = exportCurrentUserSaveBundleText();
     if (!payload) {
-      alert('同期コードを生成できませんでした。');
-      return false;
-    }
-    if (!navigator || !navigator.clipboard) {
-      alert('この環境ではクリップボードにコピーできません。下の同期コードを手動でコピーしてください。');
+      alert('共有できるセーブデータがありません。');
       return false;
     }
 
-    navigator.clipboard.writeText(payload)
+    if (!globalScope || !globalScope.navigator || !globalScope.navigator.share) {
+      updateCurrentUserQrCode();
+      alert('この端末では共有APIが使えないため、QRコードを表示して他端末で読み取ってください。');
+      return false;
+    }
+
+    try {
+      globalScope.navigator.share({
+        title: 'アイドルプロデューサー セーブデータ',
+        text: `ユーザー「${getUserId()}」のセーブデータ`,
+        url: `data:application/json,${encodeURIComponent(payload)}`
+      });
+      return true;
+    } catch (error) {
+      console.warn('Share API failed:', error);
+      updateCurrentUserQrCode();
+      alert('共有が失敗したので、QRコードを表示しました。');
+      return false;
+    }
+  }
+
+  function copyCurrentUserSaveBundleToClipboard() {
+    const payload = exportCurrentUserSaveBundleText();
+    if (!payload) {
+      alert('コピーできるセーブデータがありません。');
+      return false;
+    }
+
+    if (!globalScope || !globalScope.navigator || !globalScope.navigator.clipboard) {
+      const field = document && document.getElementById('save-user-bundle-output');
+      if (field) {
+        field.value = payload;
+        field.focus();
+        field.select();
+      }
+      alert('この端末ではクリップボードが使えないため、文字列を手動でコピーしてください。');
+      return false;
+    }
+
+    globalScope.navigator.clipboard.writeText(payload)
       .then(() => {
-        alert('同期用データをクリップボードにコピーしました。');
+        alert('保存データをクリップボードにコピーしました。');
       })
       .catch(() => {
-        alert('クリップボードへの書き込みに失敗しました。下の同期コードを手動でコピーしてください。');
+        const field = document && document.getElementById('save-user-bundle-output');
+        if (field) {
+          field.value = payload;
+          field.focus();
+          field.select();
+        }
+        alert('クリップボードにコピーできないため、文字列を手動でコピーしてください。');
       });
     return true;
   }
 
-  function importSyncPayloadFromField() {
-    const field = document && document.getElementById('save-sync-json-output');
+  function importUserSaveBundleFromField() {
+    const field = document && document.getElementById('save-user-bundle-output');
     if (!field || !field.value.trim()) {
-      alert('同期コードを入力してください。');
+      alert('保存データの文字列を入力してください。');
       return null;
     }
 
     try {
-      const result = importSyncPayloadFromText(field.value.trim());
+      const result = importUserSaveBundle(field.value.trim());
+      if (typeof renderSaveSlots === 'function') {
+        renderSaveSlots();
+      }
       alert(`ユーザー「${result.userId}」のセーブを ${result.importedSlots} 件取り込みました。`);
       return result;
     } catch (error) {
       console.error(error);
-      alert(error.message || '同期データを取り込めませんでした。');
+      alert(error.message || 'セーブデータを取り込めませんでした。');
       return null;
     }
   }
@@ -287,76 +332,47 @@
 
   function registerSaveSyncUi() {
     if (!document) return;
-
-    const userInput = document.getElementById('save-sync-user-id');
-    if (userInput) {
-      userInput.value = getUserId();
-      userInput.addEventListener('change', (event) => {
-        const normalized = setUserId(event.target.value);
-        const titleInput = document.getElementById('title-user-name');
-        if (titleInput) titleInput.value = normalized;
-        if (typeof renderSaveSlots === 'function') {
-          renderSaveSlots();
-        }
-      });
-    }
-
     bindTitleUserIdentity();
 
-    const exportButton = document.getElementById('save-sync-export-btn');
-    if (exportButton) {
-      exportButton.addEventListener('click', () => {
-        const field = document.getElementById('save-sync-json-output');
-        const targetUserId = document.getElementById('save-sync-user-id')?.value || getUserId();
-        const payload = exportSyncPayload({ userId: targetUserId });
-        if (field) field.value = payload;
-        alert('同期コードを生成しました。');
+    const shareButton = document.getElementById('save-user-share-btn');
+    if (shareButton) {
+      shareButton.addEventListener('click', () => {
+        shareCurrentUserSaveBundle();
       });
     }
 
-    const copyButton = document.getElementById('save-sync-copy-btn');
-    if (copyButton) copyButton.addEventListener('click', copySyncPayloadToClipboard);
+    const copyButton = document.getElementById('save-user-copy-btn');
+    if (copyButton) {
+      copyButton.addEventListener('click', () => {
+        copyCurrentUserSaveBundleToClipboard();
+      });
+    }
 
-    const importButton = document.getElementById('save-sync-import-btn');
-    if (importButton) importButton.addEventListener('click', importSyncPayloadFromField);
-
-    const uploadButton = document.getElementById('save-sync-upload-btn');
-    const fileInput = document.getElementById('save-sync-file-input');
-    if (uploadButton && fileInput) {
-      uploadButton.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', async (event) => {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
-        try {
-          const result = await importSyncPayloadFromFile(file);
-          if (result) {
-            alert(`ユーザー「${result.userId}」のセーブを ${result.importedSlots} 件取り込みました。`);
-          }
-        } catch (error) {
-          console.error(error);
-          alert(error.message || '同期ファイルを取り込めませんでした。');
-        } finally {
-          fileInput.value = '';
+    const qrButton = document.getElementById('save-user-qr-btn');
+    if (qrButton) {
+      qrButton.addEventListener('click', () => {
+        const payload = updateCurrentUserQrCode();
+        if (!payload) {
+          alert('QRコードを生成できませんでした。');
         }
       });
     }
 
-    const downloadButton = document.getElementById('save-sync-download-btn');
-    if (downloadButton) {
-      downloadButton.addEventListener('click', () => {
-        const payload = writeSyncPayloadToField();
-        if (!payload) return;
-        const blob = new Blob([payload], { type: 'application/json' });
-        const userId = normalizeUserId(document.getElementById('save-sync-user-id')?.value || getUserId());
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `idol-producer-save-${userId}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+    const importButton = document.getElementById('save-user-import-btn');
+    if (importButton) {
+      importButton.addEventListener('click', importUserSaveBundleFromField);
+    }
+
+    const field = document.getElementById('save-user-bundle-output');
+    if (field) {
+      field.addEventListener('change', () => {
+        if (field.value.trim()) {
+          importUserSaveBundleFromField();
+        }
       });
     }
+
+    updateCurrentUserQrCode();
   }
 
   const api = {
@@ -370,15 +386,17 @@
     getUserId,
     setUserId,
     collectSaveSlots,
-    buildSyncEnvelope,
-    exportSyncPayload,
-    importSyncPayload,
-    importSyncPayloadFromText,
-    importSyncPayloadFromFile,
+    buildUserSaveBundle,
+    exportUserSaveBundle,
+    exportUserSaveBundleText,
+    importUserSaveBundle,
+    exportCurrentUserSaveBundle,
+    exportCurrentUserSaveBundleText,
+    generateQrCodeDataUrl,
+    updateCurrentUserQrCode,
+    shareCurrentUserSaveBundle,
+    copyCurrentUserSaveBundleToClipboard,
     bindTitleUserIdentity,
-    writeSyncPayloadToField,
-    copySyncPayloadToClipboard,
-    importSyncPayloadFromField,
     registerSaveSyncUi
   };
 

@@ -63,17 +63,21 @@ const sampleSlots = {
 };
 
 const userId = 'user-demo-001';
-const payload = saveDataManager.exportSyncPayload({ userId, saveSlots: sampleSlots });
-const parsed = JSON.parse(payload);
 
 assert.strictEqual(typeof saveDataManager.getUserId, 'function');
 assert.strictEqual(saveDataManager.normalizeUserId('  demo-user  '), 'demo-user');
-assert.strictEqual(parsed.userId, userId);
-assert.strictEqual(parsed.saves[1].currentYear, 2);
-assert.strictEqual(parsed.saves[2].funds, 1500000);
-assert.deepStrictEqual(saveDataManager.importSyncPayload(parsed), { userId, importedSlots: 2 });
-assert.strictEqual(typeof saveDataManager.importSyncPayloadFromFile, 'function');
 assert.strictEqual(typeof saveDataManager.bindTitleUserIdentity, 'function');
+assert.strictEqual(typeof saveDataManager.exportUserSaveBundle, 'function');
+assert.strictEqual(typeof saveDataManager.importUserSaveBundle, 'function');
+
+const bundle = saveDataManager.exportUserSaveBundle({ userId, saveSlots: sampleSlots });
+assert.strictEqual(bundle.userId, userId);
+assert.deepStrictEqual(bundle.saves[1], sampleSlots[1]);
+assert.deepStrictEqual(saveDataManager.importUserSaveBundle(bundle, globalThis.localStorage), { userId, importedSlots: 2 });
+assert.deepStrictEqual(saveDataManager.collectSaveSlots(globalThis.localStorage), {
+  1: sampleSlots[1],
+  2: sampleSlots[2]
+});
 
 globalThis.localStorage.clear();
 saveDataManager.setUserId('username-scope');
