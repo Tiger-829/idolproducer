@@ -129,8 +129,9 @@ const GROUP_FAN_WEEKLY_DECAY = 0.004;
 let fansFromSales = 0;
 
 function getStatSeedFans() {
+  const totalMembers = Array.isArray(idolRoster) ? idolRoster.length : 0;
   const memberFanTotal = idolRoster.reduce((total, member) => total + calculateMemberFans(member), 0);
-  return Math.round((memberFanTotal/targets.length) * 0.65 * GROUP_FAN_STAT_SEED_RATE);
+  return Math.round((memberFanTotal/totalMembers) * 0.65 * GROUP_FAN_STAT_SEED_RATE);
 }
 
 function getTargetSalesFans() {
