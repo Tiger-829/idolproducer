@@ -14,14 +14,21 @@ document.addEventListener('keydown', (e) => {
     const key = e.key;
     const lowerKey = key.toLowerCase();
 
-    // Shiftキーの判定（ページ・モーダルの最上部までスクロールアップ）
+    // Shiftキーの判定（最上部までスクロールアップ）
     if (e.shiftKey) {
       e.preventDefault();
-      const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content, #decision-modal');
-      if (activeModal) {
-        activeModal.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // 現在開いているモーダルを検出
+      const openModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], #decision-modal, [id$="-modal"]');
+      
+      // モーダルが実際に開いている場合（かつ非表示ではない場合）は、モーダル内のみをスクロール
+      if (openModal && openModal.style.display !== 'none') {
+        const scrollTarget = openModal.querySelector('.modal-content, .modal-body, div[style*="overflow"]') || openModal;
+        scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        // モーダルが開いていない通常ウィンドウの場合のみ、ウィンドウをスクロール
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
