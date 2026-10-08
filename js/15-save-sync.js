@@ -165,15 +165,21 @@
     return exportUserSaveBundleText({ userId: getUserId(storage), saveSlots: collectSaveSlots(storage) });
   }
 
-  function generateQrCodeDataUrl(payloadText, options = {}) {
+  async function generateQrCodeDataUrl(payloadText, options = {}) {
     if (!payloadText || typeof payloadText !== 'string') return '';
     const qrApi = globalScope && globalScope.QRCode;
     if (!qrApi || typeof qrApi.toDataURL !== 'function') return '';
     const settings = Object.assign({ width: 220, margin: 1, color: { dark: '#1f1f1f', light: '#ffffff' } }, options);
-    return qrApi.toDataURL(payloadText, settings);
+    try {
+      const qrUrl = await qrApi.toDataURL(payloadText, settings);
+      return typeof qrUrl === 'string' ? qrUrl : '';
+    } catch (error) {
+      console.warn('QR code generation failed:', error);
+      return '';
+    }
   }
 
-  function updateCurrentUserQrCode() {
+  async function updateCurrentUserQrCode() {
     const qrImage = document && document.getElementById('save-user-qr-image');
     const field = document && document.getElementById('save-user-bundle-output');
     if (!field) return '';
@@ -182,7 +188,7 @@
     field.value = payload;
 
     if (qrImage) {
-      const qrUrl = generateQrCodeDataUrl(payload);
+      const qrUrl = await generateQrCodeDataUrl(payload);
       qrImage.src = qrUrl || '';
       qrImage.style.display = qrUrl ? 'block' : 'none';
     }
@@ -350,8 +356,8 @@
 
     const qrButton = document.getElementById('save-user-qr-btn');
     if (qrButton) {
-      qrButton.addEventListener('click', () => {
-        const payload = updateCurrentUserQrCode();
+      qrButton.addEventListener('click', async () => {
+        const payload = await updateCurrentUserQrCode();
         if (!payload) {
           alert('QRコードを生成できませんでした。');
         }
