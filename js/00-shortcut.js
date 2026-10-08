@@ -20,7 +20,7 @@ document.addEventListener('keydown', (e) => {
         break;
       case 'f': // Ctrl + F : 編成タブへ移動
         e.preventDefault();
-        if (typeof renderPageNav === 'function') renderPageNav('roster');
+        if (typeof renderPageNav === 'function') renderPageNav('formation');
         break;
       case 'o': // Ctrl + O : 事務所タブに移動
         e.preventDefault();
@@ -36,7 +36,7 @@ document.addEventListener('keydown', (e) => {
         break;
       case 'a': // Ctrl + A : 記録タブに移動
         e.preventDefault();
-        if (typeof renderPageNav === 'function') renderPageNav('history');
+        if (typeof renderPageNav === 'function') renderPageNav('record');
         break;
       case 'c': // Ctrl + C : モーダルを閉じる
         e.preventDefault();
