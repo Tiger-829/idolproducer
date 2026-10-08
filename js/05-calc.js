@@ -45,7 +45,6 @@ function calculateSingleOverall(stats) {
 // ==========================================
 // アイドル力（表現5能力＋体調2能力の平均）
 // ==========================================
-// アイドル力を構成する7能力（表現：スタイル・ファッション・歌唱・ダンス・連携／体調：回復力・運動能力）
 function calculateIdolPower(stats) {
   const source = stats || {};
   const total = IDOL_POWER_STATS.reduce((sum, statId) => sum + (source[statId] || 0), 0);
@@ -61,7 +60,7 @@ function calculateTeamIdolPower() {
   return Math.round(total / targets.length);
 }
 
-// 個人推定ファン数（開始時のグループ合計がおよそ5万fanになるよう較正直している）
+// 個人推定ファン数
 function calculateMemberFans(member) {
   const stats = member.stats || {};
   return Math.round(
@@ -71,12 +70,10 @@ function calculateMemberFans(member) {
   );
 }
 
-// メンバーイベント売上概要を取得する。
 function getMemberEventSalesSummary(member) {
   const history = Array.isArray(member.eventSalesHistory) ? member.eventSalesHistory : [];
   const recentGoods = history.filter(event => event.eventType === 'merchandise').slice(-3);
   const recentBenefits = history.filter(event => event.eventType !== 'merchandise').slice(-3);
-  // averageを処理する。
   const average = events => events.length
     ? Math.round(events.reduce((total, event) => total + event.sellThrough, 0) / events.length * 100)
     : null;
@@ -88,30 +85,19 @@ function getMemberEventSalesSummary(member) {
 // ==========================================
 // グループファン数の成長モデル
 // ==========================================
-// ファン数の上限（1億人）
 const GROUP_FAN_MAX = 100000000;
-// 売上→ファン変換: fans = K × √(生涯累計売上) × (1 + 生涯累計売上 / ACCEL)
-// K=82・根号曲線だと、累計売上 50万枚でD、100万枚でC、300万枚でB、500万枚でA、
-// 1000万枚でS・SSがそれぞれ満席になるよう逆算した係数（±18%程度）。
 const GROUP_FAN_SALES_COEFFICIENT = 82;
-// 売上が10億枚を超えると成長が加速する（1億の上限に届けるため）
 const GROUP_FAN_ACCELERATION_BASE = 1000000000;
-// 能力値由来のファンを「基礎ファン」として使う割合（残りは売上駆動）
 const GROUP_FAN_STAT_SEED_RATE = 0.2;
-// 毎週、目標ファン数へ寄る割合（売上が伸びると増え、止まると緩やかに減る）
 const GROUP_FAN_WEEKLY_PULL = 0.35;
-// 毎週の自然減衰率（売上が無い週はファンが流失する）
 const GROUP_FAN_WEEKLY_DECAY = 0.004;
-// 売上から積み上がったファン（毎週更新される状態）
 let fansFromSales = 0;
 
-// 能力値から基礎ファンを求める
 function getStatSeedFans() {
   const memberFanTotal = idolRoster.reduce((total, member) => total + calculateMemberFans(member), 0);
   return Math.round(memberFanTotal * 0.65 * GROUP_FAN_STAT_SEED_RATE);
 }
 
-// 生涯累計売上から目標ファン数を求める
 function getTargetSalesFans() {
   const total = lifetimeSales || 0;
   if (total <= 0) return 0;
@@ -121,7 +107,6 @@ function getTargetSalesFans() {
   return Math.min(GROUP_FAN_MAX, accelerated);
 }
 
-// 毎週更新：目標値へ寄りつつ、自然減衰で増減する
 function updateWeeklyGroupFans() {
   const target = getTargetSalesFans();
   fansFromSales += (target - fansFromSales) * GROUP_FAN_WEEKLY_PULL;
@@ -129,18 +114,19 @@ function updateWeeklyGroupFans() {
   fansFromSales = Math.min(GROUP_FAN_MAX, fansFromSales);
 }
 
-// グループファンを計算する。
 function calculateGroupFans() {
   return Math.min(GROUP_FAN_MAX, getStatSeedFans() + Math.round(fansFromSales));
 }
-// 週ごとのファン数履歴を記録し、1年分（最大52週）を超えた古いデータを自動削除する関数
+
+// 週ごとのファン数履歴を記録し、直近52週分を超えたデータを自動削除
 function recordWeeklyFanHistory(currentDate, currentFans) {
-  // プレイヤーデータに履歴配列がなければ初期化
+  if (typeof player === 'undefined' || !player) {
+    window.player = window.player || {};
+  }
   if (!player.fanHistory) {
     player.fanHistory = [];
   }
 
-  // 直近の記録と日付が被っていなければ、新しい週のデータを追加
   const lastEntry = player.fanHistory[player.fanHistory.length - 1];
   if (!lastEntry || lastEntry.date !== currentDate) {
     player.fanHistory.push({
@@ -149,30 +135,21 @@ function recordWeeklyFanHistory(currentDate, currentFans) {
     });
   }
 
-  // 方法A：シンプルに「直近52週分（1年分）」のデータ数で制限して古いものを削除
   const MAX_WEEKS = 52;
   if (player.fanHistory.length > MAX_WEEKS) {
-    player.fanHistory.shift(); // 先頭（一番古いデータ）を削除
+    player.fanHistory.shift();
   }
 }
 
-// 売上を計上し、ファン成長にも反映させる
 function addGroupSales(copies) {
   yearlyStats.sales += copies;
   lifetimeSales = (lifetimeSales || 0) + copies;
-  // CD累積売上の推移グラフ用に、生涯累計を記録する（週次）
   recordGroupSalesHistory();
 }
 
-// ==========================================
-// CD売上推移の履歴（記録タブのグラフ用）
-// ==========================================
-// グラフの表示期間（週）。直近1年間
 const SALES_HISTORY_WEEKS = 52;
-// 1曲ごとの推移で採用する期間（週）。発売後1年間
 const SONG_HISTORY_WEEKS = 52;
 
-// 週次のCD累積売上を履歴へ追記する（同じ週は上書きして1点だけ残す）
 function recordGroupSalesHistory() {
   if (!Array.isArray(salesHistory)) salesHistory = [];
   const weekKey = gameDate;
@@ -180,13 +157,11 @@ function recordGroupSalesHistory() {
   const last = salesHistory[salesHistory.length - 1];
   if (last && last.weekKey === weekKey) salesHistory[salesHistory.length - 1] = entry;
   else salesHistory.push(entry);
-  // 表示期間より古い履歴は捨てる（セーブが膨らまないよう）
   if (salesHistory.length > SALES_HISTORY_WEEKS) {
     salesHistory = salesHistory.slice(-SALES_HISTORY_WEEKS);
   }
 }
 
-// 1曲の発売後累積売上を履歴へ追記する（週次）
 function recordSongSalesHistory(song) {
   if (!song || !song.released) return;
   if (!Array.isArray(song.salesHistory)) song.salesHistory = [];
@@ -200,12 +175,10 @@ function recordSongSalesHistory(song) {
   }
 }
 
-// 全曲の売上推移を週次で記録する（週の進行時に呼ぶ）
 function recordAllSongSalesHistory() {
   songs.forEach(song => recordSongSalesHistory(song));
 }
 
-// 履歴を「何週前の記録か」と「累積売上」の形にして読みやすくする
 function normalizeSalesHistory(history, limitWeeks) {
   if (!Array.isArray(history) || !history.length) return [];
   const list = history
@@ -215,18 +188,15 @@ function normalizeSalesHistory(history, limitWeeks) {
   return list.slice(-(limit + 1));
 }
 
-// ファン階層（コア／ファン／ライト）の参加率（ライブは原案の1/4）
 const FAN_TIER_PARTICIPATION = {
   live: { core: 0.2, fan: 0.125, light: 0.075 },
   event: { core: 0.7, fan: 0.5, light: 0.3 }
 };
-// 階層の配分レンジ（大小関係「コア＜ファン＜＝ライト」は常に保つ）
 const FAN_TIER_SHARE_RANGE = {
   core: { min: 0.08, max: 0.26 },
   fan: { min: 0.30, max: 0.36 }
 };
 
-// 熱心度（0〜1）：歌唱・ダンス・人気が高いほどコア層が増え、ライト層が減る
 function getFanTierIntensity() {
   const summary = calculateTeamAverages();
   const quality = ((summary.averages.vocal || 0) + (summary.averages.dance || 0)) / 2;
@@ -234,17 +204,14 @@ function getFanTierIntensity() {
   return Math.max(0, Math.min(1, (quality * 0.45 + popularity * 0.55) / 100));
 }
 
-// 階層の配分（情勢で変動するが、大小関係は常に コア＜ファン＜＝ライト）
 function getFanTierShares() {
   const intensity = getFanTierIntensity();
-  // mixを処理する。
   const mix = range => range.min + (range.max - range.min) * intensity;
   const core = mix(FAN_TIER_SHARE_RANGE.core);
   const fan = mix(FAN_TIER_SHARE_RANGE.fan);
   return { core, fan, light: Math.max(0, 1 - core - fan), intensity };
 }
 
-// グループファンを3階層に分解する
 function getFanTiers() {
   const total = calculateGroupFans();
   const shares = getFanTierShares();
@@ -257,22 +224,14 @@ function getFanTiers() {
   };
 }
 
-// ライブ／イベントに実際に参加するファン数（階層ごとの参加率で決まる）
 function getParticipatingFans(kind) {
-  // 階層別参加率の加重平均（getTierParticipationRate）と一致させる
   return Math.floor(getFanTiers().total * getTierParticipationRate(kind));
 }
 
-// ==========================================
-// 4.5 能力経験値システム・体力値・年収
-// ==========================================
-
-// 能力値を1上げるのに必要な経験値 = 100 × 1.05^(現在のレベル-1)
 function getStatExpRequired(level) {
   return Math.round(100 * Math.pow(1.05, Math.max(0, level - 1)));
 }
 
-// 経験値を溜めて能力値を上げる（Lv.100で経験値は消費されない）
 function addMemberStatExp(member, statId, amount) {
   if (!member || !Number.isFinite(amount) || amount <= 0) return 0;
   if (!member.statExp) member.statExp = {};
@@ -293,7 +252,6 @@ function addMemberStatExp(member, statId, amount) {
   return gained;
 }
 
-// 次のレベルまでの進捗率（0〜1）
 function getStatExpProgress(member, statId) {
   const level = member.stats[statId] || 0;
   if (level >= 100) return 1;
@@ -301,12 +259,10 @@ function getStatExpProgress(member, statId) {
   return Math.min(1, current / getStatExpRequired(level));
 }
 
-// 旧セーブに不足している回復力・連携力・経験値・体力値を補完する
 function ensureMemberVitalState() {
   idolRoster.forEach(member => {
     if (!member.stats) member.stats = {};
     if (!Number.isFinite(member.stats.recovery)) member.stats.recovery = 40;
-    // 連携力は後から追加した能力なので、旧セーブには新人が入会した時の初期値（30）を入れる
     if (!Number.isFinite(member.stats.coordination)) member.stats.coordination = 30;
     if (!member.statExp || typeof member.statExp !== 'object') member.statExp = {};
     if (!Number.isFinite(member.staminaValue)) member.staminaValue = MAX_STAMINA_VALUE;
@@ -317,56 +273,46 @@ function ensureMemberVitalState() {
       if (!Number.isFinite(member.injury.weeksLeft) || member.injury.weeksLeft <= 0) {
         member.injury = null;
       } else if (!Number.isFinite(member.injury.totalWeeks)) {
-        // 旧セーブには全治期間の記録が無い（残りが全治なので、そのまま扱う）
         member.injury.totalWeeks = member.injury.weeksLeft;
       }
     }
   });
 }
 
-// メンバーの体力値を消費する（0未満にはならない）
 function consumeMemberStamina(member, amount) {
   if (!member || !Number.isFinite(amount) || amount <= 0) return;
   member.staminaValue = Math.max(0, Math.round((member.staminaValue ?? MAX_STAMINA_VALUE) - amount));
 }
 
-// メンバーの体力値を回復させる
 function recoverMemberStamina(member, amount) {
   if (!member || !Number.isFinite(amount) || amount <= 0) return;
   member.staminaValue = Math.min(MAX_STAMINA_VALUE, Math.round((member.staminaValue ?? 0) + amount));
 }
 
-// 毎週の自然回復量（回復力・寮設備・メンタルケアで変動）
 function getMemberWeeklyRecovery(member, isRestDay) {
   const recoveryStat = member.stats?.recovery || 0;
   const dormitoryBonus = (officeUpgrades.dormitory || 0) * 4;
-  // 自然回復はメンバーの回復力と寮のみで決まる（マネージャーはかからない）
   let recovery = STAMINA_BASE_RECOVERY + recoveryStat * STAMINA_RECOVERY_PER_STAT + dormitoryBonus;
   if (isRestDay) recovery *= STAMINA_REST_RECOVERY_MULTIPLIER;
-  // ライブ疲労中は回復力が鈍る
   recovery *= getLiveFatigueRecoveryFactor(member);
   return Math.round(recovery);
 }
 
-// ライブ疲労による回復力の下落率（0〜LIVE_FATIGUE_RECOVERY_PENALTY）
 function getLiveFatigueRecoveryPenalty(member) {
   const fatigue = member?.liveFatigue || 0;
   if (fatigue <= 0) return 0;
   return (fatigue / MAX_LIVE_FATIGUE) * LIVE_FATIGUE_RECOVERY_PENALTY;
 }
 
-// ライブ疲労中の回復力倍率（疲労が最大でも50%は保つ）
 function getLiveFatigueRecoveryFactor(member) {
   return 1 - getLiveFatigueRecoveryPenalty(member);
 }
 
-// ライブ疲労を蓄積させる（0〜MAXで頭打ち）
 function addLiveFatigue(member, amount) {
   if (!member || !Number.isFinite(amount) || amount <= 0) return;
   member.liveFatigue = Math.min(MAX_LIVE_FATIGUE, Math.round((member.liveFatigue || 0) + amount));
 }
 
-// ライブ疲労は毎週少しずつ解ける（一時的なもの）
 function decayLiveFatigue() {
   idolRoster.forEach(member => {
     if (!member.liveFatigue) return;
@@ -374,14 +320,12 @@ function decayLiveFatigue() {
   });
 }
 
-// ライブ1日あたりの体力消費（会場規模で変動）
 function getLiveStaminaCost(venue, isConsecutive) {
   const factor = LIVE_VENUE_SIZE_FACTORS[venue?.cap] ?? 1;
   const consecutiveCost = isConsecutive ? 1.15 : 1;
   return Math.round(LIVE_STAMINA_COST_BASE * factor * consecutiveCost);
 }
 
-// ライブ開催に伴う疲労のつき方
 function getLiveFatigueGain(isMultiDay, isConsecutive) {
   let gain = LIVE_FATIGUE_GAIN;
   if (isMultiDay) gain += LIVE_FATIGUE_MULTI_DAY_BONUS;
@@ -389,15 +333,8 @@ function getLiveFatigueGain(isMultiDay, isConsecutive) {
   return gain;
 }
 
-// ライブ1回あたりの付与内容を記録する（検証・実績表示用）
 const liveExperienceLogs = [];
 
-// ライブ1回あたりの経験値を会場・観客・日数から算出する
-//   観客数 ÷ キャパシティ … 埋まり率（上限 LIVE_FILL_RATE_CAP 倍）
-//   収容しやすさ（ease）    … SS=1.3 / S=1.22 / A=1.15 / B=1.0 / C=0.85 / D=0.7
-//   公演日数               … 1日=1.0、日数が増えるほど LIVE_MULTI_DAY_BONUS ずつ上乗せ
-// 基礎値は「グループレッスン×特別強化倍率（=10倍）」を基準にする。
-// ※ 全公演日が終わった1回だけ、全公演の合計動員と公演日数で算出する。
 function getLiveExperienceGain(venue, audience, showDays = 1) {
   const capacity = CAPACITY_MAP[venue?.cap] || 0;
   const fillRate = capacity > 0 ? audience / capacity : 0;
@@ -410,7 +347,6 @@ function getLiveExperienceGain(venue, audience, showDays = 1) {
   ));
 }
 
-// ライブの経験値を選抜全員に付与する（対象能力は LIVE_STAT_WEIGHTS のとおり配分）
 function applyLiveExperience(venue, audience, showDays = 1) {
   const total = getLiveExperienceGain(venue, audience, showDays);
   const selected = idolRoster.filter(member => member.isSelected);
@@ -427,7 +363,6 @@ function applyLiveExperience(venue, audience, showDays = 1) {
   return { total, gained, levelUps, memberCount: participants.length };
 }
 
-// ライブの体力消費と疲労の蓄積（選抜全員）
 function applyLiveStaminaCost(venue, isMultiDay, isConsecutive) {
   const selected = idolRoster.filter(member => member.isSelected);
   const participants = selected.length ? selected : idolRoster;
@@ -440,7 +375,6 @@ function applyLiveStaminaCost(venue, isMultiDay, isConsecutive) {
   return { cost, fatigueGain, memberCount: participants.length };
 }
 
-// ライブ週は週間スケジュールを組めないため、代わりに自然回復を1回だけ適用する
 function applyLiveWeekRecovery() {
   const selected = idolRoster.filter(member => member.isSelected);
   const participants = selected.length ? selected : idolRoster;
@@ -451,8 +385,6 @@ function applyLiveWeekRecovery() {
   });
 }
 
-// ケガ・体調不良の発生判定（体力値が低い状態で練習すると起きやすい）
-// extraReduction は特別強化中のみ指定する（リスクマネジメントの効果）
 function rollMemberInjury(member, extraReduction = 0) {
   if ((member.staminaValue ?? 0) >= STAMINA_WARNING_THRESHOLD) return false;
   const severity = (STAMINA_WARNING_THRESHOLD - member.staminaValue) / STAMINA_WARNING_THRESHOLD;
@@ -466,15 +398,12 @@ function rollMemberInjury(member, extraReduction = 0) {
   member.injury = {
     type: isAccident ? 'ケガ' : '体調不良',
     weeksLeft: weeks,
-    // 全治期間（発生時に確定する。表示と回復判定に使う）
     totalWeeks: weeks,
     since: gameDate
   };
   return true;
 }
 
-// ケガ・体調不良の残り週数と全治期間の表示（例：残り2週／全3週）
-// 全治期間不明（旧セーブなど）のときは残り週数だけを表示する
 function formatInjuryWeeks(injury) {
   if (!injury) return '';
   const left = Math.max(0, Number.isFinite(injury.weeksLeft) ? injury.weeksLeft : 0);
@@ -483,11 +412,9 @@ function formatInjuryWeeks(injury) {
   return `残り${left}週`;
 }
 
-// ケガ・体調不良の回復判定
 function processMemberInjuries() {
   idolRoster.forEach(member => {
     if (!member.injury) return;
-    // 残り週数は0未満にしない（表示で全治期間が保たれるように）
     member.injury.weeksLeft = Math.max(0, member.injury.weeksLeft - 1);
     if (member.injury.weeksLeft <= 0) {
       setLog(`【復帰】${member.name}の${member.injury.type}が治りました（${formatInjuryWeeks(member.injury)}）。`);
@@ -496,11 +423,6 @@ function processMemberInjuries() {
   });
 }
 
-// ==========================================
-// 年収・給与システム
-// ==========================================
-
-// メンバーの年収 = ファン数×8×365 + (当年1月頭のグループファン数 - 前年1月頭のファン数)×6
 function getMemberAnnualSalary(member) {
   const fans = calculateMemberFans(member);
   const fanGrowth = Math.max(0, (groupFansAtYearStart || 0) - (previousYearGroupFansAtYearStart || 0));
@@ -510,33 +432,24 @@ function getMemberAnnualSalary(member) {
   );
 }
 
-// メンバー月次給与を取得する。
 function getMemberMonthlySalary(member) {
   return getMemberAnnualSalary(member) / 12;
 }
 
-// 全メンバーの月次給与合計
 function getTotalMemberMonthlySalary() {
   return idolRoster.reduce((total, member) => total + getMemberMonthlySalary(member), 0);
 }
 
-// 給与の月次合計（メンバー＋マネージャー）
 function getTotalMonthlySalary() {
   return getTotalMemberMonthlySalary() + getTotalManagerMonthlySalary();
 }
 
-// ==========================================
-// 危機対応（謝罪・謹慎・罰金・懲戒処分）
-// ==========================================
 const CRISIS_FINE_BASE = 2000000;
 
-// 危機Severityを取得する。
 function getCrisisSeverity() {
-  // 危機回避力が低いほど深刻度が高い（1.0〜2.0倍）
   return 1 + (100 - calculateGroupCrisisResilience()) / 100;
 }
 
-// SelectedPopularityを調整する。
 function adjustSelectedPopularity(delta) {
   idolRoster.forEach(member => {
     if (!member.isSelected) return;
@@ -544,7 +457,6 @@ function adjustSelectedPopularity(delta) {
   });
 }
 
-// 危機ResponseOptionsを取得する。
 function getCrisisResponseOptions() {
   const fine = Math.round(CRISIS_FINE_BASE * getCrisisSeverity());
   return [
@@ -588,7 +500,6 @@ function getCrisisResponseOptions() {
   ];
 }
 
-// 危機Responseモーダルを開く。
 function openCrisisResponseModal() {
   if (!pendingCrisisResponse) return;
   const type = pendingCrisisResponse.type;
@@ -603,7 +514,6 @@ function openCrisisResponseModal() {
   document.getElementById('crisis-response-modal').style.display = 'flex';
 }
 
-// 危機Responseを解決する。
 function resolveCrisisResponse(optionId) {
   if (!pendingCrisisResponse) return;
   const type = pendingCrisisResponse.type;
@@ -615,10 +525,8 @@ function resolveCrisisResponse(optionId) {
   const labelMap = { apology: '謝罪', suspension: '謹慎', fine: '罰金', discipline: '懲戒処分' };
   const subject = type === 'information-leak' ? '情報漏洩' : 'SNSスキャンダル';
   setLog(`【危機対応】${labelMap[optionId]}で対応しました（${subject}）。`);
-  // 対応が終われば危機状態は解消する
   crisisEventWeekKey = '';
   crisisEventType = '';
-  // スキャンダル対応の結果として選抜の編成を見直す必要がある
   unlockSelection(`${subject}への対応`);
   updateUI();
 }
