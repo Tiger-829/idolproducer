@@ -1,5 +1,5 @@
 // ==========================================
-// UI描画（記録タブ：5項目完全対応・HTML構造連動版）
+// UI描画（記録タブ：全5項目・レイアウト完全修復版）
 // ==========================================
 
 // 記録タブの表示要素をまとめて描画する
@@ -9,7 +9,7 @@ function renderRecordsPanel() {
   renderFirstWeekRanking();       // ② 初週売上ランキング（曲名・発売日・枚数）
   renderSongList();               // ④ 楽曲一覧
   renderLiveMaxAudienceRanking(); // ⑤ ライブ1日当たりの最大動員数ランキング
-  renderRecordsHelpBlock();       // ⑥ ページ最下部のヘルプボタンエリア
+  renderRecordsHelpBlock();       // ⑥ ページ最下部のヘルプボタンエリア（一箇所に統合）
 }
 
 // 履歴の週キーを「◯月/◯日」形式にする
@@ -137,17 +137,16 @@ function renderFanHistoryTrendChart() {
   const mainPanel = document.getElementById('page-records');
   if (!mainPanel) return;
 
-  // HTML側（index.html）のレイアウト構造に合わせて専用ブロックを安全に挿入または取得
   let container = document.getElementById('records-fan-trend-block');
   if (!container) {
     container = document.createElement('div');
     container.id = 'records-fan-trend-block';
     container.className = 'records-block';
     
-    // 初週売上ランキングのブロックの手前に挿入
-    const firstWeekBlock = document.getElementById('records-firstweek-list')?.closest('.records-block');
-    if (firstWeekBlock) {
-      mainPanel.insertBefore(container, firstWeekBlock);
+    // CD売上のブロックのすぐ後ろに挿入する
+    const firstBlock = mainPanel.querySelector('.records-block');
+    if (firstBlock && firstBlock.nextSibling) {
+      mainPanel.insertBefore(container, firstBlock.nextSibling);
     } else {
       mainPanel.appendChild(container);
     }
@@ -156,7 +155,7 @@ function renderFanHistoryTrendChart() {
   const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory : [];
   const points = history.map(entry => ({
     label: formatChartWeekLabel(entry.date),
-    value: Math.round((Number(entry.fans) || 0) / 1000) // 千人単位
+    value: Math.round((Number(entry.fans) || 0) / 1000)
   }));
 
   container.innerHTML = `
@@ -214,14 +213,7 @@ function renderLiveMaxAudienceRanking() {
     container = document.createElement('div');
     container.id = 'records-live-ranking-block';
     container.className = 'records-block';
-    
-    // ヘルプブロックの手前、または楽曲一覧の直後に挿入
-    const helpBlock = document.getElementById('records-help-block');
-    if (helpBlock) {
-      mainPanel.insertBefore(container, helpBlock);
-    } else {
-      mainPanel.appendChild(container);
-    }
+    mainPanel.appendChild(container);
   }
 
   const history = Array.isArray(window.liveHistory) ? [...window.liveHistory] : [];
@@ -245,18 +237,27 @@ function renderLiveMaxAudienceRanking() {
   `;
 }
 
-// ⑥ ヘルプ（ゲーム説明を見る）ボタンエリアを確実にページ最下部に配置
+// ⑥ ヘルプ（ゲーム説明を見る）ボタンエリアを重複なくページ最下部に1つだけ配置
 function renderRecordsHelpBlock() {
   const mainPanel = document.getElementById('page-records');
   if (!mainPanel) return;
 
-  let helpBlock = document.getElementById('records-help-block');
-  if (!helpBlock) {
+  // 画面内にある既存のヘルプブロックをすべて回収、または新規作成
+  let helpBlocks = mainPanel.querySelectorAll('.records-help');
+  let helpBlock;
+  
+  if (helpBlocks.length > 0) {
+    helpBlock = helpBlocks[0];
+    // 2つ目以降の重複分は削除する
+    for (let i = 1; i < helpBlocks.length; i++) {
+      helpBlocks[i].remove();
+    }
+  } else {
     helpBlock = document.createElement('div');
-    helpBlock.id = 'records-help-block';
     helpBlock.className = 'records-help';
   }
-  // 常に親要素の一番最後（下部）に配置する
+
+  // 常に親要素の一番最後（最下部）に移動する
   mainPanel.appendChild(helpBlock);
 
   helpBlock.innerHTML = `
@@ -265,7 +266,7 @@ function renderRecordsHelpBlock() {
   `;
 }
 
-// 楽曲詳細（発売後1年間の累積売上推移）をモーダルで開く
+// 楽曲詳細モーダル
 function openSongDetail(songId) {
   const song = songs.find(item => item.id === songId);
   if (!song) return;
