@@ -11,9 +11,32 @@ document.addEventListener('keydown', (e) => {
 
   // 2. すべてのショートカットを「Ctrlキー（またはMacのCommandキー）＋ 各キー」に統一
   if (e.ctrlKey || e.metaKey) {
-    const key = e.key.toLowerCase();
+    const key = e.key;
+    const lowerKey = key.toLowerCase();
 
-    switch (key) {
+    // Shiftキーの判定（最上部までスクロール）
+    if (e.shiftKey) {
+      e.preventDefault();
+      const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content, #decision-modal');
+      if (activeModal) {
+        activeModal.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Enterキーの判定（計画を策定する）
+    if (lowerKey === 'enter') {
+      const decisionModal = document.getElementById('decision-modal');
+      if (decisionModal && decisionModal.style.display === 'flex') {
+        e.preventDefault();
+        if (typeof saveDecisionPlan === 'function') saveDecisionPlan();
+      }
+      return;
+    }
+
+    // アルファベットおよび数字の判定
+    switch (lowerKey) {
       case 'g': // Ctrl + G : グループタブへ移動
         e.preventDefault();
         if (typeof renderPageNav === 'function') renderPageNav('group');
@@ -59,27 +82,9 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         if (typeof openHelpModal === 'function') openHelpModal();
         break;
-      case 'shift': // Ctrl + shift : ページ・モーダルの最上部までスクロール
-        e.preventDefault();
-      // 開いているモーダルの中身、またはページ全体を最上部にスクロール
-        const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content, #decision-modal');
-        if (activeModal) {
-          activeModal.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;        
-        }
-        break;
-      case 'enter': // Ctrl + Enter : 計画を策定する（半年計画モーダル内などでの決定）
-        const decisionModal = document.getElementById('decision-modal');
-        if (decisionModal && decisionModal.style.display === 'flex') {
-          e.preventDefault();
-          if (typeof saveDecisionPlan === 'function') saveDecisionPlan();
-        }
-        break;
       case '1': // Ctrl + 1 : ランダムイベント等で上の選択肢を選択
       case '2': // Ctrl + 2 : ランダムイベント等で下の選択肢を選択
-        const choiceIndex = key === '1' ? 0 : 1;
+        const choiceIndex = lowerKey === '1' ? 0 : 1;
         const choiceButtons = document.querySelectorAll('.random-event-choice-btn, .event-choice-btn');
         if (choiceButtons.length > choiceIndex) {
           e.preventDefault();
