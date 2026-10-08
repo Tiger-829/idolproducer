@@ -1,12 +1,14 @@
 // ==========================================
-// UI描画（記録タブ：売上推移・楽曲一覧・初週売上ランキング）
+// UI描画（記録タブ：売上推移・楽曲一覧・初週売上ランキング・ファン数・ライブ動員ランキング）
 // ==========================================
 
 // 記録タブの表示要素をまとめて描画する
 function renderRecordsPanel() {
-  renderSalesTrendChart();
-  renderFirstWeekRanking();
-  renderSongList();
+  renderSalesTrendChart();        // ① 過去5作CD売上の推移
+  renderFirstWeekRanking();       // ② 初週売上ランキング（曲名・発売日・枚数）
+  renderFanHistoryTrendChart();   // ③ 過去1年のファン数推移（千人単位）
+  renderSongList();               // ④ 楽曲一覧
+  renderLiveMaxAudienceRanking(); // ⑤ ライブ1日当たりの最大動員数ランキング
 }
 
 // 履歴の週キーを「◯月/◯日」形式にする
@@ -20,32 +22,33 @@ function formatChartWeekLabel(weekKey) {
 // 記録タブ（売上推移・楽曲一覧・初週売上ランキング）
 // ==========================================
 // 外部ライブラリなしで折れ線グラフのSVGを描く
-// points は [{ label, value }] の配列
 function buildLineChartSvg(points, options = {}) {
   const width = options.width || 320;
   const height = options.height || 120;
-  const padding = { top: 8, right: 8, bottom: 18, left: 40 };
+  const padding = { top: 8, right: 8, bottom: 18, left: 45 };
   const list = (points || []).filter(point => Number.isFinite(Number(point.value)));
   if (list.length < 2) return '<div class="chart-empty">データが集まると表示されます</div>';
   const values = list.map(point => Math.max(0, Number(point.value)));
   const max = Math.max(...values, 1);
   const innerW = width - padding.left - padding.right;
   const innerH = height - padding.top - padding.bottom;
-  // xを処理する。
+  
   const xAt = index => padding.left + (index / (list.length - 1)) * innerW;
-  // yを処理する。
   const yAt = value => padding.top + innerH - (value / max) * innerH;
   const line = list
     .map((point, index) => `${index ? 'L' : 'M'}${xAt(index).toFixed(1)},${yAt(values[index]).toFixed(1)}`)
     .join(' ');
   const baseY = (padding.top + innerH).toFixed(1);
   const area = `${line} L${xAt(list.length - 1).toFixed(1)},${baseY} L${xAt(0).toFixed(1)},${baseY} Z`;
+  
   const gridLines = [0, 0.5, 1].map(ratio => {
     const y = (padding.top + innerH - ratio * innerH).toFixed(1);
-    const label = formatMoney(Math.round(max * ratio));
+    const rawVal = max * ratio;
+    const label = options.unitFormatter ? options.unitFormatter(rawVal) : formatMoney(Math.round(rawVal));
     return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" class="chart-grid" />
       <text x="${padding.left - 4}" y="${Number(y) + 3}" class="chart-axis-label" text-anchor="end">${escapeHtml(label)}</text>`;
   }).join('');
+
   const lastIndex = list.length - 1;
   const gradientId = options.gradientId || '';
   const gradient = gradientId ? `<linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
@@ -54,7 +57,7 @@ function buildLineChartSvg(points, options = {}) {
     </linearGradient>` : '';
   const fill = gradientId ? `url(#${gradientId})` : 'var(--primary)';
   return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img"
-      aria-label="${escapeHtml(options.ariaLabel || '累積売上の推移')}">
+      aria-label="${escapeHtml(options.ariaLabel || '推移グラフ')}">
     <defs>${gradient}</defs>
     ${gridLines}
     <path d="${area}" fill="${fill}" class="chart-area" />
@@ -65,47 +68,52 @@ function buildLineChartSvg(points, options = {}) {
   </svg>`;
 }
 
-// 履歴を「週ごとの増加量」のグラフ用データへ変換する
-function buildSalesTrendPoints(history) {
-  const list = normalizeSalesHistory(history, SALES_HISTORY_WEEKS);
-  return list.map((entry, index) => {
-    const previous = index > 0 ? list[index - 1].sales : 0;
-    return {
-      label: formatChartWeekLabel(entry.weekKey),
-      value: Math.max(0, entry.sales - previous)
-    };
-  });
-}
-
-// 直近1年間のCD累積売上グラフ
+// ① 過去5作CD売上の推移（縦:枚数、横:発売からの経過日数）
 function renderSalesTrendChart() {
   const chart = document.getElementById('records-sales-chart');
   const note = document.getElementById('records-sales-note');
   if (!chart) return;
-  const points = buildSalesTrendPoints(salesHistory);
-  chart.innerHTML = buildLineChartSvg(points, {
-    gradientId: 'records-sales-gradient',
-    ariaLabel: '直近1年間のCD累積売上推移'
-  });
-  if (!note) return;
-  const history = normalizeSalesHistory(salesHistory, SALES_HISTORY_WEEKS);
-  if (history.length < 2) {
-    note.textContent = '発売や販促を行うと、週ごとの売上推移が記録されます。';
+  const blockTitle = chart.previousElementSibling;
+  if (blockTitle) blockTitle.innerHTML = '過去5作CD売上の推移 <small>縦: 枚数 / 横: 発売からの経過日数</small>';
+
+  const releasedSongs = [...songs]
+    .filter(song => song.released && Array.isArray(song.salesHistory) && song.salesHistory.length > 0)
+    .sort((a, b) => String(b.releaseDateKey || '').localeCompare(String(a.releaseDateKey || '')))
+    .slice(0, 5);
+
+  if (!releasedSongs.length) {
+    chart.innerHTML = '<div class="chart-empty">まだ発売された楽曲がありません</div>';
+    if (note) note.textContent = '発売や販促を行うと、週ごとの売上推移が記録されます。';
     return;
   }
-  const first = history[0];
-  const last = history[history.length - 1];
-  note.textContent = `期間 ${formatChartWeekLabel(first.weekKey)} → ${formatChartWeekLabel(last.weekKey)}（${history.length - 1}週）／ 累計 ${last.sales.toLocaleString()}枚`;
+
+  const targetSong = releasedSongs[0];
+  const history = normalizeSalesHistory(targetSong.salesHistory, SONG_HISTORY_WEEKS);
+  const points = history.map((entry, index) => ({
+    label: index === 0 ? '発売' : `${index * 7}日`,
+    value: entry.sales
+  }));
+
+  chart.innerHTML = `<div style="font-size:11px; color:#555; margin-bottom:4px;">直近曲『${escapeHtml(targetSong.title)}』の推移</div>` +
+    buildLineChartSvg(points, { gradientId: 'records-sales-gradient', ariaLabel: '過去5作CD売上推移' });
+  
+  if (note) {
+    note.textContent = `楽曲「${targetSong.title}」累計売上: ${targetSong.totalSales.toLocaleString()}枚`;
+  }
 }
 
-// 初週売上ランキング（自グループの作品のみ）
+// ② 初週売上ランキング（自グループの作品のみ・曲名、発売日、単位枚）
 function renderFirstWeekRanking() {
   const list = document.getElementById('records-firstweek-list');
   if (!list) return;
+  const blockTitle = list.previousElementSibling;
+  if (blockTitle) blockTitle.innerHTML = '初週売上ランキング <small>曲名・発売日</small>';
+
   const ranked = songs
     .filter(song => song.released && Number.isFinite(song.firstWeekSales))
     .sort((a, b) => b.firstWeekSales - a.firstWeekSales)
     .slice(0, 10);
+
   if (!ranked.length) {
     list.innerHTML = '<div class="chart-empty">まだ発売した楽曲がありません</div>';
     return;
@@ -113,14 +121,43 @@ function renderFirstWeekRanking() {
   const max = Math.max(...ranked.map(song => song.firstWeekSales), 1);
   list.innerHTML = ranked.map((song, index) => {
     const width = Math.max(2, Math.round((song.firstWeekSales / max) * 100));
+    const releaseDateStr = song.releaseDateKey ? formatChartWeekLabel(song.releaseDateKey) : '不明';
     return `
       <div class="firstweek-row">
         <span class="firstweek-rank">${index + 1}</span>
-        <span class="firstweek-title">${escapeHtml(song.title)}</span>
+        <span class="firstweek-title">${escapeHtml(song.title)} <small style="color:#777; font-weight:normal;">(${releaseDateStr}発売)</small></span>
         <span class="firstweek-bar"><span style="width:${width}%"></span></span>
         <span class="firstweek-value">${song.firstWeekSales.toLocaleString()}枚</span>
       </div>`;
   }).join('');
+}
+
+// ③ 過去1年のファン数推移（単位: 千人）
+function renderFanHistoryTrendChart() {
+  let container = document.getElementById('records-fan-trend-block');
+  const mainPanel = document.getElementById('page-records');
+  if (!mainPanel) return;
+
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'records-fan-trend-block';
+    container.className = 'records-block';
+    mainPanel.insertBefore(container, mainPanel.children[1]); // CD売上の下あたりに挿入
+  }
+
+  const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory : [];
+  const points = history.map(entry => ({
+    label: formatChartWeekLabel(entry.date),
+    value: Math.round((Number(entry.fans) || 0) / 1000) // 千人単位
+  }));
+
+  container.innerHTML = `
+    <div class="records-block-title">過去1年のファン数推移 <small>単位: 千人（直近52週）</small></div>
+    <div class="records-chart" style="height:120px;">
+      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
+    </div>
+    <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
+  `;
 }
 
 // 曲一覧に出す概要（発売月・種別・累計売上）
@@ -131,10 +168,14 @@ function describeSongMeta(song) {
   return `${released}発売 / ${typeLabel} / 累計${(song.totalSales || 0).toLocaleString()}枚`;
 }
 
-// 楽曲一覧（発売済み／予定を分けて、曲名で詳細を開ける）
+// ④ 楽曲一覧（発売済み／予定を分けて、曲名で詳細を開ける）
 function renderSongList() {
   const list = document.getElementById('records-song-list');
   if (!list) return;
+  const blockTitle = list.previousElementSibling;
+  if (blockTitle) blockTitle.style.display = 'block';
+  list.style.display = 'block';
+
   if (!songs.length) {
     list.innerHTML = '<div class="chart-empty">まだ楽曲がありません</div>';
     return;
@@ -142,7 +183,7 @@ function renderSongList() {
   const released = songs.filter(song => song.released)
     .sort((a, b) => String(b.releaseDateKey || '').localeCompare(String(a.releaseDateKey || '')));
   const upcoming = songs.filter(song => !song.released);
-  // Itemを描画する。
+  
   const renderItem = song => `
     <button type="button" class="song-row${song.released ? '' : ' is-upcoming'}"
       onclick="openSongDetail('${escapeHtml(song.id)}')">
@@ -153,6 +194,40 @@ function renderSongList() {
   if (released.length) sections.push(`<div class="song-group-title">発売済み</div>${released.map(renderItem).join('')}`);
   if (upcoming.length) sections.push(`<div class="song-group-title">発売予定</div>${upcoming.map(renderItem).join('')}`);
   list.innerHTML = sections.join('');
+}
+
+// ⑤ ライブ1日当たりの最大動員数ランキング（会場名(日付)(人)）
+function renderLiveMaxAudienceRanking() {
+  let container = document.getElementById('records-live-ranking-block');
+  const mainPanel = document.getElementById('page-records');
+  if (!mainPanel) return;
+
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'records-live-ranking-block';
+    container.className = 'records-block';
+    mainPanel.appendChild(container);
+  }
+
+  const history = Array.isArray(window.liveHistory) ? [...window.liveHistory] : [];
+  history.sort((a, b) => b.dailyAudience - a.dailyAudience);
+  const topLive = history.slice(0, 10);
+
+  const rows = topLive.length > 0
+    ? topLive.map((item, idx) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #eee; font-size:12px;">
+          <span><strong>${idx + 1}.</strong> ${escapeHtml(item.venueName)} <small style="color:#777;">(${escapeHtml(item.date)})</small></span>
+          <span style="font-weight:bold; color:#1976d2;">${item.dailyAudience.toLocaleString()} 人/日</span>
+        </div>
+      `).join('')
+    : '<div class="chart-empty">まだライブ開催の実績がありません</div>';
+
+  container.innerHTML = `
+    <div class="records-block-title">ライブ1日当たりの最大動員数ランキング <small>会場名 (日付) (人/日)</small></div>
+    <div style="background:#fff; border:1px solid #eee; border-radius:6px; padding:8px; max-height:220px; overflow-y:auto;">
+      ${rows}
+    </div>
+  `;
 }
 
 // 楽曲詳細（発売後1年間の累積売上推移）をモーダルで開く
@@ -169,7 +244,6 @@ function openSongDetail(songId) {
   if (metaEl) metaEl.textContent = describeSongMeta(song);
   if (chartEl) {
     const history = normalizeSalesHistory(song.salesHistory, SONG_HISTORY_WEEKS);
-    // 発売からの経過週数をラベルにする（発売時は0週）
     const points = history.map((entry, index) => {
       const previous = index > 0 ? history[index - 1].sales : 0;
       const weeksAgo = history.length - 1 - index;
@@ -179,7 +253,7 @@ function openSongDetail(songId) {
       };
     });
     chartEl.innerHTML = song.released
-      ? buildLineChartSvg(points, { gradientId: 'song-detail-gradient', height: 150, ariaLabel: `${song.title}の発売後1年間の売上推移` })
+      ? buildLineChartSvg(points, { gradientId: 'song-detail-gradient', height: 150, ariaLabel: `${song.title}の売上推移` })
       : '<div class="chart-empty">発売後に推移が表示されます</div>';
   }
   if (statsEl) {
@@ -198,7 +272,7 @@ function openSongDetail(songId) {
   modal.style.display = 'flex';
 }
 
-// 楽曲Detailモーダルを閉じる。
+// 楽曲詳細モーダルを閉じる。
 function closeSongDetailModal() {
   const modal = document.getElementById('song-detail-modal');
   if (modal) modal.style.display = 'none';
@@ -207,7 +281,6 @@ function closeSongDetailModal() {
 // ==========================================
 // TVイベント時の演出
 // ==========================================
-// テレビ出演／大型特番／情報メディアの放送で画面演出を出す
 function playTvEventEffect(kind, title) {
   const layer = document.getElementById('tv-fx-layer');
   if (!layer) return;
@@ -226,7 +299,5 @@ function playTvEventEffect(kind, title) {
     </span>
     <span class="tv-fx-bar"></span>`;
   layer.appendChild(card);
-  // 演出は自動消去する（次の描画で残らないようタイマーで消す）
   setTimeout(() => card.remove(), 2600);
 }
-
