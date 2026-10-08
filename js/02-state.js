@@ -11,16 +11,12 @@ let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
 let currentRosterTab = 'selected';
-
-// グッズ管理変数
 let merchandiseProducts = 0;
 let merchandiseStock = 0;
 let merchandiseUnitsSold = 0;
 let merchandiseSellThrough = null;
-let merchandiseItems = [];
-
-// ライブ実績履歴（1日あたりの最大動員数ランキング用）
-let liveHistory = [];
+let merchandiseItems = []; // グッズ開発日管理（1年自動減衰用）
+let liveHistory = [];      // ライブ1日あたり最大動員数ランキング用実績保存配列
 
 let nextLivePromotionPoints = 0;
 let monthlyCdRevenue = 0;
@@ -78,6 +74,12 @@ function createInitialLeagueTeams() {
 let leagueTeams = createInitialLeagueTeams();
 let rivalLiveBookings = [];
 
+const INDIE_GROUP_NAMES = [
+  'アリス・イン・アンダーグラウンド', 'ネオン・パレット', 'プラネット・シスターズ', 
+  'ベール・ド・ノワール', '東京メルヘン倶楽部', 'チェリー・ブロッサムズ', 
+  'サイバー・ドールズ', '月下美人', 'ルーキー・ファクトリー', 'ステラ・ノヴァ'
+];
+
 function isBaseballGameDay(venueName, dateStr) {
   if (!venueName || (!venueName.includes('球場') && !venueName.includes('ドーム'))) {
     return false;
@@ -125,7 +127,111 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
     });
   }
 
+  if (Array.isArray(leagueTeams)) {
+    leagueTeams.forEach(team => {
+      if (team.id === 'player') return;
+      const power = team.basePower || 50;
+      const baseCountPerHalf = Math.min(28, Math.max(16, Math.round((power / 92) * 24)));
+      const targetLiveCount = generateFullYear ? baseCountPerHalf * 2 : baseCountPerHalf;
+      let generatedToursCount = 0;
+      let safetyCounter = 0;
+      const teamBookedDates = new Set();
+
+      while (generatedToursCount < targetLiveCount && safetyCounter < 600) {
+        safetyCounter++;
+        const randomMonthOffset = Math.floor(Math.random() * monthSpan);
+        const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
+        const targetYearOffset = Math.floor((startMonth - 1 + randomMonthOffset) / 12);
+        const bookingYear = actualYear + targetYearOffset;
+        const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
+        let selectedDateObj = null;
+        for (let attempt = 0; attempt < 35; attempt++) {
+          const randomDay = 1 + Math.floor(Math.random() * lastDay);
+          const dObj = new Date(bookingYear, targetMonth - 1, randomDay);
+          const dayOfWeek = dObj.getDay();
+          const weight = dayWeights[dayOfWeek] || 1;
+          if (Math.random() * 15 < weight) { selectedDateObj = dObj; break; }
+        }
+        if (!selectedDateObj) {
+          const randomDay = 1 + Math.floor(Math.random() * lastDay);
+          selectedDateObj = new Date(bookingYear, targetMonth - 1, randomDay);
+        }
+        const chosenVenueObj = venuePool[Math.floor(Math.random() * venuePool.length)];
+        const venueName = chosenVenueObj?.name || '市民会館';
+        const isStadium = venueName.includes('球場') || venueName.includes('ドーム');
+        const durationDays = 2 + Math.floor(Math.random() * 3);
+        const candidateDates = [];
+        let hasConflict = false;
+
+        for (let dIdx = 0; dIdx < durationDays; dIdx++) {
+          const targetDate = new Date(selectedDateObj);
+          targetDate.setDate(selectedDateObj.getDate() + dIdx);
+          if (targetDate.getMonth() + 1 !== targetMonth) break;
+          const dKey = toDateKey(targetDate);
+          if ((isStadium && isBaseballGameDay(venueName, dKey)) || globalBusyDates.has(`${venueName}_${dKey}`) || teamBookedDates.has(dKey)) {
+            hasConflict = true; break;
+          }
+          candidateDates.push(dKey);
+        }
+
+        if (!hasConflict && candidateDates.length > 0) {
+          candidateDates.forEach(dKey => { teamBookedDates.add(dKey); globalBusyDates.add(`${venueName}_${dKey}`); });
+          generatedToursCount++;
+          newRivalBookings.push({
+            id: `${team.id}-${actualYear}-${targetMonth}-${safetyCounter}`,
+            groupId: team.id, groupName: team.name, liveVenue: venueName, venue: venueName, place: venueName,
+            liveName: `${team.name} ${venueName} 公演`, liveDate: candidateDates[0], liveDates: candidateDates, venueDates: candidateDates,
+            status: 'confirmed', type: 'live', hiddenFromPlayer: false
+          });
+        }
+      }
+
+      const cdReleaseCount = generateFullYear ? 4 : 2;
+      for (let j = 0; j < cdReleaseCount; j++) {
+        const cdMonthOffset = Math.floor((j * (monthSpan / cdReleaseCount)) + Math.random() * 2);
+        const targetCdMonth = ((startMonth - 1 + cdMonthOffset) % 12) + 1;
+        const targetCdYearOffset = Math.floor((startMonth - 1 + cdMonthOffset) / 12);
+        const cdBookingYear = actualYear + targetCdYearOffset;
+        let wednesdayStr = getRandomWednesdayKey(cdBookingYear, targetCdMonth);
+        if (!teamBookedDates.has(wednesdayStr)) {
+          teamBookedDates.add(wednesdayStr);
+          newRivalBookings.push({
+            id: `${team.id}-rel-${cdBookingYear}-${targetCdMonth}-${j}`,
+            groupId: team.id, groupName: team.name, liveVenue: '', venue: '', place: '',
+            liveName: `${team.name} 新曲リリース`, liveDate: wednesdayStr, liveDates: [wednesdayStr], venueDates: [wednesdayStr],
+            status: 'confirmed', type: 'release', hiddenFromPlayer: false
+          });
+        }
+      }
+    });
+  }
+
+  const dummyGroupCount = 100;
+  for (let dIdx = 0; dIdx < dummyGroupCount; dIdx++) {
+    const randomMonthOffset = Math.floor(Math.random() * monthSpan);
+    const targetMonth = ((startMonth - 1 + randomMonthOffset) % 12) + 1;
+    const targetYearOffset = Math.floor((startMonth - 1 + randomMonthOffset) / 12);
+    const bookingYear = actualYear + targetYearOffset;
+    const lastDay = new Date(bookingYear, targetMonth, 0).getDate();
+    const randomDay = 1 + Math.floor(Math.random() * lastDay);
+    const dKey = toDateKey(new Date(bookingYear, targetMonth - 1, randomDay));
+    const chosenVenueObj = venuePool[Math.floor(Math.random() * venuePool.length)];
+    const venueName = chosenVenueObj?.name || '市民会館';
+    const isStadium = venueName.includes('球場') || venueName.includes('ドーム');
+    if ((isStadium && isBaseballGameDay(venueName, dKey)) || globalBusyDates.has(`${venueName}_${dKey}`)) continue;
+    globalBusyDates.add(`${venueName}_${dKey}`);
+    newRivalBookings.push({
+      id: `dummy-group-${dIdx}`, groupId: 'dummy', groupName: '', liveVenue: venueName, venue: venueName, place: venueName,
+      liveName: '貸切公演', liveDate: dKey, liveDates: [dKey], venueDates: [dKey], status: 'confirmed', type: 'dummy', hiddenFromPlayer: true
+    });
+  }
   rivalLiveBookings = newRivalBookings;
+}
+
+try {
+  if (typeof leagueTeams !== 'undefined') generateRivalsAndGeneralSchedule(1, 1, true);
+} catch (e) {
+  console.warn('Initial generateRivalsAndGeneralSchedule warning:', e);
 }
 
 function getRandomWednesdayKey(year, month) {
@@ -216,6 +322,10 @@ function getManagerMonthlySalary(manager) {
   return (MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL) / 12;
 }
 
+function getManagerAnnualSalary(manager) {
+  return MANAGER_YEARLY_BASE + getManagerSkillTotal(manager) * MANAGER_YEARLY_PER_LEVEL;
+}
+
 function getTotalManagerMonthlySalary() {
   return managers.reduce((total, m) => total + getManagerMonthlySalary(m), 0);
 }
@@ -256,9 +366,9 @@ function refreshManagerMarket() {
 }
 
 function hireManagerFromMarket(candidateId) {
-  if (managers.length >= MANAGER_HIRE_LIMIT) return;
+  if (managers.length >= MANAGER_HIRE_LIMIT) { alert(`マネージャーは最大${MANAGER_HIRE_LIMIT}名までです。`); return; }
   const candidate = managerMarketCandidates.find(item => item.id === candidateId);
-  if (!candidate || funds < MANAGER_HIRE_COST) return;
+  if (!candidate || funds < MANAGER_HIRE_COST) { alert('採用資金が不足しています。'); return; }
   funds -= MANAGER_HIRE_COST;
   managers.push({ id: `manager-${Date.now()}-${Math.floor(Math.random() * 10000)}`, name: candidate.name, birthYear: candidate.birthYear, age: candidate.age, skills: { ...candidate.skills }, resignAge: candidate.resignAge, joinedYear: currentYear });
   managerMarketCandidates = managerMarketCandidates.filter(item => item.id !== candidateId);
@@ -270,7 +380,8 @@ function fireManager(managerId) {
   const index = managers.findIndex(item => item.id === managerId);
   if (index < 0) return;
   const cost = getManagerFireCost(managers[index]);
-  if (funds < cost || !confirm(`解雇料 ${formatMoney(cost)} を支払って解雇しますか？`)) return;
+  if (funds < cost) { alert('解雇料が不足しています。'); return; }
+  if (!confirm(`解雇料 ${formatMoney(cost)} を支払って解雇しますか？`)) return;
   funds -= cost;
   managers.splice(index, 1);
   updateUI();
@@ -290,8 +401,28 @@ function getManagerSkillTier(skillId) {
   return { total, label: current.label, multiplier: current.multiplier };
 }
 
+function getSpecialTrainingMultiplier() {
+  return Math.round(SPECIAL_TRAINING_MULTIPLIER * getManagerSkillTier('leadership').multiplier * 100) / 100;
+}
+
+function getSpecialTrainingTargetLimit() {
+  const tier = getManagerSkillTier('scheduling');
+  return tier.total >= 25 ? 3 : (tier.total >= 15 ? 2 : 1);
+}
+
+function getSpecialTrainingStaminaReduction() { return 0.5; }
+function getSpecialTrainingRiskReduction() { return 0.5; }
+
 function toDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function isStadiumVenue(venue) {
+  return Boolean(venue && (venue.name.includes('球場') || venue.name.includes('ドーム')));
+}
+
+function getLiveBookingLeadDays(venue) {
+  return isStadiumVenue(venue) ? 180 : 45;
 }
 
 function formatMoney(value) {
@@ -317,6 +448,10 @@ function syncGameCalendar() {
   currentWeek = Math.ceil(date.getDate() / 7);
 }
 
+function normalizeLeagueTeams(teams) {
+  return Array.isArray(teams) ? teams : createInitialLeagueTeams();
+}
+
 function initializeNewGameStateBase() {
   currentYear = 1; currentMonth = 1; currentWeek = 1;
   calendarYear = new Date().getFullYear();
@@ -327,9 +462,20 @@ function initializeNewGameStateBase() {
   liveHistory = [];
   nextLivePromotionPoints = 0; monthlyCdRevenue = 0; monthlyTieUpRevenue = 0;
   monthlyLedger = createMonthlyLedger(); pendingMonthlyReport = null; promoSongId = '';
-  funds = INITIAL_FUNDS; leagueTeams = createInitialLeagueTeams(); songs = [];
-  pendingPerformanceOffers = []; scheduledPerformances = []; specialOffersSent = [];
-  weeklySchedule = null; lastWeekSchedule = null; savedCleanWeekSchedule = null;
+  crisisCheckWeekKey = ''; crisisEventWeekKey = ''; crisisEventType = '';
+  pendingCrisisResponse = null; randomEventCheckWeekKey = ''; pendingRandomEvent = null; armedRandomEvents = [];
+  pendingSelectionEvent = null; selectionLock = null; lastAnnouncedCenterId = null;
+  shownAbilityMemberIds = new Set(); fanClub = null; fanClubFoundedYear = 0; pendingFanClubEvent = null;
+  industryOfferCheckWeekKey = ''; pendingIndustryOffer = null; specialLiveEvents = [];
+  pendingEquipmentEvent = null; equipmentDowngradeCheckWeekKey = ''; groupCrisis = 55;
+  officeUpgrades = createInitialOfficeUpgrades(); yearlyStats = { sales: 0, audience: 0 };
+  lifetimeSales = 0; salesHistory = []; fansFromSales = 0; funds = INITIAL_FUNDS;
+  leagueTeams = createInitialLeagueTeams(); songs = []; pendingPerformanceOffers = [];
+  scheduledPerformances = []; specialOffersSent = []; weeklySchedule = null;
+  lastWeekSchedule = null; savedCleanWeekSchedule = null; previousYearGroupFansAtYearStart = 0;
+  groupFansAtYearStart = 0; yearEndAwardProcessed = false; yearEndKohakuProcessed = false;
+  generateRivalsAndGeneralSchedule(currentYear, currentMonth, true);
+
   idolRoster = [];
   for (let i = 0; i < 30; i++) {
     const startAge = Math.floor(Math.random() * 9) + 14;
@@ -359,10 +505,34 @@ function applySavedGameBase(data) {
   monthlyCdRevenue = data.monthlyCdRevenue || 0;
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
   monthlyLedger = data.monthlyLedger && Array.isArray(data.monthlyLedger.income) ? data.monthlyLedger : createMonthlyLedger();
+  pendingMonthlyReport = data.pendingMonthlyReport || null;
+  promoSongId = data.promoSongId || '';
+  crisisCheckWeekKey = data.crisisCheckWeekKey || '';
+  crisisEventWeekKey = data.crisisEventWeekKey || '';
+  crisisEventType = data.crisisEventType || '';
+  pendingCrisisResponse = data.pendingCrisisResponse || null;
+  randomEventCheckWeekKey = data.randomEventCheckWeekKey || '';
+  pendingRandomEvent = restorePendingRandomEvent(data.pendingRandomEvent);
+  armedRandomEvents = Array.isArray(data.armedRandomEvents) ? data.armedRandomEvents : [];
+  pendingSelectionEvent = data.pendingSelectionEvent || null;
+  selectionLock = data.selectionLock || null;
+  lastAnnouncedCenterId = data.lastAnnouncedCenterId || null;
+  fanClub = data.fanClub || null;
+  fanClubFoundedYear = data.fanClubFoundedYear || 0;
+  pendingFanClubEvent = data.pendingFanClubEvent || null;
+  industryOfferCheckWeekKey = data.industryOfferCheckWeekKey || '';
+  pendingIndustryOffer = data.pendingIndustryOffer || null;
+  specialLiveEvents = data.specialLiveEvents || [];
+  pendingEquipmentEvent = data.pendingEquipmentEvent || null;
+  equipmentDowngradeCheckWeekKey = data.equipmentDowngradeCheckWeekKey || '';
+  groupCrisis = data.groupCrisis ?? 55;
+  officeUpgrades = { ...createInitialOfficeUpgrades(), ...(data.officeUpgrades || {}) };
   funds = data.funds ?? INITIAL_FUNDS;
   yearlyStats = data.yearlyStats || { sales: 0, audience: 0 };
   lifetimeSales = Number.isFinite(data.lifetimeSales) ? data.lifetimeSales : (yearlyStats.sales || 0);
   salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
+  fansFromSales = Number.isFinite(data.fansFromSales) ? data.fansFromSales : getTargetSalesFans();
+  fansFromSales = Math.max(0, Math.min(fansFromSales, getTargetSalesFans()));
   idolRoster = data.idolRoster || [];
   ensureMemberBirthdays(); ensureMemberHeights(); ensureMemberVitalState(); ensureMemberStyleFashion(); syncMemberAges();
   productionSchedule = data.productionSchedule || {};
@@ -377,4 +547,9 @@ function applySavedGameBase(data) {
   refreshManagerMarket();
   groupFansAtYearStart = data.groupFansAtYearStart ?? calculateGroupFans();
   previousYearGroupFansAtYearStart = data.previousYearGroupFansAtYearStart ?? groupFansAtYearStart;
+  yearEndAwardProcessed = Boolean(data.yearEndAwardProcessed);
+  yearEndKohakuProcessed = Boolean(data.yearEndKohakuProcessed);
+  lastLiveDate = data.lastLiveDate || '';
+  weeklyRecoveryDone = false;
+  normalizeLeagueTeams();
 }
