@@ -131,7 +131,7 @@ let fansFromSales = 0;
 function getStatSeedFans() {
   const totalMembers = Array.isArray(idolRoster) ? idolRoster.length : 0;
   const memberFanTotal = idolRoster.reduce((total, member) => total + calculateMemberFans(member), 0);
-  return Math.round((memberFanTotal/totalMembers) * GROUP_FAN_STAT_SEED_RATE);
+  return Math.round((memberFanTotal/totalMembers) * (1+GROUP_FAN_STAT_SEED_RATE));
 }
 
 function getTargetSalesFans() {
