@@ -196,21 +196,52 @@
     }
   }
 
+  function setSaveUserQrStatus(message, isError = true) {
+    const statusEl = document && document.getElementById('save-user-qr-status');
+    if (!statusEl) return;
+    if (!message) {
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
+      return;
+    }
+    statusEl.textContent = message;
+    statusEl.style.display = 'block';
+    statusEl.style.color = isError ? '#b65378' : '#4b5563';
+    statusEl.style.background = isError ? '#fff3f7' : '#f8fafc';
+  }
+
   async function updateCurrentUserQrCode() {
     const qrImage = document && document.getElementById('save-user-qr-image');
     const field = document && document.getElementById('save-user-bundle-output');
+    const statusEl = document && document.getElementById('save-user-qr-status');
     if (!field) return '';
 
     const payload = exportCurrentUserSaveBundleText();
     field.value = payload;
 
+    if (payload.length > 3000) {
+      setSaveUserQrStatus('セーブデータが大きすぎてQRに収まりません。文字列コピーまたは共有を使ってください。');
+      if (qrImage) {
+        qrImage.removeAttribute('src');
+        qrImage.style.display = 'none';
+      }
+      return payload;
+    }
+
     if (qrImage) {
       const qrUrl = await generateQrCodeDataUrl(payload);
       qrImage.src = qrUrl || '';
       qrImage.style.display = qrUrl ? 'block' : 'none';
-      if (!qrUrl && payload && payload.length > 3000) {
+      if (!qrUrl) {
+        setSaveUserQrStatus('QRコードを生成できませんでした。ブラウザを再読み込みしてもう一度お試しください。');
         qrImage.removeAttribute('src');
+      } else {
+        setSaveUserQrStatus('QRコードを表示しました。相手の端末で読み取ってください。', false);
       }
+    }
+
+    if (!statusEl && payload && payload.length <= 3000) {
+      setSaveUserQrStatus('', false);
     }
 
     return payload;
@@ -379,10 +410,12 @@
       qrButton.addEventListener('click', async () => {
         const payload = await updateCurrentUserQrCode();
         if (!payload) {
+          setSaveUserQrStatus('QRコードを生成できませんでした。');
           alert('QRコードを生成できませんでした。');
           return;
         }
         if (payload.length > 3000) {
+          setSaveUserQrStatus('セーブデータが大きすぎてQRに収まりません。文字列コピーまたは共有を使ってください。');
           alert('セーブデータが大きすぎてQRに収まりません。文字列コピーまたは共有を使ってください。');
         }
       });
