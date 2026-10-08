@@ -125,7 +125,7 @@
   }
 
   function exportUserSaveBundleText(options = {}) {
-    return JSON.stringify(exportUserSaveBundle(options), null, 2);
+    return JSON.stringify(exportUserSaveBundle(options));
   }
 
   function importUserSaveBundle(payload, storage = getStorage()) {
@@ -170,13 +170,20 @@
     const qrApi = globalScope && globalScope.QRCode;
     if (!qrApi || typeof qrApi.toDataURL !== 'function') return '';
 
+    if (payloadText.length > 3000) {
+      console.warn('Save payload is too large for QR; use text copy/share fallback instead.', {
+        length: payloadText.length
+      });
+      return '';
+    }
+
     const viewportWidth = globalScope && globalScope.window ? globalScope.window.innerWidth || 0 : 0;
     const isMobileViewport = viewportWidth > 0 && viewportWidth <= 480;
     const defaultWidth = isMobileViewport ? Math.min(240, Math.max(180, viewportWidth - 48)) : 260;
     const settings = Object.assign({
       width: defaultWidth,
       margin: 2,
-      errorCorrectionLevel: 'M',
+      errorCorrectionLevel: 'L',
       color: { dark: '#1f1f1f', light: '#ffffff' }
     }, options);
 
@@ -201,6 +208,9 @@
       const qrUrl = await generateQrCodeDataUrl(payload);
       qrImage.src = qrUrl || '';
       qrImage.style.display = qrUrl ? 'block' : 'none';
+      if (!qrUrl && payload && payload.length > 3000) {
+        qrImage.removeAttribute('src');
+      }
     }
 
     return payload;
@@ -370,6 +380,10 @@
         const payload = await updateCurrentUserQrCode();
         if (!payload) {
           alert('QRコードを生成できませんでした。');
+          return;
+        }
+        if (payload.length > 3000) {
+          alert('セーブデータが大きすぎてQRに収まりません。文字列コピーまたは共有を使ってください。');
         }
       });
     }

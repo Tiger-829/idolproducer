@@ -70,6 +70,10 @@ assert.strictEqual(typeof saveDataManager.bindTitleUserIdentity, 'function');
 assert.strictEqual(typeof saveDataManager.exportUserSaveBundle, 'function');
 assert.strictEqual(typeof saveDataManager.importUserSaveBundle, 'function');
 
+const compactText = saveDataManager.exportUserSaveBundleText({ userId, saveSlots: sampleSlots });
+assert.strictEqual(compactText.includes('\n'), false);
+assert.strictEqual(compactText.includes('  "version"'), false);
+
 const bundle = saveDataManager.exportUserSaveBundle({ userId, saveSlots: sampleSlots });
 assert.strictEqual(bundle.userId, userId);
 assert.deepStrictEqual(bundle.saves[1], sampleSlots[1]);
