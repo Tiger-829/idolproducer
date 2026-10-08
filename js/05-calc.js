@@ -43,30 +43,65 @@ function calculateSingleOverall(stats) {
 }
 
 // ==========================================
-// アイドル力（表現5能力＋体調2能力の平均）
+// アイドル力（ご指定の重み付け計算式に統一）
+// ==========================================
+// ==========================================
+// 個人のアイドル力を算出する関数
 // ==========================================
 function calculateIdolPower(stats) {
   const source = stats || {};
-  const total = IDOL_POWER_STATS.reduce((sum, statId) => sum + (source[statId] || 0), 0);
-  return Math.round(total / IDOL_POWER_STATS.length);
+  
+  const dance = Number(source.dance) || 0;
+  const vocal = Number(source.vocal) || 0;
+  const teamwork = Number(source.teamwork) || 0;
+  const style = Number(source.style) || 0;
+  const fashion = Number(source.fashion) || 0;
+  const stamina = Number(source.stamina) || 0;
+  const recovery = Number(source.recovery) || 0;
+
+  // 指定された数式: (ダンス+歌唱力＋連携力)*2 ＋ スタイル*1.5 ＋ ファッション ＋ (体力＋回復力)/2
+  const individualScore = (((dance + vocal + teamwork) * 2) 
+                        + (style * 1.25) 
+                        + (fashion * 0.75) 
+                        + ((stamina + recovery) / 2))/10;
+
+  return Math.round(individualScore);
 }
 
-// 選抜チームのアイドル力（平均）
+// ==========================================
+// 選抜チーム（または全体）の平均アイドル力を算出する関数
+// ==========================================
 function calculateTeamIdolPower() {
-  const active = idolRoster.filter(m => m.isSelected);
-  const targets = active.length > 0 ? active : idolRoster;
+  const active = Array.isArray(idolRoster) ? idolRoster.filter(m => m && m.isSelected) : [];
+  const targets = active.length > 0 ? active : (Array.isArray(idolRoster) ? idolRoster : []);
   if (!targets.length) return 0;
-  const total = targets.reduce((sum, m) => sum + calculateIdolPower(m.stats), 0);
+
+  // Σ(k=1→n) の総和を計算
+  const total = targets.reduce((sum, m) => {
+    if (!m) return sum;
+    const stats = m.stats || {
+      dance: m.dance,
+      vocal: m.vocal,
+      teamwork: m.teamwork,
+      style: m.style,
+      fashion: m.fashion,
+      stamina: m.stamina,
+      recovery: m.recovery
+    };
+    return sum + calculateIdolPower(stats);
+  }, 0);
+
+  // 1/n * Σ (平均値の算出) ＆ 四捨五入
   return Math.round(total / targets.length);
 }
-
 // 個人推定ファン数
 function calculateMemberFans(member) {
   const stats = member.stats || {};
   return Math.round(
-    (stats.popularity || 0) * 28 +
-    ((stats.vocal || 0) + (stats.dance || 0)) * 9 +
-    (stats.talk || 0) * 5
+    (stats.popularity || 0) * 500 +
+   calculateIdolPower(stats)*500 +
+    (stats.talk || 0) * 100 +
+    (stats.sns || 0) * 75
   );
 }
 
