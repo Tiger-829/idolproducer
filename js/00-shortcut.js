@@ -17,6 +17,7 @@ document.addEventListener('keydown', (e) => {
     // Shiftキーの判定（Ctrl + Shift でページ・モーダルの最上部までスクロールアップ）
     if (e.shiftKey) {
       e.preventDefault();
+      console.log('Ctrl + Shift shortcut triggered: Scrolling to top');
 
       // 現在開いているモーダルを検出
       const openModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], #decision-modal, [id$="-modal"]');
@@ -24,9 +25,12 @@ document.addEventListener('keydown', (e) => {
       // モーダルが実際に開いている場合（かつ非表示ではない場合）は、モーダル内のみをスクロール
       if (openModal && openModal.style.display !== 'none') {
         const scrollTarget = openModal.querySelector('.modal-content, .modal-body, div[style*="overflow"]') || openModal;
+        scrollTarget.scrollTop = 0; // 強制的にトップへ
         scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         // モーダルが開いていない通常ウィンドウの場合のみ、ウィンドウをスクロール
+        document.documentElement.scrollTop = 0; // HTML要素を直接トップへ
+        document.body.scrollTop = 0; // Safari等への保険
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
       return;
