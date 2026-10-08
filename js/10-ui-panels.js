@@ -91,13 +91,14 @@ function switchPage(page) {
 // ==========================================
 // 📊 記録タブ（ファン数推移グラフ）10.js完結描画処理
 // ==========================================
-// ==========================================
-// 📊 記録タブ（ファン数推移・履歴一覧表示版）
-// ==========================================
-function renderRecordsPanel() {
-  const panel = document.getElementById('page-records');
-  if (!panel) return;
 
+function renderRecordsPanel() {
+  console.log("★ renderRecordsPanel が正常に実行されました！"); // ← ここでログが出るか確認
+  const panel = document.getElementById('page-records');
+  if (!panel) {
+    console.warn("⚠ #page-records が見つかりません！");
+    return;
+  }
   // player.fanHistory からデータを取得（なければ空配列）
   const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
     ? player.fanHistory
