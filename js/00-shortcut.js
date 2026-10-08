@@ -59,7 +59,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         if (typeof openHelpModal === 'function') openHelpModal();
         break;
-      case 'pageup': // Ctrl + PageUp : ページ・モーダルの最上部までスクロール
+      case 'shift': // Ctrl + shift : ページ・モーダルの最上部までスクロール
         e.preventDefault();
         const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content');
         if (activeModal) {
