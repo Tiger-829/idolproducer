@@ -3,7 +3,7 @@
 // ==========================================
 
 document.addEventListener('keydown', (e) => {
-  // 1. テキスト入力中（インプットやテキストエリア、コンテンツエディタ）はゲーム用ショートカットを無効化
+  // 1. テキスト入力中はゲーム用ショートカットを無効化
   const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
   if (activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.isContentEditable) {
     return;
@@ -14,24 +14,41 @@ document.addEventListener('keydown', (e) => {
     const key = e.key;
     const lowerKey = key.toLowerCase();
 
-    // Shiftキーの判定（Ctrl + Shift でページ・モーダルの最上部までスクロールアップ）
+    // Shiftキーの判定（Ctrl + Shift で最上部までスクロール）
     if (e.shiftKey) {
       e.preventDefault();
       console.log('Ctrl + Shift shortcut triggered: Scrolling to top');
 
-      // 現在開いているモーダルを検出
+      // ① 現在開いているモーダルを特定
       const openModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], #decision-modal, [id$="-modal"]');
-      
-      // モーダルが実際に開いている場合（かつ非表示ではない場合）は、モーダル内のみをスクロール
-      if (openModal && openModal.style.display !== 'none') {
-        const scrollTarget = openModal.querySelector('.modal-content, .modal-body, div[style*="overflow"]') || openModal;
-        scrollTarget.scrollTop = 0; // 強制的にトップへ
-        scrollTarget.scrollTo({ top: 0, behavior: 'smooth' });
+      const isModalOpen = openModal && window.getComputedStyle(openModal).display !== 'none';
+
+      if (isModalOpen) {
+        // モーダルが開いている場合：モーダル内またはその内部で実際にスクロール可能な要素を探索してトップへ
+        let target = openModal.querySelector('.modal-content, .modal-body');
+        if (!target || target.scrollHeight <= target.clientHeight) {
+          // もし専用クラスがなければ、モーダル内の子要素でスクロールバーを持つものを探す
+          const allEls = openModal.querySelectorAll('*');
+          for (const el of allEls) {
+            const style = window.getComputedStyle(el);
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+              target = el;
+              break;
+            }
+          }
+        }
+        
+        // 見つかったターゲット、またはモーダル本体を最上部に
+        const finalTarget = target || openModal;
+        finalTarget.scrollTop = 0;
+        finalTarget.scrollTo({ top: 0, behavior: 'smooth' });
+        console.log('Scrolled modal target to top:', finalTarget);
       } else {
-        // モーダルが開いていない通常ウィンドウの場合のみ、ウィンドウをスクロール
-        document.documentElement.scrollTop = 0; // HTML要素を直接トップへ
-        document.body.scrollTop = 0; // Safari等への保険
+        // 通常ウィンドウの場合：ウィンドウ全体を最上部に
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        console.log('Scrolled window to top');
       }
       return;
     }
