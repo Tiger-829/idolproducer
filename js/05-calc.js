@@ -98,10 +98,10 @@ function calculateTeamIdolPower() {
 function calculateMemberFans(member) {
   const stats = member.stats || {};
   return Math.round(
-    (stats.popularity || 0) * 500 +
-   calculateIdolPower(stats)*500 +
+    (stats.popularity || 0) * 250 +
+   calculateIdolPower(stats)*200 +
     (stats.talk || 0) * 100 +
-    (stats.sns || 0) * 75
+    (stats.sns || 0) * 50
   );
 }
 
@@ -130,7 +130,7 @@ let fansFromSales = 0;
 
 function getStatSeedFans() {
   const memberFanTotal = idolRoster.reduce((total, member) => total + calculateMemberFans(member), 0);
-  return Math.round(memberFanTotal * 0.65 * GROUP_FAN_STAT_SEED_RATE);
+  return Math.round((memberFanTotal/targets.length) * 0.65 * GROUP_FAN_STAT_SEED_RATE);
 }
 
 function getTargetSalesFans() {
