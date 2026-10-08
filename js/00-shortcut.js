@@ -15,7 +15,7 @@ document.addEventListener('keydown', (e) => {
     const lowerKey = key.toLowerCase();
 
     // Shiftキーの判定（最上部までスクロールアップ）
-    if (e.shiftKey) {
+    if (lowerKey === 'shift') {
       e.preventDefault();
 
       // 現在開いているモーダルを検出
