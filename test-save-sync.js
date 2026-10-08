@@ -46,6 +46,8 @@ assert.strictEqual(parsed.userId, userId);
 assert.strictEqual(parsed.saves[1].currentYear, 2);
 assert.strictEqual(parsed.saves[2].funds, 1500000);
 assert.deepStrictEqual(saveDataManager.importSyncPayload(parsed), { userId, importedSlots: 2 });
+assert.strictEqual(typeof saveDataManager.importSyncPayloadFromFile, 'function');
+assert.strictEqual(typeof saveDataManager.bindTitleUserIdentity, 'function');
 
 const plan = {
   liveVenue: '東京ドーム',

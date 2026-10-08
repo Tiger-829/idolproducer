@@ -25,22 +25,31 @@
       <h1>日本一のアイドルプロデューサーになろう</h1>
       <p>セーブデータを選択してください</p>
     </header>
+    <div class="save-sync-panel" style="margin: 0 auto 12px; max-width: 360px; background: rgba(255,255,255,0.7); border: 1px solid #f0d5e3; border-radius: 8px; padding: 10px; box-sizing: border-box;">
+      <label style="display:block; font-size:11px; color:#555; font-weight:bold;">
+        ユーザー名
+        <input id="title-user-name" type="text" maxlength="32" placeholder="例: user-name" style="width:100%; margin-top:4px; box-sizing:border-box; padding:6px; border:1px solid #d8d8d8; border-radius:4px; font-size:12px;">
+      </label>
+    </div>
     <div class="save-slots" id="save-slots"></div>
 
     <div class="save-sync-panel" style="margin: 18px auto 0; max-width: 760px; background: rgba(255,255,255,0.7); border: 1px solid #f0d5e3; border-radius: 8px; padding: 12px; box-sizing: border-box;">
+      <div style="font-size:11px; color:#666; margin-bottom:10px; line-height:1.5;">同じユーザーIDで、同期ファイルを保存して別端末で選ぶだけでセーブを受け渡せます。テキスト貼り付けも残しています。</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px;">
         <label style="flex:1; min-width: 180px; font-size: 11px; color:#555; font-weight: bold;">
           同期用ユーザーID
           <input id="save-sync-user-id" type="text" maxlength="32" placeholder="例: user-name" style="width:100%; margin-top:4px; box-sizing:border-box; padding:6px; border:1px solid #d8d8d8; border-radius:4px; font-size:12px;">
         </label>
-        <button id="save-sync-export-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期コード生成</button>
+        <button id="save-sync-export-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期ファイル生成</button>
         <button id="save-sync-copy-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">コピー</button>
       </div>
-      <textarea id="save-sync-json-output" rows="8" readonly placeholder="同期コードがここに表示されます。別端末に貼り付けて取り込みます。" style="width:100%; box-sizing:border-box; resize:vertical; border:1px solid #e3d6df; border-radius:6px; padding:8px; font-size:11px; background:#fffafc; color:#333;"></textarea>
+      <textarea id="save-sync-json-output" rows="8" readonly placeholder="同期ファイルの内容がここに表示されます。別端末でファイルを開いて取り込めます。" style="width:100%; box-sizing:border-box; resize:vertical; border:1px solid #e3d6df; border-radius:6px; padding:8px; font-size:11px; background:#fffafc; color:#333;"></textarea>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-        <button id="save-sync-import-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期コードを反映</button>
+        <button id="save-sync-upload-btn" class="main-btn" type="button" style="padding: 8px 12px;">同期ファイルを選ぶ</button>
+        <button id="save-sync-import-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">コードを反映</button>
         <button id="save-sync-download-btn" class="ghost-btn" type="button" style="padding: 8px 12px;">JSONを保存</button>
       </div>
+      <input id="save-sync-file-input" type="file" accept=".json,application/json" style="display:none;">
     </div>
 
     <div class="title-actions">

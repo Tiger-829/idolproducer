@@ -112,6 +112,34 @@
     return { userId: targetUserId, importedSlots };
   }
 
+  function importSyncPayloadFromText(payloadText, storage = getStorage()) {
+    const trimmed = typeof payloadText === 'string' ? payloadText.trim() : '';
+    if (!trimmed) {
+      throw new Error('同期コードが空です。');
+    }
+
+    const result = importSyncPayload(trimmed, storage);
+    if (typeof renderSaveSlots === 'function') {
+      renderSaveSlots();
+    }
+    return result;
+  }
+
+  async function importSyncPayloadFromFile(file, storage = getStorage()) {
+    if (!file) return null;
+
+    const text = typeof file.text === 'function'
+      ? await file.text()
+      : await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error('同期ファイルの読み込みに失敗しました。'));
+          reader.readAsText(file);
+        });
+
+    return importSyncPayloadFromText(text, storage);
+  }
+
   function writeSyncPayloadToField() {
     const field = document && document.getElementById('save-sync-json-output');
     if (!field) return '';
@@ -149,10 +177,7 @@
     }
 
     try {
-      const result = importSyncPayload(field.value.trim());
-      if (typeof renderSaveSlots === 'function') {
-        renderSaveSlots();
-      }
+      const result = importSyncPayloadFromText(field.value.trim());
       alert(`ユーザー「${result.userId}」のセーブを ${result.importedSlots} 件取り込みました。`);
       return result;
     } catch (error) {
@@ -160,6 +185,50 @@
       alert(error.message || '同期データを取り込めませんでした。');
       return null;
     }
+  }
+
+  function bindTitleUserIdentity() {
+    if (!document) return getUserId();
+
+    const storage = getStorage();
+    const legacyValue = storage ? storage.getItem(USER_ID_KEY) : null;
+    if (!legacyValue && storage) {
+      storage.setItem(USER_ID_KEY, 'guest-user');
+    }
+
+    const titleInput = document.getElementById('title-user-name');
+    const syncInput = document.getElementById('save-sync-user-id');
+    const syncValue = getUserId();
+
+    const applyUserId = (nextValue) => {
+      const normalized = normalizeUserId(nextValue || syncValue);
+      setUserId(normalized);
+      if (titleInput) titleInput.value = normalized;
+      if (syncInput) syncInput.value = normalized;
+      return normalized;
+    };
+
+    if (titleInput) {
+      titleInput.value = syncValue;
+      titleInput.addEventListener('change', (event) => {
+        applyUserId(event.target.value);
+      });
+      titleInput.addEventListener('blur', (event) => {
+        applyUserId(event.target.value);
+      });
+    }
+
+    if (syncInput) {
+      syncInput.value = syncValue;
+      syncInput.addEventListener('change', (event) => {
+        applyUserId(event.target.value);
+      });
+      syncInput.addEventListener('blur', (event) => {
+        applyUserId(event.target.value);
+      });
+    }
+
+    return getUserId();
   }
 
   function registerSaveSyncUi() {
@@ -170,8 +239,12 @@
       userInput.value = getUserId();
       userInput.addEventListener('change', (event) => {
         setUserId(event.target.value);
+        const titleInput = document.getElementById('title-user-name');
+        if (titleInput) titleInput.value = getUserId();
       });
     }
+
+    bindTitleUserIdentity();
 
     const exportButton = document.getElementById('save-sync-export-btn');
     if (exportButton) {
@@ -189,6 +262,27 @@
 
     const importButton = document.getElementById('save-sync-import-btn');
     if (importButton) importButton.addEventListener('click', importSyncPayloadFromField);
+
+    const uploadButton = document.getElementById('save-sync-upload-btn');
+    const fileInput = document.getElementById('save-sync-file-input');
+    if (uploadButton && fileInput) {
+      uploadButton.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const result = await importSyncPayloadFromFile(file);
+          if (result) {
+            alert(`ユーザー「${result.userId}」のセーブを ${result.importedSlots} 件取り込みました。`);
+          }
+        } catch (error) {
+          console.error(error);
+          alert(error.message || '同期ファイルを取り込めませんでした。');
+        } finally {
+          fileInput.value = '';
+        }
+      });
+    }
 
     const downloadButton = document.getElementById('save-sync-download-btn');
     if (downloadButton) {
@@ -220,6 +314,9 @@
     buildSyncEnvelope,
     exportSyncPayload,
     importSyncPayload,
+    importSyncPayloadFromText,
+    importSyncPayloadFromFile,
+    bindTitleUserIdentity,
     writeSyncPayloadToField,
     copySyncPayloadToClipboard,
     importSyncPayloadFromField,
