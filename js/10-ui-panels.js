@@ -91,81 +91,56 @@ function switchPage(page) {
 // ==========================================
 // 📊 記録タブ（ファン数推移グラフ）10.js完結描画処理
 // ==========================================
+// ==========================================
+// 📊 記録タブ（ファン数推移・履歴一覧表示版）
+// ==========================================
 function renderRecordsPanel() {
   const panel = document.getElementById('page-records');
   if (!panel) return;
+
+  // player.fanHistory からデータを取得（なければ空配列）
+  const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
+    ? player.fanHistory
+    : [];
+
+  // 履歴データを新しい順、または古い順に並び替え（ここでは新しい順に表示）
+  const sortedHistory = [...historyData].reverse();
+
+  const historyRows = sortedHistory.length > 0
+    ? sortedHistory.map(item => `
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">${escapeHtml(item.date)}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: #2e7d32;">
+            ${Number(item.fans).toLocaleString()} 人
+          </td>
+        </tr>
+      `).join('')
+    : '<tr><td colspan="2" style="padding: 16px; text-align: center; color: #888;">まだファン数の履歴データがありません。<br>週間サイクルが進むと自動で記録されます。</td></tr>';
 
   panel.innerHTML = `
     <h2 class="page-title">グループの記録・推移</h2>
     <div class="schedule-block">
       <div class="schedule-block-title">過去1年のファン数推移 <small>週次集計（直近52週）</small></div>
-      <div style="position: relative; width: 100%; height: 320px; margin-top: 12px;">
-        <canvas id="fanHistoryChart"></canvas>
+      
+      <div style="margin-top: 12px; max-height: 350px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; background: #fff;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background: #f5f5f5; text-align: left; position: sticky; top: 0;">
+              <th style="padding: 10px 12px; border-bottom: 2px solid #ddd;">日付（週次）</th>
+              <th style="padding: 10px 12px; border-bottom: 2px solid #ddd; text-align: right;">グループファン数</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${historyRows}
+          </tbody>
+        </table>
       </div>
+
       <div class="schedule-note" style="margin-top: 12px;">
         ※毎週の週間サイクル進行時に自動記録され、1年（52週）を超えた古いデータは自動で整理されます。
       </div>
     </div>
   `;
-
-  try {
-    const canvas = document.getElementById('fanHistoryChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    // player.fanHistory からデータを取得（なければ空配列）
-    const historyData = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory))
-      ? player.fanHistory
-      : [];
-
-    const labels = historyData.map(item => item.date);
-    const dataValues = historyData.map(item => item.fans);
-
-    // 既にグローバル領域にChartインスタンスがあれば破棄
-    if (window.fanChartInstance instanceof Chart) {
-      window.fanChartInstance.destroy();
-    }
-
-    // Chart.jsによる折れ線グラフの構築
-    window.fanChartInstance = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'グループファン数',
-          data: dataValues,
-          borderColor: '#2e7d32',
-          backgroundColor: 'rgba(46, 125, 50, 0.1)',
-          borderWidth: 2,
-          fill: true,
-          tension: 0.1,
-          pointRadius: 3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: false,
-            ticks: {
-              callback: function(value) {
-                return value.toLocaleString() + '人';
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: true,
-            position: 'top'
-          }
-        }
-      }
-    });
-  } catch (err) {
-    console.warn('Fan history chart render error:', err);
-  }
 }
 
 // ライバルチームパワーを取得する。
