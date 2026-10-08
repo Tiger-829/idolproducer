@@ -14,7 +14,7 @@ document.addEventListener('keydown', (e) => {
     const key = e.key;
     const lowerKey = key.toLowerCase();
 
-    // Shiftキーの判定（最上部までスクロール）
+    // Shiftキーの判定（ページ・モーダルの最上部までスクロールアップ）
     if (e.shiftKey) {
       e.preventDefault();
       const activeModal = document.querySelector('.modal[style*="display: flex"], .modal[style*="display: block"], .modal-content, #decision-modal');
@@ -84,11 +84,13 @@ document.addEventListener('keydown', (e) => {
         break;
       case '1': // Ctrl + 1 : ランダムイベント等で上の選択肢を選択
       case '2': // Ctrl + 2 : ランダムイベント等で下の選択肢を選択
-        const choiceIndex = lowerKey === '1' ? 0 : 1;
-        const choiceButtons = document.querySelectorAll('.random-event-choice-btn, .event-choice-btn');
-        if (choiceButtons.length > choiceIndex) {
-          e.preventDefault();
-          choiceButtons[choiceIndex].click();
+        {
+          const choiceIndex = lowerKey === '1' ? 0 : 1;
+          const choiceButtons = document.querySelectorAll('.random-event-choice-btn, .event-choice-btn');
+          if (choiceButtons.length > choiceIndex) {
+            e.preventDefault();
+            choiceButtons[choiceIndex].click();
+          }
         }
         break;
     }
