@@ -167,8 +167,8 @@ function renderLiveSlotHtml(month, index, slot) {
   const seatOptions = slot.seatOptions || {};
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const slotVenue = venues.find(v => v.name === slot.liveVenue) || null;
-  const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : (slot.liveDates || []));
-  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+ // 修正後（チェックを外した状態＝空配列を正しく維持する）
+  const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : []);const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
   const hasDates = Array.isArray(slot.liveDates) && slot.liveDates.length > 0;
   const hasVenue = Boolean(slot.liveVenue);
   const showDetails = hasVenue || hasDates;
@@ -932,7 +932,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         liveName: e.liveName,
         liveDate: e.liveDate,
         liveDates: e.liveDates || [],
-        streamDates: e.streamDates || e.liveDates || [],
+        streamDates: Array.isArray(e.streamDates) ? e.streamDates : [],
         seatPrices: e.seatPrices || {},
         seatOptions: e.seatOptions || {}
       })) : [];
