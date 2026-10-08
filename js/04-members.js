@@ -76,10 +76,24 @@ function generateBirthday(birthYear = null, preferredMonth = null, preferredWeek
 const MEMBER_HEIGHT_MIN = 148.0;
 const MEMBER_HEIGHT_MAX = 172.0;
 
-// 身長を小数第一位で生成する
-function generateMemberHeight() {
-  const range = MEMBER_HEIGHT_MAX - MEMBER_HEIGHT_MIN;
-  return Math.round((MEMBER_HEIGHT_MIN + Math.random() * range) * 10) / 10;
+// 身長を小数第一位で生成する（年齢を引数で受け取る仕様に変更）
+function generateMemberHeight(age) {
+  let upperLimit = MEMBER_HEIGHT_MAX;
+  
+  if (age === 14 || age === 15) {
+    upperLimit = 158.0;
+  } else if (age === 16 || age === 17) {
+    upperLimit = 163.0;
+  } else if (age === 18 || age === 19) {
+    upperLimit = 168.0;
+  }
+  // 20歳以降（それ以降）は上限なしのため、MEMBER_HEIGHT_MAX をそのまま（または必要に応じた上限値に）使用します
+
+  // 実際の最大値は、全体の上限（MEMBER_HEIGHT_MAX）と年齢別上限の低い方に合わせる
+  const actualMax = Math.min(upperLimit, MEMBER_HEIGHT_MAX);
+  const range = actualMax - MEMBER_HEIGHT_MIN;
+  
+  return Math.round((MEMBER_HEIGHT_MIN + Math.random() * Math.max(0, range)) * 10) / 10;
 }
 
 // 身長の表示（データが無い場合は "--"）
