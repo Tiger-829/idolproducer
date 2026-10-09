@@ -328,7 +328,7 @@ function renderWeeklyScheduleControls() {
     { id: 'goods-production', name: 'グッズ制作' }
   ];
 
-  // ★ グッズ制作（goods-production）を週メニューのスルロット選択肢から除外
+  // ★ グッズ制作（goods-production）を週メニューのスロット選択肢から除外
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed && item.id !== 'goods-production').map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
@@ -811,7 +811,7 @@ function getOfficeDowngradeRefund(facility, level = (officeUpgrades?.[facility?.
 
 function downgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
-  const facility = OFFICE_FACILITIES.find(item => item.name === facilityId);
+  const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
   if (!facility) return;
   const level = officeUpgrades?.[facilityId] ?? 0;
   if (level <= 1) {
