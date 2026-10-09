@@ -513,7 +513,7 @@ function updateEventDateNote(month, index) {
   const exp = calculateEventExpenses(eventName, venue, dates);
   const venueNameStr = venue ? venue.name : '会場未選択';
 
-  note.innerHTML = `開催日数: ${dates.length}日 (${venueNameStr})<br>ベース費用: ${formatMoney(exp.baseCost)} / 会場使用料(${dates.length}+1日): ${formatMoney(exp.venueFee)}（合計経費: ${formatMoney(exp.totalCost)}）`;
+  note.innerHTML = `開催日数: ${dates.length}日 (${venueNameStr})<br>ベース費用: ${formatMoney(exp.baseCost)} / 会場使用料: ${formatMoney(exp.venueFee)}（合計経費: ${formatMoney(exp.totalCost)}）`;
   renderEmbeddedPlanCalendars();
 }
 
