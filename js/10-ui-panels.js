@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（グッズ制作の事務作業移動 ＆ 週メニューから除外対応）
+// 10-ui-panels.js : 全機能完全保持版（グッズ制作の週メニュー除外＆事務作業追加対応）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -319,16 +319,16 @@ function renderWeeklyScheduleControls() {
     : '';
 
   const fixedSlots = typeof getWeekFixedSlots === 'function' ? getWeekFixedSlots() : new Map();
-  
-  // ★ ここから「グッズ制作（goods-production）」を週メニューから除外
   const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [
     { id: 'vocal', name: 'ボーカルレッスン' },
     { id: 'dance', name: 'ダンスレッスン' },
     { id: 'individual-lesson', name: '個別レッスン' },
     { id: 'rest-day', name: '休養' },
-    { id: 'meal-party', name: '食事会' }
+    { id: 'meal-party', name: '食事会' },
+    { id: 'goods-production', name: 'グッズ制作' }
   ];
 
+  // ★ グッズ制作（goods-production）を週メニューのスルロット選択肢から除外
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed && item.id !== 'goods-production').map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
@@ -448,7 +448,7 @@ function renderWeeklyScheduleControls() {
 
     <!-- 個別レッスン（特別強化統合） -->
     <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで「個別レッスン」を設定した枠で実行</small></div>
+      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで公式サイト等を設定した枠で実行</small></div>
       <div class="schedule-note" style="color: #2e7d32;">
         ※対象外のメンバーは練習を行わず、<strong>休養</strong>します。
       </div>
@@ -811,7 +811,7 @@ function getOfficeDowngradeRefund(facility, level = (officeUpgrades?.[facility?.
 
 function downgradeOfficeFacility(facilityId) {
   if (typeof OFFICE_FACILITIES === 'undefined') return;
-  const facility = OFFICE_FACILITIES.find(item => item.id === facilityId);
+  const facility = OFFICE_FACILITIES.find(item => item.name === facilityId);
   if (!facility) return;
   const level = officeUpgrades?.[facilityId] ?? 0;
   if (level <= 1) {
