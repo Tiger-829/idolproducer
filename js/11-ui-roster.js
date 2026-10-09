@@ -1,5 +1,5 @@
 // ==========================================
-// 11-ui-roster.js : UI描画（完全防護版）
+// 11-ui-roster.js : UI描画（グッズ在庫・種類数リアルタイム反映対応・完全防護版）
 // ==========================================
 
 // UIを更新する。
@@ -45,6 +45,12 @@ function updateUI() {
       const net = (yearlyStats?.streamRevenue || 0) - (yearlyStats?.streamCost || 0);
       streamEl.textContent = `${formatMoney(net)}${yearlyStats?.streamCost ? '（制作費込）' : ''}`;
     }
+
+    // ★ グッズの在庫数と種類数を自動反映
+    const merchStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
+    const merchProds = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
+    setText('txt-merchandise-stock', merchStock.toLocaleString());
+    setText('txt-merchandise-products', merchProds);
 
     const roster = Array.isArray(idolRoster) ? idolRoster : [];
     setText('txt-roster-count', roster.length);
@@ -271,7 +277,6 @@ function toggleMemberAbilities(memberId) {
   if (shownAbilityMemberIds.has(memberId)) shownAbilityMemberIds.delete(memberId);
   else shownAbilityMemberIds.add(memberId);
   
-  // 1. 現在開いているメンバーの details 要素をすべて特定してIDや識別子を保存しておく
   const listUI = document.getElementById('roster-list-ui');
   const openedIds = [];
   if (listUI) {
@@ -280,10 +285,8 @@ function toggleMemberAbilities(memberId) {
     });
   }
 
-  // 2. 再描画実行
   renderRosterList();
 
-  // 3. 再描画直後に、先ほど開いていたインデックスの details を再び開く
   if (listUI) {
     const newDetails = listUI.querySelectorAll('.member-details');
     openedIds.forEach(idx => {
