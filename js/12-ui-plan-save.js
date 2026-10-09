@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 構文・安全対策完全版
+// 12-ui-plan-save.js : 構文・安全対策・予定変更取消機能完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -177,8 +177,8 @@ function renderLiveSlotHtml(month, index, slot) {
   const seatOptions = slot.seatOptions || {};
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const slotVenue = venues.find(v => v.name === slot.liveVenue) || null;
- // 修正後（チェックを外した状態＝空配列を正しく維持する）
-  const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : []);const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : []);
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
   const hasDates = Array.isArray(slot.liveDates) && slot.liveDates.length > 0;
   const hasVenue = Boolean(slot.liveVenue);
   const showDetails = hasVenue || hasDates;
@@ -794,6 +794,163 @@ function applyScheduleAction(month, actionType) {
   renderEmbeddedPlanCalendars();
 }
 
+// ==========================================
+// 12.5 確定済み予定の変更・取消モーダル機能（ボタン押下時のみ4月〜対象月まで表示）
+// ==========================================
+function openModifyExistingPlansModal() {
+  let modal = document.getElementById('modify-plans-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modify-plans-modal';
+    modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;';
+    modal.innerHTML = `
+      <div style="background:#fff; width:90%; max-width:650px; max-height:85vh; border-radius:8px; padding:16px; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:12px;">
+          <h3 style="margin:0; font-size:15px; color:var(--primary);">📅 確定済み予定の変更／取消（4月〜12月度）</h3>
+          <button type="button" onclick="closeModifyExistingPlansModal()" style="background:none; border:none; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>
+        </div>
+        <div id="modify-plans-body" style="overflow-y:auto; flex:1; font-size:12px; display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const bodyEl = document.getElementById('modify-plans-body');
+  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+  const currentY = typeof currentYear !== 'undefined' ? currentYear : 1;
+  const currentM = typeof currentMonth !== 'undefined' ? currentMonth : 1;
+  const maxTargetMonth = planEndM; // 現在策定中の半年計画の終了月（例: 6月や12月）
+
+  let schedulesHtml = '';
+  let itemsCount = 0;
+
+  // ボタンを押したタイミングで、現在から当該計画の終了月（4〜12月など）までの予定を参照・変更できるようにする
+  for (let y = currentY; y <= planYearTarget; y++) {
+    const startMonth = (y === currentY) ? currentM : 1;
+    const endMonth = (y === planYearTarget) ? maxTargetMonth : 12;
+
+    for (let m = startMonth; m <= endMonth; m++) {
+      if (m < 1 || m > 12) continue;
+      const pKey = `${y}-${m}`;
+      const p = (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) ? productionSchedule[pKey] : null;
+      if (!p) continue;
+
+      let details = [];
+      if (p.release && p.release !== 'none') {
+        details.push(`💿 ${p.release === 'album' ? 'アルバム' : 'シングル'} (${p.releaseDate || '日付未定'})`);
+      }
+      if (p.liveVenue) {
+        details.push(`🎤 ライブ: ${p.liveVenue} (${p.liveDate || '日付未定'})`);
+      }
+      if (Array.isArray(p.planEvents) && p.planEvents.length > 0) {
+        details.push(`🎁 特典イベント: ${p.planEvents.length}件`);
+      }
+
+      if (details.length > 0) {
+        itemsCount++;
+        const targetDateStr = p.releaseDate || p.liveDate || `${actualYear}-${String(m).padStart(2, '0')}-01`;
+        schedulesHtml += `
+          <div style="border:1px solid #eadde1; padding:8px; border-radius:6px; background:#fafafa; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong>${y}年${m}月</strong><br>
+              <span style="color:#555; font-size:11px;">${details.join(' / ')}</span>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="main-btn" type="button" onclick="requestModifyExistingPlan('${pKey}', '${targetDateStr}', ${m})" style="padding:4px 8px; font-size:10px;">編集・変更</button>
+              <button class="danger-btn" type="button" onclick="requestCancelExistingPlan('${pKey}', '${targetDateStr}')" style="padding:4px 8px; font-size:10px;">取り消し</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  bodyEl.innerHTML = `
+    <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
+      ℹ️ ルール：実施予定日まで「半年〜3ヶ月前」は追加1割増・変更2割追加・取消3割支払い。「3ヶ月〜1ヶ月前」は追加2割増・変更不可・取消5割支払い。「1ヶ月前を切った場合」はどの操作も不可となります。
+    </div>
+    ${itemsCount > 0 ? schedulesHtml : '<div style="color:#888; text-align:center; padding:20px;">対象期間に該当する変更可能な確定済み予定はありません。</div>'}
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closeModifyExistingPlansModal() {
+  const modal = document.getElementById('modify-plans-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function requestModifyExistingPlan(pKey, targetDateStr, month) {
+  if (!targetDateStr) {
+    alert('対象の日付が不明なため変更できません。');
+    return;
+  }
+  const targetDate = new Date(`${targetDateStr}T12:00:00`);
+  const currentGameDate = getGameDateObject();
+  const diffDays = Math.round((targetDate - currentGameDate) / 86400000);
+
+  if (diffDays <= 30) {
+    alert('実施予定日の1か月前を切っているため、変更を行うことはできません。');
+    return;
+  }
+
+  if (diffDays <= 90) {
+    alert('実施予定日まで3ヶ月以内（3ヶ月〜1ヶ月前）の期間に入っているため、この予定の変更は不可となっています。');
+    return;
+  }
+
+  let addFeeRate = 0.1; // 半年〜3ヶ月前は追加1割増・変更2割追加
+  let rangeStr = '半年〜3ヶ月前';
+  if (diffDays > 90 && diffDays <= 180) {
+    addFeeRate = 0.2; // 2割追加
+  }
+
+  if (!confirm(`【予定の変更 (${rangeStr})】\nこの予定の変更を行います。\n手数料として、変更に伴う費用に ${addFeeRate * 100}% の追加料金が適用されます。続行しますか？`)) {
+    return;
+  }
+
+  closeModifyExistingPlansModal();
+  closeDecisionModal();
+  // 該当月にフォーカスして計画策定モーダルを開き直す、または該当月の編集へ誘導
+  openDecisionModal(`予定の変更・再調整（${month}月）`, planYearTarget, month, month);
+  setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。`);
+}
+
+function requestCancelExistingPlan(pKey, targetDateStr) {
+  if (!targetDateStr) {
+    alert('対象の日付が不明なため処理できません。');
+    return;
+  }
+  const targetDate = new Date(`${targetDateStr}T12:00:00`);
+  const currentGameDate = getGameDateObject();
+  const diffDays = Math.round((targetDate - currentGameDate) / 86400000);
+
+  if (diffDays <= 30) {
+    alert('実施予定日の1か月前を切っているため、取り消しを行うことはできません。');
+    return;
+  }
+
+  let penaltyRate = 0.3; // 半年〜3ヶ月前は3割支払い
+  let rangeStr = '半年〜3ヶ月前';
+  if (diffDays <= 90) {
+    penaltyRate = 0.5; // 3ヶ月〜1ヶ月前は5割支払い
+    rangeStr = '3ヶ月〜1ヶ月前';
+  }
+
+  if (!confirm(`【予定の取り消し (${rangeStr})】\nこの予定を取り消します。\nペナルティとして、取消料（違約金）として費用の一部（${penaltyRate * 100}％）が徴収されます。実行しますか？`)) {
+    return;
+  }
+
+  if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
+    delete productionSchedule[pKey];
+  }
+
+  setLog(`【予定取消】 ${pKey} の予定を取り消しました（ペナルティ適用）。`);
+  alert('予定を取り消しました。');
+  closeModifyExistingPlansModal();
+  if (typeof updateUI === 'function') updateUI();
+}
+
 // Decisionモーダルを開く。
 function openDecisionModal(title, yearTarget, startM, endM) {
   try {
@@ -887,9 +1044,14 @@ function openDecisionModal(title, yearTarget, startM, endM) {
         }
       }
 
+      // 確定済み予定の参照表示 ＋ 予定変更／取消を行うボタン（12.5）
+      const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
       summaryBox.innerHTML = `
-        <strong>【現在の進行状況と確定済み予定の参照（${currentY}年${currentM}月〜）】</strong><br>
+        <strong>【確定済み予定（ゲーム内年${gameYearVal}年${currentM}月〜）】</strong><br>
         ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在確定している将来の予定はありません。'}
+        <div style="margin-top: 8px;">
+          <button type="button" class="ghost-btn" onclick="openModifyExistingPlansModal()" style="padding:4px 8px; font-size:11px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">上記予定の変更／取消を行う</button>
+        </div>
       `;
     }
     
