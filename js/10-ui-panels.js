@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（ファン数グラフ完結対応）
+// 10-ui-panels.js : 事務所・編成・各種パネルUI完全版（グッズ制作の事務作業移動 ＆ 週メニューから除外対応）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -87,8 +87,6 @@ function switchPage(page) {
     try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
   }
 }
-
-
 
 // ライバルチームパワーを取得する。
 function getRivalTeamPower(team) {
@@ -321,17 +319,18 @@ function renderWeeklyScheduleControls() {
     : '';
 
   const fixedSlots = typeof getWeekFixedSlots === 'function' ? getWeekFixedSlots() : new Map();
+  
+  // ★ ここから「グッズ制作（goods-production）」を週メニューから除外
   const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [
     { id: 'vocal', name: 'ボーカルレッスン' },
     { id: 'dance', name: 'ダンスレッスン' },
     { id: 'individual-lesson', name: '個別レッスン' },
     { id: 'rest-day', name: '休養' },
-    { id: 'meal-party', name: '食事会' },
-    { id: 'goods-production', name: 'グッズ制作' }
+    { id: 'meal-party', name: '食事会' }
   ];
 
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
-    itemsList.filter(item => !item.fixed).map(item => {
+    itemsList.filter(item => !item.fixed && item.id !== 'goods-production').map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
       if (limit) return `<option value="${item.id}" disabled>${escapeHtml(`${item.name}（1週${item.weeklyLimit}枠まで）`)}</option>`;
       return `<option value="${item.id}" ${slotId === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`;
@@ -410,11 +409,14 @@ function renderWeeklyScheduleControls() {
     ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
+  // ★ 事務作業の欄に「グッズ制作（goods-production）」を追加
   const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [
     { id: 'single-promotion', name: 'シングル販促' },
     { id: 'live-promotion', name: 'ライブ広報' },
-    { id: 'goods-development', name: 'グッズ開発' }
+    { id: 'goods-development', name: 'グッズ開発' },
+    { id: 'goods-production', name: 'グッズ制作' }
   ];
+  
   const selectedOfficeAction = officeActions.find(action => action.id === weeklySchedule.officeAction) || null;
   const maxProd = typeof MAX_MERCHANDISE_PRODUCTS !== 'undefined' ? MAX_MERCHANDISE_PRODUCTS : 20;
   const officeToggles = officeActions.map(action => {
