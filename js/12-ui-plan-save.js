@@ -795,7 +795,7 @@ function applyScheduleAction(month, actionType) {
 }
 
 // ==========================================
-// 12.5 確定済み予定の変更・取消モーダル機能（ボタン押下時のみ4月〜対象月まで表示）
+// 12.5 確定済み予定の変更・取消モーダル機能（ゲーム内年表示に統一）
 // ==========================================
 function openModifyExistingPlansModal() {
   let modal = document.getElementById('modify-plans-modal');
@@ -806,7 +806,7 @@ function openModifyExistingPlansModal() {
     modal.innerHTML = `
       <div style="background:#fff; width:90%; max-width:650px; max-height:85vh; border-radius:8px; padding:16px; display:flex; flex-direction:column; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:12px;">
-          <h3 style="margin:0; font-size:15px; color:var(--primary);">📅 確定済み予定の変更／取消（4月〜12月度）</h3>
+          <h3 id="modify-plans-title" style="margin:0; font-size:15px; color:var(--primary);">📅 確定済み予定の変更／取消</h3>
           <button type="button" onclick="closeModifyExistingPlansModal()" style="background:none; border:none; font-size:16px; cursor:pointer; font-weight:bold;">✕</button>
         </div>
         <div id="modify-plans-body" style="overflow-y:auto; flex:1; font-size:12px; display:flex; flex-direction:column; gap:10px;"></div>
@@ -816,18 +816,24 @@ function openModifyExistingPlansModal() {
   }
 
   const bodyEl = document.getElementById('modify-plans-body');
+  const titleEl = document.getElementById('modify-plans-title');
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const currentY = typeof currentYear !== 'undefined' ? currentYear : 1;
   const currentM = typeof currentMonth !== 'undefined' ? currentMonth : 1;
-  const maxTargetMonth = planEndM; // 現在策定中の半年計画の終了月（例: 6月や12月）
+  const maxTargetMonth = planEndM; 
+
+  if (titleEl) {
+    const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
+    titleEl.textContent = `📅 確定済み予定の変更／取消 (${gameYearVal}年${currentM}月〜${planYearTarget}年${maxTargetMonth}月度)`;
+  }
 
   let schedulesHtml = '';
   let itemsCount = 0;
 
-  // ボタンを押したタイミングで、現在から当該計画の終了月（4〜12月など）までの予定を参照・変更できるようにする
   for (let y = currentY; y <= planYearTarget; y++) {
     const startMonth = (y === currentY) ? currentM : 1;
     const endMonth = (y === planYearTarget) ? maxTargetMonth : 12;
+    const displayYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
 
     for (let m = startMonth; m <= endMonth; m++) {
       if (m < 1 || m > 12) continue;
@@ -852,7 +858,7 @@ function openModifyExistingPlansModal() {
         schedulesHtml += `
           <div style="border:1px solid #eadde1; padding:8px; border-radius:6px; background:#fafafa; display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <strong>${y}年${m}月</strong><br>
+              <strong>ゲーム内 ${displayYearVal}年${m}月</strong><br>
               <span style="color:#555; font-size:11px;">${details.join(' / ')}</span>
             </div>
             <div style="display:flex; gap:6px;">
@@ -899,10 +905,10 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
     return;
   }
 
-  let addFeeRate = 0.1; // 半年〜3ヶ月前は追加1割増・変更2割追加
+  let addFeeRate = 0.1; 
   let rangeStr = '半年〜3ヶ月前';
   if (diffDays > 90 && diffDays <= 180) {
-    addFeeRate = 0.2; // 2割追加
+    addFeeRate = 0.2; 
   }
 
   if (!confirm(`【予定の変更 (${rangeStr})】\nこの予定の変更を行います。\n手数料として、変更に伴う費用に ${addFeeRate * 100}% の追加料金が適用されます。続行しますか？`)) {
@@ -911,7 +917,6 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
 
   closeModifyExistingPlansModal();
   closeDecisionModal();
-  // 該当月にフォーカスして計画策定モーダルを開き直す、または該当月の編集へ誘導
   openDecisionModal(`予定の変更・再調整（${month}月）`, planYearTarget, month, month);
   setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。`);
 }
@@ -930,10 +935,10 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
     return;
   }
 
-  let penaltyRate = 0.3; // 半年〜3ヶ月前は3割支払い
+  let penaltyRate = 0.3; 
   let rangeStr = '半年〜3ヶ月前';
   if (diffDays <= 90) {
-    penaltyRate = 0.5; // 3ヶ月〜1ヶ月前は5割支払い
+    penaltyRate = 0.5; 
     rangeStr = '3ヶ月〜1ヶ月前';
   }
 
@@ -1011,6 +1016,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           const pKey = `${y}-${m}`;
           if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
             const p = productionSchedule[pKey];
+            const displayY = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
             
             let details = [];
             if (p.release && p.release !== 'none') {
@@ -1038,16 +1044,15 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             }
 
             if (details.length > 0) {
-              upcomingSchedules.push(`・${y}年${m}月: ${details.join(' / ')}`);
+              upcomingSchedules.push(`・${displayY}年${m}月: ${details.join(' / ')}`);
             }
           }
         }
       }
 
-      // 確定済み予定の参照表示 ＋ 予定変更／取消を行うボタン（12.5）
       const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
       summaryBox.innerHTML = `
-        <strong>【確定済み予定（ゲーム内年${gameYearVal}年${currentM}月〜）】</strong><br>
+        <strong>【確定済み予定（ゲーム内 ${gameYearVal}年${currentM}月〜）】</strong><br>
         ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在確定している将来の予定はありません。'}
         <div style="margin-top: 8px;">
           <button type="button" class="ghost-btn" onclick="openModifyExistingPlansModal()" style="padding:4px 8px; font-size:11px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">上記予定の変更／取消を行う</button>
