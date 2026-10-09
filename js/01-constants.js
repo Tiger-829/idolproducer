@@ -418,13 +418,14 @@ const MEAL_PARTY_CRISIS_GAIN = 3;
 const MEAL_PARTY_RECOVERY = 10;
 
 // グッズ仕様の更新（上限20種、開発費100万）
-const MAX_MERCHANDISE_PRODUCTS = 20;
+const MAX_MERCHANDISE_PRODUCTS = 10;
 const GOODS_DEVELOPMENT_COST = 1000000;
 
 const OFFICE_ACTIONS = [
   { id: 'single-promotion', name: 'シングル販促', short: '週次で減衰', detail: '選抜発表前は今作、発表後は次作を販促します。発売前は販促回数で発売時の売上が上がり、発売後は週ごとに減衰率（発売週8／通常10／過去作100）で売上が積み上がります。' },
   { id: 'live-promotion', name: '次のライブの広報', short: '集客効果Up', detail: '次回ライブの集客効果を上げます。' },
-  { id: 'goods-development', name: 'グッズ開発', short: '種類+1/費用100万', detail: `グッズの種類を1つ開発します（開発費 1,000,000円 / 上限${MAX_MERCHANDISE_PRODUCTS}種。1年以上経過したものは自動減衰します）。` }
+  { id: 'goods-development', name: 'グッズ開発', short: '種類+1', detail: `グッズの種類を1つ増やします。 / 上限${MAX_MERCHANDISE_PRODUCTS}種。1年以上経過したものは自動減衰します）。` }
+  { id: 'goods-production', name: 'グッズ制作', short: '在庫増加', detail: 'アイドル人数と開発したグッズ種類数に応じてグッズを制作し、在庫を増やします。' }
 ];
 
 const FULL_VACATION_RECOVERY = 45;
