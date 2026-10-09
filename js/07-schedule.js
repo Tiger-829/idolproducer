@@ -841,9 +841,9 @@ function getWeekFixedSlots() {
           index: dayBase + p,
           kind: 'rest-day',
           slotId: 'rest-day',
-          label: '年始休養',
-          names: ['年始休養'],
-          description: '1/2〜年始の固定休養期間'
+          label: '年始休暇',
+          names: ['年始休暇'],
+          description: '1/2~年始休暇期間'
         }, toDateKey(checkDate));
       }
     }
