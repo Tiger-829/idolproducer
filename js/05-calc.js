@@ -98,10 +98,10 @@ function calculateTeamIdolPower() {
 function calculateMemberFans(member) {
   const stats = member.stats || {};
   return Math.round(
-    (stats.popularity || 0) * 250 +
+    ((stats.popularity || 0) * 250 +
    calculateIdolPower(stats)*200 +
     (stats.talk || 0) * 100 +
-    (stats.sns || 0) * 50
+    (stats.sns || 0) * 50)/4
   );
 }
 
