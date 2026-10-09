@@ -815,6 +815,40 @@ function getWeekFixedSlots() {
   return fixedSlots;
 }
 
+// 1. 年始の固定休養期間（1/2 から 1/10に対して最も近い月曜日まで）の判定・設定
+  const anchorYear = startDate.getFullYear();
+  const jan2 = new Date(anchorYear, 0, 2, 12);
+  const jan10 = new Date(anchorYear, 0, 10, 12);
+  
+  // 1/10に最も近い月曜日（または1/10以降の最初の月曜日）を計算
+  const jan10Day = jan10.getDay(); // 0:Sun, 1:Mon, ..., 6:Sat
+  let offsetToMon = (1 - jan10Day + 7) % 7;
+  if (offsetToMon > 3) offsetToMon -= 7; // 最も近い月曜日
+  
+  const restEndDate = new Date(jan10);
+  restEndDate.setDate(jan10.getDate() + offsetToMon);
+  restEndDate.setHours(23, 59, 59, 999);
+
+  // 今週の7日間（1日目〜7日目）をチェックして、1/2〜休養終了日の期間内であれば終日休養固定
+  for (let d = 1; d <= 6; d++) { 
+    const checkDate = new Date(startDate);
+    checkDate.setDate(checkDate.getDate() + d);
+
+    if (checkDate >= jan2 && checkDate <= restEndDate) {
+      const dayBase = (((d - 1) % dayLabelsLen + dayLabelsLen) % dayLabelsLen) * periodLabelsLen;
+      for (let p = 0; p < periodLabelsLen; p++) {
+        addFixed({
+          index: dayBase + p,
+          kind: 'rest-day',
+          slotId: 'rest-day',
+          label: '年始休養',
+          names: ['年始休養'],
+          description: '1/2〜年始の固定休養期間'
+        }, toDateKey(checkDate));
+      }
+    }
+  }
+
 function getWeekBroadcastSummaries() {
   return [...getWeekFixedSlots().values()]
     .filter(slot => slot.kind === 'broadcast')
