@@ -1,5 +1,5 @@
 // ==========================================
-// 07-schedule.js : 日次進行・新諸経費・イベントキュー新進行エンジン ＆ 年始休暇修正・グッズ制作完全版
+// 07-schedule.js : 全機能保持 ＆ 年始固定休養（1/1午前歌番組、1/1午後〜1/9午後休暇）修正版
 // ==========================================
 
 let lastWeekSchedule = null;
@@ -17,6 +17,7 @@ let pendingReports = [];
 // 1. スケジュール確定
 // ==========================================
 
+// 週次スケジュールを整備する。
 function ensureWeeklySchedule() {
   if (typeof weeklySchedule === 'undefined' || !weeklySchedule || typeof weeklySchedule !== 'object') {
     window.weeklySchedule = {};
@@ -24,6 +25,7 @@ function ensureWeeklySchedule() {
   return window.weeklySchedule;
 }
 
+// 週次スケジュールを確定。
 function confirmWeeklySchedule() {
   try {
     const today = getGameDateObject();
@@ -39,6 +41,7 @@ function confirmWeeklySchedule() {
     markMusicPreparations();
     applyWeeklySchedule();
 
+    // 次の停止地点（月末・千秋楽・水曜日）まで自動進行
     advanceUntilNextSchedulePoint();
   } catch (error) {
     console.error("【進行エラー】", error);
@@ -46,6 +49,7 @@ function confirmWeeklySchedule() {
   }
 }
 
+// 画面側の「水曜日まで進行」「イベントまで進行」ボタンからの共通エントリーポイント
 function advanceOneWeek() {
   try {
     advanceUntilNextSchedulePoint();
@@ -60,23 +64,26 @@ function advanceOneWeek() {
 // ==========================================
 function advanceUntilNextSchedulePoint() {
   let currentDate = getGameDateObject();
-  let loopSafety = 0;
+  let loopSafety = 0; // 無限ループ保護（最大60日）
 
   while (loopSafety++ < 60) {
     const nextDate = new Date(currentDate);
     nextDate.setDate(nextDate.getDate() + 1);
 
+    // 1日分の世界進行
     processDailyFlow(currentDate, nextDate);
 
     currentDate = nextDate;
     gameDate = toDateKey(currentDate);
     syncGameCalendar();
 
+    // 停止条件（キュー蓄積・月末・水曜日）に達したか判定
     if (shouldStopProgress(currentDate)) {
       break;
     }
   }
 
+  // 停止後のUI更新＆保留モーダル表示
   resetWeeklySchedule();
   updateWeeklyGroupFans();
   updateUI();
@@ -87,12 +94,15 @@ function advanceUntilNextSchedulePoint() {
 // 3. 停止判定
 // ==========================================
 function shouldStopProgress(date) {
+  // ① 進行中に「ライブ収支」や「月次決算」がキューに積まれたら即座に停止
   if (pendingReports && pendingReports.length > 0) {
     return true;
   }
+  // ② 月末（最終日）に到達した場合：月次決算モーダルのため停止
   if (isMonthEnd(date)) {
     return true;
   }
+  // ③ 次の編成・スケジュール設定日（水曜日）に到達した場合：編成のため停止
   if (date.getDay() === 3) {
     return true;
   }
@@ -100,7 +110,7 @@ function shouldStopProgress(date) {
 }
 
 // ==========================================
-// 4. 日次進行
+// 4. 日次進行（1日単位のイベント処理）
 // ==========================================
 function processDailyFlow(fromDate, toDate) {
   const toDateStr = toDateKey(toDate);
@@ -170,6 +180,7 @@ function processPlayerLives(fromDate, toDate) {
     const finalDateStr = showDates[showDates.length - 1];
     const finalDateObj = getGameDateObject(finalDateStr);
 
+    // 最終公演日（千秋楽／単独公演日）に到達した瞬間に全日程分を精算
     if (finalDateObj > fromDate && finalDateObj <= toDate) {
       const v = VENUE_DATA.find(item => item.name === entry.liveVenue);
       if (!v) return;
@@ -246,6 +257,7 @@ function processPlayerLives(fromDate, toDate) {
         }
       });
 
+      // ライブ実績履歴への保存（ランキング項目⑤用）
       if (!Array.isArray(window.liveHistory)) window.liveHistory = [];
       window.liveHistory.push({
         venueName: v.name,
@@ -256,6 +268,7 @@ function processPlayerLives(fromDate, toDate) {
         showCount: totalShowCount
       });
 
+      // 新しいグッズ売上・在庫計算式の適用
       const firstDayFans = calculateGroupFans();
       const determinedFans = Number.isFinite(entry.determinedFans) ? entry.determinedFans : firstDayFans;
       const currentStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
@@ -320,7 +333,7 @@ function processPlayerLives(fromDate, toDate) {
 }
 
 // ==========================================
-// 8. イベントライブ
+// 8. イベントライブ（フェス・特番・外部招待）
 // ==========================================
 function processEventLives(fromDate, toDate) {
   if (!Array.isArray(specialLiveEvents)) return;
@@ -497,6 +510,7 @@ function processReleaseEvents(reachDateStr) {
   }
 }
 
+// 週次サイクル処理（ファン履歴記録 ＋ グッズ1年自動減衰）
 function processWeeklyCycle(toDate) {
   totalWeeksElapsed++;
 
@@ -536,6 +550,7 @@ function processWeeklyCycle(toDate) {
 
   maintainOfficeFacilities();
 
+  // グッズ1年自動減衰処理
   if (Array.isArray(merchandiseItems) && merchandiseItems.length > 0) {
     const currentDateObj = getGameDateObject();
     const oneYearAgo = new Date(currentDateObj);
@@ -677,7 +692,7 @@ function countWeekSlots(itemId, excludeIndex = -1) {
 }
 
 // ----------------------------------------------------
-// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇［年を確実に一致］）
+// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇［年・日付の厳密一致修正版］）
 // ----------------------------------------------------
 function getWeekFixedSlots() {
   const fixedSlots = new Map();
@@ -702,6 +717,7 @@ function getWeekFixedSlots() {
 
   const anchorYear = startDate.getFullYear();
 
+  // 今週の7日間をチェックして、当年1/1午前（歌番組）および 当年1/1午後〜1/9午後（休暇）を固定
   for (let d = 0; d < dayLabelsLen; d++) {
     const checkDateMorning = new Date(startDate);
     checkDateMorning.setDate(checkDateMorning.getDate() + d);
@@ -712,8 +728,12 @@ function getWeekFixedSlots() {
 
     const dayBase = (((d - 1) % dayLabelsLen + dayLabelsLen) % dayLabelsLen) * periodLabelsLen;
 
+    const isCurrentYear = (checkDateMorning.getFullYear() === anchorYear);
+    const m = checkDateMorning.getMonth() + 1;
+    const day = checkDateMorning.getDate();
+
     // 1月1日（当年のみ：午前 歌番組 / 午後 休暇）
-    if (checkDateMorning.getFullYear() === anchorYear && checkDateMorning.getMonth() === 0 && checkDateMorning.getDate() === 1) {
+    if (isCurrentYear && m === 1 && day === 1) {
       addFixed({
         index: dayBase,
         kind: 'broadcast',
@@ -734,12 +754,10 @@ function getWeekFixedSlots() {
     }
 
     // 1月2日〜1月8日（当年のみ：終日 休暇）
-    for (let p = 0; p < periodLabelsLen; p++) {
-      const targetDayMid = new Date(checkDateMorning.getFullYear(), checkDateMorning.getMonth(), checkDateMorning.getDate(), 12, 0, 0);
-      const jan2 = new Date(anchorYear, 0, 2, 12);
-      const jan8 = new Date(anchorYear, 0, 8, 12);
-
-      if (targetDayMid.getFullYear() === anchorYear && targetDayMid >= jan2 && targetDayMid <= jan8) {
+    if (isCurrentYear && m === 1 && day >= 2 && day <= 8) {
+      for (let p = 0; p < periodLabelsLen; p++) {
+        const slotDate = new Date(checkDateMorning);
+        if (p === 1) slotDate.setHours(15, 0, 0, 0);
         addFixed({
           index: dayBase + p,
           kind: 'rest-day',
@@ -747,12 +765,12 @@ function getWeekFixedSlots() {
           label: '休暇',
           names: ['休暇'],
           description: '年始休暇期間'
-        }, toDateKey(targetDayMid));
+        }, toDateKey(slotDate));
       }
     }
 
     // 1月9日（当年のみ：午前・午後 休暇。※1/9の午後まで）
-    if (checkDateMorning.getFullYear() === anchorYear && checkDateMorning.getMonth() === 0 && checkDateMorning.getDate() === 9) {
+    if (isCurrentYear && m === 1 && day === 9) {
       addFixed({
         index: dayBase,
         kind: 'rest-day',
@@ -1379,7 +1397,7 @@ function applyWeeklySchedule() {
   const targetStatName = statusKeysList.find(k => k.id === targetStat)?.name || targetStat;
   const individualLessonCount = weeklySchedule.slots.filter(s => s === 'individual-lesson').length;
   if (individualLessonCount > 0 && targetMember) {
-    parts.push(`個別レッスン: ${targetMember.name}（他メンバー休養）`);
+    parts.push(`個別レッスン: ${targetMember.name}（${targetStatName} 10.1倍 / 他メンバー休養）`);
   }
 
   const mealCount = getWeekMealPartyCount();
@@ -1387,7 +1405,7 @@ function applyWeeklySchedule() {
   if (mealCount > 0) parts.push(`食事会 ${mealCount}回（${formatMoney(mealCount * mealCostSingle)}）`);
 
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
-  if (skippedGroupOnly) parts.push('参加者不足のためレッスンできませんでした。');
+  if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
   if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
   if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
 
@@ -1414,88 +1432,6 @@ function selectOfficeAction(actionId) {
   renderWeeklyActionPanel();
 }
 
-function getPromotionCumulativeSalesByFormula(baseSales, k) {
-  if (baseSales <= 0 || k <= 0) return 0;
-  let cumulative = 0;
-  for (let w = 1; w <= k; w++) {
-    const weeklySales = (baseSales / 20) * Math.pow(0.1, w - 1);
-    if (weeklySales < 0.5) break;
-    cumulative += weeklySales;
-  }
-  return Math.round(cumulative);
-}
-
-function applySinglePromotion(song) {
-  if (!song) return { addedSales: 0, cumulativeSales: 0, weeks: 0, mode: 'none' };
-  claimPromotionSong(song);
-  song.promoCount = (song.promoCount || 0) + 1;
-
-  const alphaStep = typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005;
-  if (!song.released) {
-    const alpha = song.promoCount * alphaStep;
-    song.releasePromoAlpha = alpha;
-    return { addedSales: 0, cumulativeSales: 0, weeks: song.promoCount, mode: 'pre-release', alpha };
-  }
-
-  if (!Number.isFinite(song.promoBase) || song.promoBase <= 0) {
-    song.promoBase = getSongPromoBaseSales(song);
-  }
-
-  const k = song.promoCount;
-  const cumulativeSales = getPromotionCumulativeSalesByFormula(song.promoBase, k);
-  const addedSales = Math.max(0, cumulativeSales - (song.promoSales || 0));
-
-  song.promoSales = cumulativeSales;
-  song.totalSales = (song.totalSales || 0) + addedSales;
-  if (typeof addGroupSales === 'function') addGroupSales(addedSales);
-  if (typeof addMonthlyCdRevenue === 'function' && typeof getSongUnitPrice === 'function') {
-    addMonthlyCdRevenue(addedSales * getSongUnitPrice(song));
-  }
-
-  return { addedSales, cumulativeSales, weeks: k, mode: 'post-release' };
-}
-
-function claimPromotionSong(song) {
-  if (typeof promoSongId !== 'undefined') {
-    promoSongId = song.id;
-  }
-}
-
-function getSongPromoBaseSales(song) {
-  const sRatio = typeof SINGLE_PROMO_FAN_RATIO !== 'undefined' ? SINGLE_PROMO_FAN_RATIO : 1.5;
-  const aRatio = typeof ALBUM_PROMO_FAN_RATIO !== 'undefined' ? ALBUM_PROMO_FAN_RATIO : 2.0;
-  const ratio = song?.releaseType === 'album' ? aRatio : sRatio;
-  const fans = typeof calculateGroupFans === 'function' ? calculateGroupFans() : 50000;
-  return Math.round(fans * ratio);
-}
-
-function describeSinglePromotionStatus() {
-  if (typeof getSinglePromotionTarget !== 'function') return '';
-  const target = getSinglePromotionTarget();
-  if (!target) return '対象の楽曲がまだありません。';
-  const song = target.song;
-  const label = target.isUpcoming ? '次作' : '今作';
-  const alphaStep = typeof RELEASE_PROMO_ALPHA_STEP !== 'undefined' ? RELEASE_PROMO_ALPHA_STEP : 0.005;
-
-  if (!song.released) {
-    const count = song.promoCount || 0;
-    return `対象: ${label}「${song.title}」`;
-  }
-
-  const nextK = (song.promoCount || 0) + 1;
-  const currentBase = (Number.isFinite(song.promoBase) && song.promoBase > 0)
-    ? song.promoBase
-    : getSongPromoBaseSales(song);
-  const nextCumulative = getPromotionCumulativeSalesByFormula(currentBase, nextK);
-  const nextAdded = Math.max(0, nextCumulative - (song.promoSales || 0));
-
-  return `対象: ${label}「${song.title}」。`;
-}
-
-function formatMultiplier(value) {
-  return (Math.round(value * 1000) / 1000).toFixed(2).replace(/\.?0+$/, '');
-}
-
 function applyOfficeAction(actionId) {
   if (actionId === 'single-promotion') {
     if (typeof getSinglePromotionTarget !== 'function') return '';
@@ -1506,12 +1442,12 @@ function applyOfficeAction(actionId) {
           if (idol.stats) idol.stats.popularity = Math.min(100, (idol.stats.popularity || 0) + 1);
         });
       }
-      return 'シングル販促';
+      return 'シングル販促（楽曲未発表のため選抜メンバーの人気Up）';
     }
     const result = applySinglePromotion(target.song);
     if (typeof addSongExperience === 'function') addSongExperience(target.song, 3);
     const label = target.isUpcoming ? '次作' : '今作';
-    return `シングル販促・${label}「${target.song.title}」`;
+    return `シングル販促・${label}「${target.song.title}」（+${result.addedSales.toLocaleString()}枚 / 累計${result.cumulativeSales.toLocaleString()}枚）`;
   }
   if (actionId === 'live-promotion') {
     if (typeof nextLivePromotionPoints !== 'undefined') nextLivePromotionPoints++;
@@ -1525,7 +1461,7 @@ function applyOfficeAction(actionId) {
     merchandiseProducts = merchandiseItems.length;
 
     if (merchandiseProducts >= maxProd) {
-      return `上限の種類数に達しているため開発しませんでした。`;
+      return `グッズ開発（上限${maxProd}種のため未実施）`;
     }
 
     merchandiseItems.push({ createdAt: gameDate });
@@ -1533,7 +1469,7 @@ function applyOfficeAction(actionId) {
 
     funds -= devCost;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('グッズ開発', devCost);
-    return `開発に成功しグッズは${merchandiseProducts}種類になりました。`;
+    return `グッズ開発（全${merchandiseProducts}種 / 在庫変動なし / -${formatMoney(devCost)}）`;
   }
   if (actionId === 'goods-production') {
     const activeMembersCount = (Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length;
@@ -1542,7 +1478,7 @@ function applyOfficeAction(actionId) {
     const unitsProduced = activeMembersCount * Math.max(1, currentProdTypes) * 100;
 
     if (funds < productionCost) {
-      return `資金不足のため制作できませんでした。`;
+      return `グッズ制作（資金不足のため未実施）`;
     }
 
     funds -= productionCost;
@@ -1550,7 +1486,7 @@ function applyOfficeAction(actionId) {
     if (typeof recordMonthlyExpense === 'function') {
       recordMonthlyExpense('グッズ制作', productionCost);
     }
-    return `グッズを${unitsProduced.toLocaleString()}個制作しました。`;
+    return `グッズ制作（在庫 +${unitsProduced.toLocaleString()}個 / -${formatMoney(productionCost)}）`;
   }
   return '';
 }
