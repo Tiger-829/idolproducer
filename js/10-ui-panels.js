@@ -448,7 +448,7 @@ function renderWeeklyScheduleControls() {
 
     <!-- 個別レッスン（特別強化統合） -->
     <div class="schedule-block">
-      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで公式サイト等を設定した枠で実行</small></div>
+      <div class="schedule-block-title">個別レッスン（特別強化） <small>スケジュールで個別レッスンを設定した枠で実行</small></div>
       <div class="schedule-note" style="color: #2e7d32;">
         ※対象外のメンバーは練習を行わず、<strong>休養</strong>します。
       </div>
