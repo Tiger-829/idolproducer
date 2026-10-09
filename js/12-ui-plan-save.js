@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 全機能完全保持 ＆ 特典イベント日付表示対応版
+// 12-ui-plan-save.js : 全機能完全保持 ＆ 半年後以降の変更取消無料化対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -826,7 +826,7 @@ function applyScheduleAction(month, actionType) {
 }
 
 // ==========================================
-// 12.5 確定済み予定の変更・取消モーダル機能（イベント単位まとめ・特典イベント日付対応）
+// 12.5 確定済み予定の変更・取消モーダル機能（半年後以降は費用無料化対応）
 // ==========================================
 function openModifyExistingPlansModal() {
   let modal = document.getElementById('modify-plans-modal');
@@ -929,7 +929,7 @@ function openModifyExistingPlansModal() {
         });
       }
 
-      // 4. 特典イベント／その他イベント予定（日付表示・連日対応）
+      // 4. 特典イベント／その他イベント予定
       if (Array.isArray(p.planEvents)) {
         p.planEvents.forEach(ev => {
           if (!ev) return;
@@ -972,7 +972,11 @@ function openModifyExistingPlansModal() {
 
   bodyEl.innerHTML = `
     <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
-      ℹ️ ルール：ゲーム内日付から見て半年（180日）以内に開催予定の予定のみ表示されます。「半年〜3ヶ月前」は追加1割増・変更2割追加・取消3割支払い。「3ヶ月〜1ヶ月前」は追加2割増・変更不可・取消5割支払い。「1ヶ月前を切った場合」はどの操作も不可となります。
+      ℹ️ ルール：ゲーム内日付から見て半年（180日）以内に開催予定の予定のみ表示されます。<br>
+      ・半年後以降（180日超）：追加費用・取消ペナルティなし（無料）<br>
+      ・半年〜3ヶ月前：変更時追加2割 / 取消時3割支払い<br>
+      ・3ヶ月〜1ヶ月前：変更不可 / 取消時5割支払い<br>
+      ・1ヶ月前以内：変更・取消ともに不可
     </div>
     ${scheduleItems.length > 0 ? schedulesHtml : '<div style="color:#888; text-align:center; padding:20px;">半年以内に該当する変更可能な確定済み予定はありません。</div>'}
   `;
@@ -1004,13 +1008,20 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
     return;
   }
 
-  let addFeeRate = 0.1; 
-  let rangeStr = '半年〜3ヶ月前';
-  if (diffDays > 90 && diffDays <= 180) {
-    addFeeRate = 0.2; 
+  // 半年後以降（180日超）の場合は追加費用なし（無料）
+  let addFeeRate = 0; 
+  let rangeStr = '半年後以降';
+  if (diffDays <= 180) {
+    addFeeRate = 0.2; // 半年〜3ヶ月前は変更2割追加
+    rangeStr = '半年〜3ヶ月前';
   }
 
-  if (!confirm(`【予定の変更 (${rangeStr})】\nこの予定の変更を行います。\n手数料として、変更に伴う費用に ${addFeeRate * 100}% の追加料金が適用されます。続行しますか？`)) {
+  let msg = `【予定の変更 (${rangeStr})】\nこの予定の変更を行います。続行しますか？`;
+  if (addFeeRate > 0) {
+    msg = `【予定の変更 (${rangeStr})】\nこの予定の変更を行います。\n手数料として、変更に伴う費用に ${addFeeRate * 100}% の追加料金が適用されます。続行しますか？`;
+  }
+
+  if (!confirm(msg)) {
     return;
   }
 
@@ -1034,14 +1045,23 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
     return;
   }
 
-  let penaltyRate = 0.3; 
-  let rangeStr = '半年〜3ヶ月前';
+  // 半年後以降（180日超）の場合は違約金なし（無料）
+  let penaltyRate = 0; 
+  let rangeStr = '半年後以降';
   if (diffDays <= 90) {
-    penaltyRate = 0.5; 
+    penaltyRate = 0.5; // 3ヶ月〜1ヶ月前は5割支払い
     rangeStr = '3ヶ月〜1ヶ月前';
+  } else if (diffDays <= 180) {
+    penaltyRate = 0.3; // 半年〜3ヶ月前は3割支払い
+    rangeStr = '半年〜3ヶ月前';
   }
 
-  if (!confirm(`【予定の取り消し (${rangeStr})】\nこの予定を取り消します。\nペナルティとして、取消料（違約金）として費用の一部（${penaltyRate * 100}％）が徴収されます。実行しますか？`)) {
+  let msg = `【予定の取り消し (${rangeStr})】\nこの予定を取り消します。ペナルティなしで実行しますか？`;
+  if (penaltyRate > 0) {
+    msg = `【予定の取り消し (${rangeStr})】\nこの予定を取り消します。\nペナルティとして、取消料（違約金）として費用の一部（${penaltyRate * 100}％）が徴収されます。実行しますか？`;
+  }
+
+  if (!confirm(msg)) {
     return;
   }
 
@@ -1049,7 +1069,7 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
     delete productionSchedule[pKey];
   }
 
-  setLog(`【予定取消】 ${pKey} の予定を取り消しました（ペナルティ適用）。`);
+  setLog(`【予定取消】 ${pKey} の予定を取り消しました。`);
   alert('予定を取り消しました。');
   closeModifyExistingPlansModal();
   if (typeof updateUI === 'function') updateUI();
