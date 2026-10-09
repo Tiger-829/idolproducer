@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 構文・安全対策・予定変更取消・カレンダーロック・日付差分判定完全版
+// 12-ui-plan-save.js : 構文・安全対策・イベント単位まとまり表示・表記最適化完全版
 // ==========================================
 
 let planYearTarget = 1;
@@ -150,11 +150,11 @@ function getPlayerCdReleaseList() {
   return cdList;
 }
 
-// 予定の日付フォーマット関数（連続の場合は「7/21-22」、単独の場合は「7/23」形式）
-function formatScheduledDateRange(dates, yearVal) {
-  if (!Array.isArray(dates) || dates.length === 0) return '日付未定';
+// 予定の日付フォーマット関数（ご指定の形式: 2027 7/21-22 または 2027 7/23）
+function formatEventDateRange(dates, yearVal) {
+  if (!Array.isArray(dates) || dates.length === 0) return '';
   const sorted = [...dates].filter(Boolean).sort();
-  if (sorted.length === 0) return '日付未定';
+  if (sorted.length === 0) return '';
 
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
@@ -162,13 +162,13 @@ function formatScheduledDateRange(dates, yearVal) {
   const [lY, lM, lD] = last.split('-').map(Number);
 
   if (sorted.length === 1 || (fY === lY && fM === lM && fD === lD)) {
-    return `${yearVal}年 ${fM}/${fD}`;
+    return `${yearVal} ${fM}/${fD}`;
   }
 
   if (fY === lY && fM === lM) {
-    return `${yearVal}年 ${fM}/${fD}-${lD}`;
+    return `${yearVal} ${fM}/${fD}-${lD}`;
   }
-  return `${yearVal}年 ${fM}/${fD} 〜 ${lM}/${lD}`;
+  return `${yearVal} ${fM}/${fD}-${lM}/${lD}`;
 }
 
 // 日付Rowを表示する。
@@ -680,14 +680,13 @@ function processDeferredPlanExpenses() {
   }
 }
 
-// スケジュールActionを適用（ゲーム内日付と予定初日の差分で半年（180日）以内に入ったらカレンダーをロック）
+// スケジュールActionを適用（カレンダーロック判定）
 function applyScheduleAction(month, actionType) {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const monthFirstDate = new Date(actualYear, month - 1, 1, 12);
   const currentGameDate = getGameDateObject();
   const diffDaysToMonth = Math.round((monthFirstDate - currentGameDate) / 86400000);
 
-  // 予定の初日または当該月がゲーム内日付から見て半年（180日）以内、あるいは過去に突入している場合はカレンダーからの直接変更をロック
   if (diffDaysToMonth <= 180) {
     alert(`この月の予定はゲーム内日付から見て半年（180日）以内のため、カレンダーからの直接変更・追加はロックされています。修正は「上記予定の変更／取消を行う」ボタンから行ってください。`);
     return;
@@ -827,7 +826,7 @@ function applyScheduleAction(month, actionType) {
 }
 
 // ==========================================
-// 12.5 確定済み予定の変更・取消モーダル機能（ゲーム内日付と予定初日の差分で半年以内判定）
+// 12.5 確定済み予定の変更・取消モーダル機能（イベント単位のまとまり表示・表記最適化）
 // ==========================================
 function openModifyExistingPlansModal() {
   let modal = document.getElementById('modify-plans-modal');
@@ -854,14 +853,13 @@ function openModifyExistingPlansModal() {
   const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
 
   if (titleEl) {
-    titleEl.textContent = `📅 確定済み予定の変更／取消 (ゲーム内 ${gameYearVal}年${currentM}月〜 半年以内)`;
+    titleEl.textContent = `📅 確定済み予定の変更／取消 (${gameYearVal}年${currentM}月〜 半年以内)`;
   }
 
-  let schedulesHtml = '';
-  let itemsCount = 0;
+  let scheduleItems = [];
   const currentGameDate = getGameDateObject();
 
-  // ゲーム内日付と予定の初日の差分が半年以内（0日〜180日以内）の予定のみを対象とする
+  // 生産スケジュール（productionSchedule）から全予定を抽出してフラットなイベントリストに分解
   for (let y = currentY; y <= currentY + 1; y++) {
     for (let m = 1; m <= 12; m++) {
       if (y === currentY && m < currentM) continue;
@@ -870,56 +868,116 @@ function openModifyExistingPlansModal() {
       const p = (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) ? productionSchedule[pKey] : null;
       if (!p) continue;
 
-      // 予定の初日を特定（リリース日またはライブの初日など）
-      const firstDateStr = p.releaseDate || (Array.isArray(p.liveDates) && p.liveDates[0]) || p.liveDate || `${gameYearVal}-${String(m).padStart(2, '0')}-01`;
-      const firstDateObj = new Date(`${firstDateStr}T12:00:00`);
-      
-      // ゲーム内日付と予定の初日の差分（日数）
-      const diffDays = Math.round((firstDateObj - currentGameDate) / 86400000);
-
-      // ゲーム内日付から見て半年以内（0日〜180日以内）の予定のみ抽出
-      if (diffDays < 0 || diffDays > 180) continue;
-
       const displayYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
 
-      let details = [];
+      // 1. CDリリース予定
       if (p.release && p.release !== 'none') {
-        const relType = p.release === 'album' ? 'アルバム' : 'シングル';
-        const dateFormatted = formatScheduledDateRange([p.releaseDate], displayYearVal);
-        details.push(`💿 ${relType} (${dateFormatted})`);
-      }
-      if (p.liveVenue) {
-        const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : [p.liveDate];
-        const dateFormatted = formatScheduledDateRange(liveDatesArr, displayYearVal);
-        details.push(`🎤 ライブ: ${p.liveVenue} (${dateFormatted})`);
-      }
-      if (Array.isArray(p.planEvents) && p.planEvents.length > 0) {
-        details.push(`🎁 特典イベント: ${p.planEvents.length}件`);
+        const relDateStr = p.releaseDate || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
+        const relDateObj = new Date(`${relDateStr}T12:00:00`);
+        const diffDays = Math.round((relDateObj - currentGameDate) / 86400000);
+
+        if (diffDays >= 0 && diffDays <= 180) {
+          const relType = p.release === 'album' ? 'アルバム発売' : 'シングル発売';
+          const songLabel = p.songName ? ` (${p.songName})` : '';
+          const dateStr = formatEventDateRange([p.releaseDate], displayYearVal);
+          scheduleItems.push({
+            pKey,
+            dateStr: p.releaseDate || relDateStr,
+            sortDate: relDateStr,
+            label: `${dateStr} ${relType}${songLabel}`
+          });
+        }
       }
 
-      if (details.length > 0) {
-        itemsCount++;
-        schedulesHtml += `
-          <div style="border:1px solid #eadde1; padding:8px; border-radius:6px; background:#fafafa; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <strong>ゲーム内 ${displayYearVal}年${m}月</strong><br>
-              <span style="color:#555; font-size:11px;">${details.join(' / ')}</span>
-            </div>
-            <div style="display:flex; gap:6px;">
-              <button class="main-btn" type="button" onclick="requestModifyExistingPlan('${pKey}', '${firstDateStr}', ${m})" style="padding:4px 8px; font-size:10px;">編集・変更</button>
-              <button class="danger-btn" type="button" onclick="requestCancelExistingPlan('${pKey}', '${firstDateStr}')" style="padding:4px 8px; font-size:10px;">取り消し</button>
-            </div>
-          </div>
-        `;
+      // 2. メインライブ予定
+      if (p.liveVenue) {
+        const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : (p.liveDate ? [p.liveDate] : []);
+        const firstLiveDate = liveDatesArr[0] || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
+        const liveDateObj = new Date(`${firstLiveDate}T12:00:00`);
+        const diffDays = Math.round((liveDateObj - currentGameDate) / 86400000);
+
+        if (diffDays >= 0 && diffDays <= 180) {
+          const dateStr = formatEventDateRange(liveDatesArr, displayYearVal);
+          // ライブ名がある場合は名称のみ表示、なければライブ
+          const liveTitle = p.liveName ? p.liveName : 'ライブ';
+          scheduleItems.push({
+            pKey,
+            dateStr: firstLiveDate,
+            sortDate: firstLiveDate,
+            label: `${dateStr} ${liveTitle}`
+          });
+        }
+      }
+
+      // 3. 追加ライブ予定
+      if (Array.isArray(p.additionalLives)) {
+        p.additionalLives.forEach(al => {
+          if (!al || !al.liveVenue) return;
+          const alDatesArr = Array.isArray(al.liveDates) && al.liveDates.length > 0 ? al.liveDates : (al.liveDate ? [al.liveDate] : []);
+          const firstAlDate = alDatesArr[0] || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
+          const alDateObj = new Date(`${firstAlDate}T12:00:00`);
+          const diffDays = Math.round((alDateObj - currentGameDate) / 86400000);
+
+          if (diffDays >= 0 && diffDays <= 180) {
+            const dateStr = formatEventDateRange(alDatesArr, displayYearVal);
+            const liveTitle = al.liveName ? al.liveName : 'ライブ';
+            scheduleItems.push({
+              pKey,
+              dateStr: firstAlDate,
+              sortDate: firstAlDate,
+              label: `${dateStr} ${liveTitle}`
+            });
+          }
+        });
+      }
+
+      // 4. 特典イベント／その他イベント予定
+      if (Array.isArray(p.planEvents)) {
+        p.planEvents.forEach(ev => {
+          if (!ev) return;
+          const evDatesArr = Array.isArray(ev.dates) && ev.dates.length > 0 ? ev.dates : (ev.date ? [ev.date] : []);
+          const firstEvDate = evDatesArr[0] || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
+          const evDateObj = new Date(`${firstEvDate}T12:00:00`);
+          const diffDays = Math.round((evDateObj - currentGameDate) / 86400000);
+
+          if (diffDays >= 0 && diffDays <= 180) {
+            const dateStr = formatEventDateRange(evDatesArr, displayYearVal);
+            const evTitle = ev.name ? ev.name : 'その他イベント';
+            scheduleItems.push({
+              pKey,
+              dateStr: firstEvDate,
+              sortDate: firstEvDate,
+              label: `${dateStr} ${evTitle}`
+            });
+          }
+        });
       }
     }
   }
 
+  // 日付順にソート
+  scheduleItems.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+
+  let schedulesHtml = '';
+  scheduleItems.forEach(item => {
+    schedulesHtml += `
+      <div style="border:1px solid #eadde1; padding:8px 12px; border-radius:6px; background:#fafafa; display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-weight:bold; color:#333; font-size:12px;">
+          ${item.label}
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="main-btn" type="button" onclick="requestModifyExistingPlan('${item.pKey}', '${item.dateStr}', 1)" style="padding:4px 8px; font-size:10px;">変更</button>
+          <button class="danger-btn" type="button" onclick="requestCancelExistingPlan('${item.pKey}', '${item.dateStr}')" style="padding:4px 8px; font-size:10px;">取消</button>
+        </div>
+      </div>
+    `;
+  });
+
   bodyEl.innerHTML = `
     <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
-      ℹ️ ルール：ゲーム内日付から見て半年（180日）以内に初日を迎える予定のみ表示されます。「半年〜3ヶ月前」は追加1割増・変更2割追加・取消3割支払い。「3ヶ月〜1ヶ月前」は追加2割増・変更不可・取消5割支払い。「1ヶ月前を切った場合」はどの操作も不可となります。
+      ℹ️ ルール：ゲーム内日付から見て半年（180日）以内に開催予定の予定のみ表示されます。「半年〜3ヶ月前」は追加1割増・変更2割追加・取消3割支払い。「3ヶ月〜1ヶ月前」は追加2割増・変更不可・取消5割支払い。「1ヶ月前を切った場合」はどの操作も不可となります。
     </div>
-    ${itemsCount > 0 ? schedulesHtml : '<div style="color:#888; text-align:center; padding:20px;">ゲーム内日付から見て半年以内に該当する変更可能な確定済み予定はありません。</div>'}
+    ${scheduleItems.length > 0 ? schedulesHtml : '<div style="color:#888; text-align:center; padding:20px;">半年以内に該当する変更可能な確定済み予定はありません。</div>'}
   `;
 
   modal.style.display = 'flex';
@@ -961,7 +1019,7 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
 
   closeModifyExistingPlansModal();
   closeDecisionModal();
-  openDecisionModal(`予定の変更・再調整（${month}月）`, planYearTarget, month, month);
+  openDecisionModal(`予定の変更・再調整`, planYearTarget, month, month);
   setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。`);
 }
 
@@ -1055,6 +1113,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
       
       let upcomingSchedules = [];
       const currentGameDate = getGameDateObject();
+      const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
 
       for (let y = currentY; y <= currentY + 1; y++) {
         for (let m = 1; m <= 12; m++) {
@@ -1062,45 +1121,54 @@ function openDecisionModal(title, yearTarget, startM, endM) {
           const pKey = `${y}-${m}`;
           if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
             const p = productionSchedule[pKey];
-            const firstDateStr = p.releaseDate || (Array.isArray(p.liveDates) && p.liveDates[0]) || p.liveDate || `${calendarYear || 2026}-${String(m).padStart(2, '0')}-01`;
-            const firstDateObj = new Date(`${firstDateStr}T12:00:00`);
-            const diffDays = Math.round((firstDateObj - currentGameDate) / 86400000);
-
-            // ゲーム内日付と予定初日の差分が半年以内（0日〜180日以内）の予定のみサムネイル概要に表示
-            if (diffDays < 0 || diffDays > 180) continue;
-
             const displayY = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
-            
-            let details = [];
+
+            // リリース
             if (p.release && p.release !== 'none') {
-              let relType = p.release === 'album' ? 'アルバム' : 'シングル';
-              let dateFormatted = formatScheduledDateRange([p.releaseDate], displayY);
-              details.push(`💿 ${relType} (${dateFormatted})`);
+              const relDateStr = p.releaseDate || `${displayY}-${String(m).padStart(2, '0')}-01`;
+              const relDateObj = new Date(`${relDateStr}T12:00:00`);
+              const diffDays = Math.round((relDateObj - currentGameDate) / 86400000);
+              if (diffDays >= 0 && diffDays <= 180) {
+                const relType = p.release === 'album' ? 'アルバム発売' : 'シングル発売';
+                const dateStr = formatEventDateRange([p.releaseDate], displayY);
+                upcomingSchedules.push(`・${dateStr} ${relType}`);
+              }
             }
 
-            let lNames = [];
-            if (p.liveName) lNames.push(p.liveName);
-            else if (p.liveVenue) lNames.push(p.liveVenue);
-            if (lNames.length > 0) {
-              const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : [p.liveDate];
-              let dateFormatted = formatScheduledDateRange(liveDatesArr, displayY);
-              details.push(`🎤 ライブ[${lNames.join(', ')}] (${dateFormatted})`);
+            // メインライブ
+            if (p.liveVenue) {
+              const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : (p.liveDate ? [p.liveDate] : []);
+              const firstLiveDate = liveDatesArr[0] || `${displayY}-${String(m).padStart(2, '0')}-01`;
+              const liveDateObj = new Date(`${firstLiveDate}T12:00:00`);
+              const diffDays = Math.round((liveDateObj - currentGameDate) / 86400000);
+              if (diffDays >= 0 && diffDays <= 180) {
+                const dateStr = formatEventDateRange(liveDatesArr, displayY);
+                const liveTitle = p.liveName ? p.liveName : 'ライブ';
+                upcomingSchedules.push(`・${dateStr} ${liveTitle}`);
+              }
             }
 
-            if (Array.isArray(p.planEvents) && p.planEvents.length > 0) {
-              details.push(`🎁 イベント(${p.planEvents.length}件)`);
-            }
-
-            if (details.length > 0) {
-              upcomingSchedules.push(`・ゲーム内 ${displayY}年${m}月: ${details.join(' / ')}`);
+            // 特典・その他イベント
+            if (Array.isArray(p.planEvents)) {
+              p.planEvents.forEach(ev => {
+                if (!ev) return;
+                const evDatesArr = Array.isArray(ev.dates) && ev.dates.length > 0 ? ev.dates : (ev.date ? [ev.date] : []);
+                const firstEvDate = evDatesArr[0] || `${displayY}-${String(m).padStart(2, '0')}-01`;
+                const evDateObj = new Date(`${firstEvDate}T12:00:00`);
+                const diffDays = Math.round((evDateObj - currentGameDate) / 86400000);
+                if (diffDays >= 0 && diffDays <= 180) {
+                  const dateStr = formatEventDateRange(evDatesArr, displayY);
+                  const evTitle = ev.name ? ev.name : 'その他イベント';
+                  upcomingSchedules.push(`・${dateStr} ${evTitle}`);
+                }
+              });
             }
           }
         }
       }
 
-      const gameYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear : currentY;
       summaryBox.innerHTML = `
-        <strong>【確定済み予定（ゲーム内 ${gameYearVal}年${currentM}月〜 半年以内）】</strong><br>
+        <strong>【確定済み予定（${gameYearVal}年${currentM}月〜 半年以内）】</strong><br>
         ${upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 6).join('<br>') : '・現在半年以内に確定している将来の予定はありません。'}
         <div style="margin-top: 8px;">
           <button type="button" class="ghost-btn" onclick="openModifyExistingPlansModal()" style="padding:4px 8px; font-size:11px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">上記予定の変更／取消を行う</button>
