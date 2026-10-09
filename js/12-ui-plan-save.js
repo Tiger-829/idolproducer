@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 全機能完全保持 ＆ 半年後以降の変更取消無料化対応版
+// 12-ui-plan-save.js : 全機能完全保持 ＆ 半年前の月の月末一括引き落とし対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -668,15 +668,57 @@ function validateChangeOrCancel(targetDateStr) {
   return true;
 }
 
-// Deferred計画Expensesを処理する。
-function processDeferredPlanExpenses() {
-  if (typeof deferredBenefitCost === 'undefined') {
-    window.deferredBenefitCost = 0;
-  }
-  if (deferredBenefitCost > 0) {
-    funds -= deferredBenefitCost;
-    setLog(`【費用精算】前回の予定期間にかかったイベント等の費用 ${formatMoney(deferredBenefitCost)} を引き落としました。`);
-    deferredBenefitCost = 0;
+// 特典イベント費用等の引き落とし処理（イベント開催日の半年前の月の月末に一括引き落とし）
+function processDeferredPlanExpenses(currentDateObj) {
+  if (typeof productionSchedule === 'undefined' || !productionSchedule) return;
+
+  const currentYearVal = currentDateObj.getFullYear();
+  const currentMonthVal = currentDateObj.getMonth() + 1;
+  const currentDayVal = currentDateObj.getDate();
+
+  // 月末日かどうかを判定
+  const nextDay = new Date(currentDateObj);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const isMonthEndDay = nextDay.getMonth() !== currentDateObj.getMonth();
+
+  if (!isMonthEndDay) return; // 月末でなければスキップ
+
+  let totalDeduction = 0;
+
+  Object.keys(productionSchedule).forEach(pKey => {
+    const plan = productionSchedule[pKey];
+    if (!plan || !Array.isArray(plan.planEvents)) return;
+
+    plan.planEvents.forEach(ev => {
+      if (!ev || ev.expensesDeducted || !Array.isArray(ev.dates) || ev.dates.length === 0) return;
+
+      const firstDateStr = ev.dates.filter(Boolean).sort()[0];
+      if (!firstDateStr) return;
+
+      const eventDate = new Date(`${firstDateStr}T12:00:00`);
+      
+      // イベント開催日の半年前（6ヶ月前）の日付を算出
+      const halfYearBefore = new Date(eventDate);
+      halfYearBefore.setMonth(halfYearBefore.getMonth() - 6);
+
+      const hbYear = halfYearBefore.getFullYear();
+      const hbMonth = halfYearBefore.getMonth() + 1;
+
+      // 「半年前の月」の「月末」に到達しているか判定
+      if (currentYearVal === hbYear && currentMonthVal === hbMonth) {
+        const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
+        const venue = venues.find(v => v.name === ev.venue) || null;
+        const exp = calculateEventExpenses(ev.name, venue, ev.dates);
+        
+        totalDeduction += exp.totalCost;
+        ev.expensesDeducted = true; // 重複引き落とし防止フラグ
+      }
+    });
+  });
+
+  if (totalDeduction > 0) {
+    funds -= totalDeduction;
+    setLog(`【費用精算】開催日半年前の月末に伴い、対象の特典イベント等の経費 ${formatMoney(totalDeduction)} を引き落としました。`);
   }
 }
 
@@ -826,7 +868,7 @@ function applyScheduleAction(month, actionType) {
 }
 
 // ==========================================
-// 12.5 確定済み予定の変更・取消モーダル機能（半年後以降は費用無料化対応）
+// 12.5 確定済み予定の変更・取消モーダル機能
 // ==========================================
 function openModifyExistingPlansModal() {
   let modal = document.getElementById('modify-plans-modal');
@@ -1008,11 +1050,10 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
     return;
   }
 
-  // 半年後以降（180日超）の場合は追加費用なし（無料）
   let addFeeRate = 0; 
   let rangeStr = '半年後以降';
   if (diffDays <= 180) {
-    addFeeRate = 0.2; // 半年〜3ヶ月前は変更2割追加
+    addFeeRate = 0.2; 
     rangeStr = '半年〜3ヶ月前';
   }
 
@@ -1045,14 +1086,13 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
     return;
   }
 
-  // 半年後以降（180日超）の場合は違約金なし（無料）
   let penaltyRate = 0; 
   let rangeStr = '半年後以降';
   if (diffDays <= 90) {
-    penaltyRate = 0.5; // 3ヶ月〜1ヶ月前は5割支払い
+    penaltyRate = 0.5; 
     rangeStr = '3ヶ月〜1ヶ月前';
   } else if (diffDays <= 180) {
-    penaltyRate = 0.3; // 半年〜3ヶ月前は3割支払い
+    penaltyRate = 0.3; 
     rangeStr = '半年〜3ヶ月前';
   }
 
@@ -1547,7 +1587,6 @@ function validatePlanLiveSlots(month, liveSlots) {
 // Decision計画を保存する。
 function saveDecisionPlan() {
   const maxVenues = 8;
-  let newBenefitCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
@@ -1562,15 +1601,6 @@ function saveDecisionPlan() {
       return;
     }
     if (!validatePlanLiveSlots(m, liveSlots)) return;
-
-    const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
-    eventSlots.forEach(event => {
-      if (event && event.dates && event.dates.length > 0) {
-        const eventVenue = venues.find(v => v.name === event.venue) || null;
-        const exp = calculateEventExpenses(event.name, eventVenue, event.dates);
-        newBenefitCost += exp.totalCost;
-      }
-    });
 
     const primary = liveSlots[0] || null;
     const plan = {
@@ -1603,13 +1633,9 @@ function saveDecisionPlan() {
     }
   }
 
-  processDeferredPlanExpenses();
-  if (typeof deferredBenefitCost === 'undefined') window.deferredBenefitCost = 0;
-  window.deferredBenefitCost += newBenefitCost;
-
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（今回設定されたイベント経費: ${formatMoney(newBenefitCost)} ※次回精算）`);
+  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
   
   if (typeof updateUI === 'function') {
     updateUI();
