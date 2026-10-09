@@ -1424,32 +1424,6 @@ function showLiveDetailedFinanceModal(report) {
   modal.style.display = 'flex';
 }
 
-function calculateLiveExpenses(venueCap, totalShows, streamShows) {
-  const baseCostPerShow = {
-    'SS': 8000000,
-    'S': 5000000,
-    'A': 3000000,
-    'B': 1500000,
-    'C': 800000,
-    'D': 400000
-  }[venueCap] || 1000000;
-
-  const baseCost = baseCostPerShow * Math.max(1, totalShows);
-
-  let streamCost = 0;
-  if (streamShows > 0) {
-    const rawStreamCost = 5000000 * Math.max(1, streamShows);
-    streamCost = Math.max(4500000, Math.min(12000000, rawStreamCost));
-  }
-
-  const totalCost = baseCost + streamCost;
-
-  return {
-    baseCost: baseCost,
-    streamCost: streamCost,
-    totalCost: totalCost
-  };
-}
 
 window.closeLiveFinanceModal = function() {
   const modal = document.getElementById('live-finance-modal');
