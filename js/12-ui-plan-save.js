@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 全機能完全保持 ＆ イベント単位まとまり表示・表記最適化版
+// 12-ui-plan-save.js : 全機能完全保持 ＆ 特典イベント日付表示対応版
 // ==========================================
 
 let planYearTarget = 1;
@@ -826,7 +826,7 @@ function applyScheduleAction(month, actionType) {
 }
 
 // ==========================================
-// 12.5 確定済み予定の変更・取消モーダル機能（イベント単位のまとまり表示・表記最適化）
+// 12.5 確定済み予定の変更・取消モーダル機能（イベント単位まとめ・特典イベント日付対応）
 // ==========================================
 function openModifyExistingPlansModal() {
   let modal = document.getElementById('modify-plans-modal');
@@ -929,7 +929,7 @@ function openModifyExistingPlansModal() {
         });
       }
 
-      // 4. 特典イベント／その他イベント予定
+      // 4. 特典イベント／その他イベント予定（日付表示・連日対応）
       if (Array.isArray(p.planEvents)) {
         p.planEvents.forEach(ev => {
           if (!ev) return;
