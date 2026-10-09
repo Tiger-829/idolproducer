@@ -1,5 +1,5 @@
 // ==========================================
-// 07-schedule.js : 全機能保持 ＆ 年始固定休養（1/1午前歌番組、1/1午後〜1/9午後休暇）修正版
+// 07-schedule.js : 全機能保持 ＆ 年始固定休養（1/1午前歌番組、1/1午後〜1/9午後休暇の厳密化）
 // ==========================================
 
 let lastWeekSchedule = null;
@@ -692,7 +692,7 @@ function countWeekSlots(itemId, excludeIndex = -1) {
 }
 
 // ----------------------------------------------------
-// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇［年・日付の厳密一致修正版］）
+// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇［年・日付の完全厳密一致版］）
 // ----------------------------------------------------
 function getWeekFixedSlots() {
   const fixedSlots = new Map();
@@ -717,7 +717,7 @@ function getWeekFixedSlots() {
 
   const anchorYear = startDate.getFullYear();
 
-  // 今週の7日間をチェックして、当年1/1午前（歌番組）および 当年1/1午後〜1/9午後（休暇）を固定
+  // 今週の7日間をチェックし、1月1日〜9日以外の日付（1/13など）には絶対に影響しないよう判定を厳格化
   for (let d = 0; d < dayLabelsLen; d++) {
     const checkDateMorning = new Date(startDate);
     checkDateMorning.setDate(checkDateMorning.getDate() + d);
@@ -726,14 +726,24 @@ function getWeekFixedSlots() {
     const checkDateAfternoon = new Date(checkDateMorning);
     checkDateAfternoon.setHours(15, 0, 0, 0);
 
-    const dayBase = (((d - 1) % dayLabelsLen + dayLabelsLen) % dayLabelsLen) * periodLabelsLen;
+    // ★ 曜日インデックスの正確な算出（0: 月〜6: 日、または木曜始まり等のズレを日数差から絶対算出）
+    const diffTime = checkDateMorning.getTime() - startDate.getTime();
+    const offsetDays = Math.round(diffTime / 86400000);
+    if (offsetDays < 1 || offsetDays > dayLabelsLen) continue; // 週の範囲外はスキップ
+
+    const dayBase = (offsetDays - 1) * periodLabelsLen;
 
     const isCurrentYear = (checkDateMorning.getFullYear() === anchorYear);
     const m = checkDateMorning.getMonth() + 1;
     const day = checkDateMorning.getDate();
 
-    // 1月1日（当年のみ：午前 歌番組 / 午後 休暇）
-    if (isCurrentYear && m === 1 && day === 1) {
+    // 対象外の年や月、または10日以降（13日など）なら絶対に適用しない
+    if (!isCurrentYear || m !== 1 || day > 9) {
+      continue;
+    }
+
+    // 1月1日（午前 歌番組 / 午後 休暇）
+    if (day === 1) {
       addFixed({
         index: dayBase,
         kind: 'broadcast',
@@ -752,9 +762,8 @@ function getWeekFixedSlots() {
         description: '1/1午後からの年始休暇'
       }, toDateKey(checkDateMorning));
     }
-
-    // 1月2日〜1月8日（当年のみ：終日 休暇）
-    if (isCurrentYear && m === 1 && day >= 2 && day <= 8) {
+    // 1月2日〜1月8日（終日 休暇）
+    else if (day >= 2 && day <= 8) {
       for (let p = 0; p < periodLabelsLen; p++) {
         const slotDate = new Date(checkDateMorning);
         if (p === 1) slotDate.setHours(15, 0, 0, 0);
@@ -768,9 +777,8 @@ function getWeekFixedSlots() {
         }, toDateKey(slotDate));
       }
     }
-
-    // 1月9日（当年のみ：午前・午後 休暇。※1/9の午後まで）
-    if (isCurrentYear && m === 1 && day === 9) {
+    // 1月9日（午前・午後 休暇）
+    else if (day === 9) {
       addFixed({
         index: dayBase,
         kind: 'rest-day',
