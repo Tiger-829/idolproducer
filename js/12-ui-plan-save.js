@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 全機能完全保持 ＆ 正確な日数差・カレンダーロック完全版
+// 12-ui-plan-save.js : 全機能完全保持 ＆ 特典イベント日付カウント連動版
 // ==========================================
 
 let planYearTarget = 1;
@@ -171,19 +171,21 @@ function formatEventDateRange(dates, yearVal) {
   return `${yearVal} ${fM}/${fD}-${lM}/${lD}`;
 }
 
-// 日付Rowを表示する。
+// 日付Rowを表示する。（プレフィックスに応じてクラス名を正確に付与）
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, prefix = 'show') {
+  const inputClass = prefix === 'show' ? 'show-date-input' : 'event-show-date-input';
+  const rowClass = prefix === 'show' ? 'show-date-row' : 'event-show-date-row';
   const onChangeHandler = prefix === 'show' 
     ? `updateShowDateNote(${month}, ${index});` 
     : `updateEventDateNote(${month}, ${index});`;
   
   return `
-    <div class="${prefix}-date-row" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-      <input type="date" class="${prefix}-date-input" id="${prefix}-date-${month}-${index}-${dateIndex}"
+    <div class="${rowClass}" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+      <input type="date" class="${inputClass}" id="${prefix}-date-${month}-${index}-${dateIndex}"
         value="${dateKey || ''}" onchange="${onChangeHandler} renderEmbeddedPlanCalendars();">
       ${prefix === 'show' ? `
       <label style="font-size:11px; display:flex; align-items:center; gap:2px; white-space:nowrap; cursor:pointer;">
-        <input type="checkbox" class="${prefix}-stream-input" id="${prefix}-stream-${month}-${index}-${dateIndex}"
+        <input type="checkbox" class="show-stream-input" id="show-stream-${month}-${index}-${dateIndex}"
           ${isStream ? 'checked' : ''} onchange="updateShowDateNote(${month}, ${index})">
         配信あり
       </label>` : ''}
@@ -513,6 +515,7 @@ function updateEventDateNote(month, index) {
   const exp = calculateEventExpenses(eventName, venue, dates);
   const venueNameStr = venue ? venue.name : '会場未選択';
 
+
   note.innerHTML = `開催日数: ${dates.length}日 (${venueNameStr})<br>ベース費用: ${formatMoney(exp.baseCost)} / 会場使用料: ${formatMoney(exp.venueFee)}（合計経費: ${formatMoney(exp.totalCost)}）`;
   renderEmbeddedPlanCalendars();
 }
@@ -521,7 +524,7 @@ function updateEventDateNote(month, index) {
 function addShowDate(month, index, prefix = 'show') {
   const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-show-dates-${month}-${index}`);
   if (!container) return;
-  const dateIndex = container.querySelectorAll(`.${prefix}-date-row`).length;
+  const dateIndex = container.querySelectorAll(`.${prefix === 'show' ? 'show-date-row' : 'event-show-date-row'}`).length;
   const tempWrapper = document.createElement('div');
   tempWrapper.innerHTML = renderShowDateRow(month, index, dateIndex, '', true, prefix);
   container.appendChild(tempWrapper.firstElementChild);
@@ -539,7 +542,8 @@ function addEventShowDate(month, index) {
 function removeShowDate(month, index, dateIndex, prefix = 'show') {
   const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-show-dates-${month}-${index}`);
   if (!container) return;
-  const row = container.querySelector(`.${prefix}-date-row[data-show-index="${dateIndex}"]`);
+  const rowClass = prefix === 'show' ? 'show-date-row' : 'event-show-date-row';
+  const row = container.querySelector(`.${rowClass}[data-show-index="${dateIndex}"]`);
   if (row) row.remove();
   if (prefix === 'show') updateShowDateNote(month, index);
   else updateEventDateNote(month, index);
@@ -668,7 +672,7 @@ function validateChangeOrCancel(targetDateStr) {
   return true;
 }
 
-// スケジュールActionを適用（正確な日数差で180日超ならカレンダーロックを免除、策定中月も許可）
+// スケジュールActionを適用
 function applyScheduleAction(month, actionType) {
   const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
   const monthFirstDate = new Date(actualYear, month - 1, 1, 12);
@@ -677,7 +681,6 @@ function applyScheduleAction(month, actionType) {
 
   const isCurrentlyPlanningTarget = (month >= planStartM && month <= planEndM);
 
-  // 180日（半年）を超えており、かつ策定中の期間内であれば自由に設定可能
   if (!isCurrentlyPlanningTarget && diffDaysToMonth <= 180) {
     alert(`この月の予定はゲーム内日付から見て半年（180日）以内のため、カレンダーからの直接変更・追加はロックされています。修正は「上記予定の変更／取消を行う」ボタンから行ってください。`);
     return;
@@ -860,7 +863,6 @@ function openModifyExistingPlansModal() {
 
       const displayYearVal = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
 
-      // 1. CDリリース予定
       if (p.release && p.release !== 'none') {
         const relDateStr = p.releaseDate || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
         const relDateObj = new Date(`${relDateStr}T12:00:00`);
@@ -879,7 +881,6 @@ function openModifyExistingPlansModal() {
         }
       }
 
-      // 2. メインライブ予定
       if (p.liveVenue) {
         const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : (p.liveDate ? [p.liveDate] : []);
         const firstLiveDate = liveDatesArr[0] || `${displayYearVal}-${String(m).padStart(2, '0')}-01`;
@@ -898,7 +899,6 @@ function openModifyExistingPlansModal() {
         }
       }
 
-      // 3. 追加ライブ予定
       if (Array.isArray(p.additionalLives)) {
         p.additionalLives.forEach(al => {
           if (!al || !al.liveVenue) return;
@@ -920,7 +920,6 @@ function openModifyExistingPlansModal() {
         });
       }
 
-      // 4. 特典イベント／その他イベント予定
       if (Array.isArray(p.planEvents)) {
         p.planEvents.forEach(ev => {
           if (!ev) return;
