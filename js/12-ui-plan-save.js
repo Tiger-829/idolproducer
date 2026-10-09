@@ -1,5 +1,5 @@
 // ==========================================
-// 12-ui-plan-save.js : 構文・安全対策・イベント単位まとまり表示・表記最適化完全版
+// 12-ui-plan-save.js : 全機能完全保持 ＆ イベント単位まとまり表示・表記最適化版
 // ==========================================
 
 let planYearTarget = 1;
@@ -150,11 +150,11 @@ function getPlayerCdReleaseList() {
   return cdList;
 }
 
-// 予定の日付フォーマット関数（ご指定の形式: 2027 7/21-22 または 2027 7/23）
+// 予定の日付フォーマット関数（例: 2027 7/21-22 または 2027 7/23）
 function formatEventDateRange(dates, yearVal) {
-  if (!Array.isArray(dates) || dates.length === 0) return '';
+  if (!Array.isArray(dates) || dates.length === 0) return `${yearVal} 未定`;
   const sorted = [...dates].filter(Boolean).sort();
-  if (sorted.length === 0) return '';
+  if (sorted.length === 0) return `${yearVal} 未定`;
 
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
@@ -859,7 +859,6 @@ function openModifyExistingPlansModal() {
   let scheduleItems = [];
   const currentGameDate = getGameDateObject();
 
-  // 生産スケジュール（productionSchedule）から全予定を抽出してフラットなイベントリストに分解
   for (let y = currentY; y <= currentY + 1; y++) {
     for (let m = 1; m <= 12; m++) {
       if (y === currentY && m < currentM) continue;
@@ -877,8 +876,8 @@ function openModifyExistingPlansModal() {
         const diffDays = Math.round((relDateObj - currentGameDate) / 86400000);
 
         if (diffDays >= 0 && diffDays <= 180) {
-          const relType = p.release === 'album' ? 'アルバム発売' : 'シングル発売';
-          const songLabel = p.songName ? ` (${p.songName})` : '';
+          const relType = p.release === 'album' ? 'アルバム発売' : 'CD発売';
+          const songLabel = p.songName ? `(${p.songName})` : '';
           const dateStr = formatEventDateRange([p.releaseDate], displayYearVal);
           scheduleItems.push({
             pKey,
@@ -898,7 +897,6 @@ function openModifyExistingPlansModal() {
 
         if (diffDays >= 0 && diffDays <= 180) {
           const dateStr = formatEventDateRange(liveDatesArr, displayYearVal);
-          // ライブ名がある場合は名称のみ表示、なければライブ
           const liveTitle = p.liveName ? p.liveName : 'ライブ';
           scheduleItems.push({
             pKey,
@@ -955,7 +953,6 @@ function openModifyExistingPlansModal() {
     }
   }
 
-  // 日付順にソート
   scheduleItems.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
   let schedulesHtml = '';
@@ -1123,19 +1120,17 @@ function openDecisionModal(title, yearTarget, startM, endM) {
             const p = productionSchedule[pKey];
             const displayY = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined') ? calendarYear + (y - currentYear) : y;
 
-            // リリース
             if (p.release && p.release !== 'none') {
               const relDateStr = p.releaseDate || `${displayY}-${String(m).padStart(2, '0')}-01`;
               const relDateObj = new Date(`${relDateStr}T12:00:00`);
               const diffDays = Math.round((relDateObj - currentGameDate) / 86400000);
               if (diffDays >= 0 && diffDays <= 180) {
-                const relType = p.release === 'album' ? 'アルバム発売' : 'シングル発売';
+                const relType = p.release === 'album' ? 'アルバム発売' : 'CD発売';
                 const dateStr = formatEventDateRange([p.releaseDate], displayY);
                 upcomingSchedules.push(`・${dateStr} ${relType}`);
               }
             }
 
-            // メインライブ
             if (p.liveVenue) {
               const liveDatesArr = Array.isArray(p.liveDates) && p.liveDates.length > 0 ? p.liveDates : (p.liveDate ? [p.liveDate] : []);
               const firstLiveDate = liveDatesArr[0] || `${displayY}-${String(m).padStart(2, '0')}-01`;
@@ -1148,7 +1143,6 @@ function openDecisionModal(title, yearTarget, startM, endM) {
               }
             }
 
-            // 特典・その他イベント
             if (Array.isArray(p.planEvents)) {
               p.planEvents.forEach(ev => {
                 if (!ev) return;
