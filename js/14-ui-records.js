@@ -66,8 +66,6 @@ function buildLineChartSvg(points, options = {}) {
   </svg>`;
 }
 
-
-
 // ① 過去5作CD売上の推移
 function renderSalesTrendChart() {
   const chart = document.getElementById('records-sales-chart');
@@ -94,7 +92,6 @@ function renderSalesTrendChart() {
     value: Math.max(0, entry.sales)
   }));
 
-  // ★ unitFormatter を追加して、縦軸を「〇枚」表示に修正
   chart.innerHTML = `<div style="font-size:11px; color:#555; margin-bottom:4px;">直近曲『${escapeHtml(targetSong.title)}』の推移</div>` +
     buildLineChartSvg(points, { 
       gradientId: 'records-sales-gradient', 
@@ -108,6 +105,7 @@ function renderSalesTrendChart() {
     note.textContent = `期間 ${formatChartWeekLabel(first.weekKey)} → ${formatChartWeekLabel(last.weekKey)}（${history.length - 1}週）／ 累計 ${last.sales.toLocaleString()}枚`;
   }
 }
+
 // ② 初週売上ランキング（曲名・発売日・枚数）
 function renderFirstWeekRanking() {
   const list = document.getElementById('records-firstweek-list');
@@ -138,7 +136,6 @@ function renderFirstWeekRanking() {
   }).join('');
 }
 
-
 // ③ 過去1年のファン数推移（単位: 千人）
 function renderFanHistoryTrendChart() {
   const mainPanel = document.getElementById('page-records');
@@ -150,7 +147,6 @@ function renderFanHistoryTrendChart() {
     container.id = 'records-fan-trend-block';
     container.className = 'records-block';
     
-    // CD売上のブロックのすぐ後ろに挿入する
     const firstBlock = mainPanel.querySelector('.records-block');
     if (firstBlock && firstBlock.nextSibling) {
       mainPanel.insertBefore(container, firstBlock.nextSibling);
@@ -159,32 +155,15 @@ function renderFanHistoryTrendChart() {
     }
   }
 
-  // ★ 複数の候補からファン履歴データを安全に取得する
   const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory
                 : (typeof groupFanHistory !== 'undefined' && Array.isArray(groupFanHistory)) ? groupFanHistory
                 : (Array.isArray(window.fanHistory) ? window.fanHistory : []);
 
-  // 直近52週分（1年分）のみを表示対象にする
   const recentHistory = history.slice(-52);
 
   const points = recentHistory.map(entry => ({
     label: formatChartWeekLabel(entry.date),
     value: Math.round((Number(entry.fans) || Number(entry.count) || 0) / 1000)
-  }));
-
-  container.innerHTML = `
-    <div class="records-block-title">過去1年のファン数推移 <small>単位: 千人（直近52週・全${history.length}件記録）</small></div>
-    <div class="records-chart" style="height:120px;">
-      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
-    </div>
-    <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
-  `;
-}
-
-  const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory : [];
-  const points = history.map(entry => ({
-    label: formatChartWeekLabel(entry.date),
-    value: Math.round((Number(entry.fans) || 0) / 1000)
   }));
 
   container.innerHTML = `
@@ -194,7 +173,7 @@ function renderFanHistoryTrendChart() {
     </div>
     <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
   `;
-
+}
 
 // 曲一覧の概要
 function describeSongMeta(song) {
@@ -264,20 +243,18 @@ function renderLiveMaxAudienceRanking() {
       ${rows}
     </div>
   `;
-
+}
 
 // ⑥ ヘルプ（ゲーム説明を見る）ボタンエリアを重複なくページ最下部に1つだけ配置
 function renderRecordsHelpBlock() {
   const mainPanel = document.getElementById('page-records');
   if (!mainPanel) return;
 
-  // 画面内にある既存のヘルプブロックをすべて回収、または新規作成
   let helpBlocks = mainPanel.querySelectorAll('.records-help');
   let helpBlock;
   
   if (helpBlocks.length > 0) {
     helpBlock = helpBlocks[0];
-    // 2つ目以降の重複分は削除する
     for (let i = 1; i < helpBlocks.length; i++) {
       helpBlocks[i].remove();
     }
@@ -286,7 +263,6 @@ function renderRecordsHelpBlock() {
     helpBlock.className = 'records-help';
   }
 
-  // 常に親要素の一番最後（最下部）に移動する
   mainPanel.appendChild(helpBlock);
 
   helpBlock.innerHTML = `
