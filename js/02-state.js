@@ -409,7 +409,7 @@ function createInitialProductionSchedule() {
     release: 'none',
     planEvents: [
       makePresetMeetup('オンラインミーグリ', 'online-meeguri', 'パルス八王子', [dateKey(4, 10)], 'cd_1_2'),
-      makePresetMeetup('リアルミーグリ', 'real-meeguri', 'パルス品川', [dateKey(4, 20)], 'cd_1_2')
+      makePresetMeetup('リアルミーグリ', 'real-meeguri', 'パルス品川', [dateKey(4, 18)], 'cd_1_2')
     ]
   };
   schedule['1-5'].planEvents = [
