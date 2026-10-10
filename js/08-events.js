@@ -243,6 +243,20 @@ function getPlanEventEntries() {
   return entries;
 }
 
+function getPlanEventType(eventId, eventName = '') {
+  const presetEvent = BENEFIT_EVENT_TYPE_OPTIONS.find(option => option.id === eventId || option.name === eventName);
+  if (presetEvent) {
+    return {
+      id: presetEvent.id,
+      profileId: presetEvent.profileId || presetEvent.id,
+      name: presetEvent.name,
+      cost: presetEvent.baseCost,
+      kind: 'benefit'
+    };
+  }
+  return PLAN_EVENT_TYPES.find(type => type.id === eventId) || null;
+}
+
 const FANCLUB_TIERS = [
   { id: 'light', name: 'ライト', fee: 500, benefit: 'デジタル会報の配信' },
   { id: 'standard', name: 'スタンダード', fee: 1500, benefit: '会報と先行配信' },
@@ -480,10 +494,23 @@ function showMonthlyReportModal(report) {
   modal.style.display = 'flex';
 }
 
+function resumeProgressAfterReport() {
+  if (Array.isArray(pendingReports) && pendingReports.length > 0) {
+    openPendingModal();
+    return;
+  }
+  if (typeof advanceUntilNextSchedulePoint === 'function') {
+    advanceUntilNextSchedulePoint();
+  } else if (typeof updateUI === 'function') {
+    updateUI();
+  }
+}
+
 function closeMonthlyReportModal() {
   const modal = document.getElementById('monthly-report-modal');
   if (modal) modal.style.display = 'none';
   pendingMonthlyReport = null;
+  resumeProgressAfterReport();
 }
 
 function finalizeMonthlyLedger(year, month) {
@@ -587,24 +614,35 @@ function isPlanReleaseDue(plan, reachDate = gameDate) {
 }
 
 function isPlanEventDue(entry, reachDate = gameDate) {
-  return !entry.event.completed && reachDate >= entry.event.date;
+  const dates = Array.isArray(entry.event.dates) && entry.event.dates.length
+    ? entry.event.dates
+    : [entry.event.date];
+  return !entry.event.completed
+    && dates.includes(reachDate)
+    && !(entry.event.completedDates || []).includes(reachDate);
 }
 
 function processPlanEvents(reachDate = gameDate) {
   getPlanEventEntries().forEach(entry => {
     if (!isPlanEventDue(entry, reachDate)) return;
-    const type = getPlanEventType(entry.event.benefitId);
+    const type = getPlanEventType(entry.event.benefitId, entry.event.name);
     if (!type) {
       entry.plan.planEvents.splice(entry.index, 1);
       return;
     }
-    entry.event.completed = true;
-    if (type.cost) funds -= type.cost;
+    if (!Array.isArray(entry.event.completedDates)) entry.event.completedDates = [];
+    const isFirstEventDate = entry.event.completedDates.length === 0;
+    entry.event.completedDates.push(reachDate);
+    const eventDates = Array.isArray(entry.event.dates) && entry.event.dates.length
+      ? entry.event.dates
+      : [entry.event.date];
+    entry.event.completed = eventDates.every(date => entry.event.completedDates.includes(date));
+    if (isFirstEventDate && type.cost) funds -= type.cost;
     if (type.kind === 'goods') {
       const goods = sellMerchandiseAtLive();
       setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
     } else {
-      const result = recordReleaseBenefitSales(type.id);
+      const result = recordReleaseBenefitSales(type.profileId || type.id);
       setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（経費: ${formatMoney(type.cost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
     }
   });
@@ -884,6 +922,8 @@ const LIVE_WEEKDAY_WEIGHT = { 0: 1.0, 6: 1.0, 5: 0.9, 1: 0.8 };
 const LIVE_WEEKDAY_DEFAULT_WEIGHT = 0.7;
 const GRADUATION_LIVE_RATE = 0.95;
 const LIVE_FINALE_RATE = 0.9;
+let liveFinanceReportPage = 0;
+let liveFinanceReportTitle = '';
 
 function getVenueTierRate(venue) {
   return VENUE_TIER_RATE[venue?.cap] ?? VENUE_TIER_DEFAULT_RATE;
@@ -897,6 +937,11 @@ function getLiveDayWeight(date) {
 function showLiveFinanceModal(rows) {
   const modal = document.getElementById('live-finance-modal');
   if (!modal || !rows.length) return;
+  liveFinanceReportPage = 0;
+  const nextButton = document.getElementById('live-finance-next-button');
+  if (nextButton) nextButton.textContent = '閉じる';
+  const title = modal.querySelector('.page-title');
+  if (title) title.textContent = 'ライブ収支';
   const zero = { audience: 0, ticketRevenue: 0, merchandise: 0, streamRevenue: 0,
     streamCost: 0, venueCost: 0, profit: 0 };
   const total = rows.reduce((sum, r) => ({
@@ -1369,24 +1414,48 @@ function showLiveDetailedFinanceModal(report) {
   if (!body) return;
 
   const titleEl = modal.querySelector('.page-title');
+  liveFinanceReportPage = 1;
+  liveFinanceReportTitle = `【${report.isMultiDay ? '千秋楽完走' : '単独公演'}】`;
   if (titleEl) {
-    titleEl.textContent = `【${report.isMultiDay ? '千秋楽完走' : '単独公演'}】ライブ収支決算報告`;
+    titleEl.textContent = `${liveFinanceReportTitle}ライブ公演報告（1/2）`;
   }
+  const nextButton = document.getElementById('live-finance-next-button');
+  if (nextButton) nextButton.textContent = '収支報告へ';
 
   const streamInfoText = report.streamDaysCount > 0
     ? `配信実施: 全${report.showCount}公演中 ${report.streamDaysCount}公演（1日あたり ${formatMoney(report.streamCostPerDay)}）`
     : '配信実施なし';
+  const dailyCdRows = (report.liveCdSalesByDate || []).map(day => `
+    <tr>
+      <td>${formatPlanDayLabel(day.date)}</td>
+      <td>${escapeHtml(day.songTitle || '対象楽曲なし')}</td>
+      <td class="num">${day.unitsSold.toLocaleString()}枚</td>
+      <td class="num plus">${formatMoney(day.revenue)}</td>
+    </tr>`).join('');
 
   body.innerHTML = `
-    <div style="margin-bottom:12px; padding:10px; background:#f5f7fa; border-radius:6px; font-size:12px; line-height:1.6;">
-      <div><strong>公演名:</strong> ${escapeHtml(report.liveName)}（会場: ${escapeHtml(report.venueName)} / ${report.venueCap}ランク）</div>
-      <div><strong>日程:</strong> ${report.showDates.map(d => formatPlanDayLabel(d)).join('・')}（全${report.showCount}公演）</div>
-      <div><strong>動員・配信:</strong> 会場動員 <strong>${report.totalAudience.toLocaleString()}人</strong> / 配信 <strong>${report.streamBuyers.toLocaleString()}人</strong></div>
-      <div style="color:#555;"><small>※${streamInfoText}</small></div>
-    </div>
+    <section class="live-report-page" data-report-page="1">
+      <div style="margin-bottom:12px; padding:10px; background:#f5f7fa; border-radius:6px; font-size:12px; line-height:1.6;">
+        <div><strong>公演名:</strong> ${escapeHtml(report.liveName)}（会場: ${escapeHtml(report.venueName)} / ${report.venueCap}ランク）</div>
+        <div><strong>日程:</strong> ${report.showDates.map(d => formatPlanDayLabel(d)).join('・')}（全${report.showCount}公演）</div>
+        <div><strong>動員・配信:</strong> 会場動員 <strong>${report.totalAudience.toLocaleString()}人</strong> / 配信 <strong>${report.streamBuyers.toLocaleString()}人</strong></div>
+        <div style="color:#555;"><small>※${streamInfoText}</small></div>
+      </div>
+      <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ ライブ日CD売上</h4>
+      <table class="live-finance-table" style="width:100%;">
+        <thead><tr><th>公演日</th><th>対象楽曲</th><th class="num">販売枚数</th><th class="num">売上</th></tr></thead>
+        <tbody>${dailyCdRows || '<tr><td colspan="4">対象となる発売済み楽曲はありません</td></tr>'}</tbody>
+        <tfoot><tr><th colspan="2">合計</th><td class="num">${(report.liveCdSalesUnits || 0).toLocaleString()}枚</td><td class="num plus">${formatMoney(report.liveCdSalesRevenue || 0)}</td></tr></tfoot>
+      </table>
+      <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ ライブグッズ売上</h4>
+      <table class="live-finance-table" style="width:100%;">
+        <tbody><tr><th>販売個数</th><td class="num">${(report.merchandiseSold || 0).toLocaleString()}個</td><th>売上金額</th><td class="num plus">${formatMoney(report.merchandiseRevenue || 0)}</td></tr></tbody>
+      </table>
+    </section>
 
-    <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 席種別 チケット売上明細</h4>
-    <table class="live-finance-table" style="margin-bottom:14px; width:100%;">
+    <section class="live-report-page" data-report-page="2" style="display:none;">
+      <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 席種別 チケット売上明細</h4>
+      <table class="live-finance-table" style="margin-bottom:14px; width:100%;">
       <thead>
         <tr>
           <th>席種</th>
@@ -1405,10 +1474,10 @@ function showLiveDetailedFinanceModal(report) {
           <td class="num plus"><strong>${formatMoney(report.ticketRevenue)}</strong></td>
         </tr>
       </tfoot>
-    </table>
+      </table>
 
-    <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 興行総合収支明細（売上・諸経費）</h4>
-    <table class="live-finance-table" style="width:100%;">
+      <h4 style="margin:12px 0 6px; font-size:13px; color:#333;">◆ 興行総合収支明細（売上・諸経費）</h4>
+      <table class="live-finance-table" style="width:100%;">
       <thead>
         <tr>
           <th>項目</th>
@@ -1459,25 +1528,37 @@ function showLiveDetailedFinanceModal(report) {
           </td>
         </tr>
       </tfoot>
-    </table>
+      </table>
+    </section>
   `;
 
   modal.style.display = 'flex';
 }
 
+function advanceLiveFinanceReportPage() {
+  const modal = document.getElementById('live-finance-modal');
+  const body = modal?.querySelector('.live-finance-body');
+  const firstPage = body?.querySelector('[data-report-page="1"]');
+  const secondPage = body?.querySelector('[data-report-page="2"]');
+
+  if (liveFinanceReportPage === 1 && firstPage && secondPage) {
+    liveFinanceReportPage = 2;
+    firstPage.style.display = 'none';
+    secondPage.style.display = 'block';
+    const title = modal.querySelector('.page-title');
+    if (title) title.textContent = `${liveFinanceReportTitle}ライブ収支報告（2/2）`;
+    const nextButton = document.getElementById('live-finance-next-button');
+    if (nextButton) nextButton.textContent = '報告を閉じる';
+    body.scrollTop = 0;
+    return;
+  }
+
+  closeLiveFinanceModal();
+}
+
 window.closeLiveFinanceModal = function() {
   const modal = document.getElementById('live-finance-modal');
   if (modal) modal.style.display = 'none';
-
-  // もし他に未処理の保留レポートがあればそれを優先して開く
-  if (typeof openPendingModal === 'function' && pendingReports.length > 0) {
-    openPendingModal();
-  } else {
-    // 溜まったレポートがなくなったら、次の停止地点（水曜日や月末など）まで自動進行を再開！
-    if (typeof advanceUntilNextSchedulePoint === 'function') {
-      advanceUntilNextSchedulePoint();
-    } else {
-      updateUI();
-    }
-  }
+  liveFinanceReportPage = 0;
+  resumeProgressAfterReport();
 };

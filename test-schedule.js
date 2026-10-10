@@ -478,11 +478,11 @@ check('a member resumes training after a scheduled rest slot reaches 80', autoRe
   && autoRestReturn.autoResting === false && autoRestReturn.listedAsResting === false, JSON.stringify(autoRestReturn));
 console.log('\n--- 9. Lesson fatigue uses the stamina before each session ---');
 const expectedFatigueRatios = {
-  'full-run-through': 0.70,
-  coordination: 0.65,
-  'individual-lesson': 0.60,
-  'dance-lesson': 0.45,
-  'vocal-lesson': 0.40,
+  'full-run-through': 0.56,
+  coordination: 0.52,
+  'individual-lesson': 0.48,
+  'dance-lesson': 0.36,
+  'vocal-lesson': 0.32,
   'strength-training': 0.15,
   'endurance-training': 0.15,
   literacy: 0.05
@@ -503,11 +503,13 @@ const repeatedDanceCost = JSON.parse(run(`
   })()
 `));
 check('a later session uses the stamina left by earlier sessions',
-  repeatedDanceCost[0] === 45 && repeatedDanceCost[1] === 25, JSON.stringify(repeatedDanceCost));
+  repeatedDanceCost[0] === 36 && repeatedDanceCost[1] === 23, JSON.stringify(repeatedDanceCost));
+check('consecutive training adds 2.5 percentage points to the rate',
+  run(`getLessonStaminaCost({ staminaRatio: 0.5 }, 100, 1, 2)`) === 53);
 check('morning fatigue applies the morning slot factor',
-  run(`getLessonStaminaCost(WEEKLY_SCHEDULE_ITEMS.find(item => item.id === 'dance-lesson'), 100, MORNING_SLOT_MULTIPLIER)`) === 36);
-check('the schedule panel explains the fatigue basis',
-  run('renderWeeklyScheduleControls()').includes('疲労 70%（実行直前の体力）'));
+  run(`getLessonStaminaCost(WEEKLY_SCHEDULE_ITEMS.find(item => item.id === 'dance-lesson'), 100, MORNING_SLOT_MULTIPLIER)`) === 29);
+check('the schedule panel exposes the full-run-through menu',
+  run('renderWeeklyScheduleControls()').includes('通し練習'));
 const repeatedDanceSpend = JSON.parse(withRecorder(`
   const savedSchedule = weeklySchedule;
   const savedPerformances = scheduledPerformances;
@@ -523,8 +525,8 @@ const repeatedDanceSpend = JSON.parse(withRecorder(`
     specialLiveEvents = [];
     weeklySchedule = cloneWeeklySchedule(weeklySchedule);
     weeklySchedule.slots = Array(WEEK_SLOT_COUNT).fill('');
+    weeklySchedule.slots[0] = 'dance-lesson';
     weeklySchedule.slots[1] = 'dance-lesson';
-    weeklySchedule.slots[3] = 'dance-lesson';
     weeklySchedule.restDayMembers = [];
     weeklySchedule.focusMemberIds = [];
     target.staminaValue = 100;
@@ -542,8 +544,43 @@ const repeatedDanceSpend = JSON.parse(withRecorder(`
     });
   }
 `));
-check('weekly execution charges two dance sessions from sequential remaining stamina', repeatedDanceSpend === 70,
+check('weekly execution adds the consecutive penalty to the second dance session', repeatedDanceSpend === 56,
   String(repeatedDanceSpend));
+const resetStreakSpend = JSON.parse(withRecorder(`
+  const savedSchedule = weeklySchedule;
+  const savedPerformances = scheduledPerformances;
+  const savedSpecialLives = specialLiveEvents;
+  const savedMembers = idolRoster.map(member => ({ id: member.id, staminaValue: member.staminaValue, injury: member.injury }));
+  try {
+    const target = idolRoster.find(member => !member.injury);
+    scheduledPerformances = [];
+    specialLiveEvents = [];
+    weeklySchedule = cloneWeeklySchedule(weeklySchedule);
+    weeklySchedule.slots = Array(WEEK_SLOT_COUNT).fill('');
+    weeklySchedule.slots[0] = 'dance-lesson';
+    weeklySchedule.slots[1] = 'rest-day';
+    weeklySchedule.slots[2] = 'dance-lesson';
+    weeklySchedule.slots[3] = 'endurance-training';
+    weeklySchedule.slots[4] = 'dance-lesson';
+    weeklySchedule.restDayMembers = [];
+    weeklySchedule.focusMemberIds = [];
+    target.staminaValue = 100;
+    window.__stamina = [];
+    applyWeeklySchedule();
+    return JSON.stringify(window.__stamina.find(entry => entry.id === target.id)?.amount);
+  } finally {
+    weeklySchedule = savedSchedule;
+    scheduledPerformances = savedPerformances;
+    specialLiveEvents = savedSpecialLives;
+    savedMembers.forEach(saved => {
+      const member = idolRoster.find(entry => entry.id === saved.id);
+      member.staminaValue = saved.staminaValue;
+      member.injury = saved.injury;
+    });
+  }
+`));
+check('rest and endurance each reset the consecutive training count', resetStreakSpend === 86,
+  String(resetStreakSpend));
 check('the boost targets are exactly the four stats', run(
   'JSON.stringify(SPECIAL_TRAINING_STATS) === JSON.stringify(["vocal", "dance", "stamina", "recovery"])'
 ) === true);
@@ -1259,6 +1296,55 @@ check('the default weekly preset has the requested 14-slot composition', run(`
       && JSON.stringify(counts) === JSON.stringify(expected);
   })()
 `) === true);
+check('the initial calendar includes the five requested meet-and-greet presets', run(`
+  (() => {
+    const schedule = createInitialProductionSchedule();
+    const year = calendarYear;
+    const date = (month, day) => toDateKey(new Date(year, month - 1, day, 12));
+    const events = Object.values(schedule).flatMap(plan => plan.planEvents || []);
+    const expected = [
+      ['1-3', 'online-meeguri', 'パルス八王子', [date(3, 6), date(3, 7)], 'cd_1_2'],
+      ['1-4', 'online-meeguri', 'パルス八王子', [date(4, 10)], 'cd_1_2'],
+      ['1-4', 'real-meeguri', 'パルス品川', [date(4, 20)], 'cd_1_2'],
+      ['1-5', 'online-meeguri', 'パルス八王子', [date(5, 9)], 'cd_1_2'],
+      ['1-7', 'online-meeguri', 'パルス船橋', [date(7, 3), date(7, 4)], 'cd_1_6']
+    ];
+    const matches = expected.every(([key, benefitId, venue, dates, cdId]) => {
+      const event = schedule[key].planEvents.find(item => item.benefitId === benefitId
+        && item.venue === venue && item.targetCdId === cdId
+        && JSON.stringify(item.dates) === JSON.stringify(dates));
+      return Boolean(event);
+    });
+    return matches && schedule['1-5'].liveVenue === (INITIAL_LIVE_VENUE || '原宿体育館');
+  })()
+`) === true);
+check('a multi-day online meet-and-greet runs both dates and charges one event fee', run(`
+  (() => {
+    const saved = { productionSchedule, funds, recordReleaseBenefitSales, setLog, formatPlanDayLabel };
+    const event = {
+      benefitId: 'online-meeguri', name: 'オンラインミーグリ',
+      date: '2027-03-06', dates: ['2027-03-06', '2027-03-07'], completed: false
+    };
+    let salesDays = 0;
+    try {
+      productionSchedule = { '1-3': { planEvents: [event] } };
+      funds = 10000000;
+      recordReleaseBenefitSales = () => { salesDays += 1; return { sellThrough: 1 }; };
+      setLog = () => {};
+      formatPlanDayLabel = date => date;
+      processPlanEvents('2027-03-06');
+      const firstDay = !event.completed && funds === 7000000;
+      processPlanEvents('2027-03-07');
+      return firstDay && event.completed && funds === 7000000 && salesDays === 2;
+    } finally {
+      productionSchedule = saved.productionSchedule;
+      funds = saved.funds;
+      recordReleaseBenefitSales = saved.recordReleaseBenefitSales;
+      setLog = saved.setLog;
+      formatPlanDayLabel = saved.formatPlanDayLabel;
+    }
+  })()
+`) === true);
 check('the default preset satisfies the weekly rest requirement', run(`
   (() => {
     const savedSchedule = weeklySchedule;
@@ -1492,6 +1578,142 @@ check('each selection sort criterion orders the list both ways', run(`
     return Object.values(results).every(Boolean);
   })()
 `) === true);
+
+const reportProgress = JSON.parse(run(`
+  (() => {
+    const saved = {
+      gameDate,
+      pendingReports,
+      pendingMonthlyReport,
+      pendingSelectionEvent,
+      pendingCrisisResponse,
+      pendingFanClubEvent,
+      pendingRandomEvent,
+      pendingEquipmentEvent,
+      pendingPerformanceOffers,
+      processDailyFlow,
+      syncGameCalendar,
+      resetWeeklySchedule,
+      updateWeeklyGroupFans,
+      updateUI,
+      openPendingModal,
+      modalDisplay: document.getElementById('monthly-report-modal').style.display
+    };
+    try {
+      gameDate = '2027-01-06';
+      pendingReports = [];
+      pendingMonthlyReport = { year: 2027, month: 1, income: [], expense: [] };
+      pendingSelectionEvent = null;
+      pendingCrisisResponse = null;
+      pendingFanClubEvent = null;
+      pendingRandomEvent = null;
+      pendingEquipmentEvent = null;
+      pendingPerformanceOffers = [];
+      processDailyFlow = () => {};
+      syncGameCalendar = () => {};
+      resetWeeklySchedule = () => {};
+      updateWeeklyGroupFans = () => {};
+      updateUI = () => {};
+      openPendingModal = () => {};
+      document.getElementById('monthly-report-modal').style.display = 'flex';
+      closeMonthlyReportModal();
+      return JSON.stringify({
+        date: gameDate,
+        weekday: getGameDateObject().getDay(),
+        closed: document.getElementById('monthly-report-modal').style.display === 'none'
+      });
+    } finally {
+      gameDate = saved.gameDate;
+      pendingReports = saved.pendingReports;
+      pendingMonthlyReport = saved.pendingMonthlyReport;
+      pendingSelectionEvent = saved.pendingSelectionEvent;
+      pendingCrisisResponse = saved.pendingCrisisResponse;
+      pendingFanClubEvent = saved.pendingFanClubEvent;
+      pendingRandomEvent = saved.pendingRandomEvent;
+      pendingEquipmentEvent = saved.pendingEquipmentEvent;
+      pendingPerformanceOffers = saved.pendingPerformanceOffers;
+      processDailyFlow = saved.processDailyFlow;
+      syncGameCalendar = saved.syncGameCalendar;
+      resetWeeklySchedule = saved.resetWeeklySchedule;
+      updateWeeklyGroupFans = saved.updateWeeklyGroupFans;
+      updateUI = saved.updateUI;
+      openPendingModal = saved.openPendingModal;
+      document.getElementById('monthly-report-modal').style.display = saved.modalDisplay;
+    }
+  })()
+`));
+check('closing a midweek financial report resumes through the next Wednesday',
+  reportProgress.date === '2027-01-13' && reportProgress.weekday === 3 && reportProgress.closed,
+  JSON.stringify(reportProgress));
+
+const liveReportProgress = JSON.parse(run(`
+  (() => {
+    const modal = document.getElementById('live-finance-modal');
+    const body = modal.querySelector('.live-finance-body');
+    const title = modal.querySelector('.page-title');
+    const button = document.getElementById('live-finance-next-button');
+    const saved = {
+      pendingReports,
+      advanceUntilNextSchedulePoint,
+      liveFinanceReportPage,
+      liveFinanceReportTitle,
+      body: body.innerHTML,
+      title: title.textContent,
+      button: button.textContent,
+      display: modal.style.display
+    };
+    try {
+      pendingReports = [];
+      window.__reportResumeCount = 0;
+      advanceUntilNextSchedulePoint = () => { window.__reportResumeCount += 1; };
+      showLiveDetailedFinanceModal({
+        liveName: 'テスト公演', venueName: 'テスト会場', venueCap: 'B',
+        showCount: 1, showDates: ['2027-01-08'], isMultiDay: false,
+        totalAudience: 10, streamBuyers: 0, streamDaysCount: 0, streamCostPerDay: 8000000,
+        liveCdSalesByDate: [{ date: '2027-01-08', songTitle: 'テスト曲', unitsSold: 200, revenue: 60000 }],
+        liveCdSalesUnits: 200, liveCdSalesRevenue: 60000,
+        seatDetails: [{ name: '指定席', unitPrice: 1000, soldCount: 10, totalCapacity: 100, totalSales: 10000 }],
+        ticketRevenue: 10000, merchandiseRevenue: 12500, merchandiseSold: 5,
+        streamRevenue: 0, streamCost: 0, baseCost: 5000, grossRevenue: 10000,
+        totalCost: 5000, profit: 5000
+      });
+      const firstPage = title.textContent.includes('ライブ公演報告（1/2）')
+        && body.querySelector('[data-report-page="1"]').style.display !== 'none'
+        && body.querySelector('[data-report-page="2"]').style.display === 'none'
+        && body.querySelector('[data-report-page="1"]').textContent.includes('200枚')
+        && body.querySelector('[data-report-page="1"]').textContent.includes('6万円')
+        && body.querySelector('[data-report-page="1"]').textContent.includes('5個')
+        && body.querySelector('[data-report-page="1"]').textContent.includes('1.3万円')
+        && button.textContent === '収支報告へ';
+      advanceLiveFinanceReportPage();
+      const secondPage = title.textContent.includes('ライブ収支報告（2/2）')
+        && body.querySelector('[data-report-page="1"]').style.display === 'none'
+        && body.querySelector('[data-report-page="2"]').style.display === 'block'
+        && button.textContent === '報告を閉じる'
+        && window.__reportResumeCount === 0;
+      advanceLiveFinanceReportPage();
+      return JSON.stringify({
+        firstPage,
+        secondPage,
+        closed: modal.style.display === 'none',
+        resumed: window.__reportResumeCount === 1
+      });
+    } finally {
+      pendingReports = saved.pendingReports;
+      advanceUntilNextSchedulePoint = saved.advanceUntilNextSchedulePoint;
+      liveFinanceReportPage = saved.liveFinanceReportPage;
+      liveFinanceReportTitle = saved.liveFinanceReportTitle;
+      body.innerHTML = saved.body;
+      title.textContent = saved.title;
+      button.textContent = saved.button;
+      modal.style.display = saved.display;
+      delete window.__reportResumeCount;
+    }
+  })()
+`));
+check('live reporting has a recap page followed by finance and resumes only after closing',
+  liveReportProgress.firstPage && liveReportProgress.secondPage && liveReportProgress.closed && liveReportProgress.resumed,
+  JSON.stringify(liveReportProgress));
 
 // ---- 結果表示 ----
 console.log('\n================ RESULT ================');

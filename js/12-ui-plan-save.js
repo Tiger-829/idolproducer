@@ -16,10 +16,10 @@ let customSecondSong = "青春の軌跡";
 let customFirstLiveName = "1stデビューライブ";
 
 const BENEFIT_EVENT_TYPE_OPTIONS = [
-  { id: 'online-meeguri', name: 'オンラインミーグリ', baseCost: 3000000 },
-  { id: 'online-sign', name: 'オンラインサイン会', baseCost: 6000000 },
-  { id: 'real-meeguri', name: 'リアルミーグリ', baseCost: 5000000 },
-  { id: 'real-sign', name: 'リアルサイン会', baseCost: 10000000 }
+  { id: 'online-meeguri', name: 'オンラインミーグリ', baseCost: 3000000, profileId: 'web-greeting' },
+  { id: 'online-sign', name: 'オンラインサイン会', baseCost: 6000000, profileId: 'web-sign' },
+  { id: 'real-meeguri', name: 'リアルミーグリ', baseCost: 5000000, profileId: 'real-greeting' },
+  { id: 'real-sign', name: 'リアルサイン会', baseCost: 10000000, profileId: 'real-sign' }
 ];
 
 // Presetリリース月を判定する。
@@ -452,6 +452,7 @@ function readEventSlotInputs(month) {
 
     return {
       name: eventName,
+      benefitId: BENEFIT_EVENT_TYPE_OPTIONS.find(option => option.name === eventName)?.id || 'online-meeguri',
       venue: venueVal,
       date: dates[0] || '',
       dates: dates,

@@ -286,6 +286,7 @@ function processPlayerLives(fromDate, toDate) {
       let grandTotalTicketRevenue = 0;
       let grandTotalStreamBuyers = 0;
       let grandTotalStreamRevenue = 0;
+      const liveCdSalesByDate = [];
 
       let maxDailyAudience = 0;
       let maxDailyDateKey = finalDateStr;
@@ -294,6 +295,25 @@ function processPlayerLives(fromDate, toDate) {
         const dObj = getGameDateObject(dateKey);
         const isFinale = (index === showDates.length - 1 && isMultiDay);
         const finaleRate = typeof LIVE_FINALE_RATE !== 'undefined' ? LIVE_FINALE_RATE : 0.9;
+
+        const liveSong = songs
+          .filter(song => song.released && song.firstWeekSales > 0 && (!song.releaseDateKey || song.releaseDateKey <= dateKey))
+          .sort((a, b) => String(b.releaseDateKey || '').localeCompare(String(a.releaseDateKey || '')))[0];
+        const cdUnits = liveSong
+          ? Math.round((liveSong.firstWeekSales / 7) * LIVE_CD_SALES_MULTIPLIER)
+          : 0;
+        const cdRevenue = liveSong ? cdUnits * getSongUnitPrice(liveSong) : 0;
+        if (liveSong && cdUnits > 0) {
+          liveSong.totalSales = (liveSong.totalSales || 0) + cdUnits;
+          addGroupSales(cdUnits);
+          addMonthlyCdRevenue(cdRevenue);
+        }
+        liveCdSalesByDate.push({
+          date: dateKey,
+          songTitle: liveSong?.title || '',
+          unitsSold: cdUnits,
+          revenue: cdRevenue
+        });
         
         let demand = Math.floor(getLiveAudienceDemand(v, dObj, isFinale ? finaleRate : null, priceFactor) * livePromotionMultiplier);
         let dayAudience = 0;
@@ -375,6 +395,9 @@ function processPlayerLives(fromDate, toDate) {
         seatDetails: seatDetails,
         totalAudience: grandTotalAudience,
         ticketRevenue: grandTotalTicketRevenue,
+        liveCdSalesByDate,
+        liveCdSalesUnits: liveCdSalesByDate.reduce((total, day) => total + day.unitsSold, 0),
+        liveCdSalesRevenue: liveCdSalesByDate.reduce((total, day) => total + day.revenue, 0),
         merchandiseRevenue: goodsRevenue,
         merchandiseSold: unitsSoldCalc,
         streamDaysCount: streamDaysCount,
@@ -1185,9 +1208,11 @@ function applyMemberLesson(member, itemId, multiplier = 1, individualStat = null
   return { exp, levels };
 }
 
-function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
+function getLessonStaminaCost(item, staminaBefore, slotEffect = 1, consecutiveTrainingCount = 1) {
   if (!item || !Number.isFinite(item.staminaRatio)) return 0;
-  return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
+  const consecutivePenalty = Math.max(0, consecutiveTrainingCount - 1) * CONSECUTIVE_TRAINING_STAMINA_PENALTY;
+  const effectiveRatio = item.staminaRatio * slotEffect + consecutivePenalty;
+  return Math.max(0, Math.round(Math.max(0, staminaBefore) * effectiveRatio));
 }
 
 // ★ 休養の義務数ルール（全休1日以上 ＆ 休養スロット合計4枠以上）のバリデーション
@@ -1358,12 +1383,14 @@ function applyWeeklySchedule() {
     let staminaCost = 0;
     let remainingStamina = member.staminaValue ?? maxStamina;
     let memberLevels = 0;
+    let consecutiveTrainingCount = 0;
 
     weeklySchedule.slots.forEach((slotId, index) => {
       const fixed = fixedSlots.get(index);
       const isCurrentlyResting = isRestDesignated && (releaseIndex === -1 || index < releaseIndex);
 
       if (fixed) {
+        consecutiveTrainingCount = 0;
         if (fixed.kind === 'rest-day') {
           // 固定の休養枠（半日扱い：100%回復）
           remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.0);
@@ -1379,6 +1406,7 @@ function applyWeeklySchedule() {
 
       // 休養スロット（半日休養＝100%回復、フル休養＝150%回復）
       if (slotId === 'rest-day') {
+        consecutiveTrainingCount = 0;
         const periodIndex = (typeof getWeekSlotPeriod === 'function') ? getWeekSlotPeriod(index) : (index % 2);
         const pairIndex = periodIndex === 0 ? index + 1 : index - 1;
         const pairSlotId = weeklySchedule.slots[pairIndex];
@@ -1397,39 +1425,57 @@ function applyWeeklySchedule() {
 
       // 食事会（別枠扱い：しっかり大きめに回復 +30 または 100%）
       if (slotId === 'meal-party') {
+        consecutiveTrainingCount = 0;
         remainingStamina = Math.min(maxStamina, remainingStamina + Math.max(30, remainingStamina * 1.0));
         return;
       }
 
-      if (!slotId || isCurrentlyResting) return;
+      if (!slotId || isCurrentlyResting) {
+        consecutiveTrainingCount = 0;
+        return;
+      }
 
       const item = itemsList.find(row => row.id === slotId);
-      if (!item) return;
+      if (!item) {
+        consecutiveTrainingCount = 0;
+        return;
+      }
 
       const periodIndex = (typeof getWeekSlotPeriod === 'function') ? getWeekSlotPeriod(index) : (index % 2);
       const slotEffect = periodIndex === 0 ? morningMultiplier : 1;
 
       if (slotId === 'individual-lesson') {
         if (member.id === targetMemberId) {
+          consecutiveTrainingCount += 1;
           const baseExp = getWeeklyLessonExperience() * slotEffect;
           const gainedExp = Math.round(baseExp * SPECIAL_INDIVIDUAL_MULTIPLIER);
           if (typeof addMemberStatExp === 'function') {
             memberLevels += addMemberStatExp(member, targetStat, gainedExp);
           }
-          const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
+          const cost = getLessonStaminaCost(item, remainingStamina, slotEffect, consecutiveTrainingCount);
           staminaCost += cost;
           remainingStamina = Math.max(0, remainingStamina - cost);
         } else {
+          consecutiveTrainingCount = 0;
           // 休養中の他メンバーは半日休養扱い（100%回復）
           remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.0);
         }
         return;
       }
 
-      if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) return;
+      if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) {
+        consecutiveTrainingCount = 0;
+        return;
+      }
+
+      if (slotId === 'endurance-training' || !Number.isFinite(item.staminaRatio)) {
+        consecutiveTrainingCount = 0;
+      } else {
+        consecutiveTrainingCount += 1;
+      }
 
       memberLevels += applyMemberLesson(member, slotId, 1, null, slotEffect).levels;
-      const cost = getLessonStaminaCost(item, remainingStamina, slotEffect);
+      const cost = getLessonStaminaCost(item, remainingStamina, slotEffect, consecutiveTrainingCount);
       staminaCost += cost;
       remainingStamina = Math.max(0, remainingStamina - cost);
     });

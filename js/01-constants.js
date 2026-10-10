@@ -397,16 +397,17 @@ function getWeekSlotLabel(slotIndex) {
 
 const FULL_RUN_THROUGH_WEEKLY_LIMIT = 2;
 const MORNING_SLOT_MULTIPLIER = 0.8;
+const CONSECUTIVE_TRAINING_STAMINA_PENALTY = 0.025;
 
 const WEEKLY_SCHEDULE_ITEMS = [
-  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaRatio: 0.45, effect: 'ダンス（＋運動能力・体力）' },
-  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaRatio: 0.40, effect: '歌唱力（＋体力）' },
+  { id: 'dance-lesson', name: 'ダンスレッスン', expStat: 'dance', secondaryExp: { athletics: 0.35, stamina: 0.3 }, staminaRatio: 0.36, effect: 'ダンス（＋運動能力・体力）' },
+  { id: 'vocal-lesson', name: '歌唱レッスン', expStat: 'vocal', secondaryExp: { stamina: 0.25 }, staminaRatio: 0.32, effect: '歌唱力（＋体力）' },
   { id: 'literacy', name: 'リテラシー講義', expStat: 'crisis', secondaryExp: { sns: 1.0 }, staminaRatio: 0.05, effect: '危機回避力・SNS運用' },
-  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaRatio: 0.60, individual: true, effect: '対象1名を集中育成' },
+  { id: 'individual-lesson', name: '個別レッスン', expStat: null, secondaryExp: {}, staminaRatio: 0.48, individual: true, effect: '対象1名を集中育成' },
   { id: 'strength-training', name: '筋力トレーニング', expStat: 'athletics', secondaryExp: { recovery: 0.5 }, staminaRatio: 0.15, effect: '運動能力（＋回復力）' },
   { id: 'endurance-training', name: '持久力トレーニング', expStat: 'stamina', secondaryExp: { recovery: 0.5 }, staminaRatio: 0.15, effect: '体力（＋回復力）' },
-  { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaRatio: 0.70, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
-  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaRatio: 0.65, groupOnly: true, effect: '連携力' },
+  { id: 'full-run-through', name: '通し練習', expStat: 'dance', secondaryExp: { vocal: 1.0 }, staminaRatio: 0.56, weeklyLimit: FULL_RUN_THROUGH_WEEKLY_LIMIT, effect: 'ダンス＋歌唱' },
+  { id: 'coordination', name: '連携', expStat: 'coordination', secondaryExp: {}, staminaRatio: 0.52, groupOnly: true, effect: '連携力' },
   { id: 'meal-party', name: '食事会', social: true, cost: 1000000 },
   { id: 'rest-day', name: '休養', rest: true },
   { id: 'rehearsal', name: 'リハーサル', fixed: true },
@@ -490,6 +491,7 @@ const INITIAL_LIVE_MONTH_MIN = 5;
 const INITIAL_LIVE_MONTH_MAX = 7;
 const INITIAL_LIVE_SHOW_DAYS = 2;
 const INITIAL_LIVE_VENUE = '原宿体育館';
+const LIVE_CD_SALES_MULTIPLIER = 2;
 const RELEASED_SONG_WEEKLY_PERSIST_RATE = 0.0006;
 const SALES_COMPARE_SONG_COUNT = 5;
 const MAX_SONG_LEVEL = 20;

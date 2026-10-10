@@ -391,6 +391,35 @@ function createInitialProductionSchedule() {
     streamDates: [toDateKey(liveSaturday), toDateKey(liveSunday)] 
   };
 
+  const dateKey = (month, day) => toDateKey(new Date(baseYear, month - 1, day, 12));
+  const makePresetMeetup = (name, benefitId, venue, dates, targetCdId) => ({
+    name,
+    benefitId,
+    venue,
+    date: dates[0],
+    dates,
+    targetCdId,
+    completed: false
+  });
+  schedule['1-3'] = {
+    release: 'none',
+    planEvents: [makePresetMeetup('オンラインミーグリ', 'online-meeguri', 'パルス八王子', [dateKey(3, 6), dateKey(3, 7)], 'cd_1_2')]
+  };
+  schedule['1-4'] = {
+    release: 'none',
+    planEvents: [
+      makePresetMeetup('オンラインミーグリ', 'online-meeguri', 'パルス八王子', [dateKey(4, 10)], 'cd_1_2'),
+      makePresetMeetup('リアルミーグリ', 'real-meeguri', 'パルス品川', [dateKey(4, 20)], 'cd_1_2')
+    ]
+  };
+  schedule['1-5'].planEvents = [
+    makePresetMeetup('オンラインミーグリ', 'online-meeguri', 'パルス八王子', [dateKey(5, 9)], 'cd_1_2')
+  ];
+  schedule['1-7'] = {
+    release: 'none',
+    planEvents: [makePresetMeetup('オンラインミーグリ', 'online-meeguri', 'パルス船橋', [dateKey(7, 3), dateKey(7, 4)], 'cd_1_6')]
+  };
+
   return schedule;
 }
 
