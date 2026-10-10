@@ -1333,8 +1333,8 @@ function applyWeeklySchedule() {
   const targetStat = weeklySchedule.individualStat || 'vocal';
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
-  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 10;
-  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 15;
+  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 25;
+  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 75;
   const morningMultiplier = typeof MORNING_SLOT_MULTIPLIER !== 'undefined' ? MORNING_SLOT_MULTIPLIER : 0.8;
   const rehCost = typeof REHEARSAL_STAMINA_COST !== 'undefined' ? REHEARSAL_STAMINA_COST : 8;
   const bcastCost = typeof BROADCAST_STAMINA_COST !== 'undefined' ? BROADCAST_STAMINA_COST : 12;
