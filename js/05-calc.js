@@ -1,8 +1,5 @@
 // ==========================================
-// 計算・総合力／経験値・体力・年収
-// ==========================================
-// ==========================================
-// 4. 計算 ＆ 総合力ロジック
+// 5 : 計算・総合力／経験値・体力・年収・体力消費減衰ロジック搭載版
 // ==========================================
 
 // チームAveragesを計算する。
@@ -45,9 +42,6 @@ function calculateSingleOverall(stats) {
 // ==========================================
 // アイドル力（ご指定の重み付け計算式に統一）
 // ==========================================
-// ==========================================
-// 個人のアイドル力を算出する関数
-// ==========================================
 function calculateIdolPower(stats) {
   const source = stats || {};
   
@@ -59,7 +53,6 @@ function calculateIdolPower(stats) {
   const stamina = Number(source.stamina) || 0;
   const recovery = Number(source.recovery) || 0;
 
-  // 指定された数式: (ダンス+歌唱力＋連携力)*2 ＋ スタイル*1.5 ＋ ファッション ＋ (体力＋回復力)/2
   const individualScore = (((dance + vocal + teamwork) * 2) 
                         + (style * 1.25) 
                         + (fashion * 0.75) 
@@ -68,15 +61,12 @@ function calculateIdolPower(stats) {
   return Math.round(individualScore);
 }
 
-// ==========================================
 // 選抜チーム（または全体）の平均アイドル力を算出する関数
-// ==========================================
 function calculateTeamIdolPower() {
   const active = Array.isArray(idolRoster) ? idolRoster.filter(m => m && m.isSelected) : [];
   const targets = active.length > 0 ? active : (Array.isArray(idolRoster) ? idolRoster : []);
   if (!targets.length) return 0;
 
-  // Σ(k=1→n) の総和を計算
   const total = targets.reduce((sum, m) => {
     if (!m) return sum;
     const stats = m.stats || {
@@ -91,9 +81,9 @@ function calculateTeamIdolPower() {
     return sum + calculateIdolPower(stats);
   }, 0);
 
-  // 1/n * Σ (平均値の算出) ＆ 四捨五入
   return Math.round(total / targets.length);
 }
+
 // 個人推定ファン数
 function calculateMemberFans(member) {
   const stats = member.stats || {};
@@ -325,6 +315,16 @@ function recoverMemberStamina(member, amount) {
   member.staminaValue = Math.min(MAX_STAMINA_VALUE, Math.round((member.staminaValue ?? 0) + amount));
 }
 
+// ==========================================
+// ★ 体力ステータスによるスタミナ消費減衰（軽減）係数の算出
+// 体力が高いほど消費が割合で減衰し、ハードなスケジュールやライブが楽になります
+// ==========================================
+function getStaminaConsumptionFactor(member) {
+  const staminaStat = member?.stats?.stamina || 0;
+  // 体力0で1.0（軽減なし）、体力50で約0.67、体力100で0.5（消費半減）
+  return 1 / (1 + (staminaStat * 0.01));
+}
+
 function getMemberWeeklyRecovery(member, isRestDay) {
   const recoveryStat = member.stats?.recovery || 0;
   const dormitoryBonus = (officeUpgrades.dormitory || 0) * 4;
@@ -399,16 +399,21 @@ function applyLiveExperience(venue, audience, showDays = 1) {
   return { total, gained, levelUps, memberCount: participants.length };
 }
 
+// ★ ライブ時のスタミナ消費に「体力ステータスによる減衰係数」を反映
 function applyLiveStaminaCost(venue, isMultiDay, isConsecutive) {
   const selected = idolRoster.filter(member => member.isSelected);
   const participants = selected.length ? selected : idolRoster;
-  const cost = getLiveStaminaCost(venue, isConsecutive);
+  const baseCost = getLiveStaminaCost(venue, isConsecutive);
   const fatigueGain = getLiveFatigueGain(isMultiDay, isConsecutive);
+  
   participants.forEach(member => {
-    consumeMemberStamina(member, cost);
+    const reductionFactor = getStaminaConsumptionFactor(member);
+    const individualCost = Math.max(1, Math.round(baseCost * reductionFactor));
+    
+    consumeMemberStamina(member, individualCost);
     addLiveFatigue(member, fatigueGain);
   });
-  return { cost, fatigueGain, memberCount: participants.length };
+  return { cost: baseCost, fatigueGain, memberCount: participants.length };
 }
 
 function applyLiveWeekRecovery() {
