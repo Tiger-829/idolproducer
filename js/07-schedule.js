@@ -98,6 +98,7 @@ function advanceUntilNextSchedulePoint() {
   openPendingModal();
 }
 
+
 // 保留中イベント・オファーの有無を判定するヘルパー
 function hasPendingEvents() {
   return (
@@ -109,6 +110,20 @@ function hasPendingEvents() {
     (typeof pendingEquipmentEvent !== 'undefined' && pendingEquipmentEvent) ||
     (typeof pendingPerformanceOffers !== 'undefined' && pendingPerformanceOffers.length > 0)
   );
+}
+
+// ボタンから呼び出される共通エントリーポイント
+function advanceOneWeek() {
+  try {
+    if (typeof advanceUntilNextSchedulePoint === 'function') {
+      advanceUntilNextSchedulePoint();
+    } else {
+      console.warn("advanceUntilNextSchedulePoint is not defined");
+    }
+  } catch (error) {
+    console.error("【進行エラー】", error);
+    alert(`進行中にエラーが発生しました:\n${error.message}`);
+  }
 }
 
 // ==========================================
