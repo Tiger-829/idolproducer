@@ -327,7 +327,8 @@ const INDIVIDUAL_EVENT_PROFILES = {
 const MUSIC_PROGRAMS = [
   { id: 'song-station', name: 'Song Station', weekday: 5, week: 2 },
   { id: 'ctv', name: 'CTV', weekday: 1, week: 3 },
-  { id: 'm-con', name: 'Mコン', weekday: 2, week: 3 }
+  { id: 'm-con', name: 'Mコン', weekday: 2, week: 3 },
+  { id: 'hall 109', name: 'Hall 109', weekday: 6, week: 3 }
 ];
 
 const SPECIAL_BROADCASTS = [
