@@ -1,6 +1,11 @@
 // ==========================================
-// 11-ui-roster.js : UI描画（グッズ在庫・種類数リアルタイム反映対応・完全防護版）
+// 11-ui-roster.js : UI描画（グッズ在庫・種類数リアルタイム反映 ＆ 5部門ソート対応版）
 // ==========================================
+
+let rosterSortState = {
+  key: 'name',     // ソート基準項目 ('age', 'popularity', 'vocal', 'dance', 'teamwork', 'name')
+  direction: 'asc' // 'asc'（昇順）または 'desc'（降順）
+};
 
 // UIを更新する。
 function updateUI() {
@@ -46,7 +51,7 @@ function updateUI() {
       streamEl.textContent = `${formatMoney(net)}${yearlyStats?.streamCost ? '（制作費込）' : ''}`;
     }
 
-    // ★ グッズの在庫数と種類数を自動反映
+    // グッズの在庫数と種類数を自動反映
     const merchStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
     const merchProds = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
     setText('txt-merchandise-stock', merchStock.toLocaleString());
@@ -78,7 +83,6 @@ function updateUI() {
     const tierEl = document.getElementById('txt-group-fan-tiers');
     if (tierEl && fanTiers) {
       const share = fanTiers.shares;
-      // pctを処理する。
       const pct = value => Math.round(value * 100);
       const liveRate = typeof getTierParticipationRate === 'function' ? getTierParticipationRate('live') : 0.1;
       const segs = [
@@ -132,7 +136,7 @@ function updateUI() {
     console.warn('Header stats error:', e);
   }
 
-  // 3. 各パネルの描画（個別 try-catch で絶対に連鎖停止させない）
+  // 3. 各パネルの描画
   const runSafe = (fn) => {
     try {
       if (typeof fn === 'function') fn();
@@ -183,6 +187,19 @@ function switchRosterTab(tab) {
   const undBtn = document.getElementById('tab-btn-und');
   if (selBtn) selBtn.classList.toggle('active', tab === 'selected');
   if (undBtn) undBtn.classList.toggle('active', tab === 'under');
+  renderRosterList();
+}
+
+// ★ 5部門ソートの基準を変更・切替する関数
+function setRosterSort(key) {
+  if (rosterSortState.key === key) {
+    // 同じ項目がクリックされた場合は昇順・降順を反転
+    rosterSortState.direction = rosterSortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    // 新しい項目の場合はデフォルトで降順（高い順）に設定（年齢のみ初期昇順）
+    rosterSortState.key = key;
+    rosterSortState.direction = (key === 'age') ? 'asc' : 'desc';
+  }
   renderRosterList();
 }
 
@@ -295,16 +312,77 @@ function toggleMemberAbilities(memberId) {
   }
 }
 
-// ロースター一覧を描画する。
+// ロースター一覧を描画する（5部門ソート機能組み込み）
 function renderRosterList() {
   const listUI = document.getElementById('roster-list-ui');
   if (!listUI) return;
-  listUI.innerHTML = '';
+  
   const roster = Array.isArray(idolRoster) ? idolRoster : [];
   const filtered = roster.filter(m => currentRosterTab === 'selected' ? m.isSelected : !m.isSelected);
+
+  // ★ 5部門（年齢・人気・歌唱力・ダンス力・連携力）のソート処理
+  const sortKey = rosterSortState.key;
+  const sortDir = rosterSortState.direction === 'asc' ? 1 : -1;
+
+  filtered.sort((a, b) => {
+    let valA = 0;
+    let valB = 0;
+
+    if (sortKey === 'age') {
+      valA = a.age || 0;
+      valB = b.age || 0;
+    } else if (sortKey === 'popularity') {
+      valA = a.stats?.popularity || 0;
+      valB = b.stats?.popularity || 0;
+    } else if (sortKey === 'vocal') {
+      valA = a.stats?.vocal || 0;
+      valB = b.stats?.vocal || 0;
+    } else if (sortKey === 'dance') {
+      valA = a.stats?.dance || 0;
+      valB = b.stats?.dance || 0;
+    } else if (sortKey === 'teamwork') {
+      valA = a.stats?.teamwork || 0;
+      valB = b.stats?.teamwork || 0;
+    }
+
+    if (valA !== valB) {
+      return (valA - valB) * sortDir;
+    }
+    // 値が同じ場合は名前順で安定ソート
+    return a.name.localeCompare(b.name, 'ja');
+  });
+
   const restingIds = new Set(Array.isArray(weeklySchedule?.restDayMembers) ? weeklySchedule.restDayMembers : []);
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
+  const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
+
+  // ソート切替ボタンのHTML生成ヘルパー
+  const getSortBtnHtml = (key, label) => {
+    const isActive = rosterSortState.key === key;
+    const arrow = isActive ? (rosterSortState.direction === 'asc' ? ' ▲' : ' ▼') : '';
+    const activeStyle = isActive ? 'background: var(--primary); color: #fff; border-color: var(--primary);' : 'background: #fff; color: #555; border-color: #ddd;';
+    return `<button type="button" onclick="setRosterSort('${key}')" style="font-size:10px; padding:3px 6px; border-radius:4px; border:1px solid #ddd; cursor:pointer; ${activeStyle}">${label}${arrow}</button>`;
+  };
+
+  let htmlContent = `
+    <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px; padding:6px; background:#fcf8fa; border:1px solid #f0d5e3; border-radius:6px;">
+      <div style="font-size:11px; font-weight:bold; color:#555;">並び替え（ソート）:</div>
+      <div style="display:flex; gap:4px; flex-wrap:wrap;">
+        ${getSortBtnHtml('age', '年齢')}
+        ${getSortBtnHtml('popularity', '人気')}
+        ${getSortBtnHtml('vocal', '歌唱力')}
+        ${getSortBtnHtml('dance', 'ダンス力')}
+        ${getSortBtnHtml('teamwork', '連携力')}
+      </div>
+    </div>
+  `;
+
+  if (!filtered.length) {
+    htmlContent += '<div class="office-maintenance-note">該当するメンバーがいません。</div>';
+    listUI.innerHTML = htmlContent;
+    return;
+  }
 
   filtered.forEach(m => {
     const overall = typeof calculateSingleOverall === 'function' ? calculateSingleOverall(m.stats) : 50;
@@ -321,13 +399,12 @@ function renderRosterList() {
       ? `<span style="color:#2980b9; font-size:9px;">[休養指定中]</span>`
       : '';
 
-    const statusKeys = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
     const topStat = [...statusKeys]
       .filter(status => status.id !== 'popularity')
       .sort((a, b) => (m.stats[b.id] || 0) - (m.stats[a.id] || 0))[0];
     const abilitiesShown = shownAbilityMemberIds.has(m.id);
 
-    listUI.innerHTML += `
+    htmlContent += `
       <details class="member-details" ${m._isOpen ? 'open' : ''}>
         <summary class="member-row member-summary" onclick="onMemberSummaryClick(event, ${m.id})">
           <div class="member-summary-main">
@@ -395,6 +472,8 @@ function renderRosterList() {
       </details>
     `;
   });
+
+  listUI.innerHTML = htmlContent;
 }
 
 // Logを設定する。
