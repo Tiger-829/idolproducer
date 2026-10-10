@@ -246,7 +246,7 @@ function renderWeeklyActionPanel() {
 
     panel.innerHTML = `
       <h2 class="page-title">今週のスケジュール</h2>
-      ${notes.length ? `<div class="weekly-event-note"><strong>今週起きること</strong><ul>${renderWeeklyEventItems(notes)}</ul></div>` : ''}
+      ${notes.length ? `<div class="weekly-event-note"><ul>${renderWeeklyEventItems(notes)}</ul></div>` : ''}
       ${renderWeeklyScheduleControls()}
     `;
   } catch (err) {
