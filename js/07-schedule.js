@@ -1434,18 +1434,17 @@ function applyWeeklySchedule() {
       remainingStamina = Math.max(0, remainingStamina - cost);
     });
 
-    levelUps += memberLevels;
-
-    // ★ 計算された最終的なスタミナをメンバーオブジェクトに確実に代入する
-    member.staminaValue = Math.max(0, Math.min(maxStamina, remainingStamina));
-
-    if (staminaCost > 0) {
-      if (typeof rollMemberInjury === 'function' && rollMemberInjury(member, 0)) {
-        const type = member.injury?.type || 'ケガ';
-        const formattedWeeks = (typeof formatInjuryWeeks === 'function') ? formatInjuryWeeks(member.injury) : '';
-        injuries.push(`${member.name}（${type}・${formattedWeeks}）`);
-      }
+   // 修正後：計算結果を実際のメンバーオブジェクトに確実に代入する
+  levelUps += memberLevels;
+  member.staminaValue = Math.max(0, Math.min(maxStamina, remainingStamina));
+  
+  if (staminaCost > 0) {
+    if (typeof rollMemberInjury === 'function' && rollMemberInjury(member, 0)) {
+      const type = member.injury?.type || 'ケガ';
+      const formattedWeeks = (typeof formatInjuryWeeks === 'function') ? formatInjuryWeeks(member.injury) : '';
+      injuries.push(`${member.name}（${type}・${formattedWeeks}）`);
     }
+  }
 
     if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
       fullyRecoveredMembers.push(member.id);
