@@ -377,7 +377,7 @@ const MANAGER_LEVEL_TIERS = [
   { label: 'E',  min: 0,  multiplier: 1.00 }
 ];
 
-const MEMBER_SALARY_FAN_FACTOR = 4;
+const MEMBER_SALARY_FAN_FACTOR = 1;
 const MEMBER_SALARY_FAN_DAYS = 350;
 const MEMBER_SALARY_GROUP_GROWTH_FACTOR = 6;
 
