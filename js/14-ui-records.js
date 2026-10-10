@@ -194,7 +194,7 @@ function renderFanHistoryTrendChart() {
     </div>
     <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
   `;
-}
+
 
 // 曲一覧の概要
 function describeSongMeta(song) {
