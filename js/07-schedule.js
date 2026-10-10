@@ -1,5 +1,5 @@
 // ==========================================
-// 07-schedule.js : 全機能保持 ＆ 年始固定休養（1/1午前歌番組、1/1午後〜1/9午後休暇の厳密化）
+// 07-schedule.js : 日次進行・新諸経費・イベントキュー新進行エンジン ＆ 休養条件緩和（全休1回＋合計4枠以上）対応版
 // ==========================================
 
 let lastWeekSchedule = null;
@@ -692,7 +692,7 @@ function countWeekSlots(itemId, excludeIndex = -1) {
 }
 
 // ----------------------------------------------------
-// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇［年・日付の完全厳密一致版］）
+// 固定枠取得関数（1/1午前：歌番組 ／ 1/1午後〜1/9午後：休暇）
 // ----------------------------------------------------
 function getWeekFixedSlots() {
   const fixedSlots = new Map();
@@ -717,7 +717,6 @@ function getWeekFixedSlots() {
 
   const anchorYear = startDate.getFullYear();
 
-  // 今週の7日間をチェックし、1月1日〜9日以外の日付（1/13など）には絶対に影響しないよう判定を厳格化
   for (let d = 0; d < dayLabelsLen; d++) {
     const checkDateMorning = new Date(startDate);
     checkDateMorning.setDate(checkDateMorning.getDate() + d);
@@ -726,10 +725,9 @@ function getWeekFixedSlots() {
     const checkDateAfternoon = new Date(checkDateMorning);
     checkDateAfternoon.setHours(15, 0, 0, 0);
 
-    // ★ 曜日インデックスの正確な算出（0: 月〜6: 日、または木曜始まり等のズレを日数差から絶対算出）
     const diffTime = checkDateMorning.getTime() - startDate.getTime();
     const offsetDays = Math.round(diffTime / 86400000);
-    if (offsetDays < 1 || offsetDays > dayLabelsLen) continue; // 週の範囲外はスキップ
+    if (offsetDays < 1 || offsetDays > dayLabelsLen) continue;
 
     const dayBase = (offsetDays - 1) * periodLabelsLen;
 
@@ -737,12 +735,10 @@ function getWeekFixedSlots() {
     const m = checkDateMorning.getMonth() + 1;
     const day = checkDateMorning.getDate();
 
-    // 対象外の年や月、または10日以降（13日など）なら絶対に適用しない
     if (!isCurrentYear || m !== 1 || day > 9) {
       continue;
     }
 
-    // 1月1日（午前 歌番組 / 午後 休暇）
     if (day === 1) {
       addFixed({
         index: dayBase,
@@ -762,7 +758,6 @@ function getWeekFixedSlots() {
         description: '1/1午後からの年始休暇'
       }, toDateKey(checkDateMorning));
     }
-    // 1月2日〜1月8日（終日 休暇）
     else if (day >= 2 && day <= 8) {
       for (let p = 0; p < periodLabelsLen; p++) {
         const slotDate = new Date(checkDateMorning);
@@ -777,7 +772,6 @@ function getWeekFixedSlots() {
         }, toDateKey(slotDate));
       }
     }
-    // 1月9日（午前・午後 休暇）
     else if (day === 9) {
       addFixed({
         index: dayBase,
@@ -1028,6 +1022,7 @@ function isWeekRestDay(dayIndex) {
   return isRest(weeklySchedule.slots[base]) && isRest(weeklySchedule.slots[base + 1]);
 }
 
+// ★ 休養の義務数ルール（全休1回を含む合計4枠の休養を必須、全日2日以上も可）に更新
 function isRestRequirementAchievable() {
   ensureWeeklySchedule();
   const fixed = getWeekFixedSlots();
@@ -1045,10 +1040,9 @@ function isRestRequirementAchievable() {
     }
     if (bothFree) daysWithBothFree += 1;
   }
-  const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
-  const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
-  if (daysWithBothFree < reqFull) return false;
-  if (freeSlots < reqFull * 2 + reqExtra) return false;
+  // フル休養（両方空いている日）が1日以上必要、かつ自由枠の合計が4枠以上必要
+  if (daysWithBothFree < 1) return false;
+  if (freeSlots < 4) return false;
   return true;
 }
 
@@ -1129,6 +1123,7 @@ function getLessonStaminaCost(item, staminaBefore, slotEffect = 1) {
   return Math.max(0, Math.round(Math.max(0, staminaBefore) * item.staminaRatio * slotEffect));
 }
 
+// ★ 休養の義務数ルール（全休1日以上 ＆ 休養スロット合計4枠以上）のバリデーション
 function validateWeeklySchedule() {
   ensureWeeklySchedule();
 
@@ -1152,16 +1147,16 @@ function validateWeeklySchedule() {
   }
 
   const rest = getWeekRestBreakdown();
-  const reqFull = typeof REQUIRED_FULL_REST_DAYS !== 'undefined' ? REQUIRED_FULL_REST_DAYS : 1;
-  const reqExtra = typeof REQUIRED_EXTRA_REST_SLOTS !== 'undefined' ? REQUIRED_EXTRA_REST_SLOTS : 2;
+  const reqFull = 1; // 最低1日フル休養（全休1回）
+  const reqTotalRestSlots = 4; // 休養スロット合計最低4枠
 
   if (typeof isRestRequirementAchievable === 'function' && isRestRequirementAchievable()) {
     const restShort = [];
     if (rest.fullRestDays < reqFull) {
-      restShort.push(`・1日フル休養（午前・午後とも休養の日）：現在 ${rest.fullRestDays}日 / 必要 ${reqFull}日`);
+      restShort.push(`・フル休養（午前・午後とも休養の日）：現在 ${rest.fullRestDays}日 / 必要 ${reqFull}日以上`);
     }
-    if (rest.extraSlots < reqExtra) {
-      restShort.push(`・半休枠（午前または午後の休養）：現在 ${rest.extraSlots}枠 / 必要 ${reqExtra}枠`);
+    if (rest.restSlots < reqTotalRestSlots) {
+      restShort.push(`・休養スロットの合計：現在 ${rest.restSlots}枠 / 必要 ${reqTotalRestSlots}枠以上（全休1回＋半休2枠、または全日2日など）`);
     }
 
     if (restShort.length > 0) {
