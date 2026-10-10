@@ -315,14 +315,6 @@ function renderWeeklyScheduleControls() {
   const selectedMember = roster.find(m => m && m.id === weeklySchedule.individualMemberId);
   const selectedMemberName = selectedMember ? (typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(selectedMember) : selectedMember.name) : '未選択';
 
-  const warnThreshold = typeof STAMINA_WARNING_THRESHOLD !== 'undefined' ? STAMINA_WARNING_THRESHOLD : 40;
-  const fatiguedMembers = members.filter(member =>
-    !member.injury && (member.staminaValue ?? 100) < warnThreshold
-  );
-  const restSuggestion = fatiguedMembers.length
-    ? `<div class="schedule-note warn">体力が低いメンバー: ${fatiguedMembers.map(member => escapeHtml(`${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（体力${member.staminaValue ?? 100}）`)).join('、')}</div>`
-    : '';
-
   const fixedSlots = typeof getWeekFixedSlots === 'function' ? getWeekFixedSlots() : new Map();
   const itemsList = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [
     { id: 'vocal', name: 'ボーカルレッスン' },
@@ -388,14 +380,18 @@ function renderWeeklyScheduleControls() {
 
   const restDayToggles = members.map(member => {
     const isResting = restDayIds.has(member.id);
-    const lowStamina = (member.staminaValue ?? 100) < warnThreshold;
     const injured = Boolean(member.injury);
+    const injuryRisk = typeof getWeeklyScheduleInjuryRisk === 'function'
+      ? getWeeklyScheduleInjuryRisk(member)
+      : { level: '—', chance: 0, stamina: member.staminaValue ?? 100 };
+    const highRisk = injuryRisk.level === '高' || injuryRisk.level === '必';
+    const injuryRiskTitle = `週間メニュー後の予測体力${injuryRisk.stamina} / ケガ発生率 ${(injuryRisk.chance * 100).toFixed(1)}%`;
     const label = member.injury
       ? `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（${member.injury.type}）`
-      : `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（体力${member.staminaValue ?? 100}）`;
+      : `${typeof formatMemberDisplayName === 'function' ? formatMemberDisplayName(member) : member.name}（ケガリスク：${injuryRisk.level}）`;
     return `
-      <button type="button" class="rest-toggle${isResting ? ' active' : ''}${lowStamina ? ' warn' : ''}"
-        onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
+      <button type="button" class="rest-toggle${isResting ? ' active' : ''}${highRisk ? ' warn' : ''}"
+        title="${escapeHtml(injuryRiskTitle)}" onclick="toggleRestDayMember(${member.id})" ${injured ? 'disabled' : ''}>
         ${escapeHtml(label)}
       </button>
     `;
@@ -470,7 +466,7 @@ function renderWeeklyScheduleControls() {
 
     <div class="schedule-block">
       <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。所定の体力まで回復すると自動で練習に復帰します。</small></div>
-      ${restSuggestion}
+      <div class="schedule-note">名前の横に週間メニュー後のケガリスクを表示します。</div>
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
 

@@ -426,10 +426,15 @@ function applyLiveWeekRecovery() {
   });
 }
 
-function rollMemberInjury(member, extraReduction = 0) {
-  if ((member.staminaValue ?? 0) >= STAMINA_WARNING_THRESHOLD) return false;
+function getMemberInjuryRisk(member, extraReduction = 0) {
+  if ((member.staminaValue ?? 0) >= STAMINA_WARNING_THRESHOLD) return 0;
   const severity = (STAMINA_WARNING_THRESHOLD - member.staminaValue) / STAMINA_WARNING_THRESHOLD;
-  const risk = severity * INJURY_BASE_RATE * Math.max(0, 1 - extraReduction);
+  return severity * INJURY_BASE_RATE * Math.max(0, 1 - extraReduction);
+}
+
+function rollMemberInjury(member, extraReduction = 0) {
+  const risk = getMemberInjuryRisk(member, extraReduction);
+  if (risk === 0) return false;
   if (Math.random() >= risk) return false;
   const isAccident = Math.random() < INJURY_ACCIDENT_RATE;
   const [minWeeks, maxWeeks] = INJURY_ACCIDENT_WEEKS_RANGE;

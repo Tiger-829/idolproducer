@@ -56,6 +56,41 @@ run('renderWeeklyActionPanel();');
 const panelHtml = run('document.getElementById("weekly-action-panel").innerHTML');
 check('the weekly schedule UI is shown on a broadcast week', panelHtml.includes('confirmWeeklySchedule()'));
 check('the live-week screen is not shown', !panelHtml.includes('イベントまで進行'));
+check('rest-day member buttons show a projected injury risk', panelHtml.includes('ケガリスク：'));
+
+const injuryRiskProbe = JSON.parse(run(`
+  (() => {
+    const member = idolRoster.find(m => m && m.isSelected);
+    const savedSchedule = weeklySchedule;
+    const savedStamina = member.staminaValue;
+    const savedFixedSlotGetter = getWeekFixedSlots;
+    try {
+      getWeekFixedSlots = () => new Map();
+      weeklySchedule = {
+        ...weeklySchedule,
+        slots: Array(14).fill('dance-lesson'),
+        vacation: false,
+        restDayMembers: []
+      };
+      member.staminaValue = 5;
+      const maximumRisk = getWeeklyScheduleInjuryRisk(member);
+      const expectedMaximumRisk = INJURY_BASE_RATE * INJURY_ACCIDENT_RATE;
+      weeklySchedule.vacation = true;
+      const vacationRisk = getWeeklyScheduleInjuryRisk(member);
+      return JSON.stringify({ maximumRisk, vacationRisk, expectedMaximumRisk });
+    } finally {
+      member.staminaValue = savedStamina;
+      weeklySchedule = savedSchedule;
+      getWeekFixedSlots = savedFixedSlotGetter;
+    }
+  })()
+`));
+check('projected risk uses post-menu stamina and the highest risk band',
+  injuryRiskProbe.maximumRisk.level === '必' && injuryRiskProbe.maximumRisk.stamina === 0
+    && injuryRiskProbe.maximumRisk.chance === injuryRiskProbe.expectedMaximumRisk,
+  JSON.stringify(injuryRiskProbe.maximumRisk));
+check('a one-week vacation has no injury risk',
+  injuryRiskProbe.vacationRisk.level === 'なし' && injuryRiskProbe.vacationRisk.chance === 0);
 
 run('weeklySchedule.vacation = false; toggleWeekVacation();');
 check('a one-week vacation is refused on a broadcast week', run('weeklySchedule.vacation') === false);

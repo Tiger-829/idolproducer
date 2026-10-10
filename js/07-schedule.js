@@ -1259,6 +1259,130 @@ function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
   return releaseMap;
 }
 
+function getWeeklyScheduleInjuryRisk(member) {
+  if (!member || member.injury || weeklySchedule.vacation) {
+    return { level: 'なし', chance: 0, stamina: member?.staminaValue ?? MAX_STAMINA_VALUE };
+  }
+
+  const participants = Array.isArray(idolRoster) ? idolRoster : [];
+  const restingMemberIds = new Set(weeklySchedule.restDayMembers || []);
+  const fixedSlots = getWeekFixedSlots();
+  const releaseSlots = calculateRestReleaseSlots(restingMemberIds, fixedSlots);
+  const items = typeof WEEKLY_SCHEDULE_ITEMS !== 'undefined' ? WEEKLY_SCHEDULE_ITEMS : [];
+  const groupOnlySlots = weeklySchedule.slots
+    .map((slotId, index) => ({ slotId, index }))
+    .filter(entry => !fixedSlots.has(entry.index) && items.some(item => item.id === entry.slotId && item.groupOnly));
+  const groupOnlyAvailableSlots = new Set(groupOnlySlots
+    .filter(entry => participants.filter(candidate => {
+      if (!candidate || candidate.injury) return false;
+      if (!restingMemberIds.has(candidate.id)) return true;
+      const releaseIndex = releaseSlots.get(candidate.id);
+      return releaseIndex !== -1 && releaseIndex <= entry.index;
+    }).length >= 2)
+    .map(entry => entry.index));
+
+  const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
+  const morningMultiplier = typeof MORNING_SLOT_MULTIPLIER !== 'undefined' ? MORNING_SLOT_MULTIPLIER : 0.8;
+  const rehearsalCost = typeof REHEARSAL_STAMINA_COST !== 'undefined' ? REHEARSAL_STAMINA_COST : 8;
+  const broadcastCost = typeof BROADCAST_STAMINA_COST !== 'undefined' ? BROADCAST_STAMINA_COST : 12;
+  const releaseIndex = releaseSlots.get(member.id) ?? 0;
+  const isRestDesignated = restingMemberIds.has(member.id);
+  let stamina = member.staminaValue ?? maxStamina;
+  let staminaCost = 0;
+  let consecutiveTrainingCount = 0;
+
+  weeklySchedule.slots.forEach((slotId, index) => {
+    const fixed = fixedSlots.get(index);
+    const isCurrentlyResting = isRestDesignated && (releaseIndex === -1 || index < releaseIndex);
+
+    if (fixed) {
+      consecutiveTrainingCount = 0;
+      if (fixed.kind === 'rest-day') {
+        stamina = Math.min(maxStamina, stamina + stamina);
+        return;
+      }
+      if (isCurrentlyResting) return;
+
+      const fixedCost = fixed.kind === 'rehearsal' ? rehearsalCost : (fixed.kind === 'broadcast' ? broadcastCost : 0);
+      staminaCost += fixedCost;
+      stamina = Math.max(0, stamina - fixedCost);
+      return;
+    }
+
+    if (slotId === 'rest-day') {
+      consecutiveTrainingCount = 0;
+      const periodIndex = typeof getWeekSlotPeriod === 'function' ? getWeekSlotPeriod(index) : index % 2;
+      const pairIndex = periodIndex === 0 ? index + 1 : index - 1;
+      const pairFixed = fixedSlots.get(pairIndex);
+      const isPairRest = (pairFixed && pairFixed.kind === 'rest-day') || weeklySchedule.slots[pairIndex] === 'rest-day';
+      if (isPairRest && periodIndex === 0) {
+        stamina = Math.min(maxStamina, stamina + stamina * 1.5);
+      } else if (!isPairRest) {
+        stamina = Math.min(maxStamina, stamina + stamina);
+      }
+      return;
+    }
+
+    if (slotId === 'meal-party') {
+      consecutiveTrainingCount = 0;
+      stamina = Math.min(maxStamina, stamina + Math.max(30, stamina));
+      return;
+    }
+
+    if (!slotId || isCurrentlyResting) {
+      consecutiveTrainingCount = 0;
+      return;
+    }
+
+    const item = items.find(row => row.id === slotId);
+    if (!item) {
+      consecutiveTrainingCount = 0;
+      return;
+    }
+
+    const periodIndex = typeof getWeekSlotPeriod === 'function' ? getWeekSlotPeriod(index) : index % 2;
+    const slotEffect = periodIndex === 0 ? morningMultiplier : 1;
+    if (slotId === 'individual-lesson') {
+      if (member.id === weeklySchedule.individualMemberId) {
+        consecutiveTrainingCount += 1;
+        const cost = getLessonStaminaCost(item, stamina, slotEffect, consecutiveTrainingCount);
+        staminaCost += cost;
+        stamina = Math.max(0, stamina - cost);
+      } else {
+        consecutiveTrainingCount = 0;
+        stamina = Math.min(maxStamina, stamina + stamina);
+      }
+      return;
+    }
+
+    if (item.groupOnly && !groupOnlyAvailableSlots.has(index)) {
+      consecutiveTrainingCount = 0;
+      return;
+    }
+
+    if (slotId === 'endurance-training' || !Number.isFinite(item.staminaRatio)) {
+      consecutiveTrainingCount = 0;
+    } else {
+      consecutiveTrainingCount += 1;
+    }
+    const cost = getLessonStaminaCost(item, stamina, slotEffect, consecutiveTrainingCount);
+    staminaCost += cost;
+    stamina = Math.max(0, stamina - cost);
+  });
+
+  const projectedMember = { staminaValue: stamina };
+  const injuryChance = staminaCost > 0
+    ? getMemberInjuryRisk(projectedMember) * INJURY_ACCIDENT_RATE
+    : 0;
+  const level = injuryChance === 0 ? 'なし'
+    : injuryChance < 0.0225 ? '低'
+    : injuryChance < 0.045 ? '中'
+    : injuryChance < 0.0675 ? '高'
+    : '必';
+
+  return { level, chance: injuryChance, stamina };
+}
+
 // ==========================================
 // 12. スケジュール設定・適用ロジック（体力百分率回復＆UI連動完全修復版）
 // ==========================================
