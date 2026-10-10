@@ -1,5 +1,5 @@
 // ==========================================
-// 10-ui-panels.js : 全機能完全保持版（グッズ制作の週メニュー除外＆事務作業追加対応）
+// 10-ui-panels.js : 全機能完全保持版（イベント事前予告・告知の完全撤廃版）
 // ==========================================
 
 if (typeof PAGE_TABS === 'undefined') {
@@ -187,7 +187,7 @@ function renderWeeklyActionPanel() {
       ensureWeeklySchedule();
     }
 
-    const events = (typeof getCurrentWeekEvents === 'function') ? getCurrentWeekEvents() : [];
+    // ★ ランダムイベントなどの事前予告テキスト（events）の参照を完全に排除
     const currentDate = (typeof getGameDateObject === 'function') ? getGameDateObject() : new Date();
 
     const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
@@ -213,7 +213,6 @@ function renderWeeklyActionPanel() {
         <div class="weekly-event-note"><strong>ライブ週</strong><ul>
           <li>${escapeHtml(`${liveLabel}にライブが行われたため、ライブ前はリハーサルを行い、ライブ後には休養を取りました。`)}</li>
           ${liveDetail ? `<li>${escapeHtml(`公演: ${liveDetail}`)}</li>` : ''}
-          ${renderWeeklyEventItems(events)}
         </ul></div>
         <button class="main-btn" style="width:100%; margin-top:8px;" onclick="advanceOneWeek()">イベントまで進行</button>
       `;
@@ -231,14 +230,13 @@ function renderWeeklyActionPanel() {
         <div class="weekly-event-note"><strong>水曜日まで進行</strong><ul>
           <li>現在は${currentDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' })}です。</li>
           <li>次のスケジュール設定日（${dateLabel}）まで進めます。</li>
-          ${renderWeeklyEventItems(events)}
         </ul></div>
         <button class="main-btn" style="width:100%; margin-top:8px;" onclick="advanceOneWeek()">水曜日まで進行</button>
       `;
       return;
     }
 
-    const notes = getWeeklyEventNoteEvents(events);
+    const notes = [];
     const externalLiveNotes = editableSpecialLiveEvents.map(event =>
       `${event.name}（${event.liveDate} / ${event.venue}）: 前日〜当日午前はリハーサル、翌日は全日休養で固定`
     );
@@ -246,7 +244,7 @@ function renderWeeklyActionPanel() {
 
     panel.innerHTML = `
       <h2 class="page-title">今週のスケジュール</h2>
-      ${notes.length ? `<div class="weekly-event-note"><ul>${renderWeeklyEventItems(notes)}</ul></div>` : ''}
+      ${notes.length ? `<div class="weekly-event-note"><ul>${notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>` : ''}
       ${renderWeeklyScheduleControls()}
     `;
   } catch (err) {
@@ -258,16 +256,6 @@ function renderWeeklyActionPanel() {
       </div>
     `;
   }
-}
-
-// 週次イベントメモイベントを取得する。
-function getWeeklyEventNoteEvents(events) {
-  return (events || []).filter(event => !String(event).startsWith('他グループのライブ'));
-}
-
-// 週次イベントItemsを描画する。
-function renderWeeklyEventItems(events) {
-  return getWeeklyEventNoteEvents(events).map(event => `<li>${escapeHtml(String(event))}</li>`).join('');
 }
 
 // 週次スケジュールControlsを描画する。
@@ -328,7 +316,6 @@ function renderWeeklyScheduleControls() {
     { id: 'goods-production', name: 'グッズ制作' }
   ];
 
-  // ★ グッズ制作（goods-production）を週メニューのスロット選択肢から除外
   const itemOptions = slotId => ['<option value="">— 空き —</option>'].concat(
     itemsList.filter(item => !item.fixed && item.id !== 'goods-production').map(item => {
       const limit = item.weeklyLimit && typeof countWeekSlots === 'function' && countWeekSlots(item.id, -1) >= item.weeklyLimit && slotId !== item.id;
@@ -409,7 +396,6 @@ function renderWeeklyScheduleControls() {
     ? '1週間の休暇中は全14枠が休養になります。レッスン・食事会・ケガは発生しません。'
     : `休養 ${restBreakdown.fullRestDays}日フル＋${restBreakdown.extraSlots}枠 / レッスン ${lessonCount}枠 / 食事会 ${mealCount}回（${formatMoney(mealCost)}）`;
 
-  // ★ 事務作業の欄に「グッズ制作（goods-production）」を追加
   const officeActions = typeof OFFICE_ACTIONS !== 'undefined' ? OFFICE_ACTIONS : [
     { id: 'single-promotion', name: 'シングル販促' },
     { id: 'live-promotion', name: 'ライブ広報' },
