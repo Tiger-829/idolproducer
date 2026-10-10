@@ -215,8 +215,6 @@ function processPlayerLives(fromDate, toDate) {
       const streamDaysCount = showDates.filter(d => streamDateSet.has(d)).length;
 
       const expenses = calculateLiveExpenses(v.cap, totalShowCount, streamDaysCount);
-      const streamTicketPrice = typeof STREAM_TICKET_PRICE !== 'undefined' ? STREAM_TICKET_PRICE : 5000;
-
       const seatCapacities = getLiveSeatCapacities(v, entry.seatOptions);
       const livePromotionMultiplier = 1 + (nextLivePromotionPoints * 0.1) + (Math.max(0, (officeUpgrades.liveProduction || 1) - 1) * 0.05);
       const priceFactor = getPriceDemandFactor(v, entry);
@@ -291,7 +289,7 @@ function processPlayerLives(fromDate, toDate) {
         if (streamDateSet.has(dateKey)) {
           const dayStreamBuyers = getStreamTicketBuyers(dObj);
           grandTotalStreamBuyers += dayStreamBuyers;
-          grandTotalStreamRevenue += dayStreamBuyers * streamTicketPrice;
+          grandTotalStreamRevenue += getStreamTicketRevenue(dayStreamBuyers);
         }
       });
 

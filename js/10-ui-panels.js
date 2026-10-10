@@ -466,7 +466,6 @@ function renderWeeklyScheduleControls() {
 
     <div class="schedule-block">
       <div class="schedule-block-title">休養日の設定 <small>休養対象はユーザーが選択。所定の体力まで回復すると自動で練習に復帰します。</small></div>
-      <div class="schedule-note">名前の横に週間メニュー後のケガリスクを表示します。</div>
       <div class="rest-toggle-grid">${restDayToggles || '<div class="schedule-note">選抜メンバーがいません。</div>'}</div>
     </div>
 

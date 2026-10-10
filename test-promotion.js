@@ -285,6 +285,11 @@ check('weekend streams sell more than weekday streams', run(`
   getStreamTicketBuyers(sunday) > getStreamTicketBuyers(wednesday)
 `) === true);
 check('stream ticket is 5,000 yen', run('STREAM_TICKET_PRICE') === 5000);
+check('stream ticket revenue is half of the listed ticket price', run(`
+  STREAM_TICKET_PAYOUT_RATE === 0.5
+    && getStreamTicketRevenue(4) === 10000
+    && STREAM_TICKET_PRICE === 5000
+`) === true);
 check('streaming production cost is 100 million per show date', run(`
   STREAM_PRODUCTION_COST === 100000000
 `) === true);
@@ -320,10 +325,17 @@ const streamCost = JSON.parse(run(`
   gameDate = dateKey;
   syncGameCalendar();
   processMonthlyReleaseAndLive(dateKey);
-  JSON.stringify({ cost: yearlyStats.streamCost, revenue: yearlyStats.streamRevenue || 0 })
+  JSON.stringify({
+    cost: yearlyStats.streamCost,
+    revenue: yearlyStats.streamRevenue || 0,
+    buyers: getStreamTicketBuyers(getGameDateObject())
+  })
 `));
 console.log('  ', JSON.stringify(streamCost));
 check('exactly 100 million yen is charged per show', streamCost.cost === 100000000, JSON.stringify(streamCost));
+check('stream income is half of the full-price ticket sales',
+  streamCost.revenue === streamCost.buyers * STREAM_TICKET_PRICE * 0.5,
+  JSON.stringify(streamCost));
 check('higher ticket price lowers attendance', run(`
   const venue = VENUE_DATA.find(v => v.cap === 'A');
   const standard = getLiveAudienceDemand(venue, new Date(2027, 0, 3), null, 1);

@@ -367,7 +367,7 @@ function renderRosterList() {
   };
 
   let htmlContent = `
-    <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px; padding:6px; background:#fcf8fa; border:1px solid #f0d5e3; border-radius:6px;">
+    <div class="roster-sort-bar">
       <div style="font-size:11px; font-weight:bold; color:#555;">並び替え（ソート）:</div>
       <div style="display:flex; gap:4px; flex-wrap:wrap;">
         ${getSortBtnHtml('age', '年齢')}

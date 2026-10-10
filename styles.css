@@ -894,6 +894,20 @@
       flex: 0 0 auto;
       width: 100%;
     }
+    .roster-sort-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 0 0 auto;
+      margin-bottom: 8px;
+      padding: 6px;
+      background: #fcf8fa;
+      border: 1px solid #f0d5e3;
+      border-radius: 6px;
+    }
     .member-row {
       display: flex;
       justify-content: space-between;

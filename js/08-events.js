@@ -754,7 +754,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;
 
     const streamBuyers = getStreamTicketBuyers(getGameDateObject());
-    const streamRevenue = streamBuyers * STREAM_TICKET_PRICE;
+    const streamRevenue = getStreamTicketRevenue(streamBuyers);
 
     const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
     const totalRevenueWithGoods = totalRevenue + totalMerchandise + streamRevenue;
@@ -997,7 +997,7 @@ function showLiveFinanceModal(rows) {
         </tr>
       </tfoot>
     </table>
-    <p class="live-finance-note">配信購入者にはライブの配信も放送されています。動員は会場の収容人数で頭打ちになります。</p>
+    <p class="live-finance-note">配信購入者にもライブが放送されます。動員は会場の収容人数で頭打ちになります。</p>
   `;
   modal.style.display = 'flex';
 }
@@ -1014,9 +1014,14 @@ function getLiveAudienceDemand(venue, date = getGameDateObject(), specialRate = 
 }
 
 const STREAM_TICKET_PRICE = 5000;
+const STREAM_TICKET_PAYOUT_RATE = 0.5;
 const STREAM_PRODUCTION_COST = 100000000;
 const STREAM_BUYER_RATE = { 0: 0.9, 6: 0.9, 1: 0.8, 5: 0.8, 2: 0.85, 3: 0.85, 4: 0.85 };
 const STREAM_BUYER_DEFAULT_RATE = 0.85;
+
+function getStreamTicketRevenue(buyers) {
+  return buyers * STREAM_TICKET_PRICE * STREAM_TICKET_PAYOUT_RATE;
+}
 
 function getStreamBuyerRate(date = getGameDateObject()) {
   if (!date || typeof date.getDay !== 'function') return STREAM_BUYER_DEFAULT_RATE;
