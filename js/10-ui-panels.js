@@ -1041,3 +1041,4 @@ function renderSalaryPanel() {
   const prevFans = typeof previousYearGroupFansAtYearStart !== 'undefined' ? (previousYearGroupFansAtYearStart || 0) : 0;
   const fanGrowth = Math.max(0, startFans - prevFans);
   const growthFactor = typeof MEMBER_SALARY_GROUP_GROWTH_FACTOR !== 'undefined' ? MEMBER_SALARY_GROUP_GROWTH_FACTOR : 6;
+}
