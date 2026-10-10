@@ -1180,40 +1180,34 @@ function getNearestWeekdayDate(baseDateStr, targetWeekday) {
 }
 
 function checkMusicProgramOffers() {
-  // productionSchedule に登録されている全プランを走査し、
-  // 「本日の日付が、そのCDの発売日のちょうど1ヶ月前」にあたるものをチェックする
-  const todayStr = gameDate; // 'YYYY-MM-DD'
-  const todayObj = getGameDateObject(todayStr);
-
+  const todayStr = gameDate;
   if (!productionSchedule) return;
 
   Object.entries(productionSchedule).forEach(([planKey, plan]) => {
     if (!plan || !plan.release || plan.release === 'none' || plan.musicOfferSent) return;
-    if (!plan.releaseDate) return; // 発売日が未定ならスキップ
+    if (!plan.releaseDate) return;
 
-    // CD発売日の1ヶ月前の日付を計算
     const releaseDateObj = new Date(`${plan.releaseDate}T12:00:00`);
     if (isNaN(releaseDateObj.getTime())) return;
 
+    // 発売日の約1ヶ月前を算出
     const offerDateObj = new Date(releaseDateObj);
     offerDateObj.setMonth(offerDateObj.getMonth() - 1);
-    const offerDateStr = toDateKey(offerDateObj);
+    
+    const todayObj = getGameDateObject(todayStr);
+    const diffDays = Math.round((todayObj - offerDateObj) / 86400000);
 
-    // 今日がちょうど「発売日の1ヶ月前」に到達した場合にオファーを配信
-    if (todayStr === offerDateStr) {
+    // ★ 修正：ぴったりその日だけでなく、「1ヶ月前を過ぎた前後数日」や「1ヶ月前以降」にオファーを出すようにする
+    if (diffDays >= 0 && diffDays <= 7 && !plan.musicOfferSent) {
       const song = ensureScheduledSong(plan.year || currentYear, plan.month || currentMonth, plan);
       if (!song || !Array.isArray(MUSIC_PROGRAMS)) return;
 
       MUSIC_PROGRAMS.forEach(program => {
         const offerId = `offer-${plan.releaseDate}-${program.id}`;
         if (!Array.isArray(pendingPerformanceOffers)) pendingPerformanceOffers = [];
-        const alreadySent = pendingPerformanceOffers.some(o => o && o.id === offerId);
-
-        if (!alreadySent) {
-          // CD発売日（plan.releaseDate）から見て、一番近くなる番組の曜日（program.weekday）を算出
+        if (!pendingPerformanceOffers.some(o => o && o.id === offerId)) {
           const airDateKey = getNearestWeekdayDate(plan.releaseDate, program.weekday);
           if (!airDateKey) return;
-
           const airDateObj = new Date(`${airDateKey}T12:00:00`);
 
           pendingPerformanceOffers.push({
@@ -1227,7 +1221,6 @@ function checkMusicProgramOffers() {
           });
         }
       });
-
       plan.musicOfferSent = true;
     }
   });
