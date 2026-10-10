@@ -868,6 +868,7 @@ function applySavedGameBase(data) {
   savedCleanWeekSchedule = data.savedCleanWeekSchedule || null;
   pendingReports = Array.isArray(data.pendingReports) ? data.pendingReports : [];
   draftState = data.draftState || null;
+
   rivalLiveBookings = data.rivalLiveBookings || [];
   managers = Array.isArray(data.managers) && data.managers.length ? data.managers : [createManager()];
   managers = managers.map(manager => {
