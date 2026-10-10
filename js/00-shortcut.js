@@ -75,6 +75,17 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         if (typeof renderPageNav === 'function') renderPageNav('office');
         break;
+      case 'p': // Ctrl + P : スケジュール進行 / 確定
+        e.preventDefault();
+        const today = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
+        if (today.getDay() === 3 && typeof confirmWeeklySchedule === 'function') {
+            confirmWeeklySchedule();
+        } else if (typeof advanceUntilNextSchedulePoint === 'function') {
+            advanceUntilNextSchedulePoint();
+        } else if (typeof advanceOneWeek === 'function') {
+            advanceOneWeek();
+        }
+        break;
       case 'm': // Ctrl + M : 資金タブに移動
         e.preventDefault();
         if (typeof renderPageNav === 'function') renderPageNav('funds');
