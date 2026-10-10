@@ -1679,9 +1679,12 @@ const monthEndReportProgress = JSON.parse(run(`
       advanceUntilNextSchedulePoint();
       const reportOpened = modal.style.display === 'flex' && pendingReports.length === 0;
       closeMonthlyReportModal();
+      const nextWeekDate = gameDate;
+      advanceUntilNextSchedulePoint();
       return JSON.stringify({
         date: gameDate,
         weekday: getGameDateObject().getDay(),
+        nextWeekDate,
         reportOpened,
         closed: modal.style.display === 'none'
       });
@@ -1700,6 +1703,7 @@ const monthEndReportProgress = JSON.parse(run(`
 `));
 check('closing the month-end report resumes through the next Wednesday',
   monthEndReportProgress.date === '2027-02-03' && monthEndReportProgress.weekday === 3
+    && monthEndReportProgress.nextWeekDate === '2027-02-03'
     && monthEndReportProgress.reportOpened && monthEndReportProgress.closed,
   JSON.stringify(monthEndReportProgress));
 

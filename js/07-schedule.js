@@ -49,56 +49,6 @@ function confirmWeeklySchedule() {
   }
 }
 
-// 画面側の「水曜日まで進行」「イベントまで進行」ボタンからの共通エントリーポイント
-// ==========================================
-// 2. 次の停止地点まで進行（自動スキップ対応版）
-// ==========================================
-function advanceUntilNextSchedulePoint() {
-  let currentDate = getGameDateObject();
-  let loopSafety = 0; // 無限ループ保護（最大60日）
-
-  while (loopSafety++ < 60) {
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-
-    // ① もし現在地が水曜日でなく、かつ当日・翌日等にプレイヤー待ちの保留モーダルがある場合は止まる
-    if (hasPendingEvents()) {
-      break;
-    }
-
-    // ② 本日が水曜日（スケジュール設定日）なら、編成・予定確認のため必ず停止
-    if (currentDate.getDay() === 3 && loopSafety > 1) {
-      break;
-    }
-
-    // ③ 本日に自グループのライブや外部イベント・リリースがある場合は停止
-    const dateKey = toDateKey(currentDate);
-    const hasEventsToday = (typeof getEventsForDate === 'function' && getEventsForDate(dateKey).length > 0);
-    if (hasEventsToday && loopSafety > 1) {
-      break;
-    }
-
-    // 1日分の世界進行（予定がない平日の場合はそのまま進める）
-    processDailyFlow(currentDate, nextDate);
-
-    currentDate = nextDate;
-    gameDate = toDateKey(currentDate);
-    syncGameCalendar();
-
-    // 停止条件（キュー蓄積・月末・水曜日）に達したか判定
-    if (shouldStopProgress(currentDate)) {
-      break;
-    }
-  }
-
-  // 停止後のUI更新＆保留モーダル表示
-  resetWeeklySchedule();
-  updateWeeklyGroupFans();
-  updateUI();
-  openPendingModal();
-}
-
-
 // 保留中イベント・オファーの有無を判定するヘルパー
 function hasPendingEvents() {
   return (
