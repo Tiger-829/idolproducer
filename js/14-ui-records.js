@@ -224,7 +224,7 @@ function renderLiveMaxAudienceRanking() {
     mainPanel.appendChild(container);
   }
 
-  const history = Array.isArray(window.liveHistory) ? [...window.liveHistory] : [];
+  const history = Array.isArray(liveHistory) ? [...liveHistory] : [];
   history.sort((a, b) => b.dailyAudience - a.dailyAudience);
   const topLive = history.slice(0, 10);
 

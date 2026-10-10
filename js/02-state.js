@@ -18,6 +18,15 @@ let merchandiseSellThrough = null;
 let merchandiseItems = []; // グッズ開発日管理（1年自動減衰用）
 let liveHistory = [];      // ライブ1日あたり最大動員数ランキング用実績保存配列
 
+function restoreMerchandiseItems(items, productCount, fallbackDate = gameDate) {
+  if (Array.isArray(items)) return items;
+  const count = Math.min(
+    MAX_MERCHANDISE_PRODUCTS,
+    Math.max(0, Math.floor(Number(productCount) || 0))
+  );
+  return Array.from({ length: count }, () => ({ createdAt: fallbackDate }));
+}
+
 let nextLivePromotionPoints = 0;
 let monthlyCdRevenue = 0;
 let monthlyTieUpRevenue = 0;
@@ -716,6 +725,8 @@ function initializeNewGameStateBase() {
   totalWeeksElapsed = 0;
   draftCount = 0;
   currentRosterTab = 'selected';
+  logHistory = [];
+  logHistory = [];
   merchandiseProducts = 0;
   merchandiseStock = 0;
   merchandiseUnitsSold = 0;
@@ -762,6 +773,8 @@ function initializeNewGameStateBase() {
   weeklySchedule = null;
   lastWeekSchedule = null;
   savedCleanWeekSchedule = null;
+  pendingReports = [];
+  draftState = null;
   previousYearGroupFansAtYearStart = 0;
   groupFansAtYearStart = 0;
   yearEndAwardProcessed = false;
@@ -800,8 +813,9 @@ function applySavedGameBase(data) {
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
   merchandiseSellThrough = data.merchandiseSellThrough ?? null;
-  merchandiseItems = Array.isArray(data.merchandiseItems) ? data.merchandiseItems : [];
+  merchandiseItems = restoreMerchandiseItems(data.merchandiseItems, merchandiseProducts);
   liveHistory = Array.isArray(data.liveHistory) ? data.liveHistory : [];
+  logHistory = Array.isArray(data.logHistory) ? data.logHistory : [];
   nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
   monthlyCdRevenue = data.monthlyCdRevenue || 0;
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
@@ -848,6 +862,12 @@ function applySavedGameBase(data) {
   pendingPerformanceOffers = data.pendingPerformanceOffers || [];
   scheduledPerformances = data.scheduledPerformances || [];
   specialOffersSent = data.specialOffersSent || [];
+  currentRosterTab = data.currentRosterTab === 'under' ? 'under' : 'selected';
+  weeklySchedule = data.weeklySchedule || null;
+  lastWeekSchedule = data.lastWeekSchedule || null;
+  savedCleanWeekSchedule = data.savedCleanWeekSchedule || null;
+  pendingReports = Array.isArray(data.pendingReports) ? data.pendingReports : [];
+  draftState = data.draftState || null;
   rivalLiveBookings = data.rivalLiveBookings || [];
   managers = Array.isArray(data.managers) && data.managers.length ? data.managers : [createManager()];
   managers = managers.map(manager => {

@@ -258,10 +258,12 @@ function initializeNewGameState() {
   totalWeeksElapsed = 0;
   draftCount = 0;
   currentRosterTab = 'selected';
+  logHistory = [];
   merchandiseProducts = 0;
   merchandiseStock = 0;
   merchandiseUnitsSold = 0;
   merchandiseSellThrough = null;
+  merchandiseItems = [];
   nextLivePromotionPoints = 0;
   monthlyCdRevenue = 0;
   monthlyTieUpRevenue = 0;
@@ -309,6 +311,8 @@ function initializeNewGameState() {
   weeklySchedule = null;
   lastWeekSchedule = null;
   savedCleanWeekSchedule = null;
+  pendingReports = [];
+  draftState = null;
   previousYearGroupFansAtYearStart = 0;
   groupFansAtYearStart = 0;
   yearEndAwardProcessed = false;
@@ -347,6 +351,10 @@ function applySavedGame(data) {
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
   merchandiseSellThrough = data.merchandiseSellThrough ?? null;
+  merchandiseItems = restoreMerchandiseItems(data.merchandiseItems, merchandiseProducts);
+  liveHistory = Array.isArray(data.liveHistory) ? data.liveHistory : [];
+  salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
+  logHistory = Array.isArray(data.logHistory) ? data.logHistory : [];
   nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
   monthlyCdRevenue = data.monthlyCdRevenue || 0;
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
@@ -381,7 +389,6 @@ function applySavedGame(data) {
   // 旧セーブには生涯売上が無いので、今年度の売上から補完する
   lifetimeSales = Number.isFinite(data.lifetimeSales) ? data.lifetimeSales : (yearlyStats.sales || 0);
   // 旧セーブには売上推移の履歴が無いので空から始める（グラフは発売分から貯まる）
-  salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
   // ファンの積み上げも復元（無いセーブは売上から目標値を復元）
   fansFromSales = Number.isFinite(data.fansFromSales) ? data.fansFromSales : getTargetSalesFans();
   // 目標値の範囲に収める（壊れたセーブで異常なファン数にならないように）
@@ -398,6 +405,12 @@ function applySavedGame(data) {
   pendingPerformanceOffers = data.pendingPerformanceOffers || [];
   scheduledPerformances = data.scheduledPerformances || [];
   specialOffersSent = data.specialOffersSent || [];
+  currentRosterTab = data.currentRosterTab === 'under' ? 'under' : 'selected';
+  weeklySchedule = data.weeklySchedule || null;
+  lastWeekSchedule = data.lastWeekSchedule || null;
+  savedCleanWeekSchedule = data.savedCleanWeekSchedule || null;
+  pendingReports = Array.isArray(data.pendingReports) ? data.pendingReports : [];
+  draftState = data.draftState || null;
   rivalLiveBookings = data.rivalLiveBookings || [];
   // マネージャー制度：旧セーブには1人だけ補完する
   managers = Array.isArray(data.managers) && data.managers.length ? data.managers : [createManager()];
@@ -422,4 +435,3 @@ function applySavedGame(data) {
   weeklyRecoveryDone = false;
   normalizeLeagueTeams();
 }
-

@@ -421,6 +421,7 @@ function openPendingModal() {
   if (pendingRandomEvent) return openRandomEventModal();
   if (pendingEquipmentEvent) return openEquipmentEventModal();
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
+  if (draftState) return openDraftModal();
 }
 
 function recordMonthlyIncome(label, amount) {

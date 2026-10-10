@@ -173,7 +173,7 @@ function getEquipmentUpgradeCandidates() {
   }
 
   // 3. ライブの動員や実績が伸び悩んでいる場合の判定（ライブ演出チームの増員）
-  const recentLives = Array.isArray(window.liveHistory) ? window.liveHistory.slice(-2) : [];
+  const recentLives = Array.isArray(liveHistory) ? liveHistory.slice(-2) : [];
   const lowLivePerformance = recentLives.some(l => l.dailyAudience < 5000);
   if (lowLivePerformance || currentScore + 5 < rivalAverage) {
     candidates.push({ 

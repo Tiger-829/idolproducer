@@ -53,6 +53,7 @@ function confirmWeeklySchedule() {
 function hasPendingEvents() {
   return (
     (typeof pendingReports !== 'undefined' && pendingReports.length > 0) ||
+    (typeof draftState !== 'undefined' && draftState) ||
     (typeof pendingSelectionEvent !== 'undefined' && pendingSelectionEvent) ||
     (typeof pendingCrisisResponse !== 'undefined' && pendingCrisisResponse) ||
     (typeof pendingFanClubEvent !== 'undefined' && pendingFanClubEvent) ||
@@ -295,8 +296,8 @@ function processPlayerLives(fromDate, toDate) {
       });
 
       // ライブ実績履歴への保存（ランキング項目⑤用）
-      if (!Array.isArray(window.liveHistory)) window.liveHistory = [];
-      window.liveHistory.push({
+      if (!Array.isArray(liveHistory)) liveHistory = [];
+      liveHistory.push({
         venueName: v.name,
         liveName: entry.liveName || v.name,
         date: maxDailyDateKey,
@@ -465,16 +466,6 @@ function openNextPendingReport() {
     return true;
   }
   return false;
-}
-
-function openPendingModal() {
-  if (openNextPendingReport()) return;
-  if (pendingSelectionEvent) return openSelectionModal();
-  if (pendingCrisisResponse) return openCrisisResponseModal();
-  if (pendingFanClubEvent) return openFanClubModal();
-  if (pendingRandomEvent) return openRandomEventModal();
-  if (pendingEquipmentEvent) return openEquipmentEventModal();
-  if (Array.isArray(pendingPerformanceOffers) && pendingPerformanceOffers.length) return openMusicOfferModal();
 }
 
 // ==========================================

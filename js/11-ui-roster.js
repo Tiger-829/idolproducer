@@ -161,7 +161,8 @@ function updateUI() {
     try {
       localStorage.setItem(saveSlotKey(activeSaveSlot), JSON.stringify({
         currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
-        merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough,
+        merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough, merchandiseItems,
+        currentRosterTab, liveHistory, salesHistory, logHistory,
         nextLivePromotionPoints, monthlyCdRevenue, monthlyTieUpRevenue, promoSongId,
         monthlyLedger, pendingMonthlyReport,
         crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
@@ -173,7 +174,7 @@ function updateUI() {
         songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
         rivalLiveBookings, managers, managerMarketCandidates, groupFansAtYearStart, previousYearGroupFansAtYearStart,
         yearEndAwardProcessed, yearEndKohakuProcessed, lastLiveDate,
-        weeklySchedule,
+        weeklySchedule, lastWeekSchedule, savedCleanWeekSchedule, pendingReports, draftState,
         savedAt: Date.now()
       }));
     } catch (e) {}
