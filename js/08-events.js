@@ -1,5 +1,5 @@
 // ==========================================
-// 08-events.js : イベント・収入・リリース・ライブ（完全サプライズ型ランダムイベント版）
+// 08-events.js : イベント・収入・リリース・ライブ（完全版・参照切れ防止対応）
 // ==========================================
 
 const RANDOM_EVENTS = [
@@ -171,6 +171,7 @@ function buildRandomEvent(eventId) {
   };
 }
 
+// ★ 復元用関数（セーブデータ読込時のエラー防止）
 function restorePendingRandomEvent(data) {
   if (!data || !data.id) return null;
   const event = RANDOM_EVENTS.find(entry => entry.id === data.id);
@@ -178,7 +179,7 @@ function restorePendingRandomEvent(data) {
   return { ...data, name: event.name, text: event.text, choices: event.choices, context: data.context || {} };
 }
 
-// ★ 事前予告（予約システム）を撤廃し、その週の初めにダイレクトに発生する仕様に変更
+// ★ サプライズ型ランダムイベント発生ロジック
 function rollRandomEvent() {
   if (getGameDateObject().getDay() !== 3) return;
   if (pendingRandomEvent || pendingCrisisResponse) return;
@@ -187,7 +188,6 @@ function rollRandomEvent() {
   if (randomEventCheckWeekKey === weekKey) return;
   randomEventCheckWeekKey = weekKey;
 
-  // 約16%の確率でその週にランダムイベントが突発的に発生
   if (Math.random() >= 0.16) return;
 
   const pool = RANDOM_EVENTS.filter(entry => entry.kind !== 'equipment' || getEquipmentUpgradeCandidates().length);
@@ -227,6 +227,20 @@ function resolveRandomEvent(choiceIndex) {
   if (choice) choice.apply(event.context);
   setLog(`【ランダムイベント】${event.name} / ${fillEventTemplate(choice ? choice.label : '経過', event.context)}`);
   updateUI();
+}
+
+// ★ 計画イベントエントリ取得関数（ReferenceError防止用に追加）
+function getPlanEventEntries() {
+  const entries = [];
+  if (typeof productionSchedule === 'undefined' || !productionSchedule) return entries;
+  Object.entries(productionSchedule).forEach(([planKey, plan]) => {
+    if (!plan || !Array.isArray(plan.planEvents)) return;
+    plan.planEvents.forEach((event, index) => {
+      if (!event || !event.date) return;
+      entries.push({ plan, planKey, event, index });
+    });
+  });
+  return entries;
 }
 
 const FANCLUB_TIERS = [
@@ -363,7 +377,7 @@ function settleMonthlyIncome() {
   const fanClubIncome = applyFanClubMonthlyIncome();
   if (fanClubIncome > 0) {
     recordMonthlyIncome('ファンクラブ会費', fanClubIncome);
-    setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}を入金しました。`);
+    setLog(`【ファンクラブ】月会費 ${formatMoney(fanClubIncome)}が振り込まれました。`);
   }
   const salary = applyMonthlySalary();
   if (salary.total > 0) {
@@ -574,18 +588,6 @@ function isPlanReleaseDue(plan, reachDate = gameDate) {
 
 function isPlanEventDue(entry, reachDate = gameDate) {
   return !entry.event.completed && reachDate >= entry.event.date;
-}
-
-function getPlanEventEntries() {
-  const entries = [];
-  Object.entries(productionSchedule).forEach(([planKey, plan]) => {
-    if (!Array.isArray(plan.planEvents)) return;
-    plan.planEvents.forEach((event, index) => {
-      if (!event || !event.date) return;
-      entries.push({ plan, planKey, event, index });
-    });
-  });
-  return entries;
 }
 
 function processPlanEvents(reachDate = gameDate) {
@@ -1088,8 +1090,8 @@ const PROMO_DIVISOR_NORMAL = 10;
 const PROMO_DIVISOR_PAST_WORK = 100;
 const CD_REVENUE_MONTHLY_SHARE = 0.8;
 const TIE_UPS = [
-  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 0.5, popularityGain: 2, songExperience: 4 },
-  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1.1, popularityGain: 1, songExperience: 10 }
+  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 500, popularityGain: 2, songExperience: 4 },
+  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1500, popularityGain: 1, songExperience: 10 }
 ];
 
 function getPromotionCumulativeSales(baseSales, divisors) {
@@ -1396,15 +1398,15 @@ function showLiveDetailedFinanceModal(report) {
       </tbody>
       <tfoot>
         <tr style="font-size:13px;">
-          <th colspan="2">売上合計（チケット＋物販＋配信）</th>
+          <th colspan="2">売上合計</th>
           <td class="num plus"><strong>${formatMoney(report.grossRevenue)}</strong></td>
         </tr>
         <tr style="font-size:13px;">
-          <th colspan="2">経費合計（基本諸経費＋配信費用）</th>
+          <th colspan="2">出費</th>
           <td class="num minus"><strong>${minus(report.totalCost)}</strong></td>
         </tr>
         <tr style="font-size:14px; background:#f0f8ff;">
-          <th colspan="2"><strong>純利益（最終収支）</strong></th>
+          <th colspan="2"><strong>最終収支</strong></th>
           <td class="num ${report.profit >= 0 ? 'plus' : 'minus'}" style="font-size:15px; font-weight:bold;">
             ${yens(report.profit)}
           </td>
