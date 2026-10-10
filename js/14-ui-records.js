@@ -66,7 +66,7 @@ function buildLineChartSvg(points, options = {}) {
   </svg>`;
 }
 
-// ① 過去5作CD売上の推移
+
 
 // ① 過去5作CD売上の推移
 function renderSalesTrendChart() {
@@ -264,7 +264,7 @@ function renderLiveMaxAudienceRanking() {
       ${rows}
     </div>
   `;
-}
+
 
 // ⑥ ヘルプ（ゲーム説明を見る）ボタンエリアを重複なくページ最下部に1つだけ配置
 function renderRecordsHelpBlock() {
