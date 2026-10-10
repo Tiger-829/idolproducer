@@ -1646,6 +1646,63 @@ check('closing a midweek financial report resumes through the next Wednesday',
   reportProgress.date === '2027-01-13' && reportProgress.weekday === 3 && reportProgress.closed,
   JSON.stringify(reportProgress));
 
+const monthEndReportProgress = JSON.parse(run(`
+  (() => {
+    const modal = document.getElementById('monthly-report-modal');
+    const saved = {
+      gameDate,
+      pendingReports,
+      pendingMonthlyReport,
+      processDailyFlow,
+      syncGameCalendar,
+      resetWeeklySchedule,
+      updateWeeklyGroupFans,
+      updateUI,
+      modalDisplay: modal.style.display
+    };
+    try {
+      gameDate = '2027-01-30';
+      pendingReports = [];
+      pendingMonthlyReport = null;
+      processDailyFlow = (fromDate, toDate) => {
+        if (toDate.getDate() === 31) {
+          const report = { year: 2027, month: 1, income: [], expense: [] };
+          pendingMonthlyReport = report;
+          pendingReports.push({ type: 'monthly', report });
+        }
+      };
+      syncGameCalendar = () => {};
+      resetWeeklySchedule = () => {};
+      updateWeeklyGroupFans = () => {};
+      updateUI = () => {};
+      modal.style.display = 'none';
+      advanceUntilNextSchedulePoint();
+      const reportOpened = modal.style.display === 'flex' && pendingReports.length === 0;
+      closeMonthlyReportModal();
+      return JSON.stringify({
+        date: gameDate,
+        weekday: getGameDateObject().getDay(),
+        reportOpened,
+        closed: modal.style.display === 'none'
+      });
+    } finally {
+      gameDate = saved.gameDate;
+      pendingReports = saved.pendingReports;
+      pendingMonthlyReport = saved.pendingMonthlyReport;
+      processDailyFlow = saved.processDailyFlow;
+      syncGameCalendar = saved.syncGameCalendar;
+      resetWeeklySchedule = saved.resetWeeklySchedule;
+      updateWeeklyGroupFans = saved.updateWeeklyGroupFans;
+      updateUI = saved.updateUI;
+      modal.style.display = saved.modalDisplay;
+    }
+  })()
+`));
+check('closing the month-end report resumes through the next Wednesday',
+  monthEndReportProgress.date === '2027-02-03' && monthEndReportProgress.weekday === 3
+    && monthEndReportProgress.reportOpened && monthEndReportProgress.closed,
+  JSON.stringify(monthEndReportProgress));
+
 const liveReportProgress = JSON.parse(run(`
   (() => {
     const modal = document.getElementById('live-finance-modal');

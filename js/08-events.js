@@ -413,6 +413,7 @@ function applyMonthlySalary() {
 }
 
 function openPendingModal() {
+  if (openNextPendingReport()) return;
   if (pendingMonthlyReport) return openPendingMonthlyReport();
   if (pendingSelectionEvent) return openSelectionModal();
   if (pendingCrisisResponse) return openCrisisResponseModal();

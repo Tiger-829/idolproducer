@@ -496,25 +496,29 @@ function hasFinishedPlayerLive(date) {
 // ==========================================
 // 10. モーダル待機キュー消化
 // ==========================================
-function openPendingModal() {
-  if (pendingReports && pendingReports.length > 0) {
-    const item = pendingReports.shift();
-    if (item.type === "live-detail" || item.type === "live") {
-      if (typeof showLiveDetailedFinanceModal === 'function') {
-        showLiveDetailedFinanceModal(item.report || item);
-      } else if (typeof showLiveFinanceModal === 'function') {
-        showLiveFinanceModal(item.rows || []);
-      }
-      return;
-    }
-    if (item.type === "monthly") {
-      if (typeof showMonthlyReportModal === 'function') {
-        showMonthlyReportModal(item.report);
-      }
-      return;
-    }
-  }
+function openNextPendingReport() {
+  if (!Array.isArray(pendingReports) || pendingReports.length === 0) return false;
 
+  const item = pendingReports.shift();
+  if (item.type === "live-detail" || item.type === "live") {
+    if (typeof showLiveDetailedFinanceModal === 'function') {
+      showLiveDetailedFinanceModal(item.report || item);
+    } else if (typeof showLiveFinanceModal === 'function') {
+      showLiveFinanceModal(item.rows || []);
+    }
+    return true;
+  }
+  if (item.type === "monthly") {
+    if (typeof showMonthlyReportModal === 'function') {
+      showMonthlyReportModal(item.report);
+    }
+    return true;
+  }
+  return false;
+}
+
+function openPendingModal() {
+  if (openNextPendingReport()) return;
   if (pendingSelectionEvent) return openSelectionModal();
   if (pendingCrisisResponse) return openCrisisResponseModal();
   if (pendingFanClubEvent) return openFanClubModal();
