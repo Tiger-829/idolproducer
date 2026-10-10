@@ -67,6 +67,8 @@ function buildLineChartSvg(points, options = {}) {
 }
 
 // ① 過去5作CD売上の推移
+
+// ① 過去5作CD売上の推移
 function renderSalesTrendChart() {
   const chart = document.getElementById('records-sales-chart');
   const note = document.getElementById('records-sales-note');
@@ -92,8 +94,13 @@ function renderSalesTrendChart() {
     value: Math.max(0, entry.sales)
   }));
 
+  // ★ unitFormatter を追加して、縦軸を「〇枚」表示に修正
   chart.innerHTML = `<div style="font-size:11px; color:#555; margin-bottom:4px;">直近曲『${escapeHtml(targetSong.title)}』の推移</div>` +
-    buildLineChartSvg(points, { gradientId: 'records-sales-gradient', ariaLabel: '過去5作CD売上推移' });
+    buildLineChartSvg(points, { 
+      gradientId: 'records-sales-gradient', 
+      ariaLabel: '過去5作CD売上推移',
+      unitFormatter: val => `${Math.round(val).toLocaleString()}枚`
+    });
 
   if (note) {
     const first = history[0];
@@ -101,7 +108,6 @@ function renderSalesTrendChart() {
     note.textContent = `期間 ${formatChartWeekLabel(first.weekKey)} → ${formatChartWeekLabel(last.weekKey)}（${history.length - 1}週）／ 累計 ${last.sales.toLocaleString()}枚`;
   }
 }
-
 // ② 初週売上ランキング（曲名・発売日・枚数）
 function renderFirstWeekRanking() {
   const list = document.getElementById('records-firstweek-list');
