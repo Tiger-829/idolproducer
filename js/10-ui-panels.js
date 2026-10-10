@@ -1,6 +1,18 @@
 // ==========================================
-// 10-ui-panels.js : 全機能完全保持版（イベント事前予告・告知の完全撤廃版）
+// 10-ui-panels.js : 全機能完全保持版（予告完全撤廃・タブ記憶・エラー防止対応）
 // ==========================================
+
+// 不足しがちなフォーマット関数の安全な定義（エラー防止用）
+if (typeof formatPlanDayLabel !== 'function') {
+  window.formatPlanDayLabel = function(dateKey) {
+    if (!dateKey) return '';
+    const parts = String(dateKey).split('-');
+    if (parts.length >= 3) {
+      return `${Number(parts[1])}月${Number(parts[2])}日`;
+    }
+    return dateKey;
+  };
+}
 
 if (typeof PAGE_TABS === 'undefined') {
   window.PAGE_TABS = [
@@ -17,8 +29,10 @@ if (typeof DEFAULT_PAGE === 'undefined') {
   window.DEFAULT_PAGE = 'office';
 }
 
+// ★ 前回開いていたタブをローカルストレージから復元
 if (typeof currentPageTab === 'undefined') {
-  window.currentPageTab = window.DEFAULT_PAGE || 'office';
+  const savedTab = localStorage.getItem('idol_last_page_tab');
+  window.currentPageTab = savedTab && PAGE_TABS.some(t => t.id === savedTab) ? savedTab : (window.DEFAULT_PAGE || 'office');
 }
 
 // safeGetIconSVGを処理する。
@@ -79,9 +93,13 @@ function renderPageNav(activePage) {
   });
 }
 
-// Pageを切替する。
+// ★ Pageを切替する（切替時にタブ状態を保存）
 function switchPage(page) {
   currentPageTab = page;
+  try {
+    localStorage.setItem('idol_last_page_tab', page);
+  } catch (e) {}
+
   renderPageNav(page);
   if (page === 'records' && typeof renderRecordsPanel === 'function') {
     try { renderRecordsPanel(); } catch (e) { console.warn('renderRecordsPanel skip:', e); }
@@ -187,7 +205,6 @@ function renderWeeklyActionPanel() {
       ensureWeeklySchedule();
     }
 
-    // ★ ランダムイベントなどの事前予告テキスト（events）の参照を完全に排除
     const currentDate = (typeof getGameDateObject === 'function') ? getGameDateObject() : new Date();
 
     const nextLiveDate = (typeof findWeekLiveStop === 'function') ? findWeekLiveStop(currentDate) : null;
