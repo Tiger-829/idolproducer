@@ -1041,9 +1041,3 @@ function renderSalaryPanel() {
   const prevFans = typeof previousYearGroupFansAtYearStart !== 'undefined' ? (previousYearGroupFansAtYearStart || 0) : 0;
   const fanGrowth = Math.max(0, startFans - prevFans);
   const growthFactor = typeof MEMBER_SALARY_GROUP_GROWTH_FACTOR !== 'undefined' ? MEMBER_SALARY_GROUP_GROWTH_FACTOR : 6;
-
-  setText('salary-note',
-    `メンバー年収 = ファン数×8×365 ＋ (当年1月頭 ${Number(startFans).toLocaleString()}人 − 前年1月頭 ${Number(prevFans).toLocaleString()}人)×6。` +
-    ` 年間給与のうちグループファン増加分は ${formatMoney(fanGrowth * growthFactor * rosterCount)} です。` +
-    ` 給与は毎月末に一括で引き落とされます。`);
-}
