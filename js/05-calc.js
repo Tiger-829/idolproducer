@@ -101,7 +101,7 @@ function calculateMemberFans(member) {
     ((stats.popularity || 0) * 250 +
    calculateIdolPower(stats)*200 +
     (stats.talk || 0) * 100 +
-    (stats.sns || 0) * 50)/4
+    (stats.sns || 0) * 50)
   );
 }
 
