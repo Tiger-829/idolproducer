@@ -84,11 +84,17 @@ Firebase の設定が未完了なら、ボタンは失敗時のメッセージ�
 | `js/07-schedule.js` | 週間スケジュールと週進行 |
 | `js/08-events.js` | イベント・収入・リリース・ライブ |
 | `js/09-selection-draft.js` | 選抜・卒業・ドラフト会議 |
-| `js/10-ui-panels.js` | UI描画（順位・事務所・マネージャー・給与） |
-| `js/11-ui-roster.js` | UI描画（編成・楽曲・updateUI） |
-| `js/12-ui-plan-save.js` | 6か月計画UI・モーダル・セーブ |
-| `js/13-help.js` | ゲーム内ヘルプ（説明データと描画） |
-| `js/14-ui-records.js` | 記録タブ（CD売上推移グラフ・楽曲一覧・初週売上ランキング・TV演出） |
+| `js/10-ui-navigation.js` | 共通ナビゲーション・タブ切替 |
+| `js/11-ui-group.js` | グループタブ |
+| `js/12-ui-formation.js` | 編成タブ |
+| `js/13-ui-office.js` | 事務所タブ |
+| `js/14-ui-funds.js` | 資金タブ |
+| `js/15-ui-ranking.js` | 順位タブ |
+| `js/16-ui-records.js` | 記録タブ |
+| `js/17-ui-core.js` | 共通UI更新・ログ表示 |
+| `js/18-ui-plan-save.js` | 6か月計画UI・モーダル・セーブ |
+| `js/19-help.js` | ゲーム内ヘルプ（説明データと描画） |
+| `js/20-save-sync.js` | セーブデータ同期 |
 | `sw.js` / `manifest.json` | PWA（オフラインキャッシュ・インストール） |
 
 - **編集の順番は `index.html` に書かれた `<script src>` の順です。** 実行順＝この順なので、後から読み込むファイルは前のファイルで定義された関数・定数を前提にできます。
@@ -220,8 +226,8 @@ Firebase の設定が未完了なら、ボタンは失敗時のメッセージ�
 - **表示は `formatInjuryWeeks` に集約**しています（例：`残り2週／全3週`）。下列の5箇所が共通ヘルパーを使います。
   - `js/07-schedule.js` … 週次ログの【ケガ】
   - `js/09-selection-draft.js` … 選抜画面のメンバー情報
-  - `js/10-ui-panels.js` … 休養日の設定ボタン
-  - `js/11-ui-roster.js` … メンバー名バーと一覧
+  - `js/13-ui-office.js` … 休養日の設定ボタン
+  - `js/12-ui-formation.js` … メンバー名バーと一覧
   - `js/05-calc.js` … 復帰ログ
 - **旧セーブ**（`totalWeeks` なし）は `ensureMemberVitalState` で `totalWeeks = weeksLeft` を補完します。
 - 週間メニュー設定の休養対象ボタンには、各メンバーのメニュー終了時点の体力から計算した「ケガリスク」を表示します。実際のケガ発生率（全体の発生率 × ケガへの振り分け率）を、0%＝なし、0%超〜2.25%未満＝低、2.25%〜4.5%未満＝中、4.5%〜6.75%未満＝高、6.75%以上＝必の5段階で表示します。ボタンにカーソルを合わせると予測体力と発生率を確認できます。
@@ -252,7 +258,7 @@ Firebase の設定が未完了なら、ボタンは失敗時のメッセージ�
 
 ### ゲーム内ヘルプの保守
 
-`js/13-help.js` の `HELP_SECTIONS` がゲーム内説明の唯一の情報源です。
+`js/19-help.js` の `HELP_SECTIONS` がゲーム内説明の唯一の情報源です。
 
 - 仕様（計算式・倍率表・上限など）を変えたら、**`HELP_SECTIONS` と同じ内容を必ず更新**してください。
 - ブロック種別は `p`（段落）／`ul`（箇条書き）／`table`（表）の3種類です。

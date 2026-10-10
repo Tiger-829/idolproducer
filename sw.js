@@ -1,4 +1,4 @@
-const APP_VERSION = 'v5';
+const APP_VERSION = 'v7';
 const CACHE_NAME = `idol-game-${APP_VERSION}`;
 // index.html から読み込む外部ファイルもオフライン動作に含める
 const ASSETS = [
@@ -15,12 +15,17 @@ const ASSETS = [
   './js/07-schedule.js',
   './js/08-events.js',
   './js/09-selection-draft.js',
-  './js/10-ui-panels.js',
-  './js/11-ui-roster.js',
-  './js/12-ui-plan-save.js',
-  './js/13-help.js',
-  './js/14-ui-records.js',
-  './js/15-save-sync.js',
+  './js/10-ui-navigation.js',
+  './js/11-ui-group.js',
+  './js/12-ui-formation.js',
+  './js/13-ui-office.js',
+  './js/14-ui-funds.js',
+  './js/15-ui-ranking.js',
+  './js/16-ui-records.js',
+  './js/17-ui-core.js',
+  './js/18-ui-plan-save.js',
+  './js/19-help.js',
+  './js/20-save-sync.js',
   './vendor/qrcode.min.js',
   './manifest.json'
 ];

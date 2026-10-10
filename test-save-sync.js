@@ -28,7 +28,7 @@ const localStorageMock = (() => {
 
 globalThis.localStorage = localStorageMock;
 
-const { saveDataManager } = require('./js/15-save-sync.js');
+const { saveDataManager } = require('./js/20-save-sync.js');
 
 const source = fs.readFileSync('./js/03-venue.js', 'utf8');
 const context = {

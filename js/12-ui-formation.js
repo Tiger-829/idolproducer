@@ -1,185 +1,26 @@
-// ==========================================
-// 11-ui-roster.js : UI描画（グッズ在庫・種類数リアルタイム反映 ＆ 5部門ソート対応版）
-// ==========================================
+function renderFormationStatus() {
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const rosterCount = document.getElementById('txt-roster-count');
+  if (rosterCount) rosterCount.textContent = String(roster.length);
+  const selectedCount = document.getElementById('txt-selected-count');
+  if (selectedCount) selectedCount.textContent = String(roster.filter(member => member && member.isSelected).length);
 
+  const selectionButton = document.getElementById('btn-selection-setup');
+  if (selectionButton) {
+    const locked = typeof isSelectionLocked === 'function' ? isSelectionLocked() : false;
+    selectionButton.disabled = locked;
+    selectionButton.textContent = (locked && typeof selectionLock !== 'undefined' && selectionLock)
+      ? `選抜確定済み（${selectionLock.year}年${selectionLock.month}月）`
+      : '選抜・センターを変更する';
+    selectionButton.style.opacity = locked ? '0.6' : '1';
+  }
+}
+
+// 編成タブ
 let rosterSortState = {
   key: 'name',     // ソート基準項目 ('age', 'popularity', 'vocal', 'dance', 'teamwork', 'name')
   direction: 'asc' // 'asc'（昇順）または 'desc'（降順）
 };
-
-// UIを更新する。
-function updateUI() {
-  // テキストを設定する。
-  const setText = (id, text) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
-  };
-
-  // 1. 最優先でタブバーを生成・同期
-  try {
-    if (typeof renderPageNav === 'function') {
-      renderPageNav(typeof currentPageTab !== 'undefined' ? currentPageTab : 'office');
-    }
-  } catch (e) {
-    console.warn('renderPageNav failed:', e);
-  }
-
-  // 2. ヘッダー・基本情報
-  try {
-    setText('txt-year', typeof currentYear !== 'undefined' ? currentYear : 1);
-    setText('txt-month', typeof currentMonth !== 'undefined' ? currentMonth : 1);
-    setText('txt-week', typeof currentWeek !== 'undefined' ? currentWeek : 1);
-
-    if (typeof getGameDateObject === 'function') {
-      setText('txt-calendar-date', getGameDateObject().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }));
-    }
-
-    if (typeof formatMoney === 'function' && typeof funds !== 'undefined') {
-      setText('txt-funds', formatMoney(funds));
-      const exactEl = document.getElementById('txt-funds-exact');
-      if (exactEl) {
-        exactEl.textContent = Math.abs(funds) >= 100000 ? `（${Math.round(funds).toLocaleString()}円）` : '';
-      }
-    }
-
-    setText('txt-year-sales', `${(yearlyStats?.sales || 0).toLocaleString()} 枚`);
-    setText('txt-year-audience', `${(yearlyStats?.audience || 0).toLocaleString()} 人`);
-
-    const streamEl = document.getElementById('txt-year-stream');
-    if (streamEl && typeof formatMoney === 'function') {
-      const net = (yearlyStats?.streamRevenue || 0) - (yearlyStats?.streamCost || 0);
-      streamEl.textContent = `${formatMoney(net)}${yearlyStats?.streamCost ? '（制作費込）' : ''}`;
-    }
-
-    // グッズの在庫数と種類数を自動反映
-    const merchStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
-    const merchProds = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
-    setText('txt-merchandise-stock', merchStock.toLocaleString());
-    setText('txt-merchandise-products', merchProds);
-
-    const roster = Array.isArray(idolRoster) ? idolRoster : [];
-    setText('txt-roster-count', roster.length);
-    const selectedCountEl = document.getElementById('txt-selected-count');
-    if (selectedCountEl) selectedCountEl.textContent = roster.filter(member => member && member.isSelected).length;
-
-    const selectionButton = document.getElementById('btn-selection-setup');
-    if (selectionButton) {
-      const locked = typeof isSelectionLocked === 'function' ? isSelectionLocked() : false;
-      selectionButton.disabled = locked;
-      selectionButton.textContent = (locked && typeof selectionLock !== 'undefined' && selectionLock)
-        ? `選抜確定済み（${selectionLock.year}年${selectionLock.month}月）`
-        : '選抜・センターを変更する';
-      selectionButton.style.opacity = locked ? '0.6' : '1';
-    }
-
-    const groupFans = typeof calculateGroupFans === 'function' ? calculateGroupFans() : 0;
-    const fansEl = document.getElementById('txt-header-fans');
-    if (fansEl) {
-      fansEl.textContent = typeof formatFanCount === 'function' ? formatFanCount(groupFans) : groupFans.toLocaleString();
-      fansEl.title = groupFans >= 100000 ? `${groupFans.toLocaleString()}人` : '';
-    }
-
-    const fanTiers = typeof getFanTiers === 'function' ? getFanTiers() : null;
-    const tierEl = document.getElementById('txt-group-fan-tiers');
-    if (tierEl && fanTiers) {
-      const share = fanTiers.shares;
-      const pct = value => Math.round(value * 100);
-      const liveRate = typeof getTierParticipationRate === 'function' ? getTierParticipationRate('live') : 0.1;
-      const segs = [
-        { key: 'core', name: 'コア', share: share.core, count: fanTiers.core },
-        { key: 'fan', name: 'ファン', share: share.fan, count: fanTiers.fan },
-        { key: 'light', name: 'ライト', share: share.light, count: fanTiers.light },
-      ];
-      tierEl.innerHTML = `
-        <div class="fan-share-bar" role="img">
-          ${segs.map(s => `<i class="fan-share-seg fan-share-${s.key}" style="width:${pct(s.share)}%"></i>`).join('')}
-        </div>
-        <div class="fan-share-legend">
-          ${segs.map(s => `<span class="fan-share-legend-item"><i class="fan-share-dot fan-share-${s.key}"></i>${s.name}${pct(s.share)}%</span>`).join('')}
-        </div>
-        <div class="fan-share-note">ライブ参加 ${(liveRate * 100).toFixed(1)}%</div>
-      `;
-    }
-
-    setText('txt-group-crisis', typeof groupCrisis !== 'undefined' ? groupCrisis : '--');
-    setText('txt-effective-crisis', typeof calculateGroupCrisisResilience === 'function' ? calculateGroupCrisisResilience() : '--');
-
-    const summary = typeof calculateTeamAverages === 'function' ? calculateTeamAverages() : { averages: {}, overall: 50, rankData: { rank: 'C', color: '#666', bg: '#eee' }, centerName: '未定' };
-    setText('txt-center-name', summary.centerName);
-    setText('txt-team-idol-power', typeof calculateTeamIdolPower === 'function' ? calculateTeamIdolPower() : '--');
-    setText('team-overall-score', summary.overall);
-
-    const badge = document.getElementById('team-rank-badge');
-    if (badge && summary.rankData) {
-      badge.textContent = summary.rankData.rank;
-      badge.style.color = summary.rankData.color;
-      badge.style.backgroundColor = summary.rankData.bg;
-      badge.style.border = `1px solid ${summary.rankData.color}`;
-    }
-
-    const avgGrid = document.getElementById('team-avg-grid');
-    if (avgGrid && typeof STATUS_KEYS !== 'undefined') {
-      avgGrid.innerHTML = '';
-      STATUS_KEYS.forEach(k => {
-        const val = summary.averages[k.id] || 0;
-        const displayVal = Math.round(val);
-        const rInfo = typeof getRankData === 'function' ? getRankData(displayVal) : { color: '#666' };
-        avgGrid.innerHTML += `
-          <div class="avg-item">
-            <span class="avg-label">${k.name}</span>
-            <span class="avg-val" style="color:${rInfo.color};">${displayVal}</span>
-          </div>
-        `;
-      });
-    }
-  } catch (e) {
-    console.warn('Header stats error:', e);
-  }
-
-  // 3. 各パネルの描画
-  const runSafe = (fn) => {
-    try {
-      if (typeof fn === 'function') fn();
-    } catch (err) {
-      console.warn('Panel render warning:', err);
-    }
-  };
-
-  runSafe(renderSongLibrary);
-  runSafe(renderRosterNameBar);
-  runSafe(renderRosterList);
-  runSafe(renderRankingPanel);
-  runSafe(renderOfficeUpgrades);
-  runSafe(renderManagerPanel);
-  runSafe(renderManagerMarketPanel);
-  runSafe(renderSalaryPanel);
-  runSafe(renderGameCalendar);
-  runSafe(renderWeeklyActionPanel);
-
-  // 4. セーブ
-  if (typeof activeSaveSlot !== 'undefined' && activeSaveSlot && typeof saveSlotKey === 'function') {
-    try {
-      localStorage.setItem(saveSlotKey(activeSaveSlot), JSON.stringify({
-        currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
-        merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough, merchandiseItems,
-        currentRosterTab, liveHistory, salesHistory, logHistory,
-        nextLivePromotionPoints, monthlyCdRevenue, monthlyTieUpRevenue, promoSongId,
-        monthlyLedger, pendingMonthlyReport,
-        crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
-        pendingCrisisResponse, randomEventCheckWeekKey, pendingRandomEvent, armedRandomEvents, pendingSelectionEvent, selectionLock, lastAnnouncedCenterId,
-        fanClub, fanClubFoundedYear, pendingFanClubEvent,
-        industryOfferCheckWeekKey, pendingIndustryOffer, specialLiveEvents,
-        pendingEquipmentEvent, equipmentDowngradeCheckWeekKey, groupCrisis, officeUpgrades,
-        yearlyStats, lifetimeSales, fansFromSales, idolRoster, productionSchedule, leagueTeams,
-        songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
-        rivalLiveBookings, managers, managerMarketCandidates, groupFansAtYearStart, previousYearGroupFansAtYearStart,
-        yearEndAwardProcessed, yearEndKohakuProcessed, lastLiveDate,
-        weeklySchedule, lastWeekSchedule, savedCleanWeekSchedule, pendingReports, draftState,
-        savedAt: Date.now()
-      }));
-    } catch (e) {}
-  }
-}
 
 // ロースターTabを切替する。
 function switchRosterTab(tab) {
@@ -202,36 +43,6 @@ function setRosterSort(key) {
     rosterSortState.direction = (key === 'age') ? 'asc' : 'desc';
   }
   renderRosterList();
-}
-
-// 楽曲ライブラリを描画する。
-function renderSongLibrary() {
-  const listUI = document.getElementById('song-list-ui');
-  if (!listUI) return;
-  const sList = Array.isArray(songs) ? songs : [];
-  const recordedSongs = sList.filter(song => Number.isFinite(song.totalSales));
-  const totalSales = recordedSongs.reduce((sum, song) => sum + song.totalSales, 0);
-  const averageSales = recordedSongs.length ? Math.round(totalSales / recordedSongs.length) : 0;
-  const summaryEl = document.getElementById('song-sales-summary');
-  if (summaryEl) {
-    summaryEl.innerHTML = `
-      <strong>楽曲累計売上: ${totalSales.toLocaleString()}枚</strong>
-      <div style="margin-top:4px; color:#666;">売上記録 ${recordedSongs.length}曲 / 1曲平均 ${averageSales.toLocaleString()}枚</div>
-    `;
-  }
-
-  if (!sList.length) {
-    listUI.innerHTML = '<div class="song-row">楽曲はまだ登録されていません。</div>';
-    return;
-  }
-
-  listUI.innerHTML = [...sList]
-    .sort((a, b) => b.releaseYear - a.releaseYear || b.releaseMonth - a.releaseMonth)
-    .map(song => {
-      const releaseStatus = song.released ? '発売済み' : `${song.releaseYear}年${song.releaseMonth}月発売予定`;
-      const sales = Number.isFinite(song.totalSales) ? `${song.totalSales.toLocaleString()}枚` : (song.released ? '過去データなし' : '未発売');
-      return `<div class="song-row"><strong>${escapeHtml(song.title)}</strong> Lv.${song.level} <span style="color:#777;">${releaseStatus} / 売上 ${sales}</span></div>`;
-    }).join('');
 }
 
 // メンバーDisplay名前を整形する。
@@ -477,18 +288,9 @@ function renderRosterList() {
   listUI.innerHTML = htmlContent;
 }
 
-// Logを設定する。
-function setLog(msg) {
-  if (!Array.isArray(logHistory)) logHistory = [];
-  logHistory.unshift({ date: gameDate, text: String(msg) });
-  const limit = typeof LOG_HISTORY_LIMIT !== 'undefined' ? LOG_HISTORY_LIMIT : 60;
-  if (logHistory.length > limit) logHistory.length = limit;
-  
-  const box = document.getElementById('log-box');
-  if (box) {
-    box.textContent = msg;
-  }
-  
-  if (typeof renderLogList === 'function') renderLogList();
-  if (typeof playTvEffectFromLog === 'function') playTvEffectFromLog(msg);
+
+function renderFormationTab() {
+  renderFormationStatus();
+  renderRosterNameBar();
+  renderRosterList();
 }
