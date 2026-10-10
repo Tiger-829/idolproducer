@@ -138,6 +138,7 @@ function renderFirstWeekRanking() {
   }).join('');
 }
 
+
 // ③ 過去1年のファン数推移（単位: 千人）
 function renderFanHistoryTrendChart() {
   const mainPanel = document.getElementById('page-records');
@@ -157,6 +158,28 @@ function renderFanHistoryTrendChart() {
       mainPanel.appendChild(container);
     }
   }
+
+  // ★ 複数の候補からファン履歴データを安全に取得する
+  const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory
+                : (typeof groupFanHistory !== 'undefined' && Array.isArray(groupFanHistory)) ? groupFanHistory
+                : (Array.isArray(window.fanHistory) ? window.fanHistory : []);
+
+  // 直近52週分（1年分）のみを表示対象にする
+  const recentHistory = history.slice(-52);
+
+  const points = recentHistory.map(entry => ({
+    label: formatChartWeekLabel(entry.date),
+    value: Math.round((Number(entry.fans) || Number(entry.count) || 0) / 1000)
+  }));
+
+  container.innerHTML = `
+    <div class="records-block-title">過去1年のファン数推移 <small>単位: 千人（直近52週・全${history.length}件記録）</small></div>
+    <div class="records-chart" style="height:120px;">
+      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
+    </div>
+    <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
+  `;
+}
 
   const history = (typeof player !== 'undefined' && player && Array.isArray(player.fanHistory)) ? player.fanHistory : [];
   const points = history.map(entry => ({
