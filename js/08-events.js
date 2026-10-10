@@ -1,5 +1,5 @@
 // ==========================================
-// イベント・収入・リリース・ライブ（完全版・経験点システム統合）
+// 08-events.js : イベント・収入・リリース・ライブ（完全サプライズ型ランダムイベント版）
 // ==========================================
 
 const RANDOM_EVENTS = [
@@ -178,34 +178,26 @@ function restorePendingRandomEvent(data) {
   return { ...data, name: event.name, text: event.text, choices: event.choices, context: data.context || {} };
 }
 
-function triggerArmedRandomEvent(todayKey) {
-  const idx = armedRandomEvents.findIndex(entry => todayKey >= entry.targetDate);
-  if (idx < 0) return;
-  const [entry] = armedRandomEvents.splice(idx, 1);
-  const built = buildRandomEvent(entry.eventId);
-  if (built) pendingRandomEvent = built;
-}
-
+// ★ 事前予告（予約システム）を撤廃し、その週の初めにダイレクトに発生する仕様に変更
 function rollRandomEvent() {
   if (getGameDateObject().getDay() !== 3) return;
   if (pendingRandomEvent || pendingCrisisResponse) return;
-  const todayKey = toDateKey(getGameDateObject());
-  triggerArmedRandomEvent(todayKey);
-  if (pendingRandomEvent) return;
+  
   const weekKey = getCurrentWeekKey();
   if (randomEventCheckWeekKey === weekKey) return;
   randomEventCheckWeekKey = weekKey;
+
+  // 約16%の確率でその週にランダムイベントが突発的に発生
   if (Math.random() >= 0.16) return;
-  if (armedRandomEvents.length >= 5) return;
 
   const pool = RANDOM_EVENTS.filter(entry => entry.kind !== 'equipment' || getEquipmentUpgradeCandidates().length);
   if (!pool.length) return;
 
   const event = pool[Math.floor(Math.random() * pool.length)];
-  const leadWeeks = 1 + Math.floor(Math.random() * 3);
-  const target = new Date(`${todayKey}T12:00:00`);
-  target.setDate(target.getDate() + leadWeeks * 7);
-  armedRandomEvents.push({ eventId: event.id, targetDate: toDateKey(target) });
+  const built = buildRandomEvent(event.id);
+  if (built) {
+    pendingRandomEvent = built;
+  }
 }
 
 function openRandomEventModal() {
@@ -327,7 +319,7 @@ function rollMonthlyTieUps() {
   TIE_UPS.forEach(tieUp => {
     const chance = tieUp.chance * (0.5 + (summary.averages.popularity || 0) / 100);
     if (Math.random() >= chance) return;
-    const revenue = Math.round(fans * tieUp.revenuePerFan * );
+    const revenue = Math.round(fans * tieUp.revenuePerFan);
     monthlyTieUpRevenue += revenue;
     
     const selected = idolRoster.filter(m => m.isSelected);
@@ -1096,23 +1088,10 @@ const PROMO_DIVISOR_NORMAL = 10;
 const PROMO_DIVISOR_PAST_WORK = 100;
 const CD_REVENUE_MONTHLY_SHARE = 0.8;
 const TIE_UPS = [
-  { 
-    id: 'magazine', 
-    name: '雑誌掲載', 
-    chance: 0.28, 
-    revenuePerFan: 1500, 
-    popularityGain: 1, 
-    songExperience: 2 
-  },
-  { 
-    id: 'tv', 
-    name: 'TVタイアップ', 
-    chance: 0.18, 
-    revenuePerFan: 3000, 
-    popularityGain: 1, 
-    songExperience: 1 
-  }
+  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 0.5, popularityGain: 2, songExperience: 4 },
+  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1.1, popularityGain: 1, songExperience: 10 }
 ];
+
 function getPromotionCumulativeSales(baseSales, divisors) {
   const base = Math.max(0, Math.round(Number(baseSales) || 0));
   if (!base || !Array.isArray(divisors) || !divisors.length) return 0;
@@ -1436,7 +1415,6 @@ function showLiveDetailedFinanceModal(report) {
 
   modal.style.display = 'flex';
 }
-
 
 window.closeLiveFinanceModal = function() {
   const modal = document.getElementById('live-finance-modal');
