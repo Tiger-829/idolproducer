@@ -1289,6 +1289,10 @@ function calculateRestReleaseSlots(restingMemberIds, fixedSlots) {
   return releaseMap;
 }
 
+// ==========================================
+// 12. スケジュール設定・適用ロジック（体力百分率回復＆UI連動完全修復版）
+// ==========================================
+
 function applyWeeklySchedule() {
   ensureWeeklySchedule();
 
@@ -1301,9 +1305,17 @@ function applyWeeklySchedule() {
   const fullVacationRec = typeof FULL_VACATION_RECOVERY !== 'undefined' ? FULL_VACATION_RECOVERY : 50;
   if (weeklySchedule.vacation) {
     participants.forEach(member => {
-      if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, fullVacationRec);
+      if (!member || member.injury) return;
+      const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
+      const current = member.staminaValue ?? maxStamina;
+      // 休暇は全員一律で大きく回復（現在値ベースまたは固定）
+      member.staminaValue = Math.min(maxStamina, current + Math.max(fullVacationRec, current * 1.0));
     });
-    setLog(`【1週間の休暇】全員がしっかり休養しました（体力値 +${fullVacationRec}）${officeMessage ? ` / ${officeMessage}` : ''}。`);
+    setLog(`【1週間の休暇】全員がしっかり休養しました${officeMessage ? ` / ${officeMessage}` : ''}。`);
+    
+    // UIを最新の状態に更新
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof renderWeeklyActionPanel === 'function') renderWeeklyActionPanel();
     return { levelUps: 0, injuries: [] };
   }
 
@@ -1333,8 +1345,6 @@ function applyWeeklySchedule() {
   const targetStat = weeklySchedule.individualStat || 'vocal';
   const maxStamina = typeof MAX_STAMINA_VALUE !== 'undefined' ? MAX_STAMINA_VALUE : 100;
   const autoRestTarget = typeof AUTO_REST_STAMINA_TARGET !== 'undefined' ? AUTO_REST_STAMINA_TARGET : 80;
-  const restSlotRec = typeof REST_SLOT_RECOVERY !== 'undefined' ? REST_SLOT_RECOVERY : 25;
-  const mealRec = typeof MEAL_PARTY_RECOVERY !== 'undefined' ? MEAL_PARTY_RECOVERY : 75;
   const morningMultiplier = typeof MORNING_SLOT_MULTIPLIER !== 'undefined' ? MORNING_SLOT_MULTIPLIER : 0.8;
   const rehCost = typeof REHEARSAL_STAMINA_COST !== 'undefined' ? REHEARSAL_STAMINA_COST : 8;
   const bcastCost = typeof BROADCAST_STAMINA_COST !== 'undefined' ? BROADCAST_STAMINA_COST : 12;
@@ -1355,7 +1365,8 @@ function applyWeeklySchedule() {
 
       if (fixed) {
         if (fixed.kind === 'rest-day') {
-          remainingStamina = Math.min(maxStamina, remainingStamina + restSlotRec);
+          // 固定の休養枠（半日扱い：100%回復）
+          remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.0);
           return;
         }
         if (isCurrentlyResting) return;
@@ -1366,14 +1377,30 @@ function applyWeeklySchedule() {
         return;
       }
 
+      // 休養スロット（半日休養＝100%回復、フル休養＝150%回復）
       if (slotId === 'rest-day') {
-        remainingStamina = Math.min(maxStamina, remainingStamina + restSlotRec);
+        const periodIndex = (typeof getWeekSlotPeriod === 'function') ? getWeekSlotPeriod(index) : (index % 2);
+        const pairIndex = periodIndex === 0 ? index + 1 : index - 1;
+        const pairSlotId = weeklySchedule.slots[pairIndex];
+        const pairFixed = fixedSlots.get(pairIndex);
+        const isPairRest = (pairFixed && pairFixed.kind === 'rest-day') || pairSlotId === 'rest-day';
+
+        if (isPairRest && periodIndex === 0) {
+          // 1日フル休養（午前・午後どちらも休養：150%回復。重複を防ぐため午前側で処理）
+          remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.5);
+        } else if (!isPairRest) {
+          // 半日休養（100%回復）
+          remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.0);
+        }
         return;
       }
+
+      // 食事会（別枠扱い：しっかり大きめに回復 +30 または 100%）
       if (slotId === 'meal-party') {
-        remainingStamina = Math.min(maxStamina, remainingStamina + mealRec);
+        remainingStamina = Math.min(maxStamina, remainingStamina + Math.max(30, remainingStamina * 1.0));
         return;
       }
+
       if (!slotId || isCurrentlyResting) return;
 
       const item = itemsList.find(row => row.id === slotId);
@@ -1393,8 +1420,8 @@ function applyWeeklySchedule() {
           staminaCost += cost;
           remainingStamina = Math.max(0, remainingStamina - cost);
         } else {
-          const recoveryAmount = Math.round(restSlotRec * slotEffect);
-          remainingStamina = Math.min(maxStamina, remainingStamina + recoveryAmount);
+          // 休養中の他メンバーは半日休養扱い（100%回復）
+          remainingStamina = Math.min(maxStamina, remainingStamina + remainingStamina * 1.0);
         }
         return;
       }
@@ -1409,21 +1436,16 @@ function applyWeeklySchedule() {
 
     levelUps += memberLevels;
 
+    // ★ 計算された最終的なスタミナをメンバーオブジェクトに確実に代入する
+    member.staminaValue = Math.max(0, Math.min(maxStamina, remainingStamina));
+
     if (staminaCost > 0) {
-      if (typeof consumeMemberStamina === 'function') consumeMemberStamina(member, staminaCost);
       if (typeof rollMemberInjury === 'function' && rollMemberInjury(member, 0)) {
         const type = member.injury?.type || 'ケガ';
         const formattedWeeks = (typeof formatInjuryWeeks === 'function') ? formatInjuryWeeks(member.injury) : '';
         injuries.push(`${member.name}（${type}・${formattedWeeks}）`);
       }
     }
-
-    const stayedRestingAllWeek = isRestDesignated && releaseIndex === -1;
-    let recovery = (typeof getMemberWeeklyRecovery === 'function') ? getMemberWeeklyRecovery(member, stayedRestingAllWeek) : 20;
-    const restSlotCount = weeklySchedule.slots.filter(s => s === 'rest-day').length;
-    recovery += restSlotCount * restSlotRec;
-    recovery += getWeekMealPartyCount() * mealRec;
-    if (typeof recoverMemberStamina === 'function') recoverMemberStamina(member, recovery);
 
     if ((member.staminaValue ?? maxStamina) >= autoRestTarget) {
       fullyRecoveredMembers.push(member.id);
@@ -1481,9 +1503,13 @@ function applyWeeklySchedule() {
 
   setLog(`【週間スケジュール】${parts.join(' / ')}`);
   weeklyRecoveryDone = true;
+
+  // ★ 処理完了後にUIを最新の状態に強制更新し、スタミナ変動を画面に反映させる
+  if (typeof updateUI === 'function') updateUI();
+  if (typeof renderWeeklyActionPanel === 'function') renderWeeklyActionPanel();
+
   return { levelUps, injuries };
 }
-
 function itemIdLabel(itemId) {
   if (itemId === 'individual-lesson') {
     const statusKeysList = typeof STATUS_KEYS !== 'undefined' ? STATUS_KEYS : [];
