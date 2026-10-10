@@ -434,10 +434,10 @@ const REQUIRED_FULL_REST_DAYS = 1;
 const REQUIRED_EXTRA_REST_SLOTS = 2;
 const AUTO_REST_STAMINA_TARGET = 80;
 const DEFAULT_WEEK_SLOTS = [
-  'rest-day', 'rest-day', 'vocal-lesson', 'dance-lesson',
-  'vocal-lesson', 'dance-lesson', 'literacy', 'rest-day',
-  'individual-lesson', 'full-run-through', 'coordination', 'strength-training',
-  'endurance-training', 'rest-day'
+  'rest-day', 'individual-lesson', 'dance-lesson','full-run-through',
+  'rest-day', 'dance-lesson', 'strength-training', 'vocal-lesson', 
+  'rest-day', 'rest-day', 'literacy', 'endurance-training', 
+  'vocal-lesson', 'coordination'
 ];
 
 const SPECIAL_TRAINING_STATS = ['vocal', 'dance', 'stamina', 'recovery'];
