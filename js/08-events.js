@@ -1152,32 +1152,86 @@ function findNearestProgramDate(year, month) {
   return draftSong ? draftSong.id : null;
 }
 
-function checkMusicProgramOffers() {
-  if (!isFirstWednesdayOfMonth()) return;
+// ==========================================
+// 定例歌番組オファー生成（CD発売日の1ヶ月前 ＆ 最短曜日調整版）
+// ==========================================
 
-  const targetMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-  const targetYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-  const targetKey = `${targetYear}-${targetMonth}`;
-  const releasePlan = productionSchedule[targetKey];
+// 指定された基準日（発売日など）から、前後いずれかで最も近い特定の曜日（0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土）の日付（YYYY-MM-DD）を取得する関数
+function getNearestWeekdayDate(baseDateStr, targetWeekday) {
+  const baseDate = new Date(`${baseDateStr}T12:00:00`);
+  if (isNaN(baseDate.getTime())) return null;
 
-  if (releasePlan && releasePlan.release && releasePlan.release !== 'none' && !releasePlan.musicOfferSent) {
-    const song = ensureScheduledSong(targetYear, targetMonth, releasePlan);
-    const calendarTargetYear = calendarYear + (targetYear - currentYear);
-    MUSIC_PROGRAMS.forEach(program => {
-      pendingPerformanceOffers.push({
-        id: `offer-${targetYear}-${targetMonth}-${program.id}`,
-        name: program.name,
-        airYear: targetYear,
-        airMonth: targetMonth,
-        airDate: getNthWeekdayOfMonth(calendarTargetYear, targetMonth, program.weekday, program.week),
-        isSpecial: false,
-        songId: song.id
-      });
-    });
-    releasePlan.musicOfferSent = true;
+  let bestDate = null;
+  let minDiff = Infinity;
+
+  // 前後7日間の範囲で該当する曜日を探す
+  for (let i = -7; i <= 7; i++) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + i);
+    if (d.getDay() === targetWeekday) {
+      const diff = Math.abs(i);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestDate = d;
+      }
+    }
   }
+  return bestDate ? toDateKey(bestDate) : null;
 }
 
+function checkMusicProgramOffers() {
+  // productionSchedule に登録されている全プランを走査し、
+  // 「本日の日付が、そのCDの発売日のちょうど1ヶ月前」にあたるものをチェックする
+  const todayStr = gameDate; // 'YYYY-MM-DD'
+  const todayObj = getGameDateObject(todayStr);
+
+  if (!productionSchedule) return;
+
+  Object.entries(productionSchedule).forEach(([planKey, plan]) => {
+    if (!plan || !plan.release || plan.release === 'none' || plan.musicOfferSent) return;
+    if (!plan.releaseDate) return; // 発売日が未定ならスキップ
+
+    // CD発売日の1ヶ月前の日付を計算
+    const releaseDateObj = new Date(`${plan.releaseDate}T12:00:00`);
+    if (isNaN(releaseDateObj.getTime())) return;
+
+    const offerDateObj = new Date(releaseDateObj);
+    offerDateObj.setMonth(offerDateObj.getMonth() - 1);
+    const offerDateStr = toDateKey(offerDateObj);
+
+    // 今日がちょうど「発売日の1ヶ月前」に到達した場合にオファーを配信
+    if (todayStr === offerDateStr) {
+      const song = ensureScheduledSong(plan.year || currentYear, plan.month || currentMonth, plan);
+      if (!song || !Array.isArray(MUSIC_PROGRAMS)) return;
+
+      MUSIC_PROGRAMS.forEach(program => {
+        const offerId = `offer-${plan.releaseDate}-${program.id}`;
+        if (!Array.isArray(pendingPerformanceOffers)) pendingPerformanceOffers = [];
+        const alreadySent = pendingPerformanceOffers.some(o => o && o.id === offerId);
+
+        if (!alreadySent) {
+          // CD発売日（plan.releaseDate）から見て、一番近くなる番組の曜日（program.weekday）を算出
+          const airDateKey = getNearestWeekdayDate(plan.releaseDate, program.weekday);
+          if (!airDateKey) return;
+
+          const airDateObj = new Date(`${airDateKey}T12:00:00`);
+
+          pendingPerformanceOffers.push({
+            id: offerId,
+            name: program.name,
+            airYear: airDateObj.getFullYear(),
+            airMonth: airDateObj.getMonth() + 1,
+            airDate: airDateKey,
+            isSpecial: false,
+            songId: song.id
+          });
+        }
+      });
+
+      plan.musicOfferSent = true;
+    }
+  });
+}
 function checkSpecialBroadcastOffers() {
   const currentGameDate = getGameDateObject();
   SPECIAL_BROADCASTS.forEach(broadcast => {
