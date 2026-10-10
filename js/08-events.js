@@ -1476,9 +1476,15 @@ window.closeLiveFinanceModal = function() {
   const modal = document.getElementById('live-finance-modal');
   if (modal) modal.style.display = 'none';
 
-  if (typeof openPendingModal === 'function') {
+  // もし他に未処理の保留レポートがあればそれを優先して開く
+  if (typeof openPendingModal === 'function' && pendingReports.length > 0) {
     openPendingModal();
   } else {
-    updateUI();
+    // 溜まったレポートがなくなったら、次の停止地点（水曜日や月末など）まで自動進行を再開！
+    if (typeof advanceUntilNextSchedulePoint === 'function') {
+      advanceUntilNextSchedulePoint();
+    } else {
+      updateUI();
+    }
   }
 };
