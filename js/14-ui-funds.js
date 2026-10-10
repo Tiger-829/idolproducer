@@ -45,7 +45,7 @@ function renderFundsTab() {
     const streamEl = document.getElementById('txt-year-stream');
     if (streamEl && typeof formatMoney === 'function') {
       const net = (yearlyStats?.streamRevenue || 0) - (yearlyStats?.streamCost || 0);
-      streamEl.textContent = `${formatMoney(net)}${yearlyStats?.streamCost ? : ''}`;
+      streamEl.textContent = `${formatMoney(net)}${yearlyStats?.streamCost ? `（-${formatMoney(yearlyStats.streamCost)}）` : ''}`;
     }
 
   renderSalaryPanel();
