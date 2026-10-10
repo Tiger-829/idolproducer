@@ -327,7 +327,7 @@ function rollMonthlyTieUps() {
   TIE_UPS.forEach(tieUp => {
     const chance = tieUp.chance * (0.5 + (summary.averages.popularity || 0) / 100);
     if (Math.random() >= chance) return;
-    const revenue = Math.round(fans * tieUp.revenuePerFan);
+    const revenue = Math.round(fans * tieUp.revenuePerFan * );
     monthlyTieUpRevenue += revenue;
     
     const selected = idolRoster.filter(m => m.isSelected);
@@ -1096,10 +1096,23 @@ const PROMO_DIVISOR_NORMAL = 10;
 const PROMO_DIVISOR_PAST_WORK = 100;
 const CD_REVENUE_MONTHLY_SHARE = 0.8;
 const TIE_UPS = [
-  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 0.5, popularityGain: 2, songExperience: 4 },
-  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1.1, popularityGain: 1, songExperience: 10 }
+  { 
+    id: 'magazine', 
+    name: '雑誌掲載', 
+    chance: 0.28, 
+    revenuePerFan: 1500, 
+    popularityGain: 1, 
+    songExperience: 2 
+  },
+  { 
+    id: 'tv', 
+    name: 'TVタイアップ', 
+    chance: 0.18, 
+    revenuePerFan: 3000, 
+    popularityGain: 1, 
+    songExperience: 1 
+  }
 ];
-
 function getPromotionCumulativeSales(baseSales, divisors) {
   const base = Math.max(0, Math.round(Number(baseSales) || 0));
   if (!base || !Array.isArray(divisors) || !divisors.length) return 0;
