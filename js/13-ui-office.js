@@ -309,12 +309,15 @@ function getIndividualLessonMemberOptions() {
 
 let officeCalendarViewYear = null;
 let officeCalendarViewMonth = null;
+let officeCalendarLastGameMonth = null;
 
 function getOfficeCalendarViewDate() {
   const currentDate = typeof getGameDateObject === 'function' ? getGameDateObject() : new Date();
-  if (officeCalendarViewYear === null || officeCalendarViewMonth === null) {
+  const gameMonth = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}`;
+  if (officeCalendarLastGameMonth !== gameMonth || officeCalendarViewYear === null || officeCalendarViewMonth === null) {
     officeCalendarViewYear = currentDate.getFullYear();
     officeCalendarViewMonth = currentDate.getMonth() + 1;
+    officeCalendarLastGameMonth = gameMonth;
   }
   return { year: officeCalendarViewYear, month: officeCalendarViewMonth };
 }
