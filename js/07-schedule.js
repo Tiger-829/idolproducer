@@ -1645,6 +1645,10 @@ function selectOfficeAction(actionId) {
 function applyOfficeAction(actionId) {
   if (actionId === 'single-promotion') {
     if (typeof getSinglePromotionTarget !== 'function') return '';
+    if (typeof applySinglePromotion !== 'function') {
+      if (typeof addSongExperience === 'function') addSongExperience(getSinglePromotionTarget()?.song, 3);
+      return 'シングル販促';
+    }
     const target = getSinglePromotionTarget();
     if (!target) {
       if (Array.isArray(idolRoster)) {

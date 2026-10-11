@@ -1159,6 +1159,89 @@ function getPromotionCumulativeSales(baseSales, divisors) {
   return Math.ceil(total - 1e-6);
 }
 
+// シングル販促：対象曲の基準売上（ファン数×係率）。シングル1.5／アルバム2.0
+function getSongPromoBaseSales(song) {
+  const fans = typeof calculateGroupFans === 'function' ? calculateGroupFans() : 0;
+  const ratio = song && song.releaseType === 'album' ? ALBUM_PROMO_FAN_RATIO : SINGLE_PROMO_FAN_RATIO;
+  return Math.max(0, Math.round(fans * ratio));
+}
+
+// 過去作かどうか（直近の発売曲より古い発売済み曲）
+function isPastWorkSong(song) {
+  if (!song || !song.released) return false;
+  const latest = findLatestReleasedSong();
+  if (!latest) return false;
+  return latest.id !== song.id;
+}
+
+// 販促の週次減衰率（発売週8／通常10／過去作100）
+function getSongPromoDivisor(song) {
+  if (!song) return PROMO_DIVISOR_NORMAL;
+  if (isPastWorkSong(song)) return PROMO_DIVISOR_PAST_WORK;
+  if (song.releaseDateKey && song.releaseDateKey === gameDate) return PROMO_DIVISOR_RELEASE_WEEK;
+  return PROMO_DIVISOR_NORMAL;
+}
+
+// シングル販促を1週ぶん適用する。
+// 発売前は販促回数で発売時売上（1 + n×0.005）を押し上げ、発売後は減衰率で
+// 週ごとに売上が積み上がる。販促は常に1曲だけが持つ（対象が変わると前の曲はリセット）。
+function applySinglePromotion(song) {
+  if (!song) return { mode: 'none', alpha: 0, addedSales: 0, cumulativeSales: 0 };
+
+  // 対象が切り替わったら、前に販促していた曲の状態をリセットする
+  if (promoSongId && promoSongId !== song.id) {
+    const previous = songs.find(item => item && item.id === promoSongId);
+    if (previous) {
+      previous.promoBase = 0;
+      previous.promoDivisors = [];
+      previous.promoCount = 0;
+    }
+  }
+  promoSongId = song.id;
+
+  // 発売前：販促回数を積み上げ、発売時の売上倍率（1 + n×0.005）を効かせる
+  if (!song.released) {
+    song.promoCount = (song.promoCount || 0) + 1;
+    const alpha = song.promoCount * RELEASE_PROMO_ALPHA_STEP;
+    return { mode: 'pre-release', alpha, addedSales: 0, cumulativeSales: 0 };
+  }
+
+  // 発売後：基準売上に対して減衰率で週次売上が積み上がる
+  song.promoBase = getSongPromoBaseSales(song);
+  if (!Array.isArray(song.promoDivisors)) song.promoDivisors = [];
+  const beforeCumulative = getPromotionCumulativeSales(song.promoBase, song.promoDivisors);
+  song.promoDivisors.push(getSongPromoDivisor(song));
+  song.promoCount = (song.promoCount || 0) + 1;
+  const cumulativeSales = getPromotionCumulativeSales(song.promoBase, song.promoDivisors);
+  const addedSales = Math.max(0, cumulativeSales - beforeCumulative);
+
+  if (addedSales > 0) {
+    addGroupSales(addedSales);
+    addMonthlyCdRevenue(addedSales * getSongUnitPrice(song));
+    song.totalSales = (song.totalSales || 0) + addedSales;
+  }
+
+  const alpha = song.promoCount * RELEASE_PROMO_ALPHA_STEP;
+  return { mode: 'released', alpha, addedSales, cumulativeSales };
+}
+
+// 事務作業パネル用：現在のシングル販促の対象と状況
+function describeSinglePromotionStatus() {
+  if (typeof getSinglePromotionTarget !== 'function') return '';
+  const target = getSinglePromotionTarget();
+  if (!target) return '販促できる楽曲がありません。';
+  const song = target.song;
+  const label = target.isUpcoming ? '次作' : '今作';
+  if (!song.released) {
+    const count = song.promoCount || 0;
+    const boost = Math.round(count * RELEASE_PROMO_ALPHA_STEP * 1000) / 10;
+    return `対象：${label}「${song.title}」（発売前・販促${count}回／発売時売上 +${boost}%）`;
+  }
+  const weeks = (song.promoDivisors || []).length;
+  const cumulative = getPromotionCumulativeSales(song.promoBase || 0, song.promoDivisors || []);
+  return `対象：${label}「${song.title}」（発売済み・販促${weeks}週／累計 +${cumulative.toLocaleString()}枚）`;
+}
+
 function trainSongs(summary) {
   const weeklyExperience = Math.max(1, Math.round((summary.averages.vocal + summary.averages.dance) / 40));
   songs.forEach(song => addSongExperience(song, weeklyExperience));
