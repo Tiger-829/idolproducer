@@ -43,8 +43,8 @@ function buildLineChartSvg(points, options = {}) {
     const y = (padding.top + innerH - ratio * innerH).toFixed(1);
     const rawVal = max * ratio;
     const label = options.unitFormatter ? options.unitFormatter(rawVal) : formatMoney(Math.round(rawVal));
-    return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" class="chart-grid" />
-      <text x="${padding.left - 4}" y="${Number(y) + 3}" class="chart-axis-label" text-anchor="end">${escapeHtml(label)}</text>`;
+    const gridLine = options.showGrid === false ? '' : `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" class="chart-grid" />`;
+    return `${gridLine}<text x="${padding.left - 4}" y="${Number(y) + 3}" class="chart-axis-label" text-anchor="end">${escapeHtml(label)}</text>`;
   }).join('');
 
   const lastIndex = list.length - 1;
@@ -96,6 +96,7 @@ function renderSalesTrendChart() {
     buildLineChartSvg(points, { 
       gradientId: 'records-sales-gradient', 
       ariaLabel: '過去5作CD売上推移',
+      showGrid: false,
       unitFormatter: val => `${Math.round(val).toLocaleString()}枚`
     });
 
@@ -169,7 +170,7 @@ function renderFanHistoryTrendChart() {
   container.innerHTML = `
     <div class="records-block-title">過去1年のファン数推移 <small>単位: 千人（直近52週）</small></div>
     <div class="records-chart" style="height:120px;">
-      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
+      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', showGrid: false, unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
     </div>
     <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
   `;

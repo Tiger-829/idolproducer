@@ -124,6 +124,23 @@ function toggleMemberAbilities(memberId) {
   }
 }
 
+// メンバー詳細（<details>）の開閉を切替える（<summary> クリック）。
+// ネイティブの開閉を抑えて自前で制御し、開閉状態をメンバーに保存する。
+// これにより並び替え・能力表示切替・タブ切替での再描画後も開いたまま維持される。
+function onMemberSummaryClick(event, memberId) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const roster = Array.isArray(idolRoster) ? idolRoster : [];
+  const member = roster.find(m => m && m.id === memberId);
+  if (!member) return;
+  const summaryEl = (event && (event.currentTarget || event.target)) || null;
+  const detailsEl = summaryEl && typeof summaryEl.closest === 'function'
+    ? summaryEl.closest('.member-details')
+    : null;
+  const nextOpen = detailsEl ? !detailsEl.open : !member._isOpen;
+  member._isOpen = nextOpen;
+  if (detailsEl) detailsEl.open = nextOpen;
+}
+
 // ロースター一覧を描画する（5部門ソート機能組み込み）
 function renderRosterList() {
   const listUI = document.getElementById('roster-list-ui');
