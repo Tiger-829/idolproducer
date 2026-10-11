@@ -215,6 +215,8 @@ Firebase の設定が未完了なら、ボタンは失敗時のメッセージ�
 
 ### ケガ・体調不良の発生率と全治期間
 
+- 日付が1日進むごとに、その日の処理後の体力を基準に、全メンバーの体力が25%回復します。寮のグレード1段階ごとに回復率が4ポイント上がり（グレード3なら37%）、最大体力を超えて回復することはありません。
+
 - **発生率の上限は `INJURY_BASE_RATE`（`js/01-constants.js`、0.18）** です。実際の発生率は
   `((STAMINA_WARNING_THRESHOLD - 体力値) / STAMINA_WARNING_THRESHOLD) × INJURY_BASE_RATE × (1 - リスクマネジメント)` で決まります。
   - 体力値が `STAMINA_WARNING_THRESHOLD`（30）以上なら発生しません。

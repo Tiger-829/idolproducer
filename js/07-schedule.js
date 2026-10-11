@@ -152,6 +152,8 @@ function processDailyFlow(fromDate, toDate) {
   }
 
   processMonthlyClosing(fromDate, toDate);
+
+  idolRoster.forEach(member => recoverMemberStamina(member, getMemberDailyStaminaRecovery(member)));
 }
 
 // ==========================================

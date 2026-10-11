@@ -1833,6 +1833,45 @@ check('live reporting has a recap page followed by finance and resumes only afte
   liveReportProgress.firstPage && liveReportProgress.secondPage && liveReportProgress.closed && liveReportProgress.resumed,
   JSON.stringify(liveReportProgress));
 
+const dailyStaminaRecovery = JSON.parse(run(`
+  (() => {
+    const processingFunctions = [
+      'processBirthdays', 'processPlanEvents', 'processReleaseEvents', 'processLiveEvents',
+      'processScheduledPerformances', 'processWeeklyCycle', 'processYearEndEvents', 'processMonthlyClosing'
+    ];
+    const savedFunctions = Object.fromEntries(processingFunctions.map(name => [name, window[name]]));
+    const savedStamina = idolRoster.map(member => member.staminaValue);
+    const savedDormitoryLevel = officeUpgrades.dormitory;
+    try {
+      processingFunctions.forEach(name => { window[name] = () => {}; });
+      officeUpgrades.dormitory = 0;
+      idolRoster.forEach(member => { member.staminaValue = 40; });
+      idolRoster[1].staminaValue = 90;
+      processDailyFlow(new Date('2027-01-07T12:00:00'), new Date('2027-01-08T12:00:00'));
+      const baseRateStamina = idolRoster[0].staminaValue;
+      idolRoster[0].staminaValue = 40;
+      officeUpgrades.dormitory = 3;
+      processDailyFlow(new Date('2027-01-08T12:00:00'), new Date('2027-01-09T12:00:00'));
+      return JSON.stringify({
+        baseRateStamina,
+        upgradedDormitoryStamina: idolRoster[0].staminaValue,
+        nearMaximum: idolRoster[1].staminaValue,
+        allRecovered: idolRoster.every(member => member.staminaValue >= 40 && member.staminaValue <= MAX_STAMINA_VALUE)
+      });
+    } finally {
+      processingFunctions.forEach(name => { window[name] = savedFunctions[name]; });
+      idolRoster.forEach((member, index) => { member.staminaValue = savedStamina[index]; });
+      officeUpgrades.dormitory = savedDormitoryLevel;
+    }
+  })()
+`));
+check('daily recovery is based on current stamina and dormitory grade without exceeding the cap',
+  dailyStaminaRecovery.baseRateStamina === 50
+    && dailyStaminaRecovery.upgradedDormitoryStamina === 55
+    && dailyStaminaRecovery.nearMaximum === MAX_STAMINA_VALUE
+    && dailyStaminaRecovery.allRecovered,
+  JSON.stringify(dailyStaminaRecovery));
+
 // ---- 結果表示 ----
 console.log('\n================ RESULT ================');
 const failed = results.filter(r => !r.ok);

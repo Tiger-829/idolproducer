@@ -334,6 +334,11 @@ function getMemberWeeklyRecovery(member, isRestDay) {
   return Math.round(recovery);
 }
 
+function getMemberDailyStaminaRecovery(member) {
+  const dormitoryBonus = (officeUpgrades.dormitory || 0) * 0.04;
+  return Math.round((member?.staminaValue ?? 0) * (0.25 + dormitoryBonus));
+}
+
 function getLiveFatigueRecoveryPenalty(member) {
   const fatigue = member?.liveFatigue || 0;
   if (fatigue <= 0) return 0;
