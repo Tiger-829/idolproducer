@@ -273,19 +273,10 @@ const VENUE_EXTRA_DAY_RATE = 0.2;
 const MAX_OFFICE_LEVEL = 10;
 
 const CAPACITY_MAP = { SS: 47500, S: 38500, A: 30000, B: 20000, C: 12500, D: 7500 };
-const CD_BENEFITS = [
-  { id: 'web-greeting', name: '特典ウェブ挨拶', cost: 2000000 },
-  { id: 'real-greeting', name: 'リアル挨拶', cost: 5000000 },
-  { id: 'web-sign', name: 'ウェブサイン', cost: 4000000 },
-  { id: 'real-sign', name: 'リアルサインイベント', cost: 10000000 }
-];
-
 const PLAN_EVENT_TYPES = [
-  ...CD_BENEFITS.map(benefit => ({ id: benefit.id, name: benefit.name, cost: benefit.cost, kind: 'benefit' })),
   { id: 'goods', name: 'グッズ販売イベント', cost: 0, kind: 'goods' }
 ];
 const MAX_PLAN_EVENTS_PER_MONTH = 3;
-const DEFAULT_PLAN_EVENT_ID = 'web-greeting';
 const DEFAULT_PLAN_VENUE_CAPS = ['B', 'C'];
 const PLAN_CALENDAR_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const SEAT_TYPES = [

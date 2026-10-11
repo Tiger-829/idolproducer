@@ -1245,8 +1245,6 @@ function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = fa
     container.innerHTML = '';
 
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
-    const cdBenefits = typeof CD_BENEFITS !== 'undefined' ? CD_BENEFITS : [];
-
     const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
 
     const wrapperDiv = document.createElement('div');
@@ -1365,12 +1363,6 @@ function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = fa
           </label>
           <label class="weekly-member-target" for="rel-date-${m}">発売日
             <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="renderEmbeddedPlanCalendars();" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
-          </label>
-          <label class="weekly-member-target" for="sel-benefit-${m}">CD特典
-            <select id="sel-benefit-${m}" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
-              <option value="none">特典なし</option>
-              ${cdBenefits.map(b => `<option value="${b.id}" ${existingPlan.releaseBenefit === b.id ? 'selected' : ''}>${b.name} (${formatMoney(b.cost)})</option>`).join('')}
-            </select>
           </label>
         </div>
 
@@ -1624,7 +1616,6 @@ function saveDecisionPlan() {
       liveDate: primary ? (primary.liveDate || null) : null,
       liveDates: primary ? primary.liveDates : [],
       streamDates: primary ? (Array.isArray(primary.streamDates) ? primary.streamDates : []) : [],
-      releaseBenefit: release === 'none' ? 'none' : document.getElementById(`sel-benefit-${m}`).value,
       seatPrices: primary ? primary.seatPrices : {},
       seatOptions: primary ? primary.seatOptions : {},
       additionalLives: liveSlots.slice(1).map(slot => ({
@@ -1643,8 +1634,8 @@ function saveDecisionPlan() {
       productionSchedule[planKey] = plan;
     }
 
-    // 「予定の追加」モード時は、この月の通常会費（ライブ＋イベント＋CD制作費）を累計する。
-    // 追加料として通常会費の1.2倍を保存時に即時徴収する（開催時の自動引き落としは従来どおり別途発生）。
+    // 「予定の追加」モードでは、この月の通常会費（ライブ＋イベント＋CD制作費）を集計する。
+    // 追加料として通常会費の1.2倍を保存時に即時徴収する。
     if (planIsAddMode) {
       let monthStandard = 0;
       if (primary && typeof getLivePlanStandardCost === 'function') {
@@ -1671,10 +1662,10 @@ function saveDecisionPlan() {
     const addFee = Math.round(totalAddStandardCost * 1.2);
     funds -= addFee;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定追加料', addFee);
-    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
+    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
     setLog(`【予定追加料】通常会費 ${formatMoney(totalAddStandardCost)} に対し、追加料 1.2倍（${formatMoney(addFee)}）を徴収しました。`);
   } else {
-    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
+    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   }
   planIsAddMode = false;
 
@@ -1755,6 +1746,7 @@ function renderSaveSlots() {
     const summary = getSaveSlotSummary(slotKey);
     const isCorrupt = summary?.isCorrupt;
     const hasData = Boolean(summary && !isCorrupt);
+    const slotFunds = slot === activeSaveSlot && typeof funds !== 'undefined' ? funds : summary?.funds;
 
     const slotCard = document.createElement('section');
     slotCard.className = 'save-slot';
@@ -1769,7 +1761,8 @@ function renderSaveSlots() {
           : hasData
             ? `${summary.year}年目 ${summary.month}月 第${summary.week}週<br>` +
               `${summary.date ? `${new Date(`${summary.date}T12:00:00`).toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' })}<br>` : ''}` +
-              `所属 ${summary.memberCount}名 / 資金 ${formatMoney(summary.funds)}<br>` +
+              `${slot === 1 ? `<span class="save-slot-current-funds">現在の資金: ${formatMoney(slotFunds)}</span><br>` : ''}` +
+              `所属 ${summary.memberCount}名${slot === 1 ? '' : ` / 資金 ${formatMoney(summary.funds)}`}<br>` +
               `<small style="color:#888;">最終保存: ${summary.savedAt}</small>`
             : '<span style="color:#888;">空き枠</span>'}
       </div>

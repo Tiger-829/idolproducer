@@ -379,7 +379,6 @@ function createInitialProductionSchedule() {
     release: 'single', 
     songName: 'SnowDrops', 
     releaseDate: toDateKey(febWednesday), 
-    releaseBenefit: 'none', 
     liveVenue: null 
   };
 
@@ -387,7 +386,6 @@ function createInitialProductionSchedule() {
     release: 'single', 
     songName: 'アジサイと風鈴', 
     releaseDate: toDateKey(junWednesday), 
-    releaseBenefit: 'none', 
     liveVenue: null 
   };
 

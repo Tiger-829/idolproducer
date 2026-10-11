@@ -149,11 +149,13 @@ function getLivePlanStandardCost(live) {
 }
 
 // --- 通常会費（その他イベント = 会場費のみ）---
-function getEventPlanStandardCost(ev) {
+function getEventPlanStandardCost(ev, eventDates = null) {
   if (!ev || !ev.venue) return 0;
   const venue = (typeof VENUE_DATA !== 'undefined') ? VENUE_DATA.find(v => v.name === ev.venue) : null;
   if (!venue || typeof getVenueFeePerShow !== 'function') return 0;
-  const dates = (Array.isArray(ev.dates) && ev.dates.length > 0)
+  const dates = (Array.isArray(eventDates) && eventDates.length > 0)
+    ? eventDates
+    : (Array.isArray(ev.dates) && ev.dates.length > 0)
     ? ev.dates : (ev.date ? [ev.date] : []);
   const daysCount = dates.length;
   if (daysCount <= 0) return 0;

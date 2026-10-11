@@ -810,14 +810,40 @@ function processPlanEvents(reachDate = gameDate) {
     const eventDates = Array.isArray(entry.event.dates) && entry.event.dates.length
       ? entry.event.dates
       : [entry.event.date];
+    const eventDateGroups = [];
+    eventDates.filter(Boolean).sort().forEach(date => {
+      const previousGroup = eventDateGroups[eventDateGroups.length - 1];
+      const previousDate = previousGroup?.[previousGroup.length - 1];
+      const nextDate = previousDate ? getGameDateObject(previousDate) : null;
+      if (nextDate) nextDate.setDate(nextDate.getDate() + 1);
+      if (previousDate && toDateKey(nextDate) === date) {
+        previousGroup.push(date);
+      } else {
+        eventDateGroups.push([date]);
+      }
+    });
+    const eventDateGroup = eventDateGroups.find(dates => dates.includes(reachDate)) || [];
+    const isEventSessionStart = eventDateGroup[0] === reachDate;
     entry.event.completed = eventDates.every(date => entry.event.completedDates.includes(date));
-    if (isFirstEventDate && type.cost) funds -= type.cost;
+    const venueCost = isEventSessionStart && typeof getEventPlanStandardCost === 'function'
+      ? getEventPlanStandardCost(entry.event, eventDateGroup)
+      : 0;
+    const baseCost = isFirstEventDate ? type.cost : 0;
+    const eventCost = baseCost + venueCost;
+    if (baseCost > 0) {
+      funds -= baseCost;
+      recordMonthlyExpense(`${type.name}（基本費用）`, baseCost);
+    }
+    if (venueCost > 0) {
+      funds -= venueCost;
+      recordMonthlyExpense(`${type.name}（会場使用料）`, venueCost);
+    }
     if (type.kind === 'goods') {
       const goods = sellMerchandiseAtLive();
-      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
     } else {
       const result = recordReleaseBenefitSales(type.profileId || type.id);
-      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（経費: ${formatMoney(type.cost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
     }
   });
 }
@@ -855,16 +881,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     song.releasePromoAlpha = promoAlpha;
     song.firstWeekSales = sales;
     song.salesHistory = [{ weekKey: gameDate, sales }];
-    const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
-    if (benefit) {
-      funds -= benefit.cost;
-      recordMonthlyExpense(`CD特典（${benefit.name}）`, benefit.cost);
-    }
-    const benefitSales = benefit ? recordReleaseBenefitSales(benefit.id) : null;
     plan.releaseCompleted = true;
-    const benefitText = benefit
-      ? ` ${benefit.name}経費: ${formatMoney(benefit.cost)} / 参加メンバー平均完売率 ${Math.round(benefitSales.sellThrough * 100)}%。`
-      : '';
     scheduleInfoMedia('release', {
       releaseType: plan.release,
       songTitle: song.title,
@@ -874,7 +891,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
       releaseDate: formatPlanDayLabel(gameDate),
       centerText: getCurrentCenterText()
     });
-    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！${benefitText}`);
+    setLog(`【発売】${isSingle ? 'シングル' : 'アルバム'}発売！ 売上: ${sales.toLocaleString()}枚！`);
   }
 
   const allLiveEntries = getScheduledLiveEntries();

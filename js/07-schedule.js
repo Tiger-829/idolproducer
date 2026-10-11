@@ -540,12 +540,6 @@ function processReleaseEvents(reachDateStr) {
     song.firstWeekSales = sales;
     song.salesHistory = [{ weekKey: gameDate, sales }];
 
-    const benefit = CD_BENEFITS.find(item => item.id === plan.releaseBenefit);
-    if (benefit) {
-      funds -= benefit.cost;
-      recordMonthlyExpense(`CD特典（${benefit.name}）`, benefit.cost);
-      recordReleaseBenefitSales(benefit.id);
-    }
     plan.releaseCompleted = true;
 
     scheduleInfoMedia('release', {

@@ -1444,13 +1444,16 @@ check('the initial calendar includes the five requested meet-and-greet presets',
     return matches && schedule['1-5'].liveVenue === (INITIAL_LIVE_VENUE || '原宿体育館');
   })()
 `) === true);
-check('a multi-day online meet-and-greet runs both dates and charges one event fee', run(`
+check('separated multi-day meet-and-greet sessions charge each session on its first day', run(`
   (() => {
     const saved = { productionSchedule, funds, recordReleaseBenefitSales, setLog, formatPlanDayLabel };
+    const venue = VENUE_DATA.find(item => item.name.includes('パルス'));
     const event = {
       benefitId: 'online-meeguri', name: 'オンラインミーグリ',
-      date: '2027-03-06', dates: ['2027-03-06', '2027-03-07'], completed: false
+      venue: venue.name,
+      date: '2027-03-06', dates: ['2027-03-06', '2027-03-07', '2027-03-20', '2027-03-21'], completed: false
     };
+    const sessionVenueCost = getEventPlanStandardCost(event, event.dates.slice(0, 2));
     let salesDays = 0;
     try {
       productionSchedule = { '1-3': { planEvents: [event] } };
@@ -1459,9 +1462,14 @@ check('a multi-day online meet-and-greet runs both dates and charges one event f
       setLog = () => {};
       formatPlanDayLabel = date => date;
       processPlanEvents('2027-03-06');
-      const firstDay = !event.completed && funds === 7000000;
+      const firstSession = !event.completed && funds === 10000000 - 3000000 - sessionVenueCost;
       processPlanEvents('2027-03-07');
-      return firstDay && event.completed && funds === 7000000 && salesDays === 2;
+      const secondSessionBefore = funds;
+      processPlanEvents('2027-03-20');
+      const secondSession = funds === secondSessionBefore - sessionVenueCost;
+      processPlanEvents('2027-03-21');
+      return firstSession && secondSession && event.completed
+        && funds === 10000000 - 3000000 - (sessionVenueCost * 2) && salesDays === 4;
     } finally {
       productionSchedule = saved.productionSchedule;
       funds = saved.funds;
