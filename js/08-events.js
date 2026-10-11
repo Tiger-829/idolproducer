@@ -1205,30 +1205,24 @@ function findNearestProgramDate(year, month) {
 }
 
 // ==========================================
-// 定例歌番組オファー生成（CD発売日の1ヶ月前 ＆ 最短曜日調整版）
+// 定例歌番組オファー生成（CD発売日の1ヶ月前）
 // ==========================================
 
-// 指定された基準日（発売日など）から、前後いずれかで最も近い特定の曜日（0:日, 1:月, 2:火, 3:水, 4:木, 5:金, 6:土）の日付（YYYY-MM-DD）を取得する関数
-function getNearestWeekdayDate(baseDateStr, targetWeekday) {
-  const baseDate = new Date(`${baseDateStr}T12:00:00`);
-  if (isNaN(baseDate.getTime())) return null;
+function getMusicProgramAirDate(releaseDateStr, program) {
+  const releaseDate = new Date(`${releaseDateStr}T12:00:00`);
+  if (isNaN(releaseDate.getTime())) return null;
 
-  let bestDate = null;
-  let minDiff = Infinity;
-
-  // 前後7日間の範囲で該当する曜日を探す
-  for (let i = -7; i <= 7; i++) {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() + i);
-    if (d.getDay() === targetWeekday) {
-      const diff = Math.abs(i);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestDate = d;
-      }
-    }
+  if (program.dateRule === 'last-weekday-of-month') {
+    const lastDate = new Date(releaseDate.getFullYear(), releaseDate.getMonth() + 1, 0, 12);
+    lastDate.setDate(lastDate.getDate() - ((lastDate.getDay() - program.weekday + 7) % 7));
+    return toDateKey(lastDate);
   }
-  return bestDate ? toDateKey(bestDate) : null;
+
+  const weekStart = new Date(releaseDate);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)
+    - (program.dateRule === 'previous-week' ? 7 : 0));
+  weekStart.setDate(weekStart.getDate() + program.weekday - 1);
+  return toDateKey(weekStart);
 }
 
 function checkMusicProgramOffers() {
@@ -1258,7 +1252,7 @@ function checkMusicProgramOffers() {
         const offerId = `offer-${plan.releaseDate}-${program.id}`;
         if (!Array.isArray(pendingPerformanceOffers)) pendingPerformanceOffers = [];
         if (!pendingPerformanceOffers.some(o => o && o.id === offerId)) {
-          const airDateKey = getNearestWeekdayDate(plan.releaseDate, program.weekday);
+          const airDateKey = getMusicProgramAirDate(plan.releaseDate, program);
           if (!airDateKey) return;
           const airDateObj = new Date(`${airDateKey}T12:00:00`);
 

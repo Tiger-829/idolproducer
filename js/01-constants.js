@@ -325,10 +325,10 @@ const INDIVIDUAL_EVENT_PROFILES = {
 };
 
 const MUSIC_PROGRAMS = [
-  { id: 'song-station', name: 'Song Station', weekday: 5, week: 2 },
-  { id: 'ctv', name: 'CTV', weekday: 1, week: 3 },
-  { id: 'm-con', name: 'Mコン', weekday: 2, week: 3 },
-  { id: 'hall 109', name: 'Hall 109', weekday: 6, week: 3 }
+  { id: 'song-station', name: 'Song Station', dateRule: 'release-week', weekday: 5 },
+  { id: 'ctv', name: 'CTV', dateRule: 'previous-week', weekday: 1 },
+  { id: 'm-con', name: 'Mコン', dateRule: 'last-weekday-of-month', weekday: 2 },
+  { id: 'hall 109', name: 'Hall 109', dateRule: 'previous-week', weekday: 6 }
 ];
 
 const SPECIAL_BROADCASTS = [

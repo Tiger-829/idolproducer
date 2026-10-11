@@ -48,6 +48,16 @@ check('scheduled release songs use the entered titles', run(`
   ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
     && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
 `));
+check('music programs use their fixed dates relative to the release week', run(`
+  JSON.stringify(Object.fromEntries(MUSIC_PROGRAMS.map(program => [
+    program.name, getMusicProgramAirDate('2027-05-12', program)
+  ]))) === JSON.stringify({
+    'Song Station': '2027-05-14',
+    CTV: '2027-05-03',
+    'Mコン': '2027-05-25',
+    'Hall 109': '2027-05-08'
+  })
+`));
 console.log('initial state:', run('JSON.stringify({ date: gameDate, year: currentYear, month: currentMonth, members: idolRoster.length, selected: idolRoster.filter(m=>m.isSelected).length })'));
 
 console.log('\n--- 1. TV appearance does not block the weekly schedule ---');
