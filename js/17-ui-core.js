@@ -23,6 +23,8 @@ function updateUI() {
     setText('txt-month', typeof currentMonth !== 'undefined' ? currentMonth : 1);
     setText('txt-week', typeof currentWeek !== 'undefined' ? currentWeek : 1);
 
+    if (typeof funds !== 'undefined' && typeof formatMoney === 'function') setText('txt-header-funds', formatMoney(funds));
+
     if (typeof getGameDateObject === 'function') {
       setText('txt-calendar-date', getGameDateObject().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }));
     }
