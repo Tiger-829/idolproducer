@@ -65,6 +65,7 @@ function updateUI() {
         songs, pendingPerformanceOffers, scheduledPerformances, specialOffersSent,
         rivalLiveBookings, managers, managerMarketCandidates, groupFansAtYearStart, previousYearGroupFansAtYearStart,
         yearEndAwardProcessed, yearEndKohakuProcessed, lastLiveDate,
+        fanHistory: Array.isArray(player?.fanHistory) ? player.fanHistory : [],
         weeklySchedule, lastWeekSchedule, savedCleanWeekSchedule, pendingReports, draftState,
         savedAt: Date.now()
       }));

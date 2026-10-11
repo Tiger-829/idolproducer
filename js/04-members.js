@@ -318,6 +318,7 @@ function initializeNewGameState() {
   yearEndAwardProcessed = false;
   yearEndKohakuProcessed = false;
 
+  player = { fanHistory: [] };
   idolRoster = [];
   for (let i = 0; i < 30; i++) {
     const startAge = Math.floor(Math.random() * 9) + 14; // 14〜22歳
@@ -432,6 +433,7 @@ function applySavedGame(data) {
   yearEndAwardProcessed = Boolean(data.yearEndAwardProcessed);
   yearEndKohakuProcessed = Boolean(data.yearEndKohakuProcessed);
   lastLiveDate = data.lastLiveDate || '';
+  player = { fanHistory: Array.isArray(data.fanHistory) ? data.fanHistory : [] };
   weeklyRecoveryDone = false;
   normalizeLeagueTeams();
 }

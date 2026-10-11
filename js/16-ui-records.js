@@ -54,11 +54,12 @@ function buildLineChartSvg(points, options = {}) {
       <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.02" />
     </linearGradient>` : '';
   const fill = gradientId ? `url(#${gradientId})` : 'var(--primary)';
+  const areaPath = options.showFill === false ? '' : `<path d="${area}" fill="${fill}" class="chart-area" />`;
   return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img"
       aria-label="${escapeHtml(options.ariaLabel || '推移グラフ')}">
     <defs>${gradient}</defs>
     ${gridLines}
-    <path d="${area}" fill="${fill}" class="chart-area" />
+    ${areaPath}
     <path d="${line}" fill="none" stroke="var(--primary)" stroke-width="2" class="chart-line" />
     <circle cx="${xAt(lastIndex).toFixed(1)}" cy="${yAt(values[lastIndex]).toFixed(1)}" r="3" fill="var(--primary)" />
     <text x="${padding.left}" y="${height - 4}" class="chart-axis-label">${escapeHtml(list[0].label)}</text>
@@ -93,10 +94,11 @@ function renderSalesTrendChart() {
   }));
 
   chart.innerHTML = `<div style="font-size:11px; color:#555; margin-bottom:4px;">直近曲『${escapeHtml(targetSong.title)}』の推移</div>` +
-    buildLineChartSvg(points, { 
-      gradientId: 'records-sales-gradient', 
+    buildLineChartSvg(points, {
+      gradientId: 'records-sales-gradient',
       ariaLabel: '過去5作CD売上推移',
       showGrid: false,
+      showFill: false,
       unitFormatter: val => `${Math.round(val).toLocaleString()}枚`
     });
 
@@ -170,7 +172,7 @@ function renderFanHistoryTrendChart() {
   container.innerHTML = `
     <div class="records-block-title">過去1年のファン数推移 <small>単位: 千人（直近52週）</small></div>
     <div class="records-chart" style="height:120px;">
-      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', showGrid: false, unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
+      ${buildLineChartSvg(points, { gradientId: 'records-fan-gradient', showGrid: false, showFill: false, unitFormatter: val => `${Math.round(val)}千人`, ariaLabel: '過去1年のファン数推移' })}
     </div>
     <div class="records-chart-note">現在のグループファン数: ${formatFanCount(calculateGroupFans())}</div>
   `;

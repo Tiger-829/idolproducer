@@ -69,6 +69,7 @@ let pendingPerformanceOffers = [];
 let scheduledPerformances = [];
 let specialOffersSent = [];
 let weeklySchedule = {};
+var player = { fanHistory: [] };
 
 // Initialリーグチームを作成する。
 function createInitialLeagueTeams() {

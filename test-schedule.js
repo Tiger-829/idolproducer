@@ -48,6 +48,23 @@ check('scheduled release songs use the entered titles', run(`
   ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
     && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
 `));
+check('fan history survives save and restore and is drawn again', run(`
+  (() => {
+    player.fanHistory = [
+      { date: '2027-05-14', fans: 120000 },
+      { date: '2027-05-21', fans: 135000 }
+    ];
+    activeSaveSlot = 1;
+    updateUI();
+    const saved = JSON.parse(localStorage.getItem(saveSlotKey(1)) || '{}');
+    player.fanHistory = [];
+    applySavedGame(saved);
+    renderFanHistoryTrendChart();
+    return saved.fanHistory?.length === 2
+      && player.fanHistory.length === 2
+      && !!document.querySelector('#records-fan-trend-block svg');
+  })()
+`) === true);
 check('music programs use their fixed dates relative to the release week', run(`
   JSON.stringify(Object.fromEntries(MUSIC_PROGRAMS.map(program => [
     program.name, getMusicProgramAirDate('2027-05-12', program)
