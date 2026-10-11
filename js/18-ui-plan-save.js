@@ -5,6 +5,7 @@
 let planYearTarget = 1;
 let planStartM = 1;
 let planEndM = 6;
+let planAllowPastMonths = false;
 let planMonthEventDrafts = {};
 let planMultiSelectModes = {}; 
 let planCalendarSelections = {}; 
@@ -961,6 +962,26 @@ function openModifyExistingPlansModal() {
     `;
   });
 
+  // 当月〜3か月前の範囲の月に「予定を追加」できるボタンを用意する
+  const addMonthButtons = [];
+  for (let back = 3; back >= 0; back--) {
+    let m = currentM - back;
+    let y = currentY;
+    while (m < 1) { m += 12; y -= 1; }
+    const dispY = gameYearVal + (y - currentY);
+    addMonthButtons.push(
+      `<button type="button" class="ghost-btn" onclick="openAddPlanForMonth(${y}, ${m})" style="padding:4px 8px; font-size:10px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">＋ ${dispY}年${m}月${back === 0 ? '（当月）' : ''}</button>`
+    );
+  }
+  const addMonthHtml = `
+    <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
+      ➕ 予定の追加：当月から3か月前までの月を選んで、その月に予定を追加できます。
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+      ${addMonthButtons.join('')}
+    </div>
+  `;
+
   bodyEl.innerHTML = `
     <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
       ℹ️ ルール：ゲーム内日付から見て半年（180日）以内に開催予定の予定のみ表示されます。<br>
@@ -969,6 +990,7 @@ function openModifyExistingPlansModal() {
       ・3ヶ月〜1ヶ月前：変更不可 / 取消時5割支払い<br>
       ・1ヶ月前以内：変更・取消ともに不可
     </div>
+    ${addMonthHtml}
     ${scheduleItems.length > 0 ? schedulesHtml : '<div style="color:#888; text-align:center; padding:20px;">半年以内に該当する変更可能な確定済み予定はありません。</div>'}
   `;
 
@@ -1064,12 +1086,26 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
   if (typeof updateUI === 'function') updateUI();
 }
 
+// 指定月（ゲーム年yearTarget／月month）に予定を追加するため、その月の計画編集を開く。
+// 「確定済み予定の変更／取消」モーダルから、当月〜3か月前の月に対して呼ばれる。
+function openAddPlanForMonth(yearTarget, month) {
+  closeModifyExistingPlansModal();
+  closeDecisionModal();
+  const dispY = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined')
+    ? calendarYear + (yearTarget - currentYear)
+    : yearTarget;
+  openDecisionModal(`予定の追加（${dispY}年${month}月）`, yearTarget, month, month, true);
+  setLog(`【予定追加】 ${dispY}年${month}月の予定を追加します。`);
+}
+
 // Decisionモーダルを開く。
-function openDecisionModal(title, yearTarget, startM, endM) {
+// allowPastMonths=true のときは、現在月より前の月も編集対象とする（当月〜3か月前への予定追加用）。
+function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false) {
   try {
     planYearTarget = yearTarget;
     planStartM = startM;
     planEndM = endM;
+    planAllowPastMonths = allowPastMonths;
     planMonthEventDrafts = {};
     planMultiSelectModes = {};
     planCalendarSelections = {};
@@ -1135,8 +1171,9 @@ function openDecisionModal(title, yearTarget, startM, endM) {
               const diffDays = Math.round((relDateObj - currentGameDate) / 86400000);
               if (diffDays >= 0 && diffDays <= 180) {
                 const relType = p.release === 'album' ? 'アルバム発売' : 'CD発売';
+                const songLabel = p.songName ? `（${p.songName}）` : '';
                 const dateStr = formatEventDateRange([p.releaseDate], displayY);
-                upcomingSchedules.push(`・${dateStr} ${relType}`);
+                upcomingSchedules.push(`・${dateStr} ${relType}${songLabel}`);
               }
             }
 
@@ -1148,7 +1185,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
               if (diffDays >= 0 && diffDays <= 180) {
                 const dateStr = formatEventDateRange(liveDatesArr, displayY);
                 const liveTitle = p.liveName ? p.liveName : 'ライブ';
-                upcomingSchedules.push(`・${dateStr} ${liveTitle}`);
+                const venueLabel = p.liveVenue ? `（${p.liveVenue}）` : '';
+                upcomingSchedules.push(`・${dateStr} ${liveTitle}${venueLabel}`);
               }
             }
 
@@ -1162,7 +1200,8 @@ function openDecisionModal(title, yearTarget, startM, endM) {
                 if (diffDays >= 0 && diffDays <= 180) {
                   const dateStr = formatEventDateRange(evDatesArr, displayY);
                   const evTitle = ev.name ? ev.name : 'その他イベント';
-                  upcomingSchedules.push(`・${dateStr} ${evTitle}`);
+                  const evVenueLabel = ev.venue ? `（${ev.venue}）` : '';
+                  upcomingSchedules.push(`・${dateStr} ${evTitle}${evVenueLabel}`);
                 }
               });
             }
@@ -1191,7 +1230,7 @@ function openDecisionModal(title, yearTarget, startM, endM) {
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
-    const effectiveStartM = (typeof currentMonth !== 'undefined' && yearTarget === currentYear && currentMonth > startM) ? currentMonth : startM;
+    const effectiveStartM = (!planAllowPastMonths && typeof currentMonth !== 'undefined' && yearTarget === currentYear && currentMonth > startM) ? currentMonth : startM;
 
     for (let m = effectiveStartM; m <= endM; m++) {
       const targetMonthPrefix = `${actualYear}-${String(m).padStart(2, '0')}`;
