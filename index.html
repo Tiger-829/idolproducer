@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="アイドル育成">
 
-  <link rel="stylesheet" href="./styles.css?v=8">
+  <link rel="stylesheet" href="./styles.css?v=9">
 </head>
 <body>
 
@@ -287,6 +287,15 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="tv-report-modal" role="dialog" aria-modal="true" aria-labelledby="tv-report-title">
+  <div class="modal-content tv-report-modal-content">
+    <div class="tv-report-label">📺 TV・メディア報道</div>
+    <h3 class="page-title" id="tv-report-title">活動報告</h3>
+    <div class="tv-report-body" id="tv-report-body"></div>
+    <button class="main-btn" type="button" style="width:100%; margin-top:14px;" onclick="closeTvReportModal()">確認する</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="help-modal">
   <div class="modal-content help-modal-content">
     <h3 class="page-title" style="margin:0 0 8px;">ゲーム説明</h3>
@@ -387,16 +396,17 @@
 <script src="./js/04-members.js?v=8"></script>
 <script src="./js/05-calc.js?v=8"></script>
 <script src="./js/06-progress.js?v=8"></script>
-<script src="./js/07-schedule.js?v=8"></script>
-<script src="./js/08-events.js?v=8"></script>
+<script src="./js/07-schedule.js?v=9"></script>
+<script src="./js/08-events.js?v=9"></script>
 <script src="./js/09-selection-draft.js?v=8"></script>
+<script src="./js/cdproduce.js?v=8"></script>
 <script src="./js/10-ui-navigation.js?v=10"></script>
 <script src="./js/11-ui-group.js?v=10"></script>
 <script src="./js/12-ui-formation.js?v=10"></script>
 <script src="./js/13-ui-office.js?v=10"></script>
 <script src="./js/14-ui-funds.js?v=10"></script>
 <script src="./js/15-ui-ranking.js?v=10"></script>
-<script src="./js/16-ui-records.js?v=10"></script>
+<script src="./js/16-ui-records.js?v=11"></script>
 <script src="./js/17-ui-core.js?v=10"></script>
 <script src="./js/18-ui-plan-save.js?v=10"></script>
 <script src="./js/19-help.js?v=10"></script>

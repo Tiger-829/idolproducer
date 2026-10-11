@@ -227,6 +227,7 @@ function resolveRandomEvent(choiceIndex) {
   if (choice) choice.apply(event.context);
   setLog(`【ランダムイベント】${event.name} / ${fillEventTemplate(choice ? choice.label : '経過', event.context)}`);
   updateUI();
+  openPendingModal();
 }
 
 // ★ 計画イベントエントリ取得関数（ReferenceError防止用に追加）
@@ -448,51 +449,212 @@ function isMonthEndDate(date = getGameDateObject()) {
   return date.getDate() === getDaysInMonth(date.getFullYear(), date.getMonth() + 1);
 }
 
+// 計画リリース日付を求める（releaseDate が無ければ月末の水曜）。
+function getPlanReleaseDateForKey(plan, year, month) {
+  if (plan && plan.releaseDate) return plan.releaseDate;
+  const calYear = (typeof calendarYear !== 'undefined' ? calendarYear : 2026) + (year - currentYear);
+  return toDateKey(getLastWednesday(calYear, month - 1));
+}
+
+// 計画月をキー（例: "1-3"）に還元する。
+function monthKey(year, month) {
+  return `${year}-${month}`;
+}
+
+// 月間レポート（CD発売・ライブ・イベント・放送・収支）を構築する。
+function buildMonthlyReport(year, month) {
+  const report = {
+    year,
+    month,
+    income: (monthlyLedger?.income || []).slice(),
+    expense: (monthlyLedger?.expense || []).slice(),
+    cdReleases: [],
+    liveReports: [],
+    eventReports: [],
+    broadcastReports: [],
+    tvEffects: []
+  };
+
+  const schedule = typeof productionSchedule === 'undefined' ? {} : productionSchedule;
+  const keys = Object.keys(schedule);
+  for (let i = 0; i < keys.length; i++) {
+    const planKey = keys[i];
+    const plan = schedule[planKey];
+    if (!plan) continue;
+    const keyParts = String(planKey).split('-');
+    if (keyParts.length < 2) continue;
+    const planYear = Number(keyParts[0]);
+    const planMonth = Number(keyParts[1]);
+    if (planYear !== year || planMonth !== month) continue;
+    if (plan.release && plan.release !== 'none' && !plan.releaseCompleted) {
+      const song = ensureScheduledSong(planYear, planMonth, plan);
+      report.cdReleases.push({
+        type: plan.release === 'album' ? 'アルバム' : 'シングル',
+        title: song.title,
+        date: plan.releaseDate || getPlanReleaseDateForKey(plan, planYear, planMonth),
+        sales: song.totalSales || 0,
+        firstWeek: song.firstWeekSales || 0,
+        id: song.id
+      });
+    }
+    if (Array.isArray(plan.planEvents)) {
+      for (let e = 0; e < plan.planEvents.length; e++) {
+        const event = plan.planEvents[e];
+        if (!event || !event.date) continue;
+        const eventDate = getGameDateObject(event.date);
+        if (eventDate.getFullYear() !== year || eventDate.getMonth() + 1 !== month) continue;
+        const type = getPlanEventType(event.benefitId, event.name);
+        report.eventReports.push({
+          name: type ? type.name : (event.name || 'イベント'),
+          cost: type ? type.cost : 0,
+          date: event.date,
+          completed: Boolean(event.completed)
+        });
+      }
+    }
+    const monthLiveEntries = (typeof getMonthLiveEntries !== 'function' ? [] : getMonthLiveEntries(plan)).filter(entry => {
+      if (!entry || entry.completed) return false;
+      const entryDate = getLiveEntryDate(entry, planYear, planMonth);
+      return entryDate.getFullYear() === year && entryDate.getMonth() + 1 === month;
+    });
+    for (let l = 0; l < monthLiveEntries.length; l++) {
+      const liveEntry = monthLiveEntries[l];
+      const entryDate = getLiveEntryDate(liveEntry, planYear, planMonth);
+      report.liveReports.push({
+        name: liveEntry.liveName || liveEntry.liveVenue,
+        venue: liveEntry.liveVenue,
+        date: entryDate,
+        isPrimary: liveEntry.isPrimary
+      });
+    }
+  }
+
+  const liveEntries = (typeof getScheduledLiveEntries === 'function') ? getScheduledLiveEntries() : [];
+  for (let i = 0; i < liveEntries.length; i++) {
+    const entry = liveEntries[i];
+    if (!entry || entry.completed) continue;
+    const date = getLiveEntryDate(entry, entry.calendarYear, entry.month);
+    if (date.getFullYear() !== year || date.getMonth() + 1 !== month) continue;
+    report.liveReports.push({
+      name: entry.liveName || entry.liveVenue,
+      venue: entry.liveVenue,
+      date,
+      isPrimary: entry.isPrimary
+    });
+  }
+
+  if (Array.isArray(scheduledPerformances)) {
+    for (let i = 0; i < scheduledPerformances.length; i++) {
+      const performance = scheduledPerformances[i];
+      if (!performance || !performance.airDate) continue;
+      const airDate = getGameDateObject(performance.airDate);
+      if (airDate.getFullYear() !== year || airDate.getMonth() + 1 !== month) continue;
+      report.broadcastReports.push({
+        name: performance.name,
+        date: performance.airDate,
+        isSpecial: Boolean(performance.isSpecial),
+        isInfoMedia: Boolean(performance.isInfoMedia)
+      });
+    }
+  }
+
+  if (Array.isArray(pendingReports)) {
+    for (let i = 0; i < pendingReports.length; i++) {
+      const item = pendingReports[i];
+      if (item.type === 'broadcast' || item.type === 'release' || item.type === 'live') {
+        report.tvEffects.push(item);
+      }
+    }
+  }
+
+  return report;
+}
 function showMonthlyReportModal(report) {
   const modal = document.getElementById('monthly-report-modal');
   const body = document.getElementById('monthly-report-body');
   const title = document.getElementById('monthly-report-title');
   if (!modal || !body || !report) return;
-  title.textContent = `${report.year}年${report.month}月 収支報告`;
+
+  let targetYear = report && typeof report.year === 'number' ? report.year : currentYear;
+  let targetMonth = report && typeof report.month === 'number' ? report.month : currentMonth;
+
+  if (typeof report === 'string') {
+    const parts = report.split('-');
+    if (parts.length === 2) {
+      targetYear = Number(parts[0]);
+      targetMonth = Number(parts[1]);
+    }
+  }
+
+  report = report && typeof report.year === 'number' && typeof report.month === 'number'
+    ? report
+    : buildMonthlyReport(targetYear, targetMonth);
+
+  title.textContent = `${report.year}年${report.month}月 報告`;
 
   const incomeTotal = sumMonthlyLedger(report.income);
   const expenseTotal = sumMonthlyLedger(report.expense);
   const balance = incomeTotal - expenseTotal;
-  const rows = Math.max(report.income.length, report.expense.length);
-  const MAX_ROWS = 8;
-  const start = Math.max(0, rows - MAX_ROWS);
-  const bodyRows = [];
-  for (let i = start; i < rows; i++) {
-    const inc = report.income[i];
-    const exp = report.expense[i];
-    bodyRows.push(`
-      <tr>
-        <td>${inc ? escapeHtml(inc.label) : ''}</td>
-        <td class="num income">${inc ? formatMoney(inc.amount) : ''}</td>
-        <td>${exp ? escapeHtml(exp.label) : ''}</td>
-        <td class="num expense">${exp ? `-${formatMoney(exp.amount)}` : ''}</td>
-      </tr>`);
-  }
-  const omitted = start > 0 ? `<tr class="omitted"><td colspan="4">…ほか ${start} 件</td></tr>` : '';
-  const emptyRow = rows === 0 ? '<tr><td colspan="4" style="text-align:center; color:#888;">この月の収支はありません</td></tr>' : '';
+
+  const yens = v => `${v > 0 ? '+' : ''}${formatMoney(v)}`;
+  const minus = v => `-${formatMoney(v)}`;
+
+  const renderSection = (heading, icon, items, renderer) => {
+    if (!items || items.length === 0) return '';
+    const rows = items.map(item => renderer(item)).join('');
+    return `
+      <section class="monthly-report-section">
+        <h4 class="monthly-report-section-title">${icon} ${escapeHtml(heading)}</h4>
+        <div class="monthly-report-list">${rows}</div>
+      </section>`;
+  };
+
+  const renderCdRelease = item => `
+    <div class="monthly-report-row">
+      <span class="monthly-report-tag monthly-report-release">📀 ${escapeHtml(item.type)}</span>
+      <span class="monthly-report-name">${escapeHtml(item.title)}</span>
+      <span class="monthly-report-meta">${formatPlanDayLabel(item.date)}</span>
+      <span class="monthly-report-value">${item.sales ? item.sales.toLocaleString() : '—'} 枚</span>
+      <span class="monthly-report-value monthly-report-firstweek">${item.firstWeek ? item.firstWeek.toLocaleString() : '—'} 枚（初週）</span>
+    </div>`;
+  const renderLive = item => `
+    <div class="monthly-report-row">
+      <span class="monthly-report-tag monthly-report-live">🎤 ライブ</span>
+      <span class="monthly-report-name">${escapeHtml(item.name)}（${escapeHtml(item.venue || '—')}）</span>
+      <span class="monthly-report-meta">${formatPlanDayLabel(item.date)}</span>
+    </div>`;
+  const renderEvent = item => `
+    <div class="monthly-report-row">
+      <span class="monthly-report-tag monthly-report-event">🎁 企画配信</span>
+      <span class="monthly-report-name">${escapeHtml(item.name)}</span>
+      <span class="monthly-report-meta">${formatPlanDayLabel(item.date)}</span>
+      <span class="monthly-report-value">${item.cost ? yens(item.cost) : '—'}</span>
+    </div>`;
+  const renderBroadcast = item => `
+    <div class="monthly-report-row">
+      <span class="monthly-report-tag ${item.isSpecial ? 'monthly-report-broadcast-special' : ''}">${item.isInfoMedia ? '📰 メディア' : '📺 テレビ'}</span>
+      <span class="monthly-report-name">${escapeHtml(item.name)}</span>
+      <span class="monthly-report-meta">${formatPlanDayLabel(item.date)}</span>
+    </div>`;
 
   body.innerHTML = `
-    <table class="monthly-report-table">
-      <thead><tr><th>収入</th><th class="num">金額</th><th>支出</th><th class="num">金額</th></tr></thead>
-      <tbody>${emptyRow}${omitted}${bodyRows.join('')}</tbody>
-      <tfoot>
-        <tr>
-          <th>計</th>
-          <th class="num income">${formatMoney(incomeTotal)}</th>
-          <th>計</th>
-          <th class="num expense">-${formatMoney(expenseTotal)}</th>
-        </tr>
-      </tfoot>
-    </table>
-    <p class="monthly-report-balance ${balance >= 0 ? 'is-profit' : 'is-loss'}">
-      収支 ${balance >= 0 ? '+' : '-'}${formatMoney(Math.abs(balance))}
-      <small>（${balance >= 0 ? '黒字' : '赤字'}）</small>
-    </p>`;
+    <div class="monthly-report-header">
+      <h2 class="monthly-report-title">${report.year}年${report.month}月 報告</h2>
+      <button type="button" class="main-btn" onclick="closeMonthlyReportModal()" style="margin-top:8px;">閉じる</button>
+    </div>
+    ${renderSection('CD発売・関連イベント', '💿', report.cdReleases.concat(report.eventReports.filter(e => e.type === 'cd_release' || e.type === 'benefit' || e.cost > 0), []), renderCdRelease)}
+    ${renderSection('ライブ公演', '🎤', report.liveReports, renderLive)}
+    ${renderSection('イベント', '🎁', report.eventReports, renderEvent)}
+    ${renderSection('テレビ放送・メディア', '📺', report.broadcastReports.concat(report.tvEffects || []), renderBroadcast)}
+    <section class="monthly-report-section">
+      <h4 class="monthly-report-section-title">📊 収支まとめ</h4>
+      <div class="monthly-report-summary">
+        <div class="monthly-report-summary-row"><span>収入</span><strong class="num">${formatMoney(incomeTotal)}</strong></div>
+        <div class="monthly-report-summary-row"><span>支出</span><strong class="num">-${formatMoney(expenseTotal)}</strong></div>
+        <div class="monthly-report-summary-row monthly-report-summary-total"><span>収支</span><strong class="num ${balance >= 0 ? 'plus' : 'minus'}">${yens(balance)}</strong></div>
+      </div>
+    </section>`;
+
   modal.style.display = 'flex';
 }
 
@@ -1433,28 +1595,48 @@ function processScheduledPerformances(reachDate = null) {
   if (logs.length) setLog(logs.join(' '));
 }
 
-function checkSenbatsuTrigger() {
-  if (!isFirstWednesdayOfMonth()) return;
+// CD発売週の1か月前の週に属する日曜日（選抜発表日）を求める。
+// 週は日曜始まり（日曜=getDay()0）で、その週の日曜日を発表日とする。
+function getSenbatsuAnnouncementSunday(releaseDateStr) {
+  const release = getGameDateObject(releaseDateStr);
+  const oneMonthBefore = new Date(release);
+  oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1);
+  const sunday = new Date(oneMonthBefore);
+  sunday.setDate(sunday.getDate() - sunday.getDay()); // 0=日曜
+  return toDateKey(sunday);
+}
+
+// 計画キーの年・月から発売日を求める（releaseDate が無ければ月末の水曜）。
+function getPlanReleaseDateForKey(plan, year, month) {
+  if (plan && plan.releaseDate) return plan.releaseDate;
+  const calYear = (typeof calendarYear !== 'undefined' ? calendarYear : 2026) + (year - currentYear);
+  return toDateKey(getLastWednesday(calYear, month - 1));
+}
+
+// 選抜発表トリガー。CD発売週の1か月前の週に属する日曜日に発表する。
+function checkSenbatsuTrigger(date = getGameDateObject()) {
   if (pendingSelectionEvent) return;
-  const targetDate = getGameDateObject();
-  targetDate.setDate(targetDate.getDate() + SENBATSU_LEAD_DAYS);
-  const targetYear = currentYear + targetDate.getFullYear() - calendarYear;
-  const targetMonth = targetDate.getMonth() + 1;
-  const targetKey = `${targetYear}-${targetMonth}`;
-
-  const plan = productionSchedule[targetKey];
-  if (!plan || !plan.release || plan.release === 'none') return;
-  if (plan.senbatsuAnnounced) return;
-  plan.senbatsuAnnounced = true;
-
-  selectionLock = null;
-
-  pendingSelectionEvent = createSelectionEvent({
-    trigger: 'release',
-    year: targetYear,
-    month: targetMonth,
-    releaseType: plan.release
-  });
+  if (date.getDay() !== 0) return; // 日曜日のみ発表
+  const todayKey = toDateKey(date);
+  for (let y = currentYear; y <= currentYear + 1; y++) {
+    for (let m = 1; m <= 12; m++) {
+      if (y === currentYear && m < currentMonth) continue;
+      const key = `${y}-${m}`;
+      const plan = productionSchedule[key];
+      if (!plan || !plan.release || plan.release === 'none' || plan.senbatsuAnnounced) continue;
+      const releaseDate = getPlanReleaseDateForKey(plan, y, m);
+      if (getSenbatsuAnnouncementSunday(releaseDate) !== todayKey) continue;
+      plan.senbatsuAnnounced = true;
+      selectionLock = null;
+      pendingSelectionEvent = createSelectionEvent({
+        trigger: 'release',
+        year: y,
+        month: m,
+        releaseType: plan.release
+      });
+      return;
+    }
+  }
 }
 
 function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, releaseType = null } = {}) {

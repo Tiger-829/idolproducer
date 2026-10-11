@@ -6,6 +6,7 @@ let planYearTarget = 1;
 let planStartM = 1;
 let planEndM = 6;
 let planAllowPastMonths = false;
+let planIsAddMode = false;
 let planMonthEventDrafts = {};
 let planMultiSelectModes = {}; 
 let planCalendarSelections = {}; 
@@ -878,6 +879,8 @@ function openModifyExistingPlansModal() {
             pKey,
             dateStr: p.releaseDate || relDateStr,
             sortDate: relDateStr,
+            kind: 'release',
+            standardCost: (typeof getCdPlanStandardCost === 'function') ? getCdPlanStandardCost(p) : 0,
             label: `${dateStr} ${relType}${songLabel}`
           });
         }
@@ -896,6 +899,8 @@ function openModifyExistingPlansModal() {
             pKey,
             dateStr: firstLiveDate,
             sortDate: firstLiveDate,
+            kind: 'live',
+            standardCost: (typeof getLivePlanStandardCost === 'function') ? getLivePlanStandardCost(p) : 0,
             label: `${dateStr} ${liveTitle}`
           });
         }
@@ -916,6 +921,8 @@ function openModifyExistingPlansModal() {
               pKey,
               dateStr: firstAlDate,
               sortDate: firstAlDate,
+              kind: 'live',
+              standardCost: (typeof getLivePlanStandardCost === 'function') ? getLivePlanStandardCost(al) : 0,
               label: `${dateStr} ${liveTitle}`
             });
           }
@@ -937,6 +944,8 @@ function openModifyExistingPlansModal() {
               pKey,
               dateStr: firstEvDate,
               sortDate: firstEvDate,
+              kind: 'event',
+              standardCost: (typeof getEventPlanStandardCost === 'function') ? getEventPlanStandardCost(ev) : 0,
               label: `${dateStr} ${evTitle}`
             });
           }
@@ -955,27 +964,27 @@ function openModifyExistingPlansModal() {
           ${item.label}
         </div>
         <div style="display:flex; gap:6px;">
-          <button class="main-btn" type="button" onclick="requestModifyExistingPlan('${item.pKey}', '${item.dateStr}', 1)" style="padding:4px 8px; font-size:10px;">変更</button>
-          <button class="danger-btn" type="button" onclick="requestCancelExistingPlan('${item.pKey}', '${item.dateStr}')" style="padding:4px 8px; font-size:10px;">取消</button>
+          <button class="main-btn" type="button" onclick="requestModifyExistingPlan('${item.pKey}', '${item.dateStr}', 1, ${item.standardCost || 0})" style="padding:4px 8px; font-size:10px;">変更</button>
+          <button class="danger-btn" type="button" onclick="requestCancelExistingPlan('${item.pKey}', '${item.dateStr}', ${item.standardCost || 0})" style="padding:4px 8px; font-size:10px;">取消</button>
         </div>
       </div>
     `;
   });
 
-  // 当月〜3か月前の範囲の月に「予定を追加」できるボタンを用意する
+  // 3か月先〜6か月先の範囲の月に「予定を追加」できるボタンを用意する
   const addMonthButtons = [];
-  for (let back = 3; back >= 0; back--) {
-    let m = currentM - back;
+  for (let fwd = 3; fwd <= 6; fwd++) {
+    let m = currentM + fwd;
     let y = currentY;
-    while (m < 1) { m += 12; y -= 1; }
+    while (m > 12) { m -= 12; y += 1; }
     const dispY = gameYearVal + (y - currentY);
     addMonthButtons.push(
-      `<button type="button" class="ghost-btn" onclick="openAddPlanForMonth(${y}, ${m})" style="padding:4px 8px; font-size:10px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">＋ ${dispY}年${m}月${back === 0 ? '（当月）' : ''}</button>`
+      `<button type="button" class="ghost-btn" onclick="openAddPlanForMonth(${y}, ${m})" style="padding:4px 8px; font-size:10px; background:#fff; border:1px solid var(--primary); color:var(--primary); border-radius:4px; cursor:pointer;">＋ ${dispY}年${m}月</button>`
     );
   }
   const addMonthHtml = `
     <div style="font-size:11px; color:#666; line-height:1.4; background:#fdf2f4; padding:8px; border-radius:6px;">
-      ➕ 予定の追加：当月から3か月前までの月を選んで、その月に予定を追加できます。
+      ➕ 予定の追加：3か月先〜6か月先の月を選んで、その月に予定を追加できます。追加時は通常会費の1.2倍の費用がかかります。
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:6px;">
       ${addMonthButtons.join('')}
@@ -1002,7 +1011,7 @@ function closeModifyExistingPlansModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function requestModifyExistingPlan(pKey, targetDateStr, month) {
+function requestModifyExistingPlan(pKey, targetDateStr, month, standardCost = 0) {
   if (!targetDateStr) {
     alert('対象の日付が不明なため変更できません。');
     return;
@@ -1021,29 +1030,34 @@ function requestModifyExistingPlan(pKey, targetDateStr, month) {
     return;
   }
 
-  let addFeeRate = 0; 
+  let addFeeRate = 0;
   let rangeStr = '半年後以降';
   if (diffDays <= 180) {
-    addFeeRate = 0.2; 
+    addFeeRate = 0.2;
     rangeStr = '半年〜3ヶ月前';
   }
 
+  const addFee = Math.round((standardCost || 0) * addFeeRate);
   let msg = `【予定の変更 (${rangeStr})】\nこの予定の変更を行います。続行しますか？`;
   if (addFeeRate > 0) {
-    msg = `【予定の変更 (${rangeStr})】\nこの予定の変更を行います。\n手数料として、変更に伴う費用に ${addFeeRate * 100}% の追加料金が適用されます。続行しますか？`;
+    msg = `【予定の変更 (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、手数料として ${addFeeRate * 100}%（${formatMoney(addFee)}）の追加料金が徴収されます。続行しますか？`;
   }
 
   if (!confirm(msg)) {
     return;
   }
 
+  if (addFee > 0) {
+    funds -= addFee;
+    if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定変更手数料', addFee);
+  }
   closeModifyExistingPlansModal();
   closeDecisionModal();
   openDecisionModal(`予定の変更・再調整`, planYearTarget, month, month);
-  setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。`);
+  setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。${addFee > 0 ? `（手数料 ${formatMoney(addFee)} 徴収）` : ''}`);
 }
 
-function requestCancelExistingPlan(pKey, targetDateStr) {
+function requestCancelExistingPlan(pKey, targetDateStr, standardCost = 0) {
   if (!targetDateStr) {
     alert('対象の日付が不明なため処理できません。');
     return;
@@ -1057,55 +1071,63 @@ function requestCancelExistingPlan(pKey, targetDateStr) {
     return;
   }
 
-  let penaltyRate = 0; 
+  let penaltyRate = 0;
   let rangeStr = '半年後以降';
   if (diffDays <= 90) {
-    penaltyRate = 0.5; 
+    penaltyRate = 0.5;
     rangeStr = '3ヶ月〜1ヶ月前';
   } else if (diffDays <= 180) {
-    penaltyRate = 0.3; 
+    penaltyRate = 0.3;
     rangeStr = '半年〜3ヶ月前';
   }
 
+  const penalty = Math.round((standardCost || 0) * penaltyRate);
   let msg = `【予定の取り消し (${rangeStr})】\nこの予定を取り消します。ペナルティなしで実行しますか？`;
   if (penaltyRate > 0) {
-    msg = `【予定の取り消し (${rangeStr})】\nこの予定を取り消します。\nペナルティとして、取消料（違約金）として費用の一部（${penaltyRate * 100}％）が徴収されます。実行しますか？`;
+    msg = `【予定の取り消し (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、キャンセル料として ${penaltyRate * 100}％（${formatMoney(penalty)}）が徴収されます。実行しますか？`;
   }
 
   if (!confirm(msg)) {
     return;
   }
 
+  if (penalty > 0) {
+    funds -= penalty;
+    if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定取消料', penalty);
+  }
   if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
     delete productionSchedule[pKey];
   }
 
-  setLog(`【予定取消】 ${pKey} の予定を取り消しました。`);
+  setLog(`【予定取消】 ${pKey} の予定を取り消しました。${penalty > 0 ? `（キャンセル料 ${formatMoney(penalty)} 徴収）` : ''}`);
   alert('予定を取り消しました。');
   closeModifyExistingPlansModal();
   if (typeof updateUI === 'function') updateUI();
 }
 
 // 指定月（ゲーム年yearTarget／月month）に予定を追加するため、その月の計画編集を開く。
-// 「確定済み予定の変更／取消」モーダルから、当月〜3か月前の月に対して呼ばれる。
+// 「確定済み予定の変更／取消」モーダルから、3か月先〜6か月先の月に対して呼ばれる。
+// 追加モードでは、保存時に通常会費の1.2倍の追加料を徴収する。
 function openAddPlanForMonth(yearTarget, month) {
   closeModifyExistingPlansModal();
   closeDecisionModal();
   const dispY = (typeof calendarYear !== 'undefined' && typeof currentYear !== 'undefined')
     ? calendarYear + (yearTarget - currentYear)
     : yearTarget;
-  openDecisionModal(`予定の追加（${dispY}年${month}月）`, yearTarget, month, month, true);
-  setLog(`【予定追加】 ${dispY}年${month}月の予定を追加します。`);
+  openDecisionModal(`予定の追加（${dispY}年${month}月）`, yearTarget, month, month, true, true);
+  setLog(`【予定追加】 ${dispY}年${month}月の予定を追加します。保存時に通常会費の1.2倍の追加料が徴収されます。`);
 }
 
 // Decisionモーダルを開く。
 // allowPastMonths=true のときは、現在月より前の月も編集対象とする（当月〜3か月前への予定追加用）。
-function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false) {
+// isAddMode=true のときは「予定の追加」モード。保存時に通常会費の1.2倍の追加料を徴収する。
+function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false, isAddMode = false) {
   try {
     planYearTarget = yearTarget;
     planStartM = startM;
     planEndM = endM;
     planAllowPastMonths = allowPastMonths;
+    planIsAddMode = isAddMode;
     planMonthEventDrafts = {};
     planMultiSelectModes = {};
     planCalendarSelections = {};
@@ -1575,6 +1597,7 @@ function validatePlanLiveSlots(month, liveSlots) {
 // Decision計画を保存する。
 function saveDecisionPlan() {
   const maxVenues = 8;
+  let totalAddStandardCost = 0;
 
   for (let m = planStartM; m <= planEndM; m++) {
     const release = document.getElementById(`sel-rel-${m}`).value;
@@ -1619,12 +1642,42 @@ function saveDecisionPlan() {
     if (typeof productionSchedule !== 'undefined') {
       productionSchedule[planKey] = plan;
     }
+
+    // 「予定の追加」モード時は、この月の通常会費（ライブ＋イベント＋CD制作費）を累計する。
+    // 追加料として通常会費の1.2倍を保存時に即時徴収する（開催時の自動引き落としは従来どおり別途発生）。
+    if (planIsAddMode) {
+      let monthStandard = 0;
+      if (primary && typeof getLivePlanStandardCost === 'function') {
+        monthStandard += getLivePlanStandardCost(primary);
+      }
+      if (Array.isArray(plan.additionalLives) && typeof getLivePlanStandardCost === 'function') {
+        plan.additionalLives.forEach(al => { monthStandard += getLivePlanStandardCost(al); });
+      }
+      if (Array.isArray(plan.planEvents) && typeof getEventPlanStandardCost === 'function') {
+        plan.planEvents.forEach(ev => { monthStandard += getEventPlanStandardCost(ev); });
+      }
+      if (release && release !== 'none' && typeof getCdPlanStandardCost === 'function') {
+        monthStandard += getCdPlanStandardCost(plan);
+      }
+      totalAddStandardCost += monthStandard;
+    }
   }
 
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
-  setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
-  
+
+  // 「予定の追加」モードでは通常会費の1.2倍の追加料を保存時に即時徴収する。
+  if (planIsAddMode && totalAddStandardCost > 0) {
+    const addFee = Math.round(totalAddStandardCost * 1.2);
+    funds -= addFee;
+    if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定追加料', addFee);
+    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
+    setLog(`【予定追加料】通常会費 ${formatMoney(totalAddStandardCost)} に対し、追加料 1.2倍（${formatMoney(addFee)}）を徴収しました。`);
+  } else {
+    setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。（経費は各イベント開催日半年前の月末に自動引き落としされます）`);
+  }
+  planIsAddMode = false;
+
   if (typeof updateUI === 'function') {
     updateUI();
   }

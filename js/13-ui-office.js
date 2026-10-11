@@ -570,6 +570,7 @@ function renderGameCalendar() {
           <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(-1)" ${canPrev ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canPrev ? 'pointer' : 'default'};">＜</button>
           <strong>${year}年${actualMonthNum}月</strong>
           <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(1)" ${canNext ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canNext ? 'pointer' : 'default'};">＞</button>
+          <button type="button" class="ghost-btn small" onclick="showMonthlyReportModal('${year}-${actualMonthNum}')" style="padding:2px 8px; font-size:12px; margin-left:4px;">📋 報告</button>
         </div>
         <div class="calendar-grid">${cells}</div>
       </div>

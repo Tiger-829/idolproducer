@@ -138,6 +138,8 @@ function processDailyFlow(fromDate, toDate) {
   processPlanEvents(toDateStr);
   processReleaseEvents(toDateStr);
   processLiveEvents(fromDate, toDate);
+  // 選抜発表はCD発売週の1か月前の週に属する日曜日に行う（日次で判定）
+  checkSenbatsuTrigger(toDate);
 
   if (typeof processScheduledPerformances === 'function') {
     processScheduledPerformances(toDateStr);
@@ -465,6 +467,12 @@ function openNextPendingReport() {
     }
     return true;
   }
+  if (item.type === "tv-report") {
+    if (typeof showTvReportModal === 'function') {
+      showTvReportModal(item.report || item);
+    }
+    return true;
+  }
   return false;
 }
 
@@ -502,6 +510,15 @@ function processReleaseEvents(reachDateStr) {
     const isSingle = (plan.release === 'single');
     const song = ensureScheduledSong(currentYear, currentMonth, plan);
 
+    // CD制作費を発売時に引き落とす（未徴収のみ）。基本費用÷合計制作費を初週売上バフに使う。
+    if (typeof deductCdProductionCostIfDue === 'function') {
+      const cdCost = deductCdProductionCostIfDue(plan);
+      if (cdCost > 0) {
+        setLog(`【CD制作費】『${song.title}』の制作費 ${formatMoney(cdCost)} を発売に伴い徴収しました。`);
+      }
+    }
+    const cdSalesBuff = (typeof getCdProductionSalesBuff === 'function') ? getCdProductionSalesBuff(plan.cdProduction) : 1;
+
     const F = calculateGroupFans();
     const baseFirstWeek = calculateFanBasedSales(F, 0);
 
@@ -512,7 +529,7 @@ function processReleaseEvents(reachDateStr) {
     const typeFactor = isSingle ? 1.0 : 0.7;
     const randomFactor = 0.95 + Math.random() * 0.10;
 
-    const sales = Math.round(baseFirstWeek * qualityMultiplier * songLevelMultiplier * promoMultiplier * typeFactor * randomFactor);
+    const sales = Math.round(baseFirstWeek * qualityMultiplier * songLevelMultiplier * promoMultiplier * typeFactor * randomFactor * cdSalesBuff);
 
     addGroupSales(sales);
     addMonthlyCdRevenue(sales * getSongUnitPrice(song));
@@ -577,7 +594,6 @@ function processWeeklyCycle(toDate) {
   }
 
   const summary = calculateTeamAverages();
-  checkSenbatsuTrigger();
   checkMusicProgramOffers();
   resolveIndustryOffer();
   trainSongs(summary);

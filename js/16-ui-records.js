@@ -420,3 +420,69 @@ function playTvEventEffect(kind, title) {
   layer.appendChild(card);
   setTimeout(() => card.remove(), 2600);
 }
+
+function playTvEffectFromLog(message) {
+  const text = String(message || '');
+  const hasLabel = label => text.includes(`【${label}】`);
+  const isRandomEvent = hasLabel('ランダムイベント');
+  const isRelease = hasLabel('発売');
+  const isLive = /【ライブ[^】]*】|【イベント出演】/.test(text);
+  const isSpecialBroadcast = hasLabel('大型特番');
+  const isBroadcast = hasLabel('テレビ出演');
+  const infoMedia = typeof INFO_MEDIA !== 'undefined'
+    ? Object.values(INFO_MEDIA).find(media => media.label && hasLabel(media.label))
+    : null;
+  const benefitEvent = typeof BENEFIT_EVENT_TYPE_OPTIONS !== 'undefined'
+    ? BENEFIT_EVENT_TYPE_OPTIONS.find(event => event.name && hasLabel(event.name))
+    : null;
+
+  let title = '';
+  let cardKind = '';
+  if (isRandomEvent) {
+    title = 'ランダムイベント結果';
+  } else if (isRelease) {
+    title = 'CD発売報告';
+  } else if (isLive) {
+    title = 'ライブ・イベント報告';
+  } else if (isSpecialBroadcast) {
+    title = '大型特番出演報告';
+    cardKind = 'special';
+  } else if (isBroadcast) {
+    title = 'テレビ出演報告';
+    cardKind = 'broadcast';
+  } else if (infoMedia) {
+    title = `${infoMedia.label}の報道`;
+    cardKind = 'info';
+  } else if (benefitEvent) {
+    title = 'CD関連イベント報告';
+  } else {
+    return;
+  }
+
+  if (cardKind) playTvEventEffect(cardKind, text);
+  if (!Array.isArray(pendingReports)) pendingReports = [];
+  pendingReports.push({
+    type: 'tv-report',
+    report: {
+      title,
+      text
+    }
+  });
+}
+
+function showTvReportModal(report) {
+  const modal = document.getElementById('tv-report-modal');
+  const title = document.getElementById('tv-report-title');
+  const body = document.getElementById('tv-report-body');
+  if (!modal || !title || !body || !report) return;
+
+  title.textContent = report.title || '活動報告';
+  body.textContent = report.text || '';
+  modal.style.display = 'flex';
+}
+
+function closeTvReportModal() {
+  const modal = document.getElementById('tv-report-modal');
+  if (modal) modal.style.display = 'none';
+  if (typeof resumeProgressAfterReport === 'function') resumeProgressAfterReport();
+}

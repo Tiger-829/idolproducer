@@ -927,6 +927,25 @@ check('ordinary logs play no effect', run(`
     return document.querySelectorAll('.tv-fx-card').length === 0;
   })()
 `) === true);
+check('CD, live, and random-event logs queue readable report modals', run(`
+  (() => {
+    pendingReports = [];
+    playTvEffectFromLog('【発売】シングル『光』発売！ 初週売上: 12,000枚！');
+    playTvEffectFromLog('【ライブ千秋楽】初ライブ（ホール / 動員 1,000人 / 収支 +1,000,000円）');
+    playTvEffectFromLog('【ランダムイベント】日常投稿がバズる / 宣伝する');
+    const queued = pendingReports.length === 3
+      && pendingReports[0].report.title === 'CD発売報告'
+      && pendingReports[1].report.title === 'ライブ・イベント報告'
+      && pendingReports[2].report.title === 'ランダムイベント結果';
+    openNextPendingReport();
+    const shown = document.getElementById('tv-report-modal').style.display === 'flex'
+      && document.getElementById('tv-report-title').textContent === 'CD発売報告'
+      && document.getElementById('tv-report-body').textContent.includes('12,000枚');
+    document.getElementById('tv-report-modal').style.display = 'none';
+    pendingReports = [];
+    return queued && shown;
+  })()
+`) === true);
 
 // ---- ドラフト：他チームの指名履歴・落選時の再指名 ----
 // 1巡目は「回転パネル」を先に通すため、指名パネルを出すヘルパーを用意する

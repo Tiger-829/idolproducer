@@ -15,6 +15,7 @@ const ASSETS = [
   './js/07-schedule.js',
   './js/08-events.js',
   './js/09-selection-draft.js',
+  './js/cdproduce.js',
   './js/10-ui-navigation.js',
   './js/11-ui-group.js',
   './js/12-ui-formation.js',

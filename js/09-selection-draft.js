@@ -85,6 +85,8 @@ function confirmSelection() {
   });
   const center = idolRoster.find(member => member.id === centerId);
   const isRelease = pendingSelectionEvent.trigger === 'release';
+  const eventYear = pendingSelectionEvent.year;
+  const eventMonth = pendingSelectionEvent.month;
   // 発表で確定した場合は、次作の発表まで変更不可になる
   if (isRelease) {
     lockSelection(pendingSelectionEvent.year, pendingSelectionEvent.month, pendingSelectionEvent.releaseType);
@@ -97,6 +99,16 @@ function confirmSelection() {
     ? `【選抜決定】センターは【${center ? center.name : '未定'}】！ ${ids.size}名の選抜体制を敷きました。`
     : `【編成変更】センターは【${center ? center.name : '未定'}】！ ${ids.size}名の選抜に変更しました。`);
   updateUI();
+
+  // リリース選抜の確定後は、CD制作の内訳（収録曲数・MV・制作費）を決定するモーダルを開く
+  if (isRelease && typeof openCdProductionModal === 'function') {
+    const planKey = `${eventYear}-${eventMonth}`;
+    const plan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) ? productionSchedule[planKey] : null;
+    const leadTitle = (plan && plan.songName) || '';
+    const existing = (plan && plan.cdProduction) ? plan.cdProduction : createDefaultCdProduction(leadTitle);
+    cdProductionTargetPlanKey = planKey;
+    openCdProductionModal(existing);
+  }
 }
 
 // 選抜を取消。
