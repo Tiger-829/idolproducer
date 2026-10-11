@@ -67,13 +67,79 @@ function buildLineChartSvg(points, options = {}) {
   </svg>`;
 }
 
-// ① 過去5作CD売上の推移
+// 複数系列（曲）を色分けして重ね描きする折れ線グラフのSVGを生成する。
+// seriesList: [{ name, color, points: [{ weekKey, value }] }]
+// 横軸は「日付」（全系列の週キーの集合）で、1年間の売上推移を時系列で比較できる。
+function buildMultiLineChartSvg(seriesList, options = {}) {
+  const width = options.width || 320;
+  const height = options.height || 120;
+  const padding = { top: 8, right: 8, bottom: 22, left: 45 };
+  const series = (seriesList || [])
+    .filter(s => s && Array.isArray(s.points) && s.points.length)
+    .map(s => ({
+      name: s.name || '無題',
+      color: s.color || 'var(--primary)',
+      points: s.points
+        .filter(p => p && typeof p.weekKey === 'string')
+        .map(p => ({ weekKey: p.weekKey, value: Math.max(0, Number(p.value) || 0) }))
+    }))
+    .filter(s => s.points.length);
+
+  const weekKeys = [...new Set(series.flatMap(s => s.points.map(p => p.weekKey)))].sort();
+  if (weekKeys.length < 2) return '<div class="chart-empty">データが集まると表示されます</div>';
+
+  const indexOf = new Map(weekKeys.map((key, i) => [key, i]));
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const max = Math.max(1, ...series.flatMap(s => s.points.map(p => p.value)));
+  const xAt = i => padding.left + (i / (weekKeys.length - 1)) * innerW;
+  const yAt = v => padding.top + innerH - (v / max) * innerH;
+
+  const gridLines = [0, 0.5, 1].map(ratio => {
+    const y = (padding.top + innerH - ratio * innerH).toFixed(1);
+    const rawVal = max * ratio;
+    const label = options.unitFormatter ? options.unitFormatter(rawVal) : formatMoney(Math.round(rawVal));
+    const gridLine = options.showGrid === false ? '' : `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" class="chart-grid" />`;
+    return `${gridLine}<text x="${padding.left - 4}" y="${Number(y) + 3}" class="chart-axis-label" text-anchor="end">${escapeHtml(label)}</text>`;
+  }).join('');
+
+  const lines = series.map(s => {
+    const pts = s.points
+      .map(p => ({ i: indexOf.get(p.weekKey), v: p.value }))
+      .filter(p => Number.isFinite(p.i))
+      .sort((a, b) => a.i - b.i);
+    if (!pts.length) return '';
+    if (pts.length < 2) {
+      const p = pts[0];
+      return `<circle cx="${xAt(p.i).toFixed(1)}" cy="${yAt(p.v).toFixed(1)}" r="3" fill="${s.color}" />`;
+    }
+    const d = pts.map((p, idx) => `${idx ? 'L' : 'M'}${xAt(p.i).toFixed(1)},${yAt(p.v).toFixed(1)}`).join(' ');
+    const lastPt = pts[pts.length - 1];
+    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" class="chart-line" />` +
+      `<circle cx="${xAt(lastPt.i).toFixed(1)}" cy="${yAt(lastPt.v).toFixed(1)}" r="3" fill="${s.color}" />`;
+  }).join('');
+
+  const firstLabel = formatChartWeekLabel(weekKeys[0]);
+  const lastLabel = formatChartWeekLabel(weekKeys[weekKeys.length - 1]);
+
+  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img"
+      aria-label="${escapeHtml(options.ariaLabel || '推移グラフ')}">
+    ${gridLines}
+    ${lines}
+    <text x="${padding.left}" y="${height - 4}" class="chart-axis-label">${escapeHtml(firstLabel)}</text>
+    <text x="${width - padding.right}" y="${height - 4}" class="chart-axis-label" text-anchor="end">${escapeHtml(lastLabel)}</text>
+  </svg>`;
+}
+
+// ① 過去5作CD売上の推移（曲ごとに色分けした折れ線を重ね描き）
+const SALES_SERIES_COLORS = ['#e91e63', '#3f51b5', '#00897b', '#fb8c00', '#8e24aa'];
+
 function renderSalesTrendChart() {
   const chart = document.getElementById('records-sales-chart');
   const note = document.getElementById('records-sales-note');
   if (!chart) return;
   const blockTitle = chart.previousElementSibling;
-  if (blockTitle) blockTitle.innerHTML = '過去5作CD売上の推移 <small>縦: 枚数 / 横: 発売からの経過日数</small>';
+  if (blockTitle) blockTitle.innerHTML = '過去5作CD売上の推移 <small>曲ごとに色分け / 横: 日付</small>';
 
   const releasedSongs = [...songs]
     .filter(song => song.released && Array.isArray(song.salesHistory) && song.salesHistory.length > 0)
@@ -86,26 +152,39 @@ function renderSalesTrendChart() {
     return;
   }
 
-  const targetSong = releasedSongs[0];
-  const history = normalizeSalesHistory(targetSong.salesHistory, SONG_HISTORY_WEEKS);
-  const points = history.map((entry, index) => ({
-    label: index === 0 ? '発売' : `${index * 7}日`,
-    value: Math.max(0, entry.sales)
-  }));
+  // 曲ごとに色を割り当てて系列化（累計売上の週次推移）
+  const seriesList = releasedSongs.map((song, index) => {
+    const history = normalizeSalesHistory(song.salesHistory, SONG_HISTORY_WEEKS);
+    return {
+      name: song.title || `楽曲${index + 1}`,
+      color: SALES_SERIES_COLORS[index % SALES_SERIES_COLORS.length],
+      points: history.map(entry => ({ weekKey: entry.weekKey, value: Math.max(0, entry.sales) }))
+    };
+  }).filter(series => series.points.length > 0);
 
-  chart.innerHTML = `<div style="font-size:11px; color:#555; margin-bottom:4px;">直近曲『${escapeHtml(targetSong.title)}』の推移</div>` +
-    buildLineChartSvg(points, {
-      gradientId: 'records-sales-gradient',
+  // 凡例（色＋曲名）
+  const legend = `<div class="records-chart-legend">` +
+    seriesList.map(series =>
+      `<span class="records-legend-item"><i class="records-legend-swatch" style="background:${series.color}"></i>${escapeHtml(series.name)}</span>`
+    ).join('') +
+    `</div>`;
+
+  chart.innerHTML =
+    buildMultiLineChartSvg(seriesList, {
       ariaLabel: '過去5作CD売上推移',
       showGrid: false,
-      showFill: false,
       unitFormatter: val => `${Math.round(val).toLocaleString()}枚`
-    });
+    }) + legend;
 
   if (note) {
-    const first = history[0];
-    const last = history[history.length - 1];
-    note.textContent = `期間 ${formatChartWeekLabel(first.weekKey)} → ${formatChartWeekLabel(last.weekKey)}（${history.length - 1}週）／ 累計 ${last.sales.toLocaleString()}枚`;
+    // 期間は全系列の週キーから、累計はグループの売上履歴（最新値）から求める
+    const groupHistory = normalizeSalesHistory(salesHistory, SONG_HISTORY_WEEKS);
+    const allWeeks = [...new Set(seriesList.flatMap(s => s.points.map(p => p.weekKey)))].sort();
+    const first = allWeeks[0];
+    const last = allWeeks[allWeeks.length - 1];
+    let total = groupHistory.length ? groupHistory[groupHistory.length - 1].sales : 0;
+    if (!total) total = Math.max(0, ...seriesList.flatMap(s => s.points.map(p => p.value)));
+    note.textContent = `期間 ${formatChartWeekLabel(first)} → ${formatChartWeekLabel(last)}（${seriesList.length}曲）／ 累計 ${total.toLocaleString()}枚`;
   }
 }
 
