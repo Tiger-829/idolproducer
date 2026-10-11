@@ -37,8 +37,21 @@ function clampCdNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
+function createDefaultCdTrack(index, name = '') {
+  return {
+    name,
+    role: index === 0 ? 'lead' : 'normal',
+    locked: index === 0,
+    useMv: false,
+    performanceType: 'senbatsu'
+  };
+}
+
 // --- CD制作設定のデフォルト ---
 function createDefaultCdProduction(leadTitle = '') {
+  const tracks = Array.from({ length: CD_TRACK_MIN }, (_, index) =>
+    createDefaultCdTrack(index, index === 0 ? leadTitle : '')
+  );
   return {
     trackCount: CD_TRACK_MIN,
     useMv: false,
@@ -46,20 +59,51 @@ function createDefaultCdProduction(leadTitle = '') {
     performanceType: 'senbatsu',
     performanceCenterId: null,
     performanceMemberIds: [],
-    tracks: [{ name: leadTitle || '', role: 'lead', locked: true }],
+    tracks,
     totalCost: 0,
     costDeducted: false
   };
+}
+
+function prepareCdProductionForModal(cdProduction) {
+  const config = cdProduction || createDefaultCdProduction('');
+  config.trackCount = clampCdNumber(config.trackCount, CD_TRACK_MIN, CD_TRACK_MAX, CD_TRACK_MIN);
+  if (!Array.isArray(config.tracks)) config.tracks = [];
+
+  const legacyUseMv = Boolean(config.useMv);
+  const legacyMvTrackCount = legacyUseMv
+    ? clampCdNumber(config.mvTrackCount, CD_MV_TRACK_MIN, Math.min(CD_MV_TRACK_MAX, config.trackCount), CD_MV_TRACK_MIN)
+    : 0;
+  const legacyPerformanceType = getCdPerformanceType(config.performanceType).id;
+
+  while (config.tracks.length < config.trackCount) {
+    config.tracks.push(createDefaultCdTrack(config.tracks.length));
+  }
+  config.tracks.length = config.trackCount;
+  config.tracks.forEach((track, index) => {
+    if (typeof track.useMv !== 'boolean') track.useMv = index < legacyMvTrackCount;
+    if (!CD_PERFORMANCE_TYPES.some(type => type.id === track.performanceType)) {
+      track.performanceType = legacyPerformanceType;
+    }
+    track.role = index === 0 ? 'lead' : 'normal';
+    track.locked = index === 0;
+  });
+  return config;
 }
 
 // --- 制作費計算 ---
 function calculateCdProductionCost(config) {
   const c = config || {};
   const trackCount = clampCdNumber(c.trackCount, CD_TRACK_MIN, CD_TRACK_MAX, CD_TRACK_MIN);
-  const useMv = Boolean(c.useMv);
-  const mvTrackCount = useMv
-    ? clampCdNumber(c.mvTrackCount, CD_MV_TRACK_MIN, Math.min(CD_MV_TRACK_MAX, trackCount), CD_MV_TRACK_MIN)
-    : 0;
+  const tracksHaveMvSettings = Array.isArray(c.tracks) && c.tracks.some(track => typeof track.useMv === 'boolean');
+  const trackMvCount = tracksHaveMvSettings ? c.tracks.filter(track => track.useMv).length : 0;
+  const selectedMvTrackCount = tracksHaveMvSettings && (trackMvCount > 0 || !c.useMv)
+    ? trackMvCount
+    : (c.useMv
+      ? clampCdNumber(c.mvTrackCount, CD_MV_TRACK_MIN, Math.min(CD_MV_TRACK_MAX, trackCount), CD_MV_TRACK_MIN)
+      : 0);
+  const mvTrackCount = Math.min(selectedMvTrackCount, trackCount);
+  const useMv = mvTrackCount > 0;
 
   const trackCost = trackCount * CD_TRACK_COST;
   const costumeCost = trackCount * CD_COSTUME_COST;
@@ -144,7 +188,7 @@ function openCdProductionModal(cdProduction) {
     modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10001; align-items:center; justify-content:center;';
     document.body.appendChild(modal);
   }
-  cdProductionModalState = cdProduction || createDefaultCdProduction('');
+  cdProductionModalState = prepareCdProductionForModal(cdProduction);
   renderCdProductionModal();
   modal.style.display = 'flex';
 }
@@ -154,22 +198,28 @@ function closeCdProductionModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function getCdPerformanceNote(typeId) {
-  switch (typeId) {
-    case 'senbatsu': return '選抜メンバーが披露します。センターを選択できます。';
-    case 'under': return 'アンダーメンバーが披露します。センターを選択できます。';
-    case 'all': return '全メンバーが披露します。センターを選択できます。';
-    case 'unit': return 'ユニット／期別のメンバーが披露します。';
-    case 'solo': return 'ソロで披露します。歌唱メンバーを選択できます。';
-    default: return '';
-  }
-}
-
 function onCdTrackNameChange(index) {
   const el = document.getElementById(`cd-track-name-${index}`);
   if (el && cdProductionModalState && cdProductionModalState.tracks[index]) {
     cdProductionModalState.tracks[index].name = el.value;
   }
+}
+
+function onCdTrackMvChange(index) {
+  const el = document.getElementById(`cd-track-mv-${index}`);
+  const track = cdProductionModalState?.tracks[index];
+  if (!el || !track) return;
+  track.useMv = el.value === 'yes';
+  cdProductionModalState.useMv = cdProductionModalState.tracks.some(item => item.useMv);
+  cdProductionModalState.mvTrackCount = cdProductionModalState.tracks.filter(item => item.useMv).length;
+  renderCdProductionModal();
+}
+
+function onCdTrackPerformanceTypeChange(index) {
+  const el = document.getElementById(`cd-track-performance-type-${index}`);
+  const track = cdProductionModalState?.tracks[index];
+  if (!el || !track) return;
+  track.performanceType = el.value;
 }
 
 function onCdTrackCountChange() {
@@ -178,33 +228,14 @@ function onCdTrackCountChange() {
   const count = clampCdNumber(el.value, CD_TRACK_MIN, CD_TRACK_MAX, CD_TRACK_MIN);
   cdProductionModalState.trackCount = count;
   const tracks = cdProductionModalState.tracks;
-  while (tracks.length < count) tracks.push({ name: '', role: 'normal', locked: false });
+  while (tracks.length < count) tracks.push(createDefaultCdTrack(tracks.length));
   while (tracks.length > count) tracks.pop();
-  const mvMax = Math.min(CD_MV_TRACK_MAX, count);
-  if (cdProductionModalState.mvTrackCount > mvMax) cdProductionModalState.mvTrackCount = mvMax;
-  renderCdProductionModal();
-}
-
-function onCdUseMvChange() {
-  const el = document.getElementById('cd-use-mv');
-  if (!el) return;
-  cdProductionModalState.useMv = el.value === 'yes';
-  renderCdProductionModal();
-}
-
-function onCdMvTrackCountChange() {
-  const el = document.getElementById('cd-mv-track-count');
-  if (!el) return;
-  cdProductionModalState.mvTrackCount = clampCdNumber(el.value, CD_MV_TRACK_MIN, CD_MV_TRACK_MAX, CD_MV_TRACK_MIN);
-  renderCdProductionModal();
-}
-
-function onCdPerformanceTypeChange() {
-  const el = document.getElementById('cd-performance-type');
-  if (!el) return;
-  cdProductionModalState.performanceType = el.value;
-  cdProductionModalState.performanceCenterId = null;
-  cdProductionModalState.performanceMemberIds = [];
+  const mvTracks = tracks.filter(track => track.useMv);
+  while (mvTracks.length > Math.min(CD_MV_TRACK_MAX, count)) {
+    mvTracks.pop().useMv = false;
+  }
+  cdProductionModalState.useMv = tracks.some(track => track.useMv);
+  cdProductionModalState.mvTrackCount = tracks.filter(track => track.useMv).length;
   renderCdProductionModal();
 }
 
@@ -218,25 +249,37 @@ function renderCdProductionModal() {
   for (let n = CD_TRACK_MIN; n <= CD_TRACK_MAX; n++) {
     trackOptions.push(`<option value="${n}" ${cfg.trackCount === n ? 'selected' : ''}>${n}曲</option>`);
   }
+  const mvTrackCount = cfg.tracks.filter(track => track.useMv).length;
   const mvMax = Math.min(CD_MV_TRACK_MAX, cfg.trackCount);
-  const mvOptions = [];
-  for (let n = CD_MV_TRACK_MIN; n <= mvMax; n++) {
-    mvOptions.push(`<option value="${n}" ${cfg.mvTrackCount === n ? 'selected' : ''}>${n}曲</option>`);
-  }
-  const perfOptions = CD_PERFORMANCE_TYPES.map(type =>
-    `<option value="${type.id}" ${cfg.performanceType === type.id ? 'selected' : ''}>${type.name}</option>`
-  ).join('');
+  const mvSelectionInvalid = mvTrackCount > 0 && mvTrackCount < CD_MV_TRACK_MIN;
 
   const trackRows = cfg.tracks.map((track, i) => {
     const locked = i === 0;
+    const canAddMv = track.useMv || mvTrackCount < mvMax;
     return `
-      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-        <span style="font-size:11px; color:#888; width:64px;">${i === 0 ? 'リード曲' : `曲${i + 1}`}</span>
+      <div style="padding:7px; margin-bottom:6px; border:1px solid #eee; border-radius:5px;">
+        <div style="font-size:11px; color:#888; margin-bottom:4px;">${i === 0 ? 'リード曲' : `曲${i + 1}`}</div>
         <input type="text" id="cd-track-name-${i}" value="${escapeHtml(track.name || '')}" maxlength="24"
           placeholder="${i === 0 ? '表題曲（決定済み）' : '曲名を入力'}"
-          ${locked ? 'readonly style="background:#f0f0f0;"' : ''}
-          onchange="onCdTrackNameChange(${i})"
-          style="flex:1; padding:5px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+          ${locked ? 'readonly style="background:#f0f0f0;' : 'style="'} padding:5px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; width:100%;"
+          onchange="onCdTrackNameChange(${i})">
+        <div style="display:flex; gap:8px; margin-top:5px;">
+          <label style="flex:1; font-size:10px; font-weight:bold; color:#555;">MV
+            <select id="cd-track-mv-${i}" onchange="onCdTrackMvChange(${i})"
+              style="width:100%; padding:5px; font-size:11px; margin-top:2px;">
+              <option value="no" ${!track.useMv ? 'selected' : ''}>なし</option>
+              <option value="yes" ${track.useMv ? 'selected' : ''} ${canAddMv ? '' : 'disabled'}>あり</option>
+            </select>
+          </label>
+          <label style="flex:2; font-size:10px; font-weight:bold; color:#555;">披露メンバー属性
+            <select id="cd-track-performance-type-${i}" onchange="onCdTrackPerformanceTypeChange(${i})"
+              style="width:100%; padding:5px; font-size:11px; margin-top:2px;">
+              ${CD_PERFORMANCE_TYPES.map(type =>
+                `<option value="${type.id}" ${track.performanceType === type.id ? 'selected' : ''}>${type.name}</option>`
+              ).join('')}
+            </select>
+          </label>
+        </div>
       </div>
     `;
   }).join('');
@@ -248,30 +291,14 @@ function renderCdProductionModal() {
         選抜が決定しました。CDの収録内容を決めて制作費を確定してください。<br>
         <span style="color:#b8742a;">※制作費は発売月の月末に引き落としされます。費用をかけるほど初週売上のバフが上がります。</span>
       </p>
-      <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="display:flex; gap:10px; margin-bottom:6px;">
         <label style="flex:1; font-size:11px; font-weight:bold; color:#555;">収録曲数
           <select id="cd-track-count" onchange="onCdTrackCountChange()" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">${trackOptions.join('')}</select>
         </label>
-        <label style="flex:1; font-size:11px; font-weight:bold; color:#555;">MVをつけるか
-          <select id="cd-use-mv" onchange="onCdUseMvChange()" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
-            <option value="no" ${!cfg.useMv ? 'selected' : ''}>なし</option>
-            <option value="yes" ${cfg.useMv ? 'selected' : ''}>あり</option>
-          </select>
-        </label>
-      </div>
-      <div id="cd-mv-count-wrap" style="display:${cfg.useMv ? 'block' : 'none'}; margin-bottom:10px;">
-        <label style="font-size:11px; font-weight:bold; color:#555;">MVを作る曲数（${CD_MV_TRACK_MIN}〜${CD_MV_TRACK_MAX}曲）
-          <select id="cd-mv-track-count" onchange="onCdMvTrackCountChange()" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">${mvOptions.join('')}</select>
-        </label>
       </div>
       <div style="margin-bottom:10px;">
-        <label style="font-size:11px; font-weight:bold; color:#555;">披露メンバー属性
-          <select id="cd-performance-type" onchange="onCdPerformanceTypeChange()" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">${perfOptions}</select>
-        </label>
-        <p style="font-size:10px; color:#888; margin:4px 0 0;">${getCdPerformanceNote(cfg.performanceType)}</p>
-      </div>
-      <div style="margin-bottom:10px;">
-        <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:4px;">各曲の曲名</div>
+        <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:4px;">各曲の内容</div>
+        <p style="font-size:10px; color:#888; margin:0 0 5px;">MVを付ける場合は3〜${mvMax}曲選択してください。</p>
         ${trackRows}
       </div>
       <div style="background:#fdf2f4; border-radius:6px; padding:10px; font-size:11px; color:#555; line-height:1.7; margin-bottom:12px;">
@@ -288,7 +315,7 @@ function renderCdProductionModal() {
         </div>
       </div>
       <div class="actions" style="flex-direction:row; gap:6px;">
-        <button class="main-btn" style="flex:2;" onclick="confirmCdProduction()">この内容で決定（発売月末に引き落とし）</button>
+        <button class="main-btn" style="flex:2;" onclick="confirmCdProduction()" ${mvSelectionInvalid ? 'disabled' : ''}>この内容で決定（発売月末に引き落とし）</button>
       </div>
     </div>
   `;
@@ -296,6 +323,16 @@ function renderCdProductionModal() {
 
 function confirmCdProduction() {
   const cost = calculateCdProductionCost(cdProductionModalState);
+  if (cost.useMv && (cost.mvTrackCount < CD_MV_TRACK_MIN || cost.mvTrackCount > Math.min(CD_MV_TRACK_MAX, cost.trackCount))) {
+    setLog(`【CD制作】MVを付ける曲数は3〜${Math.min(CD_MV_TRACK_MAX, cost.trackCount)}曲にしてください。`);
+    return;
+  }
+  cdProductionModalState.useMv = cost.useMv;
+  cdProductionModalState.mvTrackCount = cost.mvTrackCount;
+  const performanceTypes = cdProductionModalState.tracks.map(track => track.performanceType);
+  cdProductionModalState.performanceType = performanceTypes.every(type => type === performanceTypes[0])
+    ? performanceTypes[0]
+    : null;
   cdProductionModalState.totalCost = cost.totalCost;
   cdProductionModalState.costDeducted = false;
   cdProductionConfirmed = cdProductionModalState;
