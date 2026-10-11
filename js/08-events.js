@@ -993,10 +993,6 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
         audience: grandAudience,
         ...liveExperience
       });
-      const expText = Object.entries(liveExperience.gained)
-        .map(([statId, amount]) => `${STATUS_KEYS.find(s => s.id === statId)?.name || statId}+${amount}`)
-        .join(' / ');
-      liveLogs.push(` ▼経験値 基礎${liveExperience.total}（${expText}）${liveExperience.levelUps ? ` / 能力UP ${liveExperience.levelUps}件` : ''}`);
     }
     if (!remainingDates.length) {
       scheduleInfoMedia('live', {
@@ -1588,7 +1584,7 @@ function processScheduledPerformances(reachDate = null) {
       if (song) addSongExperience(song, (performance.songExperience ?? 30) * prepMultiplier);
       const fee = performance.appearanceFee || 3000000;
       funds += fee;
-      logs.push(`【大型特番】${performance.name}で「${song ? song.title : '楽曲'}」を披露（メンバー全員の全能力に経験点+10,000pt / 出演料 ${formatMoney(fee)}）。`);
+      logs.push(`【大型特番】${performance.name}で「${song ? song.title : '楽曲'}」を披露（出演料 ${formatMoney(fee)}）。`);
     } else {
       targets.forEach(member => {
         addMemberStatExp(member, 'popularity', 3000);
@@ -1597,7 +1593,7 @@ function processScheduledPerformances(reachDate = null) {
       if (song) addSongExperience(song, REGULAR_PROGRAM_SONG_EXPERIENCE * prepMultiplier);
       const fee = REGULAR_PROGRAM_APPEARANCE_FEE;
       funds += fee;
-      logs.push(`【テレビ出演】${performance.name}で「${song ? song.title : '楽曲'}」を披露（人気+3,000pt / トーク+2,000pt / 出演料 ${formatMoney(fee)}）。`);
+      logs.push(`【テレビ出演】${performance.name}で「${song ? song.title : '楽曲'}」を披露（出演料 ${formatMoney(fee)}）。`);
     }
   });
 

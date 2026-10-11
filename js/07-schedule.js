@@ -1628,7 +1628,6 @@ function applyWeeklySchedule() {
 
   if (officeMessage) parts.push(`事務作業: ${officeMessage}`);
   if (skippedGroupOnly) parts.push('連携: 参加者不足のため未実施');
-  if (levelUps > 0) parts.push(`能力UP ${levelUps}件`);
   if (injuries.length) parts.push(`【ケガ】${injuries.join('、')}`);
 
   setLog(`【週間スケジュール】${parts.join(' / ')}`);
