@@ -1717,6 +1717,12 @@ function startNewGame(slot) {
   }
 }
 
+function closeGameSetupModal() {
+  const setupModal = document.getElementById('setup-game-modal');
+  if (setupModal) setupModal.style.display = 'none';
+  pendingActiveSlot = null;
+}
+
 // 試合セットアップ計画を送信する。
 function submitGameSetupAndPlan() {
   const gNameInput = document.getElementById('input-setup-groupname');
@@ -1724,10 +1730,10 @@ function submitGameSetupAndPlan() {
   const song2Input = document.getElementById('input-setup-2nd-song');
   const liveInput = document.getElementById('input-setup-live-name');
 
-  if (gNameInput && gNameInput.value.trim()) customGroupName = gNameInput.value.trim();
-  if (song1Input && song1Input.value.trim()) customFirstSong = song1Input.value.trim();
-  if (song2Input && song2Input.value.trim()) customSecondSong = song2Input.value.trim();
-  if (liveInput && liveInput.value.trim()) customFirstLiveName = liveInput.value.trim();
+  customGroupName = gNameInput?.value.trim() || 'スタースコープ';
+  customFirstSong = song1Input?.value.trim() || 'はじまりの光';
+  customSecondSong = song2Input?.value.trim() || '青春の軌跡';
+  customFirstLiveName = liveInput?.value.trim() || '1stデビューライブ';
 
   const setupModal = document.getElementById('setup-game-modal');
   if (setupModal) setupModal.style.display = 'none';
@@ -1773,18 +1779,19 @@ function initGame(slot, startFresh) {
       initializeNewGameState();
     }
     
-    if (typeof groupName !== 'undefined') {
-      groupName = customGroupName;
-    }
+    const playerTeam = Array.isArray(leagueTeams)
+      ? leagueTeams.find(team => team && team.id === 'player')
+      : null;
+    if (playerTeam) playerTeam.name = customGroupName;
     if (typeof productionSchedule !== 'undefined') {
-      if (productionSchedule['1-1']) {
-        productionSchedule['1-1'].songName = customFirstSong;
-        if (productionSchedule['1-1'].liveName) {
-          productionSchedule['1-1'].liveName = customFirstLiveName;
-        }
-      }
       if (productionSchedule['1-2']) {
-        productionSchedule['1-2'].songName = customSecondSong;
+        productionSchedule['1-2'].songName = customFirstSong;
+      }
+      if (productionSchedule['1-6']) {
+        productionSchedule['1-6'].songName = customSecondSong;
+      }
+      if (productionSchedule['1-5']) {
+        productionSchedule['1-5'].liveName = customFirstLiveName;
       }
     }
 

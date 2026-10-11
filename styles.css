@@ -1306,6 +1306,20 @@
       padding: 16px;
       border-radius: 12px;
     }
+    .setup-modal-close {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: #f7e8ee;
+      color: #8d3155;
+      font-size: 23px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .setup-modal-close:active { transform: scale(0.96); }
     .ranking-note { font-size: 11px; color: #777; line-height: 1.6; margin-bottom: 6px; }
     .ranking-list { display: flex; flex-direction: column; gap: 5px; }
     .ranking-row {

@@ -25,7 +25,29 @@ const check = (name, condition, extra = '') => {
   console.log(`${condition ? 'PASS' : 'FAIL'} : ${name}${extra ? ` -> ${extra}` : ''}`);
 };
 
-run('initGame(1, true); document.getElementById("decision-modal").style.display = "none";');
+run('startNewGame(1);');
+check('new game opens the initial setup modal', window.document.getElementById('setup-game-modal').style.display === 'flex');
+run('document.querySelector(".setup-modal-close").click();');
+check('closing initial setup cancels game start', window.document.getElementById('setup-game-modal').style.display === 'none'
+  && run('pendingActiveSlot === null && document.getElementById("game-screen").hidden'));
+
+run(`
+  startNewGame(1);
+  document.getElementById('input-setup-groupname').value = 'テストグループ';
+  document.getElementById('input-setup-1st-song').value = 'テスト1stシングル';
+  document.getElementById('input-setup-2nd-song').value = 'テスト2ndシングル';
+  document.getElementById('input-setup-live-name').value = 'テスト初ライブ';
+  submitGameSetupAndPlan();
+  document.getElementById('decision-modal').style.display = 'none';
+`);
+check('setup group name appears as the player team name', run('getLeagueRanking().find(team => team.isPlayer)?.name') === 'テストグループ');
+check('setup first single is assigned to the February release', run("productionSchedule['1-2']?.songName") === 'テスト1stシングル');
+check('setup second single is assigned to the June release', run("productionSchedule['1-6']?.songName") === 'テスト2ndシングル');
+check('setup first live name is assigned to the initial live', run("productionSchedule['1-5']?.liveName") === 'テスト初ライブ');
+check('scheduled release songs use the entered titles', run(`
+  ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
+    && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
+`));
 console.log('initial state:', run('JSON.stringify({ date: gameDate, year: currentYear, month: currentMonth, members: idolRoster.length, selected: idolRoster.filter(m=>m.isSelected).length })'));
 
 console.log('\n--- 1. TV appearance does not block the weekly schedule ---');
