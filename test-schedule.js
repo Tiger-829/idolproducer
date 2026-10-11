@@ -48,6 +48,29 @@ check('scheduled release songs use the entered titles', run(`
   ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
     && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
 `));
+check('monthly report displays a finalized ledger without detail arrays', run(`
+  (() => {
+    const modal = document.getElementById('monthly-report-modal');
+    const saved = {
+      monthlyLedger,
+      pendingMonthlyReport,
+      modalDisplay: modal.style.display,
+      bodyHtml: document.getElementById('monthly-report-body').innerHTML
+    };
+    try {
+      monthlyLedger = { income: [{ label: 'テスト収入', amount: 1234 }], expense: [] };
+      const report = finalizeMonthlyLedger(2027, 1);
+      showMonthlyReportModal(report);
+      return modal.style.display === 'flex'
+        && document.getElementById('monthly-report-body').innerHTML.includes('1,234');
+    } finally {
+      monthlyLedger = saved.monthlyLedger;
+      pendingMonthlyReport = saved.pendingMonthlyReport;
+      modal.style.display = saved.modalDisplay;
+      document.getElementById('monthly-report-body').innerHTML = saved.bodyHtml;
+    }
+  })()
+`) === true);
 check('fan history survives save and restore and is drawn again', run(`
   (() => {
     player.fanHistory = [

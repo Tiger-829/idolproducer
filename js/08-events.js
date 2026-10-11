@@ -589,6 +589,16 @@ function showMonthlyReportModal(report) {
   report = report && typeof report.year === 'number' && typeof report.month === 'number'
     ? report
     : buildMonthlyReport(targetYear, targetMonth);
+  report = {
+    ...report,
+    income: Array.isArray(report.income) ? report.income : [],
+    expense: Array.isArray(report.expense) ? report.expense : [],
+    cdReleases: Array.isArray(report.cdReleases) ? report.cdReleases : [],
+    liveReports: Array.isArray(report.liveReports) ? report.liveReports : [],
+    eventReports: Array.isArray(report.eventReports) ? report.eventReports : [],
+    broadcastReports: Array.isArray(report.broadcastReports) ? report.broadcastReports : [],
+    tvEffects: Array.isArray(report.tvEffects) ? report.tvEffects : []
+  };
 
   title.textContent = `${report.year}年${report.month}月 報告`;
 
