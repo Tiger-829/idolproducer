@@ -31,8 +31,21 @@ function isPresetReleaseMonth(month) {
 
 // 計画カレンダー日付を取得する。
 function getPlanCalendarDate(month, day) {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+  const actualYear = getPlanActualYear();
   return new Date(actualYear, month - 1, day, 12);
+}
+
+function getPlanActualYear() {
+  return calendarYear && calendarYear > 2000
+    ? calendarYear + (planYearTarget - currentYear)
+    : 2026 + (planYearTarget - currentYear);
+}
+
+function initializePlanDateInput(input, month) {
+  if (!input || input.value) return;
+  const firstDay = getPlanCalendarDate(month, 1);
+  input.value = toDateKey(firstDay);
+  input.dataset.calendarInitialized = 'true';
 }
 
 // 計画月イベントDraftsを取得する。
@@ -65,7 +78,7 @@ function getStandardSeatPrice(venue, seatId) {
 
 // リリース日のデフォルト水曜を返す。
 function getPlanReleaseDefaultWednesday(month) {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+  const actualYear = getPlanActualYear();
   if (typeof getLastWednesday === 'function') {
     return toDateKey(getLastWednesday(actualYear, month - 1));
   }
@@ -173,6 +186,37 @@ function formatEventDateRange(dates, yearVal) {
   return `${yearVal} ${fM}/${fD}-${lM}/${lD}`;
 }
 
+function getConsecutiveDateGroups(dates) {
+  const sorted = [...new Set((Array.isArray(dates) ? dates : []).filter(Boolean))].sort();
+  const groups = [];
+  sorted.forEach(date => {
+    const previous = groups[groups.length - 1]?.[groups[groups.length - 1].length - 1];
+    if (previous) {
+      const next = getGameDateObject(previous);
+      next.setDate(next.getDate() + 1);
+      if (toDateKey(next) === date) {
+        groups[groups.length - 1].push(date);
+        return;
+      }
+    }
+    groups.push([date]);
+  });
+  return groups;
+}
+
+function getEventSessionDrafts(event) {
+  if (Array.isArray(event.sessions) && event.sessions.length) {
+    return event.sessions.map(session => ({ ...session, dates: [...(session.dates || [])] }));
+  }
+  const dates = Array.isArray(event.dates) && event.dates.length ? event.dates : (event.date ? [event.date] : []);
+  return [{
+    name: event.name || BENEFIT_EVENT_TYPE_OPTIONS[0].name,
+    venue: event.venue || '',
+    dates,
+    seatPrices: { ...(event.seatPrices || {}) }
+  }];
+}
+
 // 日付Rowを表示する。（プレフィックスに応じてクラス名を正確に付与）
 function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, prefix = 'show') {
   const inputClass = prefix === 'show' ? 'show-date-input' : 'event-show-date-input';
@@ -184,7 +228,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, pr
   return `
     <div class="${rowClass}" data-show-index="${dateIndex}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
       <input type="date" class="${inputClass}" id="${prefix}-date-${month}-${index}-${dateIndex}"
-        value="${dateKey || ''}" onchange="${onChangeHandler} renderEmbeddedPlanCalendars();">
+        value="${dateKey || ''}" onfocus="initializePlanDateInput(this, ${month})" onchange="${onChangeHandler} renderEmbeddedPlanCalendars();">
       ${prefix === 'show' ? `
       <label style="font-size:11px; display:flex; align-items:center; gap:2px; white-space:nowrap; cursor:pointer;">
         <input type="checkbox" class="show-stream-input" id="show-stream-${month}-${index}-${dateIndex}"
@@ -262,12 +306,9 @@ function renderEventSlotHtml(month, index, event) {
 
   const cdList = getPlayerCdReleaseList();
   const currentCdId = event.targetCdId || (cdList[0] ? cdList[0].id : '');
-  const currentEventName = event.name || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
-  const eventVenue = allVenues.find(v => v.name === event.venue) || null;
-  const seatPrices = event.seatPrices || {};
-  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
-  const hasDates = Array.isArray(event.dates) && event.dates.length > 0;
-  const hasVenue = Boolean(event.venue);
+  const sessions = getEventSessionDrafts(event);
+  const hasDates = sessions.some(session => session.dates?.length);
+  const hasVenue = sessions.some(session => session.venue);
   const showDetails = hasVenue || hasDates;
 
   return `
@@ -277,19 +318,6 @@ function renderEventSlotHtml(month, index, event) {
         <button class="danger-btn" type="button" onclick="removePlanEvent(${month}, ${index})">削除</button>
       </div>
 
-      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">イベント種類（名称）
-        <select id="event-name-${month}-${index}" onchange="updateEventDateNote(${month}, ${index})" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
-          ${BENEFIT_EVENT_TYPE_OPTIONS.map(opt => `<option value="${opt.name}" ${currentEventName === opt.name ? 'selected' : ''}>${opt.name} (${formatMoney(opt.baseCost)})</option>`).join('')}
-        </select>
-      </label>
-
-      <label class="weekly-member-target" style="display:block; margin-bottom:6px; font-size:11px;">会場 (パルス関連のみ)
-        <select id="event-ven-${month}-${index}" onchange="onEventVenueSelectChange(${month}, ${index})" style="width:100%; padding:6px; font-size:11px; margin-top:3px;">
-          <option value="">会場を選択</option>
-          ${venues.map(v => `<option value="${v.name}" ${event.venue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
-        </select>
-      </label>
-
       <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#555; margin-bottom:6px;">
         <span>紐づくCD:</span>
         <select id="event-cd-${month}-${index}" style="font-size:11px; padding:4px; flex:1;">
@@ -298,31 +326,46 @@ function renderEventSlotHtml(month, index, event) {
       </div>
 
       <div id="event-details-container-${month}-${index}" style="display: ${showDetails ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
-        <div style="font-size:11px;">
-          <div style="color:#555; margin-bottom:3px;">開催日設定</div>
-          <div id="event-show-dates-${month}-${index}" class="show-date-list">
-             ${(event.dates || []).map((dateKey, dateIndex) => 
-              renderShowDateRow(month, index, dateIndex, dateKey, true, 'event-show')
-            ).join('')}
-          </div>
-          <div style="margin-top:4px;">
-            <button class="plan-add-show-btn" type="button" onclick="addEventShowDate(${month}, ${index})">＋開催日を追加</button>
-          </div>
-          <div id="event-date-note-${month}-${index}" style="margin-top:4px; font-size:10px; color:#666;"></div>
+        <div id="event-sessions-${month}-${index}">
+          ${sessions.map((session, sessionIndex) => renderEventSessionHtml(month, index, sessionIndex, session)).join('')}
         </div>
-
-        <details class="seat-settings" style="margin-top:6px;">
-          <summary style="font-size:11px; cursor:pointer; font-weight:bold;">席種・チケット価格</summary>
-          <div class="seat-settings-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:6px;">
-            ${seatTypes.map(seat => {
-              const price = seatPrices[seat.id] ?? getStandardSeatPrice(eventVenue, seat.id);
-              return `<div style="font-size:10px;"><label style="display:block;">${seat.name}（円）</label><input type="number" id="event-seat-price-${month}-${index}-${seat.id}" min="0" step="500" value="${price}" style="width:100%; padding:4px; font-size:10px; box-sizing:border-box;"></div>`;
-            }).join('')}
-          </div>
-        </details>
+        <button class="plan-add-show-btn" type="button" onclick="addEventShowDate(${month}, ${index})">＋開催日を追加</button>
+        <button class="plan-add-show-btn" type="button" onclick="splitEventSessions(${month}, ${index})">日程を分離</button>
+        <div id="event-date-note-${month}-${index}" style="margin-top:4px; font-size:10px; color:#666;"></div>
       </div>
     </div>
   `;
+}
+
+function renderEventSessionHtml(month, eventIndex, sessionIndex, session) {
+  const venues = (typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : []).filter(v => v.name.includes('パルス'));
+  const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  const venue = (typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : []).find(v => v.name === session.venue);
+  const dates = session.dates || [];
+  return `
+    <div class="event-session" data-session-index="${sessionIndex}" style="border:1px solid #eadde1; padding:6px; margin:5px 0; border-radius:5px;">
+      <div style="font-size:10px; color:#8a5a12; font-weight:bold;">設定単位 ${sessionIndex + 1}（${formatEventDateRange(dates, '')}）</div>
+      <label style="display:block; font-size:11px; margin-top:4px;">イベント概要
+        <select id="event-name-${month}-${eventIndex}-${sessionIndex}" onchange="updateEventDateNote(${month}, ${eventIndex})" style="width:100%; padding:5px;">
+          ${BENEFIT_EVENT_TYPE_OPTIONS.map(opt => `<option value="${opt.name}" ${session.name === opt.name ? 'selected' : ''}>${opt.name} (${formatMoney(opt.baseCost)})</option>`).join('')}
+        </select>
+      </label>
+      <label style="display:block; font-size:11px; margin-top:4px;">会場
+        <select id="event-ven-${month}-${eventIndex}-${sessionIndex}" onchange="onEventVenueSelectChange(${month}, ${eventIndex}, ${sessionIndex})" style="width:100%; padding:5px;">
+          <option value="">会場を選択</option>
+          ${venues.map(v => `<option value="${v.name}" ${session.venue === v.name ? 'selected' : ''}>${v.name}(${v.cap}/${v.ease})</option>`).join('')}
+        </select>
+      </label>
+      <div class="event-show-date-list" data-session-index="${sessionIndex}" style="margin-top:4px;">
+        ${dates.map((dateKey, dateIndex) => renderShowDateRow(month, eventIndex, sessionIndex * 100 + dateIndex, dateKey, true, 'event-show')).join('')}
+      </div>
+      <details class="seat-settings" style="margin-top:5px;">
+        <summary style="font-size:10px; cursor:pointer;">席種・チケット価格</summary>
+        <div class="seat-settings-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:5px; margin-top:5px;">
+          ${seatTypes.map(seat => `<div style="font-size:10px;"><label>${seat.name}（円）</label><input type="number" class="event-session-seat-price" data-seat-id="${seat.id}" min="0" step="500" value="${session.seatPrices?.[seat.id] ?? getStandardSeatPrice(venue, seat.id)}" style="width:100%; padding:4px;"></div>`).join('')}
+        </div>
+      </details>
+    </div>`;
 }
 
 // 会場SelectChangeを処理する。
@@ -344,8 +387,8 @@ function onVenueSelectChange(month, index) {
 }
 
 // イベント会場SelectChangeを処理する。
-function onEventVenueSelectChange(month, index) {
-  const selVen = document.getElementById(`event-ven-${month}-${index}`);
+function onEventVenueSelectChange(month, index, sessionIndex = 0) {
+  const selVen = document.getElementById(`event-ven-${month}-${index}-${sessionIndex}`);
   const detailsContainer = document.getElementById(`event-details-container-${month}-${index}`);
   const hasVenue = Boolean(selVen && selVen.value);
 
@@ -422,44 +465,43 @@ function readEventSlotInputs(month) {
 
   return Array.from(container.querySelectorAll('.plan-event-slot')).map(slotEl => {
     const index = Number(slotEl.dataset.eventSlotIndex);
-    const eventName = (document.getElementById(`event-name-${month}-${index}`) || {}).value || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
-    const venueVal = (document.getElementById(`event-ven-${month}-${index}`) || {}).value || '';
     const targetCdId = (document.getElementById(`event-cd-${month}-${index}`) || {}).value || 'cd_default';
+    const sessions = Array.from(slotEl.querySelectorAll('.event-session')).map((sessionEl, sessionIndex) => {
+      const name = (document.getElementById(`event-name-${month}-${index}-${sessionIndex}`) || {}).value
+        || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
+      const venue = (document.getElementById(`event-ven-${month}-${index}-${sessionIndex}`) || {}).value || '';
+      const dates = Array.from(sessionEl.querySelectorAll('.event-show-date-input')).map(input => input.value).filter(Boolean);
+      const seatPrices = {};
+      sessionEl.querySelectorAll('.event-session-seat-price').forEach(input => {
+        const price = Number.parseInt(input.value, 10);
+        seatPrices[input.dataset.seatId] = Number.isFinite(price) && price >= 0
+          ? price
+          : getStandardSeatPrice(venues.find(v => v.name === venue), input.dataset.seatId);
+      });
+      return { name, venue, dates, seatPrices };
+    }).filter(session => session.venue || session.dates.length);
+    const dates = sessions.flatMap(session => session.dates).sort();
+    const firstSession = sessions[0] || { name: BENEFIT_EVENT_TYPE_OPTIONS[0].name, venue: '', seatPrices: {} };
 
-    const dateInputs = slotEl.querySelectorAll('.event-show-date-input');
-    const dates = [];
+    if (!sessions.length && dates.length === 0) return null;
 
-    dateInputs.forEach(dInput => {
-      const val = dInput.value;
-      if (val) {
-        dates.push(val);
-      }
-    });
-
-    if (!venueVal && dates.length === 0) return null;
-
-    const venueObj = venues.find(v => v.name === venueVal);
-    if (venueObj && !venueObj.name.includes('パルス')) {
+    if (sessions.some(session => {
+      const venue = venues.find(v => v.name === session.venue);
+      return venue && !venue.name.includes('パルス');
+    })) {
       alert(`特典イベントには「パルス」に関連する会場のみ設定できます。`);
       return null;
     }
 
-    const seatPrices = {};
-    const slotVenue = venueObj || null;
-    seatTypes.forEach(seat => {
-      const priceInput = document.getElementById(`event-seat-price-${month}-${index}-${seat.id}`);
-      const price = Number.parseInt(priceInput ? priceInput.value : '', 10);
-      seatPrices[seat.id] = Number.isFinite(price) && price >= 0 ? price : getStandardSeatPrice(slotVenue, seat.id);
-    });
-
     return {
-      name: eventName,
-      benefitId: BENEFIT_EVENT_TYPE_OPTIONS.find(option => option.name === eventName)?.id || 'online-meeguri',
-      venue: venueVal,
+      name: firstSession.name,
+      benefitId: BENEFIT_EVENT_TYPE_OPTIONS.find(option => option.name === firstSession.name)?.id || 'online-meeguri',
+      venue: firstSession.venue,
       date: dates[0] || '',
       dates: dates,
       targetCdId: targetCdId,
-      seatPrices: seatPrices,
+      seatPrices: firstSession.seatPrices,
+      sessions,
       completed: false
     };
   }).filter(Boolean);
@@ -503,23 +545,18 @@ function updateEventDateNote(month, index) {
   const note = document.getElementById(`event-date-note-${month}-${index}`);
   if (!note) return;
   const slotEl = document.querySelector(`.plan-event-slot[data-event-slot-index="${index}"]`);
-  const nameSelect = document.getElementById(`event-name-${month}-${index}`);
-  const venueSelect = document.getElementById(`event-ven-${month}-${index}`);
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
-  const venue = venues.find(item => item.name === (venueSelect ? venueSelect.value : ''));
-  const eventName = nameSelect ? nameSelect.value : BENEFIT_EVENT_TYPE_OPTIONS[0].name;
-
-  const dateInputs = slotEl ? slotEl.querySelectorAll('.event-show-date-input') : [];
-  const dates = [];
-  dateInputs.forEach(dInput => {
-    if (dInput.value) dates.push(dInput.value);
+  const sessions = slotEl ? Array.from(slotEl.querySelectorAll('.event-session')).map((sessionEl, sessionIndex) => {
+    const name = document.getElementById(`event-name-${month}-${index}-${sessionIndex}`)?.value || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
+    const venue = venues.find(item => item.name === document.getElementById(`event-ven-${month}-${index}-${sessionIndex}`)?.value);
+    const dates = Array.from(sessionEl.querySelectorAll('.event-show-date-input')).map(input => input.value).filter(Boolean);
+    return { name, venue, dates };
+  }).filter(session => session.dates.length || session.venue) : [];
+  const summaries = sessions.map(session => {
+    const exp = calculateEventExpenses(session.name, session.venue, session.dates);
+    return `${session.dates.length}日 (${session.venue?.name || '会場未選択'}) / 合計 ${formatMoney(exp.totalCost)}`;
   });
-
-  const exp = calculateEventExpenses(eventName, venue, dates);
-  const venueNameStr = venue ? venue.name : '会場未選択';
-
-
-  note.innerHTML = `開催日数: ${dates.length}日 (${venueNameStr})<br>ベース費用: ${formatMoney(exp.baseCost)} / 会場使用料: ${formatMoney(exp.venueFee)}（合計経費: ${formatMoney(exp.totalCost)}）`;
+  note.innerHTML = summaries.length ? summaries.join('<br>') : '開催日と会場を設定してください';
   renderEmbeddedPlanCalendars();
 }
 
@@ -538,7 +575,36 @@ function addShowDate(month, index, prefix = 'show') {
 
 // イベント公演日付を追加する。
 function addEventShowDate(month, index) {
-  addShowDate(month, index, 'event-show');
+  const container = document.getElementById(`event-sessions-${month}-${index}`);
+  const session = container?.lastElementChild;
+  if (!session) return;
+  const dateIndex = session.querySelectorAll('.event-show-date-row').length;
+  const tempWrapper = document.createElement('div');
+  tempWrapper.innerHTML = renderShowDateRow(month, index, Number(session.dataset.sessionIndex) * 100 + dateIndex, '', true, 'event-show');
+  session.querySelector('.event-show-date-list').appendChild(tempWrapper.firstElementChild);
+  updateEventDateNote(month, index);
+}
+
+function splitEventSessions(month, index) {
+  const drafts = getPlanMonthEventDrafts(month);
+  const slot = document.querySelector(`#plan-events-${month} .plan-event-slot[data-event-slot-index="${index}"]`);
+  if (!slot) return;
+  const current = readEventSlotInputs(month)[index];
+  if (!current) return;
+  const groups = getConsecutiveDateGroups(current.dates);
+  if (groups.length <= 1) {
+    alert('連続していない日程が複数ある場合に分離できます。');
+    return;
+  }
+  drafts[index] = { ...current, sessions: groups.map(dates => ({
+    name: current.name,
+    venue: current.venue,
+    dates,
+    seatPrices: { ...(current.seatPrices || {}) }
+  })) };
+  refreshPlanEventsContainer(month);
+  updateEventDateNote(month, index);
+  renderEmbeddedPlanCalendars();
 }
 
 // 日付を表示する。
@@ -677,7 +743,7 @@ function validateChangeOrCancel(targetDateStr) {
 
 // スケジュールActionを適用
 function applyScheduleAction(month, actionType) {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+  const actualYear = getPlanActualYear();
   const monthFirstDate = new Date(actualYear, month - 1, 1, 12);
   const currentGameDate = getGameDateObject();
   const diffDaysToMonth = Math.round((monthFirstDate - currentGameDate) / 86400000);
@@ -769,7 +835,7 @@ function applyScheduleAction(month, actionType) {
         const detailsContainer = document.getElementById(`event-details-container-${month}-${slotIndex}`);
         if (detailsContainer) detailsContainer.style.display = 'block';
 
-        const showDatesContainer = document.getElementById(`event-show-dates-${month}-${slotIndex}`);
+        const showDatesContainer = document.querySelector(`#event-sessions-${month}-${slotIndex} .event-show-date-list`);
         if (showDatesContainer) {
           const existingDateInputs = Array.from(showDatesContainer.querySelectorAll('.event-show-date-input')).map(i => i.value).filter(Boolean);
           const combinedDates = Array.from(new Set([...existingDateInputs, ...targetDates])).sort();
@@ -1245,7 +1311,7 @@ function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = fa
     container.innerHTML = '';
 
     const presetRelType = typeof PRESET_RELEASE_TYPE !== 'undefined' ? PRESET_RELEASE_TYPE : 'single';
-    const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+    const actualYear = getPlanActualYear();
 
     const wrapperDiv = document.createElement('div');
     wrapperDiv.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
@@ -1436,7 +1502,7 @@ function toggleMultiSelectMode(month) {
 
 // Embedded計画Calendarsを描画する。
 function renderEmbeddedPlanCalendars() {
-  const actualYear = calendarYear && calendarYear > 2000 ? calendarYear : (2026 + (planYearTarget - currentYear));
+  const actualYear = getPlanActualYear();
   const weekdays = typeof PLAN_CALENDAR_WEEKDAYS !== 'undefined' ? PLAN_CALENDAR_WEEKDAYS : ['日', '月', '火', '水', '木', '金', '土'];
   
   for (let m = planStartM; m <= planEndM; m++) {

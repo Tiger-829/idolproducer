@@ -501,14 +501,21 @@ function buildMonthlyReport(year, month) {
       for (let e = 0; e < plan.planEvents.length; e++) {
         const event = plan.planEvents[e];
         if (!event || !event.date) continue;
-        const eventDate = getGameDateObject(event.date);
-        if (eventDate.getFullYear() !== year || eventDate.getMonth() + 1 !== month) continue;
-        const type = getPlanEventType(event.benefitId, event.name);
-        report.eventReports.push({
-          name: type ? type.name : (event.name || 'イベント'),
-          cost: type ? type.cost : 0,
-          date: event.date,
-          completed: Boolean(event.completed)
+        const eventDates = Array.isArray(event.dates) && event.dates.length ? event.dates : [event.date];
+        eventDates.filter(date => {
+          const eventDate = getGameDateObject(date);
+          return eventDate.getFullYear() === year && eventDate.getMonth() + 1 === month;
+        }).forEach(date => {
+          const session = Array.isArray(event.sessions)
+            ? event.sessions.find(item => (item.dates || []).includes(date))
+            : null;
+          const type = getPlanEventType(session?.benefitId || event.benefitId, session?.name || event.name);
+          report.eventReports.push({
+            name: type ? type.name : (session?.name || event.name || 'イベント'),
+            cost: type ? type.cost : 0,
+            date,
+            completed: Boolean(event.completed)
+          });
         });
       }
     }
@@ -799,7 +806,10 @@ function isPlanEventDue(entry, reachDate = gameDate) {
 function processPlanEvents(reachDate = gameDate) {
   getPlanEventEntries().forEach(entry => {
     if (!isPlanEventDue(entry, reachDate)) return;
-    const type = getPlanEventType(entry.event.benefitId, entry.event.name);
+    const session = Array.isArray(entry.event.sessions)
+      ? entry.event.sessions.find(item => (item.dates || []).includes(reachDate))
+      : null;
+    const type = getPlanEventType(session?.benefitId || entry.event.benefitId, session?.name || entry.event.name);
     if (!type) {
       entry.plan.planEvents.splice(entry.index, 1);
       return;
@@ -811,22 +821,27 @@ function processPlanEvents(reachDate = gameDate) {
       ? entry.event.dates
       : [entry.event.date];
     const eventDateGroups = [];
-    eventDates.filter(Boolean).sort().forEach(date => {
-      const previousGroup = eventDateGroups[eventDateGroups.length - 1];
-      const previousDate = previousGroup?.[previousGroup.length - 1];
-      const nextDate = previousDate ? getGameDateObject(previousDate) : null;
-      if (nextDate) nextDate.setDate(nextDate.getDate() + 1);
-      if (previousDate && toDateKey(nextDate) === date) {
-        previousGroup.push(date);
-      } else {
-        eventDateGroups.push([date]);
-      }
-    });
+    if (Array.isArray(entry.event.sessions) && entry.event.sessions.length) {
+      entry.event.sessions.forEach(item => {
+        const dates = (item.dates || []).filter(Boolean).sort();
+        if (dates.length) eventDateGroups.push(dates);
+      });
+    } else {
+      eventDates.filter(Boolean).sort().forEach(date => {
+        const previousGroup = eventDateGroups[eventDateGroups.length - 1];
+        const previousDate = previousGroup?.[previousGroup.length - 1];
+        const nextDate = previousDate ? getGameDateObject(previousDate) : null;
+        if (nextDate) nextDate.setDate(nextDate.getDate() + 1);
+        if (previousDate && toDateKey(nextDate) === date) previousGroup.push(date);
+        else eventDateGroups.push([date]);
+      });
+    }
     const eventDateGroup = eventDateGroups.find(dates => dates.includes(reachDate)) || [];
     const isEventSessionStart = eventDateGroup[0] === reachDate;
     entry.event.completed = eventDates.every(date => entry.event.completedDates.includes(date));
+    const eventCostTarget = session ? { ...entry.event, venue: session.venue, dates: eventDateGroup } : entry.event;
     const venueCost = isEventSessionStart && typeof getEventPlanStandardCost === 'function'
-      ? getEventPlanStandardCost(entry.event, eventDateGroup)
+      ? getEventPlanStandardCost(eventCostTarget, eventDateGroup)
       : 0;
     const baseCost = isFirstEventDate ? type.cost : 0;
     const eventCost = baseCost + venueCost;

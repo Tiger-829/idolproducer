@@ -421,7 +421,8 @@ function getEventsForDate(dateKey) {
       }
       if (Array.isArray(plan.planEvents)) {
         plan.planEvents.forEach(ev => {
-          if (ev && ev.date === dateKey && !ev.completed) {
+          const dates = Array.isArray(ev?.dates) && ev.dates.length ? ev.dates : [ev?.date];
+          if (ev && dates.includes(dateKey) && !ev.completed) {
             const bInfo = typeof PLAN_EVENT_TYPES !== 'undefined' ? PLAN_EVENT_TYPES.find(t => t.id === ev.benefitId) : null;
             events.push(`🎁 [特典イベント] ${bInfo ? bInfo.name : 'イベント'}`);
           }
@@ -518,7 +519,9 @@ function renderGameCalendar() {
         releaseDates.add(plan.releaseDate);
       }
       (Array.isArray(plan.planEvents) ? plan.planEvents : []).forEach(event => {
-        if (event && event.date && !event.completed) planEventDates.add(event.date);
+        if (!event || event.completed) return;
+        const dates = Array.isArray(event.dates) && event.dates.length ? event.dates : [event.date];
+        dates.filter(Boolean).forEach(date => planEventDates.add(date));
       });
     });
   }
