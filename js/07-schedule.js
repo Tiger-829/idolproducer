@@ -313,10 +313,10 @@ function processPlayerLives(fromDate, toDate) {
       const determinedFans = Number.isFinite(entry.determinedFans) ? entry.determinedFans : firstDayFans;
       const currentStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
 
-      const salesCap = 5000 * (firstDayFans * 3 - determinedFans * 2);
-      const stockCap = 5000 * currentStock;
+      const salesCap = MERCHANDISE_UNIT_PRICE * (firstDayFans * 3 - determinedFans * 2);
+      const stockCap = MERCHANDISE_UNIT_PRICE * currentStock;
       const goodsRevenue = Math.max(0, Math.min(salesCap, stockCap));
-      const unitsSoldCalc = Math.round(goodsRevenue / 5000);
+      const unitsSoldCalc = Math.round(goodsRevenue / MERCHANDISE_UNIT_PRICE);
 
       merchandiseStock = Math.max(0, currentStock - (firstDayFans * 3 + determinedFans * 2));
       merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;

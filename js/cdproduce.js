@@ -6,12 +6,12 @@
 // 「合計制作費 ÷ 基本費用」を初週売上のバフとして適用する。
 
 // --- 基本設定 ---
-const CD_PRODUCTION_BASE_COST = 360000000; // 基本費用 3億6000万
+const CD_PRODUCTION_BASE_COST = 36000000; // 基本費用 3600万
 
-const CD_TRACK_COST = 20000000;           // 曲製作費 2000万/曲
-const CD_MV_LOCATION_COST = 40000000;     // MVロケ地費用 4000万/曲
-const CD_MV_PRODUCTION_COST = 30000000;    // MV制作費用 3000万/曲
-const CD_COSTUME_COST = 10000000;         // 衣装費 1000万/曲
+const CD_TRACK_COST = 2000000;            // 曲製作費 200万/曲
+const CD_MV_LOCATION_COST = 4000000;      // MVロケ地費用 400万/曲
+const CD_MV_PRODUCTION_COST = 3000000;    // MV制作費用 300万/曲
+const CD_COSTUME_COST = 1000000;          // 衣装費 100万/曲
 
 const CD_TRACK_MIN = 4;                   // 収録曲数の下限
 const CD_TRACK_MAX = 7;                   // 収録曲数の上限

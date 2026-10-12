@@ -299,12 +299,12 @@ const VENUE_TIER_PRICE_RATE = { SS: 1.15, S: 1.1, A: 1.05, B: 1, C: 0.95, D: 0.9
 const VENUE_TIER_DEFAULT_PRICE_RATE = 1;
 
 const OFFICE_FACILITIES = [
-  { id: 'lessons', name: 'レッスン', baseCost: 750000, baseMaintenance: 300000, effect: 'レッスン効果を強化' },
-  { id: 'dormitory', name: '寮', baseCost: 1200000, baseMaintenance: 200000, effect: '育成時の体力回復を強化' },
-  { id: 'analytics', name: 'データ分析', baseCost: 1500000, baseMaintenance: 250000, effect: 'グループ危機回避力を強化' },
-  { id: 'snsTraining', name: 'SNS教育', baseCost: 1000000, baseMaintenance: 200000, effect: 'SNS運用と危機回避力を強化' },
-  { id: 'liveProduction', name: 'ライブ演出', baseCost: 1800000, baseMaintenance: 150000, effect: 'ライブ動員を強化' },
-  { id: 'merchandise', name: 'グッズ', baseCost: 1000000, baseMaintenance: 150000, effect: 'ライブでのグッズ収益を強化' }
+  { id: 'lessons', name: 'レッスン', baseCost: 750000, baseMaintenance: 1200000, effect: 'レッスン効果を強化' },
+  { id: 'dormitory', name: '寮', baseCost: 1200000, baseMaintenance: 1400000, effect: '育成時の体力回復を強化' },
+  { id: 'analytics', name: 'データ分析', baseCost: 1500000, baseMaintenance: 1600000, effect: 'グループ危機回避力を強化' },
+  { id: 'snsTraining', name: 'SNS教育', baseCost: 1000000, baseMaintenance: 1300000, effect: 'SNS運用と危機回避力を強化' },
+  { id: 'liveProduction', name: 'ライブ演出', baseCost: 1800000, baseMaintenance: 1800000, effect: 'ライブ動員を強化' },
+  { id: 'merchandise', name: 'グッズ', baseCost: 1000000, baseMaintenance: 1200000, effect: 'ライブでのグッズ収益を強化' }
 ];
 
 const INDIVIDUAL_EVENT_PROFILES = {
@@ -475,6 +475,7 @@ const LIVE_FATIGUE_WEEKLY_DECAY = 20;
 let weeklyRecoveryDone = false;
 let lastLiveDate = '';
 
+const MERCHANDISE_UNIT_PRICE = 4000;
 const INITIAL_FUNDS = 100000000;
 const PRESET_RELEASE_MONTHS = [2, 6];
 const PRESET_RELEASE_TYPE = 'single';
