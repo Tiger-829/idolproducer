@@ -314,7 +314,7 @@ function renderLiveMaxAudienceRanking() {
     ? topLive.map((item, idx) => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #eee; font-size:12px;">
           <span><strong>${idx + 1}.</strong> ${escapeHtml(item.venueName)} <small style="color:#777;">(${escapeHtml(item.date)})</small></span>
-          <span style="font-weight:bold; color:#1976d2;">${item.dailyAudience.toLocaleString()} 人/日</span>
+          <span style="font-weight:bold; color:#1976d2;">${item.dailyAudience.toLocaleString()} 人</span>
         </div>
       `).join('')
     : '<div class="chart-empty">まだライブ開催の実績がありません</div>';

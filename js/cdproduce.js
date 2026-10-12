@@ -6,12 +6,12 @@
 // 「合計制作費 ÷ 基本費用」を初週売上のバフとして適用する。
 
 // --- 基本設定 ---
-const CD_PRODUCTION_BASE_COST = 36000000; // 基本費用 3600万
+const CD_PRODUCTION_BASE_COST = 360000000; // 基本費用 3億6000万
 
-const CD_TRACK_COST = 2000000;            // 曲製作費 200万/曲
-const CD_MV_LOCATION_COST = 4000000;      // MVロケ地費用 400万/曲
-const CD_MV_PRODUCTION_COST = 3000000;    // MV制作費用 300万/曲
-const CD_COSTUME_COST = 1000000;          // 衣装費 100万/曲
+const CD_TRACK_COST = 20000000;           // 曲製作費 2000万/曲
+const CD_MV_LOCATION_COST = 40000000;     // MVロケ地費用 4000万/曲
+const CD_MV_PRODUCTION_COST = 30000000;    // MV制作費用 3000万/曲
+const CD_COSTUME_COST = 10000000;         // 衣装費 1000万/曲
 
 const CD_TRACK_MIN = 4;                   // 収録曲数の下限
 const CD_TRACK_MAX = 7;                   // 収録曲数の上限
@@ -231,6 +231,30 @@ function onCdTrackPerformanceTypeChange(index) {
   renderCdProductionModal();
 }
 
+function getCdMemberSortKey() {
+  const keys = typeof SELECTION_SORT_KEYS !== 'undefined' ? SELECTION_SORT_KEYS : [];
+  return keys.find(key => key.id === cdProductionModalState?.memberSortKey) || keys[0] || null;
+}
+
+function onCdMemberSortChange() {
+  const keyEl = document.getElementById('cd-member-sort-key');
+  const orderEl = document.getElementById('cd-member-sort-order');
+  if (!cdProductionModalState || !keyEl || !orderEl) return;
+  cdProductionModalState.memberSortKey = keyEl.value;
+  cdProductionModalState.memberSortDesc = orderEl.value !== 'asc';
+  renderCdProductionModal();
+}
+
+function sortCdMembers(members) {
+  const key = getCdMemberSortKey();
+  if (!key) return members;
+  const dir = cdProductionModalState?.memberSortDesc === false ? 1 : -1;
+  return [...members].sort((a, b) => {
+    const diff = ((Number(key.get(a)) || 0) - (Number(key.get(b)) || 0)) * dir;
+    return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
+  });
+}
+
 function getCdTrackEligibleMembers(track) {
   if (track.performanceType === 'under') return idolRoster.filter(member => !member.isSelected);
   if (track.performanceType === 'senbatsu') return idolRoster.filter(member => member.isSelected);
@@ -285,8 +309,9 @@ function renderCdProductionModal() {
     const locked = i === 0;
     const canAddMv = track.useMv || mvTrackCount < mvMax;
     const eligibleMembers = getCdTrackEligibleMembers(track);
-    const renderMemberOptions = selectedId => eligibleMembers.map(member =>
-      `<option value="${member.id}" ${member.id === selectedId ? 'selected' : ''}>${escapeHtml(formatMemberDisplayName(member))}</option>`
+    const sortKey = getCdMemberSortKey();
+    const renderMemberOptions = selectedId => sortCdMembers(eligibleMembers).map(member =>
+      `<option value="${member.id}" ${member.id === selectedId ? 'selected' : ''}>${escapeHtml(formatMemberDisplayName(member))}${sortKey ? `（${escapeHtml(sortKey.name)} ${Number(sortKey.get(member)) || 0}）` : ''}</option>`
     ).join('');
     const memberSelection = track.performanceType === 'under' || track.performanceType === 'all'
       ? `<label style="flex:1; font-size:10px; font-weight:bold; color:#555;">センター
@@ -347,6 +372,18 @@ function renderCdProductionModal() {
         </label>
       </div>
       <div style="margin-bottom:10px;">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px; font-size:10px; font-weight:bold; color:#555;">
+          <span>センター／歌唱メンバーの並び替え</span>
+          <select id="cd-member-sort-key" onchange="onCdMemberSortChange()" style="padding:4px; font-size:11px;">
+            ${(typeof SELECTION_SORT_KEYS !== 'undefined' ? SELECTION_SORT_KEYS : []).map(key =>
+              `<option value="${key.id}" ${getCdMemberSortKey()?.id === key.id ? 'selected' : ''}>${escapeHtml(key.name)}</option>`
+            ).join('')}
+          </select>
+          <select id="cd-member-sort-order" onchange="onCdMemberSortChange()" style="padding:4px; font-size:11px;">
+            <option value="desc" ${cfg.memberSortDesc === false ? '' : 'selected'}>降順</option>
+            <option value="asc" ${cfg.memberSortDesc === false ? 'selected' : ''}>昇順</option>
+          </select>
+        </div>
         <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:4px;">各曲の内容</div>
         <p style="font-size:10px; color:#888; margin:0 0 5px;">MVを付ける場合は3〜${mvMax}曲選択してください。</p>
         ${trackRows}

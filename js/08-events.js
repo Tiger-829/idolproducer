@@ -1330,7 +1330,7 @@ function getSongLevelExpProgress(song) {
   return Math.min(1, current / getSongLevelExpRequired(song.level));
 }
 
-const SONG_UNIT_PRICE = { single: 300, album: 600 };
+const SONG_UNIT_PRICE = { single: 1200, album: 2400 };
 function getSongUnitPrice(song) {
   return SONG_UNIT_PRICE[song?.releaseType] || SONG_UNIT_PRICE.single;
 }
@@ -1342,8 +1342,8 @@ const PROMO_DIVISOR_NORMAL = 10;
 const PROMO_DIVISOR_PAST_WORK = 100;
 const CD_REVENUE_MONTHLY_SHARE = 0.8;
 const TIE_UPS = [
-  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 500, popularityGain: 2, songExperience: 4 },
-  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 1500, popularityGain: 1, songExperience: 10 }
+  { id: 'magazine', name: '雑誌掲載', chance: 0.28, revenuePerFan: 50, popularityGain: 2, songExperience: 4 },
+  { id: 'tv', name: 'TVタイアップ', chance: 0.18, revenuePerFan: 100, popularityGain: 1, songExperience: 10 }
 ];
 
 function getPromotionCumulativeSales(baseSales, divisors) {

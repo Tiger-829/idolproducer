@@ -590,8 +590,8 @@ function getOfficeUpgradeCost(facility, level = (officeUpgrades?.[facility?.id] 
 }
 
 function getOfficeMaintenanceCost(facility, level = (officeUpgrades?.[facility?.id] || 1)) {
-  if (!facility || level <= 1 || !facility.baseMaintenance) return 0;
-  return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** (level - 2)));
+  if (!facility || !facility.baseMaintenance) return 0;
+  return Math.round(facility.baseMaintenance * (OFFICE_MAINTENANCE_GROWTH ** Math.max(0, level - 1)));
 }
 
 function upgradeOfficeFacility(facilityId) {
@@ -641,6 +641,7 @@ function maintainOfficeFacilities() {
   );
   if (!cost) return;
   funds -= cost;
+  if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('設備維持費', cost);
   if (funds < 0) setLog(`【維持費】事務所設備の週維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
 }
 

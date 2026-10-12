@@ -144,11 +144,10 @@ function setSelectionSort(sortKey) {
 
 // 選抜画面を項目順に並べる（元の並びは崩さない）
 function sortSelectionMembers(members) {
-  const key = SELECTION_SORT_KEYS.find(entry => entry.id === pendingSelectionEvent?.sortKey);
-  if (!key) return members;
-  const dir = pendingSelectionEvent.sortDesc === false ? 1 : -1;
+  const key = SELECTION_SORT_KEYS.find(entry => entry.id === pendingSelectionEvent?.sortKey) || SELECTION_SORT_KEYS[0];
+  const dir = pendingSelectionEvent?.sortDesc === false ? 1 : -1;
   return [...members].sort((a, b) => {
-    const diff = (Number(key.get(a)) - Number(key.get(b))) * dir;
+    const diff = ((Number(key.get(a)) || 0) - (Number(key.get(b)) || 0)) * dir;
     return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
   });
 }
@@ -198,7 +197,7 @@ function renderSelectionModal() {
   }).join('');
 
   const confirmDisabled = ids.size < MIN_SELECTION_SIZE ? 'disabled' : '';
-  const activeSortKey = event.sortKey || '';
+  const activeSortKey = sortKey.id;
   const sortBar = `
     <div class="draft-sort-bar">
       <span class="draft-sort-label">並び替え</span>
