@@ -47,13 +47,7 @@ function setRosterSort(key) {
 
 // メンバーDisplay名前を整形する。
 function formatMemberDisplayName(member) {
-  const name = String(member?.name || '');
-  const reading = String(member?.reading || '');
-  if (!reading) return name;
-  const spaceIndex = name.indexOf(' ');
-  const givenName = spaceIndex >= 0 ? name.slice(spaceIndex + 1) : name;
-  const hasKanaInName = /[\u3041-\u3096\u309D-\u309F]/.test(givenName);
-  return hasKanaInName ? name : `${name}（${reading}）`;
+  return String(member?.name || '');
 }
 
 // ロースター名前Barを描画する。
