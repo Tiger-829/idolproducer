@@ -148,7 +148,7 @@ function sortSelectionMembers(members) {
   if (!key) return members;
   const dir = pendingSelectionEvent.sortDesc === false ? 1 : -1;
   return [...members].sort((a, b) => {
-    const diff = (key.get(a) - key.get(b)) * dir;
+    const diff = (Number(key.get(a)) - Number(key.get(b))) * dir;
     return diff !== 0 ? diff : a.name.localeCompare(b.name, 'ja');
   });
 }
@@ -162,6 +162,7 @@ function renderSelectionModal() {
   const title = isRelease && event.month
     ? `選抜発表（${event.year}年${event.month}月発売）`
     : '選抜・センターを変更';
+  const sortKey = SELECTION_SORT_KEYS.find(key => key.id === event.sortKey) || SELECTION_SORT_KEYS[0];
 
   const centerOptions = [...ids].map(id => idolRoster.find(member => member.id === id)).filter(Boolean);
   const centerMember = centerOptions.find(member => member.id === event.centerId);
@@ -182,6 +183,7 @@ function renderSelectionModal() {
 
   const memberRows = sortSelectionMembers(idolRoster).map(member => {
     const overall = calculateSingleOverall(member.stats);
+    const sortValue = Number(sortKey.get(member)) || 0;
     const rInfo = getRankData(overall);
     const selected = ids.has(member.id);
     return `
@@ -190,7 +192,7 @@ function renderSelectionModal() {
         <span class="selection-check">${selected ? '✓' : ''}</span>
         <span class="selection-name">${escapeHtml(formatMemberDisplayName(member))}${member.isCenter ? '<i class="selection-crown">C</i>' : ''}</span>
         <span class="selection-meta">${member.age}歳 / 体力${member.staminaValue}${member.injury ? ` / ${escapeHtml(member.injury.type)} ${escapeHtml(formatInjuryWeeks(member.injury))}` : ''}</span>
-        <span class="selection-score" style="color:${rInfo.color};">${overall}</span>
+        <span class="selection-score" style="color:${rInfo.color};" title="${escapeHtml(sortKey.name)}">${sortValue}</span>
       </button>
     `;
   }).join('');

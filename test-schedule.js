@@ -1701,12 +1701,16 @@ check('each selection sort criterion orders the list both ways', run(`
     SELECTION_SORT_KEYS.forEach(key => {
       const readValues = () => [...document.querySelectorAll('#selection-modal .selection-member')]
         .map(el => key.get(idolRoster.find(m => m.id === Number(el.dataset.memberId))));
+      const readDisplayedValues = () => [...document.querySelectorAll('#selection-modal .selection-score')]
+        .map(el => Number(el.textContent));
       setSelectionSort(key.id);
       const desc = readValues();
+      const displayed = readDisplayedValues();
       setSelectionSort(key.id);
       const asc = readValues();
       results[key.id] = desc.every((v, i) => i === 0 || desc[i - 1] >= v)
-        && asc.every((v, i) => i === 0 || asc[i - 1] <= v);
+        && asc.every((v, i) => i === 0 || asc[i - 1] <= v)
+        && desc.every((v, i) => displayed[i] === v);
     });
     cancelSelection();
     return Object.values(results).every(Boolean);

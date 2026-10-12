@@ -43,7 +43,9 @@ function createDefaultCdTrack(index, name = '') {
     role: index === 0 ? 'lead' : 'normal',
     locked: index === 0,
     useMv: false,
-    performanceType: 'senbatsu'
+    performanceType: 'senbatsu',
+    performanceCenterId: null,
+    performanceMemberIds: []
   };
 }
 
@@ -85,6 +87,8 @@ function prepareCdProductionForModal(cdProduction) {
     if (!CD_PERFORMANCE_TYPES.some(type => type.id === track.performanceType)) {
       track.performanceType = legacyPerformanceType;
     }
+    if (!Array.isArray(track.performanceMemberIds)) track.performanceMemberIds = [];
+    if (track.performanceCenterId == null) track.performanceCenterId = null;
     track.role = index === 0 ? 'lead' : 'normal';
     track.locked = index === 0;
   });
@@ -222,6 +226,28 @@ function onCdTrackPerformanceTypeChange(index) {
   const track = cdProductionModalState?.tracks[index];
   if (!el || !track) return;
   track.performanceType = el.value;
+  track.performanceCenterId = null;
+  track.performanceMemberIds = [];
+  renderCdProductionModal();
+}
+
+function getCdTrackEligibleMembers(track) {
+  if (track.performanceType === 'under') return idolRoster.filter(member => !member.isSelected);
+  if (track.performanceType === 'senbatsu') return idolRoster.filter(member => member.isSelected);
+  return idolRoster;
+}
+
+function onCdTrackPerformanceMemberChange(index, role) {
+  const el = document.getElementById(`cd-track-${role}-${index}`);
+  const track = cdProductionModalState?.tracks[index];
+  if (!el || !track) return;
+  const memberId = el.value ? Number(el.value) : null;
+  if (role === 'center') {
+    track.performanceCenterId = memberId;
+  } else {
+    track.performanceMemberIds = memberId == null ? [] : [memberId];
+  }
+  renderCdProductionModal();
 }
 
 function onCdTrackCountChange() {
@@ -258,6 +284,27 @@ function renderCdProductionModal() {
   const trackRows = cfg.tracks.map((track, i) => {
     const locked = i === 0;
     const canAddMv = track.useMv || mvTrackCount < mvMax;
+    const eligibleMembers = getCdTrackEligibleMembers(track);
+    const renderMemberOptions = selectedId => eligibleMembers.map(member =>
+      `<option value="${member.id}" ${member.id === selectedId ? 'selected' : ''}>${escapeHtml(formatMemberDisplayName(member))}</option>`
+    ).join('');
+    const memberSelection = track.performanceType === 'under' || track.performanceType === 'all'
+      ? `<label style="flex:1; font-size:10px; font-weight:bold; color:#555;">センター
+          <select id="cd-track-center-${i}" onchange="onCdTrackPerformanceMemberChange(${i}, 'center')"
+            style="width:100%; padding:5px; font-size:11px; margin-top:2px;">
+            <option value="">センターを選択</option>
+            ${renderMemberOptions(track.performanceCenterId)}
+          </select>
+        </label>`
+      : track.performanceType === 'solo'
+      ? `<label style="flex:1; font-size:10px; font-weight:bold; color:#555;">歌唱メンバー
+          <select id="cd-track-member-${i}" onchange="onCdTrackPerformanceMemberChange(${i}, 'member')"
+            style="width:100%; padding:5px; font-size:11px; margin-top:2px;">
+            <option value="">歌唱メンバーを選択</option>
+            ${renderMemberOptions(track.performanceMemberIds[0])}
+          </select>
+        </label>`
+      : '';
     return `
       <div style="padding:7px; margin-bottom:6px; border:1px solid #eee; border-radius:5px;">
         <div style="font-size:11px; color:#888; margin-bottom:4px;">${i === 0 ? 'リード曲' : `曲${i + 1}`}</div>
@@ -282,6 +329,7 @@ function renderCdProductionModal() {
             </select>
           </label>
         </div>
+        ${memberSelection ? `<div style="display:flex; gap:8px; margin-top:5px;">${memberSelection}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -324,6 +372,21 @@ function renderCdProductionModal() {
 }
 
 function confirmCdProduction() {
+  const invalidTrack = cdProductionModalState.tracks.find(track => {
+    if (track.performanceType === 'under' || track.performanceType === 'all') {
+      return !getCdTrackEligibleMembers(track).some(member => member.id === track.performanceCenterId);
+    }
+    if (track.performanceType === 'solo') {
+      return !idolRoster.some(member => member.id === track.performanceMemberIds[0]);
+    }
+    return false;
+  });
+  if (invalidTrack) {
+    const trackIndex = cdProductionModalState.tracks.indexOf(invalidTrack) + 1;
+    const role = invalidTrack.performanceType === 'solo' ? '歌唱メンバー' : 'センター';
+    setLog(`【CD制作】曲${trackIndex}の${role}を選択してください。`);
+    return;
+  }
   const cost = calculateCdProductionCost(cdProductionModalState);
   if (cost.useMv && (cost.mvTrackCount < CD_MV_TRACK_MIN || cost.mvTrackCount > Math.min(CD_MV_TRACK_MAX, cost.trackCount))) {
     setLog(`【CD制作】MVを付ける曲数は3〜${Math.min(CD_MV_TRACK_MAX, cost.trackCount)}曲にしてください。`);

@@ -53,6 +53,49 @@ check('CD通常会費 = 基本+曲+衣装+MV(5曲/MV3曲) = 72,000,000', cdCost 
 const cdCostNoCd = run('getCdPlanStandardCost({})');
 check('CD通常会費(未設定) = 基本費用 36,000,000', cdCostNoCd === 36000000, `got ${cdCostNoCd}`);
 
+// --- CD披露メンバーの選定 ---
+const cdPerformanceSelection = run(`
+  (() => {
+    const originalSelection = idolRoster.map(member => [member, member.isSelected]);
+    const selected = idolRoster.slice(0, 3);
+    idolRoster.forEach(member => { member.isSelected = selected.includes(member); });
+    const underMember = idolRoster.find(member => !member.isSelected);
+    const soloMember = idolRoster[0];
+    const cfg = createDefaultCdProduction('リード曲');
+    openCdProductionModal(cfg);
+    const typeSelect = document.getElementById('cd-track-performance-type-1');
+    typeSelect.value = 'under';
+    onCdTrackPerformanceTypeChange(1);
+    const underOptions = [...document.querySelectorAll('#cd-track-center-1 option')].map(option => Number(option.value));
+    const hasUnderOptionsOnly = underOptions.includes(underMember.id)
+      && !selected.some(member => underOptions.includes(member.id));
+    const underCenter = document.getElementById('cd-track-center-1');
+    underCenter.value = String(underMember.id);
+    onCdTrackPerformanceMemberChange(1, 'center');
+    const savedUnderCenter = cdProductionModalState.tracks[1].performanceCenterId === underMember.id;
+
+    const allType = document.getElementById('cd-track-performance-type-2');
+    allType.value = 'all';
+    onCdTrackPerformanceTypeChange(2);
+    const allCenterOptions = [...document.querySelectorAll('#cd-track-center-2 option')].map(option => Number(option.value));
+    const hasAllRosterOptions = idolRoster.every(member => allCenterOptions.includes(member.id));
+
+    const soloType = document.getElementById('cd-track-performance-type-3');
+    soloType.value = 'solo';
+    onCdTrackPerformanceTypeChange(3);
+    const soloOptions = [...document.querySelectorAll('#cd-track-member-3 option')].map(option => Number(option.value));
+    const hasSoloSingerOptions = soloOptions.includes(soloMember.id);
+    const soloSinger = document.getElementById('cd-track-member-3');
+    soloSinger.value = String(soloMember.id);
+    onCdTrackPerformanceMemberChange(3, 'member');
+    const savedSoloSinger = cdProductionModalState.tracks[3].performanceMemberIds[0] === soloMember.id;
+    originalSelection.forEach(([member, wasSelected]) => { member.isSelected = wasSelected; });
+    closeCdProductionModal();
+    return hasUnderOptionsOnly && savedUnderCenter && hasAllRosterOptions && hasSoloSingerOptions && savedSoloSinger;
+  })()
+`);
+check('CD内訳でアンダー／全員曲のセンターとソロ歌唱者を選べる', cdPerformanceSelection);
+
 // --- 2. ライブ通常会費ヘルパー（会場費＋配信費）---
 const liveStandard = run(`
   (() => {
