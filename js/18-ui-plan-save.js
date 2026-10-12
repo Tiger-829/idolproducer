@@ -235,7 +235,7 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, pr
           ${isStream ? 'checked' : ''} onchange="updateShowDateNote(${month}, ${index})">
         配信あり
       </label>` : ''}
-      <button class="danger-btn" type="button" onclick="removeShowDate(${month}, ${index}, ${dateIndex}, '${prefix}')">削除</button>
+      <button class="danger-btn" type="button" onclick="removeShowDate(${month}, ${index}, ${dateIndex}, '${prefix}', this)">削除</button>
     </div>`;
 }
 
@@ -494,6 +494,7 @@ function readEventSlotInputs(month) {
     }
 
     return {
+      slotIndex: index,
       name: firstSession.name,
       benefitId: BENEFIT_EVENT_TYPE_OPTIONS.find(option => option.name === firstSession.name)?.id || 'online-meeguri',
       venue: firstSession.venue,
@@ -511,7 +512,7 @@ function readEventSlotInputs(month) {
 function updateShowDateNote(month, index) {
   const note = document.getElementById(`show-date-note-${month}-${index}`);
   if (!note) return;
-  const slotEl = document.querySelector(`.live-slot[data-slot-index="${index}"]`);
+  const slotEl = document.querySelector(`#live-slots-${month} .live-slot[data-slot-index="${index}"]`);
   const venueSelect = document.getElementById(`sel-ven-${month}-${index}`);
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const venue = venues.find(item => item.name === (venueSelect ? venueSelect.value : ''));
@@ -520,15 +521,15 @@ function updateShowDateNote(month, index) {
     return;
   }
 
-  const dateInputs = slotEl ? slotEl.querySelectorAll('.show-date-input') : [];
-  const streamInputs = slotEl ? slotEl.querySelectorAll('.show-stream-input') : [];
+  const rows = slotEl ? slotEl.querySelectorAll('.show-date-row') : [];
   const dates = [];
   let streamCount = 0;
 
-  dateInputs.forEach((dInput, dIdx) => {
-    if (dInput.value) {
+  rows.forEach(row => {
+    const dInput = row.querySelector('.show-date-input');
+    if (dInput && dInput.value) {
       dates.push(dInput.value);
-      if (streamInputs[dIdx] && streamInputs[dIdx].checked) streamCount++;
+      if (row.querySelector('.show-stream-input')?.checked) streamCount++;
     }
   });
 
@@ -544,7 +545,7 @@ function updateShowDateNote(month, index) {
 function updateEventDateNote(month, index) {
   const note = document.getElementById(`event-date-note-${month}-${index}`);
   if (!note) return;
-  const slotEl = document.querySelector(`.plan-event-slot[data-event-slot-index="${index}"]`);
+  const slotEl = document.querySelector(`#plan-events-${month} .plan-event-slot[data-event-slot-index="${index}"]`);
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
   const sessions = slotEl ? Array.from(slotEl.querySelectorAll('.event-session')).map((sessionEl, sessionIndex) => {
     const name = document.getElementById(`event-name-${month}-${index}-${sessionIndex}`)?.value || BENEFIT_EVENT_TYPE_OPTIONS[0].name;
@@ -554,7 +555,7 @@ function updateEventDateNote(month, index) {
   }).filter(session => session.dates.length || session.venue) : [];
   const summaries = sessions.map(session => {
     const exp = calculateEventExpenses(session.name, session.venue, session.dates);
-    return `${session.dates.length}日 (${session.venue?.name || '会場未選択'}) / 合計 ${formatMoney(exp.totalCost)}`;
+    return `${session.venue?.name || '会場未選択'} / ${formatMoney(exp.venueFee)}`;
   });
   note.innerHTML = summaries.length ? summaries.join('<br>') : '開催日と会場を設定してください';
   renderEmbeddedPlanCalendars();
@@ -608,12 +609,15 @@ function splitEventSessions(month, index) {
 }
 
 // 日付を表示する。
-function removeShowDate(month, index, dateIndex, prefix = 'show') {
-  const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-show-dates-${month}-${index}`);
-  if (!container) return;
+function removeShowDate(month, index, dateIndex, prefix = 'show', button = null) {
   const rowClass = prefix === 'show' ? 'show-date-row' : 'event-show-date-row';
-  const row = container.querySelector(`.${rowClass}[data-show-index="${dateIndex}"]`);
-  if (row) row.remove();
+  let row = button ? button.closest(`.${rowClass}`) : null;
+  if (!row) {
+    const container = document.getElementById(prefix === 'show' ? `show-dates-${month}-${index}` : `event-sessions-${month}-${index}`);
+    row = container ? container.querySelector(`.${rowClass}[data-show-index="${dateIndex}"]`) : null;
+  }
+  if (!row) return;
+  row.remove();
   if (prefix === 'show') updateShowDateNote(month, index);
   else updateEventDateNote(month, index);
   renderEmbeddedPlanCalendars();
@@ -712,6 +716,11 @@ function addPlanEvent(month) {
 // 計画イベントを削除する。
 function removePlanEvent(month, index) {
   const drafts = getPlanMonthEventDrafts(month);
+  // 入力途中の内容を失わないよう、再描画前に現在の入力値を下書きへ反映する
+  readEventSlotInputs(month).forEach(input => {
+    const { slotIndex, ...draft } = input;
+    if (slotIndex >= 0 && slotIndex < drafts.length) drafts[slotIndex] = draft;
+  });
   if (index >= 0 && index < drafts.length) {
     drafts.splice(index, 1);
   }
@@ -1676,7 +1685,7 @@ function saveDecisionPlan() {
       release,
       songName: songName || null,
       releaseDate: release === 'none' ? null : (getPlanReleaseDate(m) || null),
-      planEvents: eventSlots.map(item => ({ ...item })),
+      planEvents: eventSlots.map(({ slotIndex, ...item }) => ({ ...item })),
       liveVenue: primary ? primary.liveVenue : null,
       liveName: primary ? (primary.liveName || primary.liveVenue) : null,
       liveDate: primary ? (primary.liveDate || null) : null,

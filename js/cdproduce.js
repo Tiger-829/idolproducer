@@ -154,7 +154,14 @@ function getLivePlanStandardCost(live) {
 
 // --- 通常会費（その他イベント = 会場費のみ）---
 function getEventPlanStandardCost(ev, eventDates = null) {
-  if (!ev || !ev.venue) return 0;
+  if (!ev) return 0;
+  if (!eventDates && Array.isArray(ev.sessions) && ev.sessions.length) {
+    return ev.sessions.reduce((sum, session) => sum + getEventPlanStandardCost(
+      { venue: session.venue, dates: session.dates },
+      (session.dates || []).filter(Boolean)
+    ), 0);
+  }
+  if (!ev.venue) return 0;
   const venue = (typeof VENUE_DATA !== 'undefined') ? VENUE_DATA.find(v => v.name === ev.venue) : null;
   if (!venue || typeof getVenueFeePerShow !== 'function') return 0;
   const dates = (Array.isArray(eventDates) && eventDates.length > 0)
