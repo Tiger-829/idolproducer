@@ -538,6 +538,9 @@ function levelUpManagerSkill(managerId, skillId) {
   const cost = getManagerSkillUpCost(manager, skillId);
   if (cost === null || funds < cost) return;
   funds -= cost;
+  if (typeof recordMonthlyExpense === 'function') {
+    recordMonthlyExpense('マネージャー育成費', cost, `${manager.name}の能力強化`);
+  }
   manager.skills[skillId] += 1;
   updateUI();
 }
@@ -574,6 +577,9 @@ function hireManagerFromMarket(candidateId) {
     return;
   }
   funds -= MANAGER_HIRE_COST;
+  if (typeof recordMonthlyExpense === 'function') {
+    recordMonthlyExpense('マネージャー採用費', MANAGER_HIRE_COST, `${candidate.name}の採用`);
+  }
   managers.push({
     id: `manager-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
     name: candidate.name,
@@ -599,6 +605,9 @@ function fireManager(managerId) {
   }
   if (!confirm(`解雇料 ${formatMoney(cost)} を支払って解雇しますか？`)) return;
   funds -= cost;
+  if (typeof recordMonthlyExpense === 'function') {
+    recordMonthlyExpense('マネージャー解雇料', cost, `${managers[index].name}の契約終了`);
+  }
   managers.splice(index, 1);
   updateUI();
 }

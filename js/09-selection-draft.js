@@ -327,6 +327,7 @@ function executeYearEndAwards() {
   if (isCdTop) {
     report += " ★★★ 栄冠！ 年間売上300万枚＆動員1位で【CD大賞】を受賞しました！ ★★★\n";
     funds += 50000000;
+    recordMonthlyIncome('CD大賞受賞賞金', 50000000, '年間売上300万枚以上かつ年間動員1位');
   }
   if (inKohaku) adjustTargetPopularity(Math.round(REGULAR_PROGRAM_POPULARITY * 3));
   alert(report);
@@ -429,6 +430,8 @@ function runGraduationPlan(member, choice, regularVenueName) {
     const productionCost = copies * 1200 + 500000;
     const profit = revenue - productionCost;
     funds += profit;
+    recordMonthlyIncome('卒業グッズ売上', revenue, `${member.name}の卒業記念グッズ ${copies.toLocaleString()}個`);
+    recordMonthlyExpense('卒業グッズ制作費', productionCost, `${member.name}の卒業記念グッズ制作`);
     setLog(`【卒業グッズ】${member.name}のグッズを${copies.toLocaleString()}個制作（収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);
     return;
   }
@@ -443,6 +446,7 @@ function runGraduationPlan(member, choice, regularVenueName) {
   const venueFee = Math.floor(capacity * feeRate);
   if (isCeremony) {
     funds -= venueFee;
+    recordMonthlyExpense('卒業セレモニー会場費', venueFee, `${member.name}の卒業セレモニー（${venue.name}）`);
     setLog(`【卒業セレモニー】${member.name}を常設ライブ内で送り出しました（${venue.name} / 会場利用料 ${formatMoney(venueFee)}）。`);
     return;
   }
@@ -454,6 +458,8 @@ function runGraduationPlan(member, choice, regularVenueName) {
   const revenue = audience * 8000;
   const profit = revenue - venueFee;
   funds += profit;
+  recordMonthlyIncome('卒業コンサート・チケット売上', revenue, `${member.name}の卒業コンサート（${venue.name} / ${audience.toLocaleString()}人）`);
+  recordMonthlyExpense('卒業コンサート会場費', venueFee, `${venue.name}の利用料`);
   yearlyStats.audience += audience;
   const eventName = choice === 3 ? '常設ライブ追加の卒業コンサート' : '単独卒業コンサート';
   setLog(`【${eventName}】${member.name}（${venue.name} / 動員 ${audience.toLocaleString()}人 / 会場利用料 ${formatMoney(venueFee)} / 収支 ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);

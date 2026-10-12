@@ -180,7 +180,9 @@ function deductCdProductionCostIfDue(plan) {
   const cost = calculateCdProductionCost(plan.cdProduction).totalCost;
   plan.cdProduction.costDeducted = true;
   funds -= cost;
-  if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('CD制作費', cost);
+  if (typeof recordMonthlyExpense === 'function') {
+    recordMonthlyExpense('CD制作費', cost, `${plan.cdProduction.title || '発売予定CD'}の制作費`);
+  }
   return cost;
 }
 

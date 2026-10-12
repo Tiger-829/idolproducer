@@ -71,6 +71,35 @@ check('monthly report displays a finalized ledger without detail arrays', run(`
     }
   })()
 `) === true);
+check('monthly report itemizes income and expenses with their reasons', run(`
+  (() => {
+    const modal = document.getElementById('monthly-report-modal');
+    const saved = {
+      modalDisplay: modal.style.display,
+      bodyHtml: document.getElementById('monthly-report-body').innerHTML
+    };
+    try {
+      showMonthlyReportModal({
+        year: 2027,
+        month: 1,
+        income: [{ label: 'ライブ・チケット売上', amount: 120000, detail: 'テストライブ（会場 / 10人）' }],
+        expense: [{ label: 'ライブ会場・設営費', amount: 30000, detail: 'テストライブの会場費' }]
+      });
+      const body = document.getElementById('monthly-report-body');
+      return body.textContent.includes('ライブ・チケット売上')
+        && body.textContent.includes('テストライブ（会場 / 10人）')
+        && body.textContent.includes('ライブ会場・設営費')
+        && body.textContent.includes('テストライブの会場費')
+        && body.textContent.includes('12万円')
+        && body.textContent.includes('30,000円')
+        && body.textContent.includes('収入の内訳')
+        && body.textContent.includes('支出の内訳');
+    } finally {
+      modal.style.display = saved.modalDisplay;
+      document.getElementById('monthly-report-body').innerHTML = saved.bodyHtml;
+    }
+  })()
+`) === true);
 check('fan history survives save and restore and is drawn again', run(`
   (() => {
     player.fanHistory = [
@@ -1740,7 +1769,7 @@ const reportProgress = JSON.parse(run(`
     try {
       gameDate = '2027-01-06';
       pendingReports = [];
-      pendingMonthlyReport = { year: 2027, month: 1, income: [], expense: [] };
+      pendingMonthlyReport = null;
       pendingSelectionEvent = null;
       pendingCrisisResponse = null;
       pendingFanClubEvent = null;
@@ -1780,9 +1809,64 @@ const reportProgress = JSON.parse(run(`
     }
   })()
 `));
-check('closing a midweek financial report resumes through the next Wednesday',
-  reportProgress.date === '2027-01-13' && reportProgress.weekday === 3 && reportProgress.closed,
+check('closing a manually opened midweek financial report does not advance time',
+  reportProgress.date === '2027-01-06' && reportProgress.weekday === 3 && reportProgress.closed,
   JSON.stringify(reportProgress));
+
+check('office calendar no longer offers a manual financial report button', run(`
+  renderGameCalendar();
+  !Array.from(document.querySelectorAll('#calendar-visual button'))
+    .some(button => button.textContent.includes('報告'))
+`));
+
+const monthlyFacilityMaintenance = JSON.parse(run(`
+  (() => {
+    const saved = {
+      funds,
+      monthlyLedger,
+      pendingMonthlyReport,
+      pendingReports,
+      officeUpgrades,
+      settleMonthlyIncome
+    };
+    try {
+      funds = 20000000;
+      monthlyLedger = createMonthlyLedger();
+      pendingMonthlyReport = null;
+      pendingReports = [];
+      officeUpgrades = {
+        lessons: 0,
+        dormitory: 2,
+        analytics: 0,
+        snsTraining: 0,
+        liveProduction: 0,
+        merchandise: 0
+      };
+      settleMonthlyIncome = () => {};
+      processMonthlyClosing(new Date('2027-01-30T12:00:00'), new Date('2027-01-31T12:00:00'));
+      const report = pendingReports[0]?.report;
+      return JSON.stringify({
+        funds,
+        expenses: report?.expense || [],
+        total: (report?.expense || []).reduce((sum, expense) => sum + expense.amount, 0)
+      });
+    } finally {
+      funds = saved.funds;
+      monthlyLedger = saved.monthlyLedger;
+      pendingMonthlyReport = saved.pendingMonthlyReport;
+      pendingReports = saved.pendingReports;
+      officeUpgrades = saved.officeUpgrades;
+      settleMonthlyIncome = saved.settleMonthlyIncome;
+    }
+  })()
+`));
+const maintenanceExpenses = monthlyFacilityMaintenance.expenses;
+check('month-end maintenance charges each facility at its current monthly rate',
+  maintenanceExpenses.length === 6
+    && maintenanceExpenses.some(expense => expense.label === '設備維持費（寮）' && expense.amount === 2240000)
+    && monthlyFacilityMaintenance.total === 9340000
+    && monthlyFacilityMaintenance.funds === 10660000,
+  JSON.stringify(monthlyFacilityMaintenance));
 
 const monthEndReportProgress = JSON.parse(run(`
   (() => {

@@ -573,7 +573,6 @@ function renderGameCalendar() {
           <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(-1)" ${canPrev ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canPrev ? 'pointer' : 'default'};">＜</button>
           <strong>${year}年${actualMonthNum}月</strong>
           <button type="button" class="ghost-btn small" onclick="shiftOfficeCalendarMonth(1)" ${canNext ? '' : 'disabled'} style="padding:2px 8px; font-size:12px; cursor:${canNext ? 'pointer' : 'default'};">＞</button>
-          <button type="button" class="ghost-btn small" onclick="showMonthlyReportModal('${year}-${actualMonthNum}')" style="padding:2px 8px; font-size:12px; margin-left:4px;">📋 報告</button>
         </div>
         <div class="calendar-grid">${cells}</div>
       </div>
@@ -607,6 +606,9 @@ function upgradeOfficeFacility(facilityId) {
     return;
   }
   funds -= cost;
+  if (typeof recordMonthlyExpense === 'function') {
+    recordMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`);
+  }
   if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level + 1;
   setLog(`【設備投資】${facility.name}をLv.${level + 1}に強化しました。`);
   updateUI();
@@ -627,22 +629,31 @@ function downgradeOfficeFacility(facilityId) {
     return;
   }
   const refund = getOfficeDowngradeRefund(facility, level);
-  if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n払い戻し額: ${formatMoney(refund)}\n（能力は低下し、週間維持費も下がります）`)) return;
+  if (!confirm(`${facility.name}をLv.${level - 1}にダウングレードしますか？\n払い戻し額: ${formatMoney(refund)}\n（能力は低下し、月額維持費も下がります）`)) return;
   if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level - 1;
   funds += refund;
+  if (refund > 0 && typeof recordMonthlyIncome === 'function') {
+    recordMonthlyIncome(`設備整理の払い戻し（${facility.name}）`, refund, `Lv.${level} → Lv.${level - 1} の整理`);
+  }
   setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（払い戻し額 ${formatMoney(refund)}）。`);
   updateUI();
 }
 
 function maintainOfficeFacilities() {
   if (typeof OFFICE_FACILITIES === 'undefined' || !Array.isArray(OFFICE_FACILITIES)) return;
-  const cost = OFFICE_FACILITIES.reduce((total, facility) =>
-    total + getOfficeMaintenanceCost(facility), 0
-  );
+  const costs = OFFICE_FACILITIES.map(facility => ({
+    facility,
+    cost: getOfficeMaintenanceCost(facility)
+  })).filter(item => item.cost > 0);
+  const cost = costs.reduce((total, item) => total + item.cost, 0);
   if (!cost) return;
   funds -= cost;
-  if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('設備維持費', cost);
-  if (funds < 0) setLog(`【維持費】事務所設備の週維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
+  if (typeof recordMonthlyExpense === 'function') {
+    costs.forEach(({ facility, cost: facilityCost }) =>
+      recordMonthlyExpense(`設備維持費（${facility.name}）`, facilityCost)
+    );
+  }
+  if (funds < 0) setLog(`【維持費】事務所設備の月額維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
 }
 
 function renderOfficeUpgrades() {
@@ -661,7 +672,7 @@ function renderOfficeUpgrades() {
       <div class="office-facility-row">
         <div>
           <div class="office-facility-name">${facility.name} Lv.${level}${isMax ? '（MAX）' : ''}</div>
-          <div class="office-facility-meta">${facility.effect}<br>現在の週維持費 ${formatMoney(currentMaintenance)}${isMax ? '' : ` / 強化後 ${formatMoney(nextMaintenance)}`}</div>
+          <div class="office-facility-meta">${facility.effect}<br>現在の月額維持費 ${formatMoney(currentMaintenance)}${isMax ? '' : ` / 強化後 ${formatMoney(nextMaintenance)}`}</div>
         </div>
         <div class="facility-actions">
           <div class="facility-action-label">

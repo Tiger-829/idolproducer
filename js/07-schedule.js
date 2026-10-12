@@ -324,6 +324,20 @@ function processPlayerLives(fromDate, toDate) {
       const grossRevenue = grandTotalTicketRevenue + goodsRevenue + grandTotalStreamRevenue;
       const profit = grossRevenue - expenses.totalCost;
 
+      const liveDescription = `${entry.liveName || v.name}（${v.name} / ${totalShowCount}公演）`;
+      recordMonthlyIncome('ライブ・チケット売上', grandTotalTicketRevenue, liveDescription);
+      if (goodsRevenue > 0) {
+        recordMonthlyIncome('ライブ・グッズ売上', goodsRevenue, `${liveDescription} / ${unitsSoldCalc.toLocaleString()}個`);
+      }
+      if (grandTotalStreamRevenue > 0) {
+        recordMonthlyIncome('ライブ配信チケット売上', grandTotalStreamRevenue, `${liveDescription} / ${streamDaysCount}公演配信`);
+      }
+      if (expenses.baseCost > 0) {
+        recordMonthlyExpense('ライブ会場・設営費', expenses.baseCost, liveDescription);
+      }
+      if (expenses.streamCost > 0) {
+        recordMonthlyExpense('ライブ配信設備費', expenses.streamCost, `${liveDescription} / ${streamDaysCount}公演分`);
+      }
       funds += profit;
       yearlyStats.audience += grandTotalAudience;
       yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue;
@@ -412,6 +426,10 @@ function processEventLives(fromDate, toDate) {
 function processMonthlyClosing(fromDate, toDate) {
   if (!isMonthEnd(toDate)) {
     return;
+  }
+
+  if (typeof maintainOfficeFacilities === 'function') {
+    maintainOfficeFacilities();
   }
 
   if (typeof settleMonthlyIncome === 'function') {
@@ -592,8 +610,6 @@ function processWeeklyCycle(toDate) {
   resolveIndustryOffer();
   trainSongs(summary);
   recordAllSongSalesHistory();
-
-  maintainOfficeFacilities();
 
   // グッズ1年自動減衰処理
   if (Array.isArray(merchandiseItems) && merchandiseItems.length > 0) {
@@ -1217,7 +1233,7 @@ function validateWeeklySchedule() {
   if (mealCount > 0) {
     funds -= mealCount * mealCostSingle;
     if (typeof recordMonthlyExpense === 'function') {
-      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle);
+      recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle, 'メンバーの親睦・グループ危機回避力の向上');
     }
     if (typeof adjustTargetPopularity === 'function' && typeof MEAL_PARTY_POPULARITY_GAIN !== 'undefined') {
       adjustTargetPopularity(MEAL_PARTY_POPULARITY_GAIN);
@@ -1691,7 +1707,9 @@ function applyOfficeAction(actionId) {
     merchandiseProducts = merchandiseItems.length;
 
     funds -= devCost;
-    if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('グッズ開発', devCost);
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense('グッズ開発費', devCost, `ラインナップ ${merchandiseProducts}種`);
+    }
     return `グッズ開発（全${merchandiseProducts}種 / 在庫変動なし / -${formatMoney(devCost)}）`;
   }
   if (actionId === 'goods-production') {
@@ -1707,7 +1725,7 @@ function applyOfficeAction(actionId) {
     funds -= productionCost;
     merchandiseStock = (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0) + unitsProduced;
     if (typeof recordMonthlyExpense === 'function') {
-      recordMonthlyExpense('グッズ制作', productionCost);
+      recordMonthlyExpense('グッズ制作費', productionCost, `${unitsProduced.toLocaleString()}個を生産`);
     }
     return `グッズ制作（在庫 +${unitsProduced.toLocaleString()}個 / -${formatMoney(productionCost)}）`;
   }

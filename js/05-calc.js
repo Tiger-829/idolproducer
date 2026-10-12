@@ -516,7 +516,9 @@ function getCrisisResponseOptions() {
       label: '謝罪してお詫びを出す',
       detail: `資金 -${formatMoney(Math.round(fine * 0.3))} / 危機回避力 +2 / 人気 -1`,
       effect: () => {
-        funds -= Math.round(fine * 0.3);
+        const cost = Math.round(fine * 0.3);
+        funds -= cost;
+        recordMonthlyExpense('危機対応費（謝罪・お詫び）', cost);
         groupCrisis = Math.min(100, groupCrisis + 2);
         adjustSelectedPopularity(-1);
       }
@@ -536,6 +538,7 @@ function getCrisisResponseOptions() {
       detail: `資金 -${formatMoney(fine)} / 危機回避力 +4 / 人気 据え置き`,
       effect: () => {
         funds -= fine;
+        recordMonthlyExpense('危機対応費（罰金）', fine);
         groupCrisis = Math.min(100, groupCrisis + 4);
       }
     },

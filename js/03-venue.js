@@ -203,7 +203,10 @@ function processInfoMedia(performance) {
   });
 
   const fee = performance.fee || 0;
-  if (fee) funds += fee;
+  if (fee) {
+    funds += fee;
+    recordMonthlyIncome('メディア出演料', fee, `${performance.mediaLabel || media.name}への出演`);
+  }
   if (performance.songId) {
     const song = songs.find(item => item.id === performance.songId);
     if (song) addSongExperience(song, INFO_MEDIA_SONG_EXPERIENCE);

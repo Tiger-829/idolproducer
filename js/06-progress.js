@@ -262,7 +262,7 @@ function openEquipmentEventModal() {
   button.textContent = 'ダウングレード';
   if (title) title.textContent = '設備整理の提案';
   description.textContent =
-    `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level - 1}に下げますか？\n売却額: ${formatMoney(refund)} / 週間維持費の削減: ${formatMoney(saving)}${level <= 1 ? '（Lv.1未満にはできません）' : ''}`;
+    `${pendingEquipmentEvent.reason} ${facility.name}をLv.${level - 1}に下げますか？\n売却額: ${formatMoney(refund)} / 月額維持費の削減: ${formatMoney(saving)}${level <= 1 ? '（Lv.1未満にはできません）' : ''}`;
   document.getElementById('equipment-event-modal').style.display = 'flex';
 }
 
@@ -279,6 +279,9 @@ function resolveEquipmentEvent(accept) {
     const refund = getOfficeDowngradeRefund(facility, level);
     officeUpgrades[event.facilityId] = level - 1;
     funds += refund;
+    if (refund > 0 && typeof recordMonthlyIncome === 'function') {
+      recordMonthlyIncome(`設備整理の払い戻し（${facility.name}）`, refund, `イベント提案によりLv.${level} → Lv.${level - 1}へ整理`);
+    }
     setLog(`【設備整理】${facility.name}をLv.${level - 1}にダウングレードしました（売却額 ${formatMoney(refund)}）。`);
   } else {
     setLog(`【設備整理】${event.name}の縮小提案を見送りました。`);

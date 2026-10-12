@@ -1187,6 +1187,54 @@
       color: #555;
     }
     .monthly-report-firstweek { color: #1e7d32; }
+    .monthly-report-cashflow-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .monthly-report-cashflow-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 7px 2px;
+      border-bottom: 1px solid #f1eaed;
+      font-size: 12px;
+    }
+    .monthly-report-cashflow-description {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .monthly-report-cashflow-description strong {
+      color: #333;
+      font-weight: 600;
+    }
+    .monthly-report-cashflow-description small,
+    .monthly-report-empty {
+      color: #888;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+    .monthly-report-cashflow-amount {
+      flex: 0 0 auto;
+      color: #2e7d32;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    .monthly-report-cashflow-total {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .monthly-report-cashflow-total strong { font-family: monospace; }
+    .monthly-report-cashflow-expense .monthly-report-cashflow-amount { color: #c62828; }
+    .monthly-report-cashflow-expense .monthly-report-cashflow-total strong { color: #c62828; }
+    .monthly-report-empty { margin: 6px 0 0; }
     .monthly-report-summary {
       display: flex;
       flex-direction: column;
