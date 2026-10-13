@@ -237,11 +237,11 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   // Set up mock members with specific popularity
   run(`
     idolRoster[0].isSelected = true;
-    idolRoster[0].stats.popularity = 80; // 80/80 = 1.0 (100%)
+    idolRoster[0].stats.popularity = 80;
     idolRoster[1].isSelected = true;
-    idolRoster[1].stats.popularity = 40; // 40/80 = 0.5 (50%)
+    idolRoster[1].stats.popularity = 40;
     idolRoster[2].isSelected = true;
-    idolRoster[2].stats.popularity = 100; // Min(1, 100/80) = 1.0 (100%)
+    idolRoster[2].stats.popularity = 100;
     idolRoster[3].isSelected = false; // Not selected
     // Deselect other members for controlled calculation
     for (let i = 4; i < idolRoster.length; i++) {
@@ -284,18 +284,19 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run('merchandiseStock'), 300, 'Total stock should be 300');
   console.log('PASS: sellMerchandiseAtRealEvent caps at eventMerchandiseStock when stock < demand');
 
-  // Test recordReleaseBenefitSales for real events: sellThrough = Min(1, popularity/80)
+  // Real-event sell-through is capped popularity / 80 for each selected member.
   const benefitResult = run(`recordReleaseBenefitSales('real-greeting', 'real-meeguri')`);
-  // Capacity of real-greeting is 80
-  // Member 0: pop 80 -> sellThrough 1.0 -> unitsSold 80
-  // Member 1: pop 40 -> sellThrough 0.5 -> unitsSold 40
-  // Member 2: pop 100 -> sellThrough 1.0 -> unitsSold 80
-  // Total available = 80 * 3 = 240, Total unitsSold = 80 + 40 + 80 = 200
-  // Average sellThrough = 200 / 240 = 0.8333...
   assert.strictEqual(benefitResult.available, 240, `Available capacity should be 240`);
-  assert.strictEqual(benefitResult.unitsSold, 200, `Units sold should be 200`);
-  assert(Math.abs(benefitResult.sellThrough - (200 / 240)) < 0.001, `Average sell-through should be approx 83%`);
-  console.log('PASS: recordReleaseBenefitSales uses Min(1, popularity/80) for real events');
+  assert.strictEqual(benefitResult.unitsSold, 200, `Popularity 80/40/100 should sell 80/40/80 units`);
+  assert(Math.abs(benefitResult.sellThrough - (200 / 240)) < 0.001,
+    'Average sell-through should equal mean capped popularity / 80');
+  console.log('PASS: real-event sell-through uses capped popularity / 80');
+
+  const onlineBenefitResult = run(`recordReleaseBenefitSales('web-greeting')`);
+  assert.strictEqual(onlineBenefitResult.available, 450, 'Online greeting should use its configured capacity');
+  assert.strictEqual(onlineBenefitResult.unitsSold, 375, 'Online greeting should use the same popularity / 80 rate');
+  assert(Math.abs(onlineBenefitResult.sellThrough - (onlineBenefitResult.unitsSold / onlineBenefitResult.available)) < 0.001,
+    'Online average sell-through should match rounded units sold divided by capacity');
 
   // Test processPlanEvents execution on real event date
   run(`
