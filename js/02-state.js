@@ -148,7 +148,7 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   
   const targetYearNum = Number(year) || 1;
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
-  const actualYear = baseYear + targetYearNum - 1;
+  const actualYear = baseYear + (targetYearNum - currentYear);
   const generatedMonths = new Set();
   for (let monthOffset = 0; monthOffset < monthSpan; monthOffset++) {
     const monthIndex = startMonth - 1 + monthOffset;

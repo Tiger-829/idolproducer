@@ -339,6 +339,34 @@ check('regenerating one half-year retains rival bookings from the other half', r
     }
   })()
 `) === true);
+check('second-year rival and dummy bookings use the current calendar year', run(`
+  (() => {
+    const saved = { currentYear, calendarYear, leagueTeams, rivalLiveBookings };
+    try {
+      currentYear = 2;
+      calendarYear = 2027;
+      leagueTeams = [];
+      rivalLiveBookings = [];
+      generateRivalsAndGeneralSchedule(2, 1, true);
+      const bookings = rivalLiveBookings.filter(booking => booking.type !== 'baseball');
+      const stadiumBookings = bookings.filter(booking =>
+        VENUE_DATA.some(venue => venue.name === booking.venue
+          && (venue.name.includes('球場') || venue.name.includes('ドーム')))
+      );
+      return bookings.length > 0
+        && bookings.every(booking => (booking.venueDates || [booking.liveDate])
+          .every(date => date.startsWith('2027-')))
+        && stadiumBookings.every(booking =>
+          (booking.venueDates || [booking.liveDate]).every(date => !isBaseballGameDay(booking.venue, date))
+        );
+    } finally {
+      currentYear = saved.currentYear;
+      calendarYear = saved.calendarYear;
+      leagueTeams = saved.leagueTeams;
+      rivalLiveBookings = saved.rivalLiveBookings;
+    }
+  })()
+`) === true);
 check('monthly report displays a finalized ledger without detail arrays', run(`
   (() => {
     const modal = document.getElementById('monthly-report-modal');
