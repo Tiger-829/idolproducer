@@ -592,9 +592,6 @@ function renderEventSlotHtml(month, index, event) {
   const cdList = getPlayerCdReleaseList();
   const currentCdId = event.targetCdId || (cdList[0] ? cdList[0].id : '');
   const sessions = getEventSessionDrafts(event);
-  const hasDates = sessions.some(session => session.dates?.length);
-  const hasVenue = sessions.some(session => session.venue);
-  const showDetails = hasVenue || hasDates;
 
   return `
     <div class="plan-event-slot" data-event-slot-index="${index}" style="border:1px solid #eadde1; padding:8px; border-radius:6px; margin-bottom:6px; background:#fdf8f9;">
@@ -610,7 +607,7 @@ function renderEventSlotHtml(month, index, event) {
         </select>
       </div>
 
-      <div id="event-details-container-${month}-${index}" style="display: ${showDetails ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
+      <div id="event-details-container-${month}-${index}" style="display:block; margin-top:8px; border-top:1px dashed #eee; padding-top:6px;">
         <div id="event-sessions-${month}-${index}">
           ${sessions.map((session, sessionIndex) => renderEventSessionHtml(month, index, sessionIndex, session)).join('')}
         </div>
@@ -673,17 +670,10 @@ function onVenueSelectChange(month, index) {
 
 // イベント会場SelectChangeを処理する。
 function onEventVenueSelectChange(month, index, sessionIndex = 0) {
-  const selVen = document.getElementById(`event-ven-${month}-${index}-${sessionIndex}`);
   const detailsContainer = document.getElementById(`event-details-container-${month}-${index}`);
-  const hasVenue = Boolean(selVen && selVen.value);
+  if (detailsContainer) detailsContainer.style.display = 'block';
 
-  if (detailsContainer) {
-    detailsContainer.style.display = hasVenue ? 'block' : 'none';
-  }
-
-  if (hasVenue) {
-    updateEventDateNote(month, index);
-  }
+  updateEventDateNote(month, index);
   renderEmbeddedPlanCalendars();
 }
 
@@ -742,7 +732,7 @@ function readLiveSlotInputs(month) {
 }
 
 // イベント枠Inputsを取得する。
-function readEventSlotInputs(month) {
+function readEventSlotInputs(month, includeEmpty = false) {
   const container = document.getElementById(`plan-events-${month}`);
   if (!container) return [];
   const venues = typeof VENUE_DATA !== 'undefined' ? VENUE_DATA : [];
@@ -764,11 +754,11 @@ function readEventSlotInputs(month) {
           : getStandardSeatPrice(venues.find(v => v.name === venue), input.dataset.seatId);
       });
       return { name, venue, dates, seatPrices };
-    }).filter(session => session.venue || session.dates.length);
+    }).filter(session => includeEmpty || session.venue || session.dates.length);
     const dates = sessions.flatMap(session => session.dates).sort();
     const firstSession = sessions[0] || { name: BENEFIT_EVENT_TYPE_OPTIONS[0].name, venue: '', seatPrices: {} };
 
-    if (!sessions.length && dates.length === 0) return null;
+    if (!includeEmpty && !sessions.length && dates.length === 0) return null;
 
     if (sessions.some(session => {
       const venue = venues.find(v => v.name === session.venue);
@@ -980,6 +970,10 @@ function renderPlanEventsHtml(month) {
 // 計画イベントを追加する。
 function addPlanEvent(month) {
   const drafts = getPlanMonthEventDrafts(month);
+  readEventSlotInputs(month, true).forEach(input => {
+    const { slotIndex, ...draft } = input;
+    if (slotIndex >= 0 && slotIndex < drafts.length) drafts[slotIndex] = draft;
+  });
   const maxEvents = 6;
   if (drafts.length >= maxEvents) {
     alert(`1か月あたりのイベント枠は最大${maxEvents}件までです。`);
@@ -1002,7 +996,7 @@ function addPlanEvent(month) {
 function removePlanEvent(month, index) {
   const drafts = getPlanMonthEventDrafts(month);
   // 入力途中の内容を失わないよう、再描画前に現在の入力値を下書きへ反映する
-  readEventSlotInputs(month).forEach(input => {
+  readEventSlotInputs(month, true).forEach(input => {
     const { slotIndex, ...draft } = input;
     if (slotIndex >= 0 && slotIndex < drafts.length) drafts[slotIndex] = draft;
   });
@@ -2065,7 +2059,12 @@ function saveDecisionPlan() {
 // Planningマニュアルを開く。
 function openPlanningManual() {
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
-  if (currentMonth === 1 || (currentMonth >= 1 && currentMonth <= 6)) {
+  const planningDate = getGameDateObject();
+  if (isFirstWednesdayOfMonth(planningDate)
+    && (planningDate.getMonth() === 0 || planningDate.getMonth() === 8)) {
+    planningPromptWeekKey = gameDate;
+  }
+  if (currentMonth >= 1 && currentMonth <= 8) {
     try {
       if (typeof generateRivalsAndGeneralSchedule === 'function') {
         generateRivalsAndGeneralSchedule(targetYear, 7, false);

@@ -663,9 +663,6 @@ function checkYearlyTransition() {
     groupFansAtYearStart = calculateGroupFans();
     yearEndAwardProcessed = false;
     yearEndKohakuProcessed = false;
-
-    if (currentMonth === 1) openDecisionModal("当年7月〜12月の計画策定", currentYear, 7, 12);
-    else if (currentMonth === 7) openDecisionModal("翌年1月〜6月の計画策定", currentYear + 1, 1, 6);
   }
 }
 

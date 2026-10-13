@@ -333,7 +333,7 @@ function getCurrentWeekEvents() {
     const targetReleaseMonth = targetReleaseDate.getMonth() + 1;
     const selectionPlan = productionSchedule[`${targetReleaseYear}-${targetReleaseMonth}`];
     if (selectionPlan?.release && selectionPlan.release !== 'none') events.push('選抜発表');
-    if (currentMonth === 1 || currentMonth === 7) events.push('半年活動計画');
+    if (currentMonth === 1 || currentMonth === 9) events.push('半年活動計画');
   }
 
   getScheduledLiveEntries().forEach(entry => {

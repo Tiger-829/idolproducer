@@ -48,6 +48,154 @@ check('scheduled release songs use the entered titles', run(`
   ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
     && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
 `));
+check('planning prompts appear on the first Wednesday in January and September and only once per week', run(`
+  (() => {
+    const modal = document.getElementById('decision-modal');
+    const saved = {
+      currentYear,
+      currentMonth,
+      currentWeek,
+      gameDate,
+      calendarYear,
+      planningPromptWeekKey,
+      planYearTarget,
+      planStartM,
+      planEndM,
+      planAllowPastMonths,
+      planIsAddMode,
+      planMonthEventDrafts,
+      planMultiSelectModes,
+      planCalendarSelections,
+      modalDisplay: modal.style.display,
+      updateUI,
+      generateRivalsAndGeneralSchedule,
+      pendingReports,
+      pendingMonthlyReport,
+      pendingSelectionEvent,
+      pendingCrisisResponse,
+      pendingFanClubEvent,
+      pendingRandomEvent,
+      pendingEquipmentEvent,
+      pendingPerformanceOffers,
+      draftState
+    };
+    try {
+      updateUI = () => {};
+      generateRivalsAndGeneralSchedule = () => {};
+      pendingReports = [];
+      pendingMonthlyReport = null;
+      pendingSelectionEvent = null;
+      pendingCrisisResponse = null;
+      pendingFanClubEvent = null;
+      pendingRandomEvent = null;
+      pendingEquipmentEvent = null;
+      pendingPerformanceOffers = [];
+      draftState = null;
+      currentYear = 3;
+      calendarYear = 2028;
+
+      gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
+      syncGameCalendar();
+      planningPromptWeekKey = '';
+      openPendingModal();
+      const januaryOpens = modal.style.display === 'flex'
+        && planYearTarget === 3 && planStartM === 7 && planEndM === 12;
+      closeDecisionModal();
+      openPendingModal();
+      const januaryDoesNotRepeat = modal.style.display === 'none';
+
+      gameDate = toDateKey(getFirstWednesday(calendarYear, 8));
+      syncGameCalendar();
+      planningPromptWeekKey = '';
+      openPendingModal();
+      const septemberOpens = modal.style.display === 'flex'
+        && planYearTarget === 4 && planStartM === 1 && planEndM === 6;
+
+      return januaryOpens && januaryDoesNotRepeat && septemberOpens;
+    } finally {
+      closeDecisionModal();
+      currentYear = saved.currentYear;
+      currentMonth = saved.currentMonth;
+      currentWeek = saved.currentWeek;
+      gameDate = saved.gameDate;
+      calendarYear = saved.calendarYear;
+      planningPromptWeekKey = saved.planningPromptWeekKey;
+      planYearTarget = saved.planYearTarget;
+      planStartM = saved.planStartM;
+      planEndM = saved.planEndM;
+      planAllowPastMonths = saved.planAllowPastMonths;
+      planIsAddMode = saved.planIsAddMode;
+      planMonthEventDrafts = saved.planMonthEventDrafts;
+      planMultiSelectModes = saved.planMultiSelectModes;
+      planCalendarSelections = saved.planCalendarSelections;
+      modal.style.display = saved.modalDisplay;
+      updateUI = saved.updateUI;
+      generateRivalsAndGeneralSchedule = saved.generateRivalsAndGeneralSchedule;
+      pendingReports = saved.pendingReports;
+      pendingMonthlyReport = saved.pendingMonthlyReport;
+      pendingSelectionEvent = saved.pendingSelectionEvent;
+      pendingCrisisResponse = saved.pendingCrisisResponse;
+      pendingFanClubEvent = saved.pendingFanClubEvent;
+      pendingRandomEvent = saved.pendingRandomEvent;
+      pendingEquipmentEvent = saved.pendingEquipmentEvent;
+      pendingPerformanceOffers = saved.pendingPerformanceOffers;
+      draftState = saved.draftState;
+    }
+  })()
+`) === true);
+check('new event slots show their fields and preserve unfinished event details when adding another slot', run(`
+  (() => {
+    const saved = {
+      planYearTarget,
+      planStartM,
+      planEndM,
+      planAllowPastMonths,
+      planIsAddMode,
+      planMonthEventDrafts,
+      planMultiSelectModes,
+      planCalendarSelections,
+      modalDisplay: document.getElementById('decision-modal').style.display
+    };
+    try {
+      openDecisionModal('イベント入力テスト', 2, 7, 7);
+      addPlanEvent(7);
+
+      const details = document.getElementById('event-details-container-7-0');
+      const nameInput = document.getElementById('event-name-7-0-0');
+      const venueInput = document.getElementById('event-ven-7-0-0');
+      if (!details || details.style.display === 'none' || !nameInput || !venueInput) return false;
+
+      const eventName = nameInput.options[1]?.value;
+      const venueName = venueInput.options[1]?.value;
+      if (!eventName || !venueName) return false;
+      nameInput.value = eventName;
+      venueInput.value = venueName;
+      addEventShowDate(7, 0);
+      const dateInput = document.querySelector('#event-sessions-7-0 .event-show-date-input');
+      if (!dateInput) return false;
+      dateInput.value = '2028-07-12';
+
+      addPlanEvent(7);
+      const savedDraft = getPlanMonthEventDrafts(7)[0];
+      const savedSession = savedDraft?.sessions?.[0];
+      return document.getElementById('event-details-container-7-1')?.style.display !== 'none'
+        && savedSession?.name === eventName
+        && savedSession?.venue === venueName
+        && savedSession?.dates.includes('2028-07-12');
+    } finally {
+      closeDecisionModal();
+      planYearTarget = saved.planYearTarget;
+      planStartM = saved.planStartM;
+      planEndM = saved.planEndM;
+      planAllowPastMonths = saved.planAllowPastMonths;
+      planIsAddMode = saved.planIsAddMode;
+      planMonthEventDrafts = saved.planMonthEventDrafts;
+      planMultiSelectModes = saved.planMultiSelectModes;
+      planCalendarSelections = saved.planCalendarSelections;
+      document.getElementById('decision-modal').style.display = saved.modalDisplay;
+    }
+  })()
+`) === true);
 check('monthly report displays a finalized ledger without detail arrays', run(`
   (() => {
     const modal = document.getElementById('monthly-report-modal');

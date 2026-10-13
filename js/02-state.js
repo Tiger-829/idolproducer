@@ -7,6 +7,7 @@ let currentMonth = 1;
 let currentWeek = 1;
 let gameDate = '';
 let calendarYear = new Date().getFullYear();
+let planningPromptWeekKey = '';
 let lastRenderedCalendarDate = '';
 let totalWeeksElapsed = 0;
 let draftCount = 0;
@@ -757,6 +758,7 @@ function initializeNewGameStateBase() {
   calendarYear = new Date().getFullYear();
   productionSchedule = createInitialProductionSchedule();
   gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
+  planningPromptWeekKey = '';
   totalWeeksElapsed = 0;
   draftCount = 0;
   currentRosterTab = 'selected';
@@ -845,6 +847,7 @@ function applySavedGameBase(data) {
   currentYear = data.currentYear || 1;
   calendarYear = data.calendarYear || new Date().getFullYear();
   gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);
+  planningPromptWeekKey = data.planningPromptWeekKey || '';
   syncGameCalendar();
   totalWeeksElapsed = data.totalWeeksElapsed || 0;
   draftCount = data.draftCount || 0;

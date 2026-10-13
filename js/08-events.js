@@ -423,6 +423,15 @@ function openPendingModal() {
   if (pendingEquipmentEvent) return openEquipmentEventModal();
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
   if (draftState) return openDraftModal();
+
+  const currentDate = getGameDateObject();
+  if (isFirstWednesdayOfMonth(currentDate)
+    && (currentDate.getMonth() === 0 || currentDate.getMonth() === 8)
+    && planningPromptWeekKey !== gameDate) {
+    planningPromptWeekKey = gameDate;
+    if (typeof updateUI === 'function') updateUI();
+    return openPlanningManual();
+  }
 }
 
 function recordMonthlyIncome(label, amount, detail = '') {
