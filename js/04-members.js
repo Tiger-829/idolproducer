@@ -391,6 +391,8 @@ function applySavedGame(data) {
   currentYear = data.currentYear || 1;
   gameDate = data.gameDate || migrateLegacyGameDate(currentYear, data.currentMonth || 1, data.currentWeek || 1);
   calendarYear = data.calendarYear || getGameDateObject().getFullYear();
+  // 旧バージョンで越年済みのセーブは calendarYear / currentYear が据え置きのためずれている
+  const yearMigratedOnLoad = getGameDateObject().getFullYear() !== calendarYear;
   syncGameCalendar();
   totalWeeksElapsed = data.totalWeeksElapsed || 0;
   draftCount = data.draftCount || 0;
@@ -494,5 +496,5 @@ function applySavedGame(data) {
   weeklyRecoveryDone = false;
   normalizeLeagueTeams();
   // 旧バージョンで越年済みのセーブは calendarYear / currentYear が据え置きのため補正する
-  if (typeof checkYearlyTransition === 'function') checkYearlyTransition(getGameDateObject());
+  if (yearMigratedOnLoad && typeof resetYearlyCycle === 'function') resetYearlyCycle();
 }

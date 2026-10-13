@@ -698,6 +698,33 @@ function buildDraftCandidatePool() {
 }
 
 
+// 新規ライバルグループ名を重複しないように生成する
+function generateRivalGroupName(usedNames = []) {
+  const used = new Set(usedNames);
+  const candidates = [];
+  for (const head of RIVAL_NAME_HEADS) {
+    for (const tail of RIVAL_NAME_TAILS) {
+      const name = `${head}・${tail}`;
+      if (!used.has(name)) candidates.push(name);
+    }
+  }
+  if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
+  let maxSeq = 0;
+  for (const name of used) {
+    const match = /^新世代プロジェクト(\d+)期$/.exec(name);
+    if (match) maxSeq = Math.max(maxSeq, Number(match[1]));
+  }
+  return `新世代プロジェクト${maxSeq + 1}期`;
+}
+
+// 既存チームと重複しないライバルチームIDを発行する
+function createRivalTeamId() {
+  let index = leagueTeams.length;
+  let id = `rival_${index}`;
+  while (leagueTeams.some(team => team.id === id)) id = `rival_${++index}`;
+  return id;
+}
+
 // ドラフトMeetingを開始する。
 function startDraftMeeting() {
   draftCount++;

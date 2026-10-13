@@ -652,10 +652,15 @@ function processWeeklyCycle(toDate) {
 
 function checkYearlyTransition(date = getGameDateObject()) {
   const actualYear = date.getFullYear();
-  if (!calendarYear || actualYear === calendarYear) return;
+  if (!calendarYear || actualYear === calendarYear) return false;
 
   currentYear += actualYear - calendarYear;
   calendarYear = actualYear;
+  resetYearlyCycle();
+  return true;
+}
+
+function resetYearlyCycle() {
   yearlyStats = {
     sales: 0,
     audience: 0,

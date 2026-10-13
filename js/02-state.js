@@ -740,6 +740,8 @@ function syncGameCalendar() {
   if (!calendarYear) {
     calendarYear = new Date().getFullYear();
   }
+  // どの経路で状態が復元されても、暦年と「N年目」のずれを必ず解消する
+  if (typeof checkYearlyTransition === 'function') checkYearlyTransition(date);
   currentMonth = date.getMonth() + 1;
   currentWeek = Math.ceil(date.getDate() / 7);
 }

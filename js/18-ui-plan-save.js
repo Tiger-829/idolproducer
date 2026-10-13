@@ -2061,6 +2061,7 @@ function saveDecisionPlan() {
 
 // Planningマニュアルを開く。
 function openPlanningManual() {
+  if (typeof syncGameCalendar === 'function') syncGameCalendar();
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
   const planningDate = getGameDateObject();
   if (isFirstWednesdayOfMonth(planningDate)
