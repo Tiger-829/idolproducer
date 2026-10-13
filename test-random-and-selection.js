@@ -158,5 +158,21 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert(setupSong.length > 0, 'Setup 1st song should be set');
   console.log(`PASS: setRandomSetupSongName set input-setup-1st-song to "${setupSong}"`);
 
+  // Open 6-month decision modal for months 7-12 and test song-name random button
+  run(`
+    openDecisionModal('当年7月〜12月の計画策定', 1, 7, 12);
+    // Enable single release on month 7
+    const selRel7 = document.getElementById('sel-rel-7');
+    if (selRel7) {
+      selRel7.value = 'single';
+      onReleaseSelectChange(7);
+    }
+  `);
+  await run(`setRandomPlanSongName(7);`);
+  const planSong7 = run(`document.getElementById('song-name-7')?.value`);
+  assert(typeof planSong7 === 'string' && planSong7.length > 0, 'song-name-7 should be filled by setRandomPlanSongName');
+  assert(lines.includes(planSong7), 'song-name-7 should be from randamname.txt');
+  console.log(`PASS: setRandomPlanSongName(7) set song-name-7 to "${planSong7}"`);
+
   console.log('\nALL CHECKS PASSED SUCCESSFULLY!');
 })();

@@ -232,10 +232,17 @@ async function setRandomTrackName(index) {
     name = 'はじまりの光';
   }
   const el = document.getElementById(`cd-track-name-${index}`);
-  if (el) el.value = name;
+  if (el) {
+    el.value = name;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
   if (cdProductionModalState?.tracks && cdProductionModalState.tracks[index]) {
     cdProductionModalState.tracks[index].name = name;
   }
+}
+if (typeof window !== 'undefined') {
+  window.setRandomTrackName = setRandomTrackName;
 }
 
 function onCdTrackMvChange(index) {

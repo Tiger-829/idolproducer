@@ -1504,7 +1504,14 @@ async function setRandomPlanSongName(month) {
     name = 'はじまりの光';
   }
   const input = document.getElementById(`song-name-${month}`);
-  if (input) input.value = name;
+  if (input) {
+    input.value = name;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+if (typeof window !== 'undefined') {
+  window.setRandomPlanSongName = setRandomPlanSongName;
 }
 
 // Decisionモーダルを閉じる。
@@ -1913,7 +1920,14 @@ async function setRandomSetupSongName(inputId) {
     name = 'はじまりの光';
   }
   const input = document.getElementById(inputId);
-  if (input) input.value = name;
+  if (input) {
+    input.value = name;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+if (typeof window !== 'undefined') {
+  window.setRandomSetupSongName = setRandomSetupSongName;
 }
 
 // 試合セットアップ計画を送信する。
