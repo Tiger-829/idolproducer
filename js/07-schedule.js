@@ -134,6 +134,7 @@ function processDailyFlow(fromDate, toDate) {
   const toDateStr = toDateKey(toDate);
   const wasWednesday = toDate.getDay() === 3;
 
+  checkYearlyTransition(toDate);
   processBirthdays(fromDate, toDate);
   processPlanEvents(toDateStr);
   processReleaseEvents(toDateStr);
@@ -647,23 +648,31 @@ function processWeeklyCycle(toDate) {
   if (totalWeeksElapsed > 0 && totalWeeksElapsed % 120 === 0) {
     startDraftMeeting();
   }
-
-  checkYearlyTransition();
 }
 
-function checkYearlyTransition() {
-  const d = getGameDateObject();
-  const actualYear = d.getFullYear();
-  if (calendarYear && actualYear !== calendarYear) {
-    yearlyStats = { sales: 0, audience: 0 };
-    if (Array.isArray(leagueTeams)) {
-      leagueTeams.forEach(team => { if (team) { team.sales = 0; team.audience = 0; team.showCount = 0; } });
-    }
-    previousYearGroupFansAtYearStart = groupFansAtYearStart || calculateGroupFans();
-    groupFansAtYearStart = calculateGroupFans();
-    yearEndAwardProcessed = false;
-    yearEndKohakuProcessed = false;
+function checkYearlyTransition(date = getGameDateObject()) {
+  const actualYear = date.getFullYear();
+  if (!calendarYear || actualYear === calendarYear) return;
+
+  currentYear += actualYear - calendarYear;
+  calendarYear = actualYear;
+  yearlyStats = {
+    sales: 0,
+    audience: 0,
+    streamRevenue: 0,
+    streamCost: 0,
+    fanClubIncome: 0,
+    cdRevenue: 0,
+    tieUpRevenue: 0,
+    salary: 0
+  };
+  if (Array.isArray(leagueTeams)) {
+    leagueTeams.forEach(team => { if (team) { team.sales = 0; team.audience = 0; team.showCount = 0; } });
   }
+  previousYearGroupFansAtYearStart = groupFansAtYearStart || calculateGroupFans();
+  groupFansAtYearStart = calculateGroupFans();
+  yearEndAwardProcessed = false;
+  yearEndKohakuProcessed = false;
 }
 
 // ==========================================
