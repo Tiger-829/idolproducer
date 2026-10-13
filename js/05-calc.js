@@ -56,7 +56,7 @@ function calculateIdolPower(stats) {
   const individualScore = (((dance + vocal + teamwork) * 2) 
                         + (style * 1.25) 
                         + (fashion * 0.75) 
-                        + ((stamina + recovery) / 2))/10;
+                        + ((stamina + recovery) / 2))/9;
 
   return Math.round(individualScore);
 }
