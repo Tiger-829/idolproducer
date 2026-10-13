@@ -1166,6 +1166,8 @@ function processYearEndEvents(reachDate = gameDate) {
     const date = new Date(startDate);
     date.setDate(date.getDate() + offset);
     if (date.getMonth() + 1 !== 12) continue;
+    // 年度切替直後に、前年12月の日付で年末イベントを再発火させない
+    if (date.getFullYear() !== calendarYear) continue;
 
     if (date.getDate() === AWARD_DATE.day && !yearEndAwardProcessed) {
       yearEndAwardProcessed = true;

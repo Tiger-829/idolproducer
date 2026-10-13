@@ -493,4 +493,6 @@ function applySavedGame(data) {
   player = { fanHistory: Array.isArray(data.fanHistory) ? data.fanHistory : [] };
   weeklyRecoveryDone = false;
   normalizeLeagueTeams();
+  // 旧バージョンで越年済みのセーブは calendarYear / currentYear が据え置きのため補正する
+  if (typeof checkYearlyTransition === 'function') checkYearlyTransition(getGameDateObject());
 }

@@ -91,4 +91,35 @@ check('rechecking the same date does not advance the game year again', run('curr
 run('checkYearlyTransition(new Date("2028-01-01T12:00:00"));');
 check('later years continue advancing normally', run('currentYear === 3 && calendarYear === 2028'));
 
+run(`
+  yearEndAwardProcessed = false;
+  yearEndKohakuProcessed = false;
+  window.__yearEndRuns = 0;
+  executeYearEndAwards = () => { window.__yearEndRuns++; };
+  executeKohaku = () => { window.__yearEndRuns++; };
+  gameDate = '2028-12-30';
+  processYearEndEvents('2028-12-31');
+  gameDate = '2028-12-31';
+  processYearEndEvents('2029-01-01');
+  checkYearlyTransition(new Date('2029-01-01T12:00:00'));
+`);
+check('year-end events fire once per year and are not re-fired by the rollover day', run('window.__yearEndRuns === 2 && !yearEndKohakuProcessed'));
+
+run(`
+  window.__legacy = {
+    currentYear: 1, calendarYear: 2027, gameDate: '2028-03-08',
+    yearlyStats: { sales: 999, audience: 999 },
+    yearEndAwardProcessed: true, yearEndKohakuProcessed: true,
+    idolRoster: [], productionSchedule: { '2-1': { release: 'none' } }
+  };
+  applySavedGame(window.__legacy);
+  updateUI();
+`);
+check('a legacy save that already crossed a year is migrated on load', run('currentYear === 2 && calendarYear === 2028'));
+check('migrated save resets annual stats and year-end flags', run('yearlyStats.sales === 0 && !yearEndAwardProcessed && !yearEndKohakuProcessed'));
+check('migrated save keeps plan keys pointing at the same actual year', run('calendarYear + (2 - currentYear) === 2028'));
+check('migrated save shows the new year in the header', run("document.getElementById('txt-year').textContent === '2'"));
+run(`applySavedGame({ currentYear: 2, calendarYear: 2028, gameDate: '2028-12-31', yearEndKohakuProcessed: true, yearlyStats: { sales: 5, audience: 5 }, idolRoster: [] });`);
+check('an up-to-date save is left untouched on load', run('currentYear === 2 && yearEndKohakuProcessed && yearlyStats.sales === 5'));
+
 dom.window.close();
