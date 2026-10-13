@@ -239,6 +239,270 @@ function renderShowDateRow(month, index, dateIndex, dateKey, isStream = true, pr
     </div>`;
 }
 
+// 過去に設定されたライブ名を保存
+function recordPastLiveName(name) {
+  if (!name || typeof name !== 'string') return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  if (typeof pastLiveNames === 'undefined' || !Array.isArray(pastLiveNames)) {
+    if (typeof window !== 'undefined') window.pastLiveNames = [];
+  }
+  const list = typeof pastLiveNames !== 'undefined' && Array.isArray(pastLiveNames) ? pastLiveNames : [];
+  if (!list.includes(trimmed)) {
+    list.push(trimmed);
+  }
+}
+
+// 過去のすべてのライブ名（セーブ保存分、初期ライブ、実施済み、スケジュール登録済み）を集約
+function getAllPastLiveNames() {
+  const set = new Set();
+  if (typeof pastLiveNames !== 'undefined' && Array.isArray(pastLiveNames)) {
+    pastLiveNames.forEach(n => n && typeof n === 'string' && set.add(n.trim()));
+  }
+  if (typeof customFirstLiveName === 'string' && customFirstLiveName.trim()) {
+    set.add(customFirstLiveName.trim());
+  }
+  if (typeof liveHistory !== 'undefined' && Array.isArray(liveHistory)) {
+    liveHistory.forEach(item => {
+      if (item && item.liveName && typeof item.liveName === 'string') {
+        set.add(item.liveName.trim());
+      }
+    });
+  }
+  if (typeof productionSchedule !== 'undefined' && productionSchedule) {
+    Object.values(productionSchedule).forEach(p => {
+      if (!p) return;
+      if (p.liveName && typeof p.liveName === 'string') set.add(p.liveName.trim());
+      if (Array.isArray(p.liveSlots)) {
+        p.liveSlots.forEach(slot => {
+          if (slot && slot.liveName && typeof slot.liveName === 'string') set.add(slot.liveName.trim());
+        });
+      }
+      if (Array.isArray(p.additionalLives)) {
+        p.additionalLives.forEach(slot => {
+          if (slot && slot.liveName && typeof slot.liveName === 'string') set.add(slot.liveName.trim());
+        });
+      }
+    });
+  }
+  return [...set].filter(Boolean);
+}
+
+function getOrdinalSuffix(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+// ライブ名から冠や年号を進めたサジェスト候補を生成する
+function suggestNextLiveNames(baseName, targetYear, actualYear) {
+  if (!baseName || typeof baseName !== 'string') return [];
+  const suggestions = [];
+  const trimmed = baseName.trim();
+  if (!trimmed) return [];
+
+  // 1. 4桁西暦（例: 2025, 2026）
+  const yearMatches = trimmed.match(/(?:19|20)\d{2}/g);
+  if (yearMatches) {
+    if (actualYear) {
+      const yearStr = String(actualYear);
+      const replacedTargetYear = trimmed.replace(/(?:19|20)\d{2}/g, yearStr);
+      if (replacedTargetYear !== trimmed && !suggestions.includes(replacedTargetYear)) {
+        suggestions.push(replacedTargetYear);
+      }
+    }
+    const lastYear = parseInt(yearMatches[yearMatches.length - 1], 10);
+    const nextYearStr = String(lastYear + 1);
+    const replacedNextYear = trimmed.replace(new RegExp(String(lastYear), 'g'), nextYearStr);
+    if (replacedNextYear !== trimmed && !suggestions.includes(replacedNextYear)) {
+      suggestions.push(replacedNextYear);
+    }
+  }
+
+  // 2. 序数（例: 1st, 2nd, 3rd, 4th, ...）
+  const ordinalMatch = trimmed.match(/(\d+)(st|nd|rd|th)/i);
+  if (ordinalMatch) {
+    const num = parseInt(ordinalMatch[1], 10);
+    const nextNum = num + 1;
+    const nextOrdinal = `${nextNum}${getOrdinalSuffix(nextNum)}`;
+    const isUpper = ordinalMatch[2] === ordinalMatch[2].toUpperCase();
+    const formattedNext = isUpper ? nextOrdinal.toUpperCase() : nextOrdinal.toLowerCase();
+    const replacedOrdinal = trimmed.replace(/(\d+)(st|nd|rd|th)/i, formattedNext);
+    if (replacedOrdinal !== trimmed && !suggestions.includes(replacedOrdinal)) {
+      suggestions.push(replacedOrdinal);
+    }
+
+    if (actualYear && yearMatches) {
+      const yearStr = String(actualYear);
+      const bothReplaced = replacedOrdinal.replace(/(?:19|20)\d{2}/g, yearStr);
+      if (bothReplaced !== trimmed && !suggestions.includes(bothReplaced)) {
+        suggestions.unshift(bothReplaced);
+      }
+    }
+  }
+
+  // 3. 第N回 / 第N弾 / 第N回目
+  const roundMatch = trimmed.match(/第(\d+)(回|弾|回目)/);
+  if (roundMatch) {
+    const num = parseInt(roundMatch[1], 10);
+    const nextNum = num + 1;
+    const replacedRound = trimmed.replace(/第(\d+)(回|弾|回目)/, `第${nextNum}${roundMatch[2]}`);
+    if (replacedRound !== trimmed && !suggestions.includes(replacedRound)) {
+      suggestions.push(replacedRound);
+    }
+    if (actualYear && yearMatches) {
+      const yearStr = String(actualYear);
+      const bothReplaced = replacedRound.replace(/(?:19|20)\d{2}/g, yearStr);
+      if (bothReplaced !== trimmed && !suggestions.includes(bothReplaced)) {
+        suggestions.unshift(bothReplaced);
+      }
+    }
+  }
+
+  // 4. Vol.N / vol.N / #N / No.N / Part.N / ACT.N
+  const volMatch = trimmed.match(/(Vol\.|vol\.|VOL\.|#|No\.|No|Part\.|Part|ACT\.|ACT)\s*(\d+)/i);
+  if (volMatch) {
+    const prefix = volMatch[1];
+    const num = parseInt(volMatch[2], 10);
+    const nextNum = num + 1;
+    const replacedVol = trimmed.replace(/(Vol\.|vol\.|VOL\.|#|No\.|No|Part\.|Part|ACT\.|ACT)\s*(\d+)/i, `${prefix} ${nextNum}`);
+    if (replacedVol !== trimmed && !suggestions.includes(replacedVol)) {
+      suggestions.push(replacedVol);
+    }
+  }
+
+  // 5. 元の名前そのまま
+  if (!suggestions.includes(trimmed)) {
+    suggestions.push(trimmed);
+  }
+
+  return suggestions;
+}
+
+// 計画策定画面用のサジェスト一覧を取得
+function getLiveNameSuggestionsForPlan(month, index) {
+  const actualYear = typeof getPlanActualYear === 'function' ? getPlanActualYear() : (typeof calendarYear !== 'undefined' ? calendarYear : 2026);
+  const targetYear = typeof planYearTarget !== 'undefined' ? planYearTarget : 1;
+  const pastNames = getAllPastLiveNames();
+  
+  if (pastNames.length === 0) {
+    return ['1stデビューライブ', `全国ツアー${actualYear}`, '定期公演 Vol.1'];
+  }
+
+  const suggestions = new Set();
+  
+  const ordinalMaxMap = new Map();
+  const roundMaxMap = new Map();
+  const volMaxMap = new Map();
+  const yearPatternTemplates = new Map();
+
+  pastNames.forEach(name => {
+    // 序数パターン
+    const ordMatch = name.match(/^(.*?)(\d+)(st|nd|rd|th)(.*)$/i);
+    if (ordMatch) {
+      const key = `${ordMatch[1]}__${ordMatch[4]}`.toLowerCase();
+      const num = parseInt(ordMatch[2], 10);
+      const curMax = ordinalMaxMap.get(key)?.num || 0;
+      if (num > curMax) {
+        ordinalMaxMap.set(key, { num, isUpper: ordMatch[3] === ordMatch[3].toUpperCase(), prefix: ordMatch[1], suffix: ordMatch[4] });
+      }
+    }
+
+    // 第N回パターン
+    const rndMatch = name.match(/^(.*?)第(\d+)(回|弾|回目)(.*)$/);
+    if (rndMatch) {
+      const key = `${rndMatch[1]}__${rndMatch[3]}__${rndMatch[4]}`.toLowerCase();
+      const num = parseInt(rndMatch[2], 10);
+      const curMax = roundMaxMap.get(key)?.num || 0;
+      if (num > curMax) {
+        roundMaxMap.set(key, { num, prefix: rndMatch[1], unit: rndMatch[3], suffix: rndMatch[4] });
+      }
+    }
+
+    // Volパターン
+    const vMatch = name.match(/^(.*?)(Vol\.|vol\.|VOL\.|#|No\.|No|Part\.|Part|ACT\.|ACT)\s*(\d+)(.*)$/i);
+    if (vMatch) {
+      const key = `${vMatch[1]}__${vMatch[2]}__${vMatch[4]}`.toLowerCase();
+      const num = parseInt(vMatch[3], 10);
+      const curMax = volMaxMap.get(key)?.num || 0;
+      if (num > curMax) {
+        volMaxMap.set(key, { num, prefix: vMatch[1], tag: vMatch[2], suffix: vMatch[4] });
+      }
+    }
+
+    // 西暦年号パターン
+    if (/(?:19|20)\d{2}/.test(name)) {
+      const key = name.replace(/(?:19|20)\d{2}/g, '____YEAR____');
+      yearPatternTemplates.set(key, name);
+    }
+  });
+
+  // 1. シリーズ最大値 + 1
+  ordinalMaxMap.forEach(entry => {
+    const nextNum = entry.num + 1;
+    const suf = getOrdinalSuffix(nextNum);
+    const ordStr = entry.isUpper ? suf.toUpperCase() : suf.toLowerCase();
+    let nextName = `${entry.prefix}${nextNum}${ordStr}${entry.suffix}`;
+    if (/(?:19|20)\d{2}/.test(nextName)) {
+      nextName = nextName.replace(/(?:19|20)\d{2}/g, String(actualYear));
+    }
+    suggestions.add(nextName);
+  });
+
+  roundMaxMap.forEach(entry => {
+    const nextNum = entry.num + 1;
+    let nextName = `${entry.prefix}第${nextNum}${entry.unit}${entry.suffix}`;
+    if (/(?:19|20)\d{2}/.test(nextName)) {
+      nextName = nextName.replace(/(?:19|20)\d{2}/g, String(actualYear));
+    }
+    suggestions.add(nextName);
+  });
+
+  volMaxMap.forEach(entry => {
+    const nextNum = entry.num + 1;
+    let nextName = `${entry.prefix}${entry.tag} ${nextNum}${entry.suffix}`;
+    if (/(?:19|20)\d{2}/.test(nextName)) {
+      nextName = nextName.replace(/(?:19|20)\d{2}/g, String(actualYear));
+    }
+    suggestions.add(nextName);
+  });
+
+  yearPatternTemplates.forEach((_, key) => {
+    const nextName = key.replace(/____YEAR____/g, String(actualYear));
+    suggestions.add(nextName);
+  });
+
+  // 2. 直近の各ライブ名からの変換サジェスト
+  pastNames.slice().reverse().forEach(name => {
+    const nextList = suggestNextLiveNames(name, targetYear, actualYear);
+    nextList.forEach(s => suggestions.add(s));
+  });
+
+  // 3. 元の名前も保持
+  pastNames.slice(-4).reverse().forEach(name => {
+    suggestions.add(name);
+  });
+
+  return [...suggestions].filter(Boolean);
+}
+
+// サジェストされたライブ名を入力欄へ反映する
+function applyLiveNameSuggestion(month, index, name) {
+  const el = document.getElementById(`live-name-${month}-${index}`);
+  if (el) {
+    el.value = name;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.recordPastLiveName = recordPastLiveName;
+  window.getAllPastLiveNames = getAllPastLiveNames;
+  window.getLiveNameSuggestionsForPlan = getLiveNameSuggestionsForPlan;
+  window.applyLiveNameSuggestion = applyLiveNameSuggestion;
+}
+
 // ライブ枠HTMLを描画する。
 function renderLiveSlotHtml(month, index, slot) {
   const isPrimary = index === 0;
@@ -251,6 +515,7 @@ function renderLiveSlotHtml(month, index, slot) {
   const hasDates = Array.isArray(slot.liveDates) && slot.liveDates.length > 0;
   const hasVenue = Boolean(slot.liveVenue);
   const showDetails = hasVenue || hasDates;
+  const suggestions = getLiveNameSuggestionsForPlan(month, index);
 
   return `
     <div class="live-slot" data-slot-index="${index}" style="border:1px solid #eadde1; padding:8px; border-radius:6px; margin-bottom:6px; background:#fff;">
@@ -267,8 +532,22 @@ function renderLiveSlotHtml(month, index, slot) {
 
       <div id="live-details-container-${month}-${index}" style="display: ${showDetails ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
         <label class="weekly-member-target" for="live-name-${month}-${index}">ライブ名
-          <input type="text" id="live-name-${month}-${index}" maxlength="40" value="${escapeHtml(slot.liveName || '')}" placeholder="例: 春の全国ツアー" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
+          <input type="text" id="live-name-${month}-${index}" list="live-name-suggestions-${month}-${index}" maxlength="40" value="${escapeHtml(slot.liveName || '')}" placeholder="例: 春の全国ツアー" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
+          <datalist id="live-name-suggestions-${month}-${index}">
+            ${suggestions.map(s => `<option value="${escapeHtml(s)}">`).join('')}
+          </datalist>
         </label>
+        ${suggestions.length > 0 ? `
+          <div class="live-name-suggestion-box" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+            <span style="font-size:10px; color:#888;">💡候補:</span>
+            ${suggestions.slice(0, 5).map(s => `
+              <button type="button" class="ghost-btn" style="padding:2px 6px; font-size:10px; border-radius:10px; line-height:1.2; white-space:nowrap;"
+                onclick="applyLiveNameSuggestion(${month}, ${index}, '${escapeHtml(s).replace(/'/g, "\\'")}')">
+                ${escapeHtml(s)}
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
         <div style="margin-top:6px; font-size:11px;">
           <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
           <div id="show-dates-${month}-${index}" class="show-date-list">
@@ -1705,6 +1984,12 @@ function saveDecisionPlan() {
     }
     if (!validatePlanLiveSlots(m, liveSlots)) return;
 
+    liveSlots.forEach(slot => {
+      if (slot.liveName && typeof recordPastLiveName === 'function') {
+        recordPastLiveName(slot.liveName);
+      }
+    });
+
     const primary = liveSlots[0] || null;
     const plan = {
       release,
@@ -1941,6 +2226,9 @@ function submitGameSetupAndPlan() {
   customFirstSong = song1Input?.value.trim() || 'はじまりの光';
   customSecondSong = song2Input?.value.trim() || '青春の軌跡';
   customFirstLiveName = liveInput?.value.trim() || '1stデビューライブ';
+  if (typeof recordPastLiveName === 'function') {
+    recordPastLiveName(customFirstLiveName);
+  }
 
   const setupModal = document.getElementById('setup-game-modal');
   if (setupModal) setupModal.style.display = 'none';

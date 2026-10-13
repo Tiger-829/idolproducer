@@ -13,10 +13,30 @@ let draftCount = 0;
 let currentRosterTab = 'selected';
 let merchandiseProducts = 0;
 let merchandiseStock = 0;
+let liveMerchandiseStock = 0;
+let eventMerchandiseStock = 0;
 let merchandiseUnitsSold = 0;
 let merchandiseSellThrough = null;
 let merchandiseItems = []; // グッズ開発日管理（1年自動減衰用）
 let liveHistory = [];      // ライブ1日あたり最大動員数ランキング用実績保存配列
+let pastLiveNames = [];    // 過去に設定したライブ名の保存・サジェスト用配列
+
+function syncMerchandiseStock() {
+  if (typeof liveMerchandiseStock === 'undefined') liveMerchandiseStock = 0;
+  if (typeof eventMerchandiseStock === 'undefined') eventMerchandiseStock = 0;
+  if (typeof merchandiseStock === 'undefined') merchandiseStock = 0;
+  if (merchandiseStock !== liveMerchandiseStock + eventMerchandiseStock) {
+    if (merchandiseStock === 0) {
+      liveMerchandiseStock = 0;
+      eventMerchandiseStock = 0;
+    } else if (liveMerchandiseStock === 0 && eventMerchandiseStock === 0) {
+      liveMerchandiseStock = Math.round(merchandiseStock * 3 / 5);
+      eventMerchandiseStock = merchandiseStock - liveMerchandiseStock;
+    } else {
+      merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
+    }
+  }
+}
 
 function restoreMerchandiseItems(items, productCount, fallbackDate = gameDate) {
   if (Array.isArray(items)) return items;
@@ -737,10 +757,13 @@ function initializeNewGameStateBase() {
   logHistory = [];
   merchandiseProducts = 0;
   merchandiseStock = 0;
+  liveMerchandiseStock = 0;
+  eventMerchandiseStock = 0;
   merchandiseUnitsSold = 0;
   merchandiseSellThrough = null;
   merchandiseItems = [];
   liveHistory = [];
+  pastLiveNames = [];
   nextLivePromotionPoints = 0;
   monthlyCdRevenue = 0;
   monthlyTieUpRevenue = 0;
@@ -820,10 +843,14 @@ function applySavedGameBase(data) {
   draftCount = data.draftCount || 0;
   merchandiseProducts = data.merchandiseProducts || 0;
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
+  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 3 / 5);
+  eventMerchandiseStock = data.eventMerchandiseStock ?? (merchandiseStock - liveMerchandiseStock);
+  merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
   merchandiseSellThrough = data.merchandiseSellThrough ?? null;
   merchandiseItems = restoreMerchandiseItems(data.merchandiseItems, merchandiseProducts);
   liveHistory = Array.isArray(data.liveHistory) ? data.liveHistory : [];
+  pastLiveNames = Array.isArray(data.pastLiveNames) ? [...data.pastLiveNames] : [];
   logHistory = Array.isArray(data.logHistory) ? data.logHistory : [];
   nextLivePromotionPoints = data.nextLivePromotionPoints || 0;
   monthlyCdRevenue = data.monthlyCdRevenue || 0;

@@ -418,7 +418,7 @@ const OFFICE_ACTIONS = [
   { id: 'single-promotion', name: 'シングル販促', short: '週次で減衰', detail: '選抜発表前は今作、発表後は次作を販促します。発売前は販促回数で発売時の売上が上がり、発売後は週ごとに減衰率（発売週8／通常10／過去作100）で売上が積み上がります。' },
   { id: 'live-promotion', name: '次のライブの広報', short: '集客効果Up', detail: '次回ライブの集客効果を上げます。' },
   { id: 'goods-development', name: 'グッズ開発', short: '種類+1', detail: `グッズの種類を1つ増やします。 / 上限${MAX_MERCHANDISE_PRODUCTS}種。1年以上経過したものは自動減衰します）。` },
-  { id: 'goods-production', name: 'グッズ制作', short: '在庫増加', detail: 'アイドル人数と開発したグッズ種類数に応じてグッズを制作し、在庫を増やします。' }
+  { id: 'goods-production', name: 'グッズ制作', short: '在庫増加', detail: 'アイドル人数と開発したグッズ種類数に応じてグッズを制作し、在庫を増やします（制作費: 1個あたり1,200円［ライブグッズ:イベントグッズ=3:2］）。' }
 ];
 
 const FULL_VACATION_RECOVERY = 45;
@@ -475,7 +475,18 @@ const LIVE_FATIGUE_WEEKLY_DECAY = 20;
 let weeklyRecoveryDone = false;
 let lastLiveDate = '';
 
-const MERCHANDISE_UNIT_PRICE = 4000;
+// グッズ仕様（製造原価・売価・制作比率）
+// ライブグッズ: 製造1500円、売価2400円
+const LIVE_MERCHANDISE_COST = 1500;
+const LIVE_MERCHANDISE_UNIT_PRICE = 2400;
+// イベントグッズ: 製造750円、売価1500円
+const EVENT_MERCHANDISE_COST = 750;
+const EVENT_MERCHANDISE_UNIT_PRICE = 1500;
+// グッズ制作時の製造比率（ライブグッズ:イベントグッズ = 3:2）
+// (1500 * 3 + 750 * 2) / 5 = 1200円
+const MERCHANDISE_PRODUCTION_UNIT_COST = 1200;
+
+const MERCHANDISE_UNIT_PRICE = 2400;
 const INITIAL_FUNDS = 100000000;
 const PRESET_RELEASE_MONTHS = [2, 6];
 const PRESET_RELEASE_TYPE = 'single';

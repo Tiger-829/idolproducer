@@ -238,7 +238,8 @@ function getPlanEventEntries() {
   Object.entries(productionSchedule).forEach(([planKey, plan]) => {
     if (!plan || !Array.isArray(plan.planEvents)) return;
     plan.planEvents.forEach((event, index) => {
-      if (!event || !event.date) return;
+      const hasDate = Boolean(event && (event.date || (Array.isArray(event.dates) && event.dates.length)));
+      if (!hasDate) return;
       entries.push({ plan, planKey, event, index });
     });
   });
@@ -766,24 +767,79 @@ function recordIndividualEventSale(member, eventType, available) {
   return { available, unitsSold, sellThrough };
 }
 
-function recordReleaseBenefitSales(benefitId) {
+function isRealBenefitEvent(typeId, profileId) {
+  return typeId === 'real-meeguri' || typeId === 'real-sign' || profileId === 'real-greeting' || profileId === 'real-sign';
+}
+
+function recordReleaseBenefitSales(benefitId, eventTypeId = '') {
+  const isReal = isRealBenefitEvent(eventTypeId, benefitId);
   const participants = idolRoster.filter(member => member.isSelected);
-  const results = participants.map(member =>
-    recordIndividualEventSale(member, benefitId, INDIVIDUAL_EVENT_PROFILES[benefitId].capacity)
-  );
+  const results = participants.map(member => {
+    if (isReal) {
+      const pop = member.stats?.popularity || 0;
+      const sellThrough = Math.min(1, Math.max(0, pop / 80));
+      const capacity = INDIVIDUAL_EVENT_PROFILES[benefitId]?.capacity || 80;
+      const unitsSold = Math.round(capacity * sellThrough);
+      if (!Array.isArray(member.eventSalesHistory)) member.eventSalesHistory = [];
+      member.eventSalesHistory.push({
+        eventType: benefitId,
+        date: gameDate,
+        available: capacity,
+        unitsSold,
+        sellThrough
+      });
+      if (member.eventSalesHistory.length > 24) member.eventSalesHistory.shift();
+      return { available: capacity, unitsSold, sellThrough };
+    }
+    return recordIndividualEventSale(member, benefitId, INDIVIDUAL_EVENT_PROFILES[benefitId].capacity);
+  });
   const available = results.reduce((sum, result) => sum + result.available, 0);
   const unitsSold = results.reduce((sum, result) => sum + result.unitsSold, 0);
-  return { available, unitsSold, sellThrough: available ? unitsSold / available : 0 };
+  return { available, unitsSold, sellThrough: available ? unitsSold / available : 0, memberResults: results };
+}
+
+function sellMerchandiseAtRealEvent(participants = null) {
+  if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
+  const memberList = participants || idolRoster.filter(m => m.isSelected);
+  if (!memberList.length) return { unitsSold: 0, revenue: 0, demand: 0 };
+  const currentEventStock = typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0);
+  const demand = memberList.reduce((sum, member) => {
+    const pop = member.stats?.popularity || 0;
+    const sellThrough = Math.min(1, Math.max(0, pop / 80));
+    return sum + (sellThrough * 180);
+  }, 0);
+  const unitsSold = Math.min(currentEventStock, Math.round(demand));
+  const unitPrice = typeof EVENT_MERCHANDISE_UNIT_PRICE !== 'undefined' ? EVENT_MERCHANDISE_UNIT_PRICE : 1500;
+  const revenue = unitsSold * unitPrice;
+
+  if (typeof eventMerchandiseStock !== 'undefined') {
+    eventMerchandiseStock = Math.max(0, eventMerchandiseStock - unitsSold);
+  }
+  if (typeof merchandiseStock !== 'undefined') {
+    merchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : 0) + (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0);
+  }
+  if (typeof merchandiseUnitsSold !== 'undefined') {
+    merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSold;
+  }
+  if (revenue > 0) {
+    if (typeof funds !== 'undefined') funds += revenue;
+    if (typeof recordMonthlyIncome === 'function') {
+      recordMonthlyIncome('リアルイベント・グッズ売上', revenue, `グッズ販売: ${unitsSold.toLocaleString()}個（単価${formatMoney(unitPrice)}）`);
+    }
+  }
+  return { unitsSold, revenue, demand };
 }
 
 function sellMerchandiseAtLive() {
-  if (merchandiseProducts <= 0 || merchandiseStock <= 0) {
+  if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
+  const currentLiveStock = typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0);
+  if (merchandiseProducts <= 0 || currentLiveStock <= 0) {
     merchandiseSellThrough = merchandiseProducts > 0 ? 0 : null;
     return { unitsSold: 0, revenue: 0 };
   }
   const participants = idolRoster.length ? idolRoster : [];
   if (!participants.length) return { unitsSold: 0, revenue: 0 };
-  const startingStock = merchandiseStock;
+  const startingStock = currentLiveStock;
   const baseStockPerMember = Math.floor(startingStock / participants.length);
   let remainder = startingStock % participants.length;
   let availableTotal = 0;
@@ -796,10 +852,16 @@ function sellMerchandiseAtLive() {
     availableTotal += sale.available;
     unitsSold += sale.unitsSold;
   });
-  merchandiseStock -= unitsSold;
+  if (typeof liveMerchandiseStock !== 'undefined') {
+    liveMerchandiseStock = Math.max(0, liveMerchandiseStock - unitsSold);
+  }
+  if (typeof merchandiseStock !== 'undefined') {
+    merchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : 0) + (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0);
+  }
   merchandiseUnitsSold += unitsSold;
   merchandiseSellThrough = availableTotal ? unitsSold / availableTotal : 0;
-  return { unitsSold, revenue: unitsSold * 2500 };
+  const liveMerchPrice = typeof LIVE_MERCHANDISE_UNIT_PRICE !== 'undefined' ? LIVE_MERCHANDISE_UNIT_PRICE : 2400;
+  return { unitsSold, revenue: unitsSold * liveMerchPrice };
 }
 
 function getPlanReleaseTriggerKey(plan, year, monthIndex) {
@@ -876,8 +938,18 @@ function processPlanEvents(reachDate = gameDate) {
       const goods = sellMerchandiseAtLive();
       setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
     } else {
-      const result = recordReleaseBenefitSales(type.profileId || type.id);
-      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%）。`);
+      const isReal = isRealBenefitEvent(type.id, type.profileId);
+      const result = recordReleaseBenefitSales(type.profileId || type.id, type.id);
+      let goodsInfo = '';
+      if (isReal) {
+        const goods = sellMerchandiseAtRealEvent();
+        if (goods.unitsSold > 0) {
+          goodsInfo = ` / グッズ売上: ${formatMoney(goods.revenue)}（${goods.unitsSold.toLocaleString()}個）`;
+        } else if ((typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : merchandiseStock) === 0) {
+          goodsInfo = ' / グッズ完売（在庫なし）';
+        }
+      }
+      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%${goodsInfo}）。`);
     }
   });
 }
@@ -965,15 +1037,23 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
       totalRevenue += sold * getEffectiveSeatPrice(v, entry, seat);
     });
 
+    if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
     const firstDayFans = calculateGroupFans();
     const determinedFans = Number.isFinite(entry.determinedFans) ? entry.determinedFans : firstDayFans;
-    const currentStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
-    const salesCap = MERCHANDISE_UNIT_PRICE * (firstDayFans * 3 - determinedFans * 2);
-    const stockCap = MERCHANDISE_UNIT_PRICE * currentStock;
+    const currentLiveStock = typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0);
+    const liveMerchPrice = typeof LIVE_MERCHANDISE_UNIT_PRICE !== 'undefined' ? LIVE_MERCHANDISE_UNIT_PRICE : 2400;
+    const salesCap = liveMerchPrice * (firstDayFans * 3 - determinedFans * 2);
+    const stockCap = liveMerchPrice * currentLiveStock;
     const totalMerchandise = Math.max(0, Math.min(salesCap, stockCap));
-    const unitsSoldCalc = Math.round(totalMerchandise / MERCHANDISE_UNIT_PRICE);
+    const unitsSoldCalc = Math.round(totalMerchandise / liveMerchPrice);
 
-    merchandiseStock = Math.max(0, currentStock - (firstDayFans * 3 + determinedFans * 2));
+    const nextLiveStock = Math.max(0, currentLiveStock - (firstDayFans * 3 + determinedFans * 2));
+    if (typeof liveMerchandiseStock !== 'undefined') {
+      liveMerchandiseStock = nextLiveStock;
+    }
+    if (typeof merchandiseStock !== 'undefined') {
+      merchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : nextLiveStock) + (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0);
+    }
     merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;
 
     const streamBuyers = getStreamTicketBuyers(getGameDateObject());

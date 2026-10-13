@@ -98,11 +98,18 @@ function renderSongLibrary() {
 
 
 function renderGroupTab() {
+  if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
   const merchStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
+  const liveStock = typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : 0;
+  const eventStock = typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0;
   const merchProds = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
   const stockElement = document.getElementById('txt-merchandise-stock');
+  const liveStockElement = document.getElementById('txt-live-merchandise-stock');
+  const eventStockElement = document.getElementById('txt-event-merchandise-stock');
   const productsElement = document.getElementById('txt-merchandise-products');
   if (stockElement) stockElement.textContent = merchStock.toLocaleString();
+  if (liveStockElement) liveStockElement.textContent = liveStock.toLocaleString();
+  if (eventStockElement) eventStockElement.textContent = eventStock.toLocaleString();
   if (productsElement) productsElement.textContent = String(merchProds);
   renderGroupStatus();
   renderSongLibrary();

@@ -174,5 +174,200 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert(lines.includes(planSong7), 'song-name-7 should be from randamname.txt');
   console.log(`PASS: setRandomPlanSongName(7) set song-name-7 to "${planSong7}"`);
 
+  console.log('\n=== 8. Testing Past Live Names Preservation and Pattern Suggestions ===');
+  // 8-1: suggestNextLiveNames with Year increment
+  const tourNext = run(`suggestNextLiveNames('ツアー2025', 2, 2026)`);
+  assert(Array.isArray(tourNext), 'suggestNextLiveNames should return array');
+  assert(tourNext.includes('ツアー2026'), `suggestNextLiveNames("ツアー2025", 2, 2026) should suggest "ツアー2026", got: ${JSON.stringify(tourNext)}`);
+  console.log('PASS: "ツアー2025" suggested ->', tourNext);
+
+  // 8-2: suggestNextLiveNames with Ordinal (1st -> 2nd, 2nd -> 3rd)
+  const underLiveNext = run(`suggestNextLiveNames('1stシングルアンダーライブ', 1, 2026)`);
+  assert(underLiveNext.includes('2ndシングルアンダーライブ'), `Should suggest "2ndシングルアンダーライブ", got: ${JSON.stringify(underLiveNext)}`);
+  console.log('PASS: "1stシングルアンダーライブ" suggested ->', underLiveNext);
+
+  // 8-3: Japanese round (第1回 -> 第2回)
+  const roundNext = run(`suggestNextLiveNames('第1回選抜総選挙ライブ', 1, 2026)`);
+  assert(roundNext.includes('第2回選抜総選挙ライブ'), `Should suggest "第2回選抜総選挙ライブ", got: ${JSON.stringify(roundNext)}`);
+  console.log('PASS: "第1回選抜総選挙ライブ" suggested ->', roundNext);
+
+  // 8-4: Vol.1 -> Vol. 2
+  const volNext = run(`suggestNextLiveNames('定期公演 Vol.1', 1, 2026)`);
+  assert(volNext.some(s => /定期公演 Vol\.\s*2/.test(s)), `Should suggest Vol. 2, got: ${JSON.stringify(volNext)}`);
+  console.log('PASS: "定期公演 Vol.1" suggested ->', volNext);
+
+  // 8-5: getLiveNameSuggestionsForPlan series max increment (1st & 2nd exist -> suggest 3rd)
+  run(`
+    pastLiveNames = ['1stシングルアンダーライブ', '2ndシングルアンダーライブ', 'ツアー2025'];
+  `);
+  const planSuggestions = run(`getLiveNameSuggestionsForPlan(7, 0)`);
+  assert(planSuggestions.includes('3rdシングルアンダーライブ'), `Should suggest "3rdシングルアンダーライブ", got: ${JSON.stringify(planSuggestions)}`);
+  assert(planSuggestions.includes('ツアー2026') || planSuggestions.includes('ツアー2027'), `Should suggest Tour with target year, got: ${JSON.stringify(planSuggestions)}`);
+  console.log('PASS: getLiveNameSuggestionsForPlan correctly detected series max and suggested "3rdシングルアンダーライブ":', planSuggestions);
+
+  // 8-6: Testing UI rendering (datalist & chips) and applyLiveNameSuggestion
+  const renderedSlotHtml = run(`renderLiveSlotHtml(7, 0, { liveVenue: 'Zepp Nagoya', liveName: '', liveDates: ['2026-07-15'] })`);
+  assert(renderedSlotHtml.includes('list="live-name-suggestions-7-0"'), 'HTML should contain datalist reference');
+  assert(renderedSlotHtml.includes('id="live-name-suggestions-7-0"'), 'HTML should contain datalist element');
+  assert(renderedSlotHtml.includes('💡候補:'), 'HTML should contain suggestion chips');
+  assert(renderedSlotHtml.includes('applyLiveNameSuggestion(7, 0,'), 'HTML should wire click handler');
+  console.log('PASS: renderLiveSlotHtml generates datalist and clickable suggestion chips');
+
+  // Insert rendered slot into DOM to test applyLiveNameSuggestion
+  run(`
+    const testContainer = document.createElement('div');
+    testContainer.id = 'test-live-slot-container';
+    testContainer.innerHTML = renderLiveSlotHtml(7, 0, { liveVenue: 'Zepp Nagoya', liveName: '', liveDates: ['2026-07-15'] });
+    document.body.appendChild(testContainer);
+    applyLiveNameSuggestion(7, 0, '3rdシングルアンダーライブ');
+  `);
+  const inputVal = run(`document.getElementById('live-name-7-0').value`);
+  assert.strictEqual(inputVal, '3rdシングルアンダーライブ', 'applyLiveNameSuggestion should update input field');
+  console.log('PASS: applyLiveNameSuggestion successfully populated input field to "3rdシングルアンダーライブ"');
+
+  // 8-7: Testing saveDecisionPlan records past live name
+  run(`
+    recordPastLiveName('アニバーサリーツアー2026');
+  `);
+  const recorded = run(`pastLiveNames.includes('アニバーサリーツアー2026')`);
+  assert(recorded, 'recordPastLiveName should persist name to pastLiveNames');
+  console.log('PASS: recordPastLiveName successfully recorded new live name into state');
+
+  console.log('\n=== 9. Testing Real Benefit Event Goods Sales and Sell-Through Rates ===');
+  // Set up mock members with specific popularity
+  run(`
+    idolRoster[0].isSelected = true;
+    idolRoster[0].stats.popularity = 80; // 80/80 = 1.0 (100%)
+    idolRoster[1].isSelected = true;
+    idolRoster[1].stats.popularity = 40; // 40/80 = 0.5 (50%)
+    idolRoster[2].isSelected = true;
+    idolRoster[2].stats.popularity = 100; // Min(1, 100/80) = 1.0 (100%)
+    idolRoster[3].isSelected = false; // Not selected
+    // Deselect other members for controlled calculation
+    for (let i = 4; i < idolRoster.length; i++) {
+      idolRoster[i].isSelected = false;
+    }
+    eventMerchandiseStock = 500;
+    liveMerchandiseStock = 300;
+    merchandiseStock = 800;
+    merchandiseUnitsSold = 0;
+    funds = 10000000;
+  `);
+
+  // Expected demand: member 0 (1.0 * 180) + member 1 (0.5 * 180) + member 2 (1.0 * 180) = 180 + 90 + 180 = 450
+  // With event stock = 500, unitsSold = Min(500, 450) = 450
+  // Event goods selling price = 1500 yen (revenue = 450 * 1500 = 675,000 yen)
+  const goodsResult = run(`sellMerchandiseAtRealEvent()`);
+  assert.strictEqual(goodsResult.demand, 450, `Demand should be 450, got ${goodsResult.demand}`);
+  assert.strictEqual(goodsResult.unitsSold, 450, `Units sold should be 450, got ${goodsResult.unitsSold}`);
+  assert.strictEqual(goodsResult.revenue, 450 * 1500, `Revenue should be 675,000, got ${goodsResult.revenue}`);
+  assert.strictEqual(run('eventMerchandiseStock'), 50, `Remaining event stock should be 50, got ${run('eventMerchandiseStock')}`);
+  assert.strictEqual(run('liveMerchandiseStock'), 300, `Live stock should remain unchanged at 300, got ${run('liveMerchandiseStock')}`);
+  assert.strictEqual(run('merchandiseStock'), 350, `Total stock should be 350, got ${run('merchandiseStock')}`);
+  assert.strictEqual(run('merchandiseUnitsSold'), 450, `Merchandise units sold should be 450, got ${run('merchandiseUnitsSold')}`);
+  assert.strictEqual(run('funds'), 10000000 + 675000, `Funds should increase by 675,000`);
+  console.log('PASS: sellMerchandiseAtRealEvent calculates demand, stock cap, and revenue correctly with event goods price (1500 yen)');
+
+  // Test Stock capping: eventStock = 200, demand = 450 -> unitsSold = 200
+  run(`
+    eventMerchandiseStock = 200;
+    liveMerchandiseStock = 300;
+    merchandiseStock = 500;
+    merchandiseUnitsSold = 0;
+    funds = 10000000;
+  `);
+  const cappedGoodsResult = run(`sellMerchandiseAtRealEvent()`);
+  assert.strictEqual(cappedGoodsResult.unitsSold, 200, `Units sold capped by stock should be 200, got ${cappedGoodsResult.unitsSold}`);
+  assert.strictEqual(cappedGoodsResult.revenue, 200 * 1500, `Revenue should be 300,000`);
+  assert.strictEqual(run('eventMerchandiseStock'), 0, 'Remaining event stock should be 0');
+  assert.strictEqual(run('liveMerchandiseStock'), 300, 'Live stock should remain 300');
+  assert.strictEqual(run('merchandiseStock'), 300, 'Total stock should be 300');
+  console.log('PASS: sellMerchandiseAtRealEvent caps at eventMerchandiseStock when stock < demand');
+
+  // Test recordReleaseBenefitSales for real events: sellThrough = Min(1, popularity/80)
+  const benefitResult = run(`recordReleaseBenefitSales('real-greeting', 'real-meeguri')`);
+  // Capacity of real-greeting is 80
+  // Member 0: pop 80 -> sellThrough 1.0 -> unitsSold 80
+  // Member 1: pop 40 -> sellThrough 0.5 -> unitsSold 40
+  // Member 2: pop 100 -> sellThrough 1.0 -> unitsSold 80
+  // Total available = 80 * 3 = 240, Total unitsSold = 80 + 40 + 80 = 200
+  // Average sellThrough = 200 / 240 = 0.8333...
+  assert.strictEqual(benefitResult.available, 240, `Available capacity should be 240`);
+  assert.strictEqual(benefitResult.unitsSold, 200, `Units sold should be 200`);
+  assert(Math.abs(benefitResult.sellThrough - (200 / 240)) < 0.001, `Average sell-through should be approx 83%`);
+  console.log('PASS: recordReleaseBenefitSales uses Min(1, popularity/80) for real events');
+
+  // Test processPlanEvents execution on real event date
+  run(`
+    gameDate = '2027-04-18';
+    eventMerchandiseStock = 1000;
+    liveMerchandiseStock = 500;
+    merchandiseStock = 1500;
+    productionSchedule['1-4'] = {
+      release: 'none',
+      planEvents: [
+        {
+          name: 'リアルミーグリ',
+          benefitId: 'real-meeguri',
+          venue: 'パルス品川',
+          dates: ['2027-04-18'],
+          completedDates: []
+        }
+      ]
+    };
+    processPlanEvents('2027-04-18');
+  `);
+  // Event stock should be deducted: 1000 - 450 = 550, Live stock untouched: 500, Total: 1050
+  assert.strictEqual(run('eventMerchandiseStock'), 550, `Event stock after processPlanEvents should be 550, got ${run('eventMerchandiseStock')}`);
+  assert.strictEqual(run('liveMerchandiseStock'), 500, `Live stock after processPlanEvents should be 500, got ${run('liveMerchandiseStock')}`);
+  assert.strictEqual(run('merchandiseStock'), 1050, `Total stock after processPlanEvents should be 1050, got ${run('merchandiseStock')}`);
+  console.log('PASS: processPlanEvents on real event sells merchandise and updates stock');
+
+  console.log('\n=== 10. Testing Live Goods Price (2400) and Goods Production Unit Cost (1200) ===');
+  // 10-1: Live goods unit price is 2400 in sellMerchandiseAtLive
+  run(`
+    merchandiseProducts = 2;
+    liveMerchandiseStock = 100;
+    eventMerchandiseStock = 50;
+    merchandiseStock = 150;
+    merchandiseUnitsSold = 0;
+  `);
+  const liveGoodsResult = run(`sellMerchandiseAtLive()`);
+  assert(liveGoodsResult.unitsSold > 0, 'Live goods unitsSold should be > 0');
+  assert.strictEqual(liveGoodsResult.revenue, liveGoodsResult.unitsSold * 2400, 'Live goods revenue should equal unitsSold * 2400');
+  assert.strictEqual(run('eventMerchandiseStock'), 50, 'Event stock should remain untouched during live sales');
+  console.log(`PASS: sellMerchandiseAtLive uses live goods price 2400 yen (${liveGoodsResult.unitsSold} units -> ${liveGoodsResult.revenue} yen) and only draws from live stock`);
+
+  // 10-2: Goods production cost is 1200 yen per unit and splits 3:2
+  run(`
+    funds = 10000000;
+    liveMerchandiseStock = 0;
+    eventMerchandiseStock = 0;
+    merchandiseStock = 0;
+    merchandiseProducts = 1;
+  `);
+  const activeCount = run(`(Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length`);
+  const expectedUnits = activeCount * 1 * 100;
+  const expectedLiveUnits = Math.round(expectedUnits * 3 / 5);
+  const expectedEventUnits = expectedUnits - expectedLiveUnits;
+  const expectedCost = 1200 * expectedUnits;
+  const prodLog = run(`applyOfficeAction('goods-production')`);
+  assert.strictEqual(run('liveMerchandiseStock'), expectedLiveUnits, `Live stock should increase by ${expectedLiveUnits}`);
+  assert.strictEqual(run('eventMerchandiseStock'), expectedEventUnits, `Event stock should increase by ${expectedEventUnits}`);
+  assert.strictEqual(run('merchandiseStock'), expectedUnits, `Total stock should increase by ${expectedUnits}`);
+  assert.strictEqual(run('funds'), 10000000 - expectedCost, `Funds should be deducted by ${expectedCost}`);
+  assert(prodLog.includes(expectedLiveUnits.toLocaleString()) && prodLog.includes(expectedEventUnits.toLocaleString()), `Log should include produced live and event units: ${prodLog}`);
+  console.log(`PASS: Goods production produces ${expectedUnits} units (live: ${expectedLiveUnits}, event: ${expectedEventUnits}) at 1,200 yen/unit (total cost: ${expectedCost} yen)`);
+
+  // 10-3: UI card rendering in group tab
+  run(`renderGroupTab();`);
+  const uiLiveStock = run(`document.getElementById('txt-live-merchandise-stock')?.textContent`);
+  const uiEventStock = run(`document.getElementById('txt-event-merchandise-stock')?.textContent`);
+  const uiTotalStock = run(`document.getElementById('txt-merchandise-stock')?.textContent`);
+  assert.strictEqual(uiLiveStock, expectedLiveUnits.toLocaleString(), `UI live stock should be ${expectedLiveUnits.toLocaleString()}`);
+  assert.strictEqual(uiEventStock, expectedEventUnits.toLocaleString(), `UI event stock should be ${expectedEventUnits.toLocaleString()}`);
+  assert.strictEqual(uiTotalStock, expectedUnits.toLocaleString(), `UI total stock should be ${expectedUnits.toLocaleString()}`);
+  console.log('PASS: renderGroupTab displays separate live, event, and total stock numbers correctly');
+
   console.log('\nALL CHECKS PASSED SUCCESSFULLY!');
 })();

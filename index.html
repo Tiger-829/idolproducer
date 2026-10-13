@@ -101,9 +101,19 @@
 
       <!-- ★ ここにグッズの在庫数・種類数の表示カードを追加しました -->
       <!-- グッズの在庫数・種類数表示カード -->
-      <div class="team-fans-card" style="display: flex; justify-content: space-around; align-items: center;">
+      <div class="team-fans-card" style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div style="text-align: center;">
-          <span style="font-size: 11px; color: #888; display: block;">グッズ保有在庫</span>
+          <span style="font-size: 11px; color: #888; display: block;">ライブグッズ在庫</span>
+          <strong id="txt-live-merchandise-stock" style="font-size: 14px; color: var(--primary);">0</strong><small> 個</small>
+        </div>
+        <div style="border-left: 1px solid #eadde1; height: 24px;"></div>
+        <div style="text-align: center;">
+          <span style="font-size: 11px; color: #888; display: block;">イベントグッズ在庫</span>
+          <strong id="txt-event-merchandise-stock" style="font-size: 14px; color: var(--primary);">0</strong><small> 個</small>
+        </div>
+        <div style="border-left: 1px solid #eadde1; height: 24px;"></div>
+        <div style="text-align: center;">
+          <span style="font-size: 11px; color: #888; display: block;">グッズ総在庫</span>
           <strong id="txt-merchandise-stock" style="font-size: 14px; color: var(--primary);">0</strong><small> 個</small>
         </div>
         <div style="border-left: 1px solid #eadde1; height: 24px;"></div>

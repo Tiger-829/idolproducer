@@ -303,6 +303,8 @@ function initializeNewGameState() {
   logHistory = [];
   merchandiseProducts = 0;
   merchandiseStock = 0;
+  liveMerchandiseStock = 0;
+  eventMerchandiseStock = 0;
   merchandiseUnitsSold = 0;
   merchandiseSellThrough = null;
   merchandiseItems = [];
@@ -338,6 +340,7 @@ function initializeNewGameState() {
   yearlyStats = { sales: 0, audience: 0 };
   lifetimeSales = 0;
   salesHistory = [];
+  pastLiveNames = [];
   fansFromSales = 0;
   funds = INITIAL_FUNDS;
   leagueTeams = createInitialLeagueTeams();
@@ -393,10 +396,14 @@ function applySavedGame(data) {
   draftCount = data.draftCount || 0;
   merchandiseProducts = data.merchandiseProducts || 0;
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
+  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 3 / 5);
+  eventMerchandiseStock = data.eventMerchandiseStock ?? (merchandiseStock - liveMerchandiseStock);
+  merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;
   merchandiseSellThrough = data.merchandiseSellThrough ?? null;
   merchandiseItems = restoreMerchandiseItems(data.merchandiseItems, merchandiseProducts);
   liveHistory = Array.isArray(data.liveHistory) ? data.liveHistory : [];
+  pastLiveNames = Array.isArray(data.pastLiveNames) ? [...data.pastLiveNames] : [];
   salesHistory = Array.isArray(data.salesHistory) ? data.salesHistory : [];
   logHistory = Array.isArray(data.logHistory) ? data.logHistory : [];
   nextLivePromotionPoints = data.nextLivePromotionPoints || 0;

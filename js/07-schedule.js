@@ -309,16 +309,24 @@ function processPlayerLives(fromDate, toDate) {
       });
 
       // 新しいグッズ売上・在庫計算式の適用
+      if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
       const firstDayFans = calculateGroupFans();
       const determinedFans = Number.isFinite(entry.determinedFans) ? entry.determinedFans : firstDayFans;
-      const currentStock = typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0;
+      const currentLiveStock = typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0);
+      const liveMerchPrice = typeof LIVE_MERCHANDISE_UNIT_PRICE !== 'undefined' ? LIVE_MERCHANDISE_UNIT_PRICE : 2400;
 
-      const salesCap = MERCHANDISE_UNIT_PRICE * (firstDayFans * 3 - determinedFans * 2);
-      const stockCap = MERCHANDISE_UNIT_PRICE * currentStock;
+      const salesCap = liveMerchPrice * (firstDayFans * 3 - determinedFans * 2);
+      const stockCap = liveMerchPrice * currentLiveStock;
       const goodsRevenue = Math.max(0, Math.min(salesCap, stockCap));
-      const unitsSoldCalc = Math.round(goodsRevenue / MERCHANDISE_UNIT_PRICE);
+      const unitsSoldCalc = Math.round(goodsRevenue / liveMerchPrice);
 
-      merchandiseStock = Math.max(0, currentStock - (firstDayFans * 3 + determinedFans * 2));
+      const nextLiveStock = Math.max(0, currentLiveStock - (firstDayFans * 3 + determinedFans * 2));
+      if (typeof liveMerchandiseStock !== 'undefined') {
+        liveMerchandiseStock = nextLiveStock;
+      }
+      if (typeof merchandiseStock !== 'undefined') {
+        merchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : nextLiveStock) + (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0);
+      }
       merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;
 
       const grossRevenue = grandTotalTicketRevenue + goodsRevenue + grandTotalStreamRevenue;
@@ -1715,19 +1723,27 @@ function applyOfficeAction(actionId) {
   if (actionId === 'goods-production') {
     const activeMembersCount = (Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length;
     const currentProdTypes = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
-    const productionCost = 3000 * (activeMembersCount * Math.max(1, currentProdTypes) * 100);
+    const unitCost = typeof MERCHANDISE_PRODUCTION_UNIT_COST !== 'undefined' ? MERCHANDISE_PRODUCTION_UNIT_COST : 1200;
     const unitsProduced = activeMembersCount * Math.max(1, currentProdTypes) * 100;
+    const productionCost = unitCost * unitsProduced;
 
     if (funds < productionCost) {
       return `グッズ制作（資金不足のため未実施）`;
     }
 
     funds -= productionCost;
-    merchandiseStock = (typeof merchandiseStock !== 'undefined' ? merchandiseStock : 0) + unitsProduced;
+    if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
+    const liveUnitsProduced = Math.round(unitsProduced * 3 / 5);
+    const eventUnitsProduced = unitsProduced - liveUnitsProduced;
+
+    liveMerchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : 0) + liveUnitsProduced;
+    eventMerchandiseStock = (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0) + eventUnitsProduced;
+    merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
+
     if (typeof recordMonthlyExpense === 'function') {
-      recordMonthlyExpense('グッズ制作費', productionCost, `${unitsProduced.toLocaleString()}個を生産`);
+      recordMonthlyExpense('グッズ制作費', productionCost, `${unitsProduced.toLocaleString()}個（ライブ: ${liveUnitsProduced.toLocaleString()}個 / イベント: ${eventUnitsProduced.toLocaleString()}個）を生産`);
     }
-    return `グッズ制作（在庫 +${unitsProduced.toLocaleString()}個 / -${formatMoney(productionCost)}）`;
+    return `グッズ制作（在庫: ライブ+${liveUnitsProduced.toLocaleString()}個、イベント+${eventUnitsProduced.toLocaleString()}個 / -${formatMoney(productionCost)}）`;
   }
   return '';
 }

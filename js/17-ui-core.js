@@ -54,8 +54,8 @@ function updateUI() {
     try {
       localStorage.setItem(saveSlotKey(activeSaveSlot), JSON.stringify({
         currentYear, currentMonth, currentWeek, gameDate, calendarYear, totalWeeksElapsed, draftCount, funds,
-        merchandiseProducts, merchandiseStock, merchandiseUnitsSold, merchandiseSellThrough, merchandiseItems,
-        currentRosterTab, liveHistory, salesHistory, logHistory,
+        merchandiseProducts, merchandiseStock, liveMerchandiseStock, eventMerchandiseStock, merchandiseUnitsSold, merchandiseSellThrough, merchandiseItems,
+        currentRosterTab, liveHistory, pastLiveNames, salesHistory, logHistory,
         nextLivePromotionPoints, monthlyCdRevenue, monthlyTieUpRevenue, promoSongId,
         monthlyLedger, pendingMonthlyReport,
         crisisCheckWeekKey, crisisEventWeekKey, crisisEventType,
