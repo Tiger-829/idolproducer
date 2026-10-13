@@ -220,6 +220,24 @@ function onCdTrackNameChange(index) {
   }
 }
 
+async function setRandomTrackName(index) {
+  let name = '';
+  if (typeof getRandomSongName === 'function') {
+    name = await getRandomSongName();
+  } else if (typeof getRandomSongNameSync === 'function') {
+    name = getRandomSongNameSync();
+  } else if (typeof SONG_TITLES !== 'undefined' && Array.isArray(SONG_TITLES)) {
+    name = SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)];
+  } else {
+    name = 'はじまりの光';
+  }
+  const el = document.getElementById(`cd-track-name-${index}`);
+  if (el) el.value = name;
+  if (cdProductionModalState?.tracks && cdProductionModalState.tracks[index]) {
+    cdProductionModalState.tracks[index].name = name;
+  }
+}
+
 function onCdTrackMvChange(index) {
   const el = document.getElementById(`cd-track-mv-${index}`);
   const track = cdProductionModalState?.tracks[index];
@@ -342,10 +360,14 @@ function renderCdProductionModal() {
     return `
       <div style="padding:7px; margin-bottom:6px; border:1px solid #eee; border-radius:5px;">
         <div style="font-size:11px; color:#888; margin-bottom:4px;">${i === 0 ? 'リード曲' : `曲${i + 1}`}</div>
-        <input type="text" id="cd-track-name-${i}" value="${escapeHtml(track.name || '')}" maxlength="24"
-          placeholder="${i === 0 ? '表題曲（決定済み）' : '曲名を入力'}"
-          ${locked ? 'readonly style="background:#f0f0f0;' : 'style="'} padding:5px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; width:100%;"
-          onchange="onCdTrackNameChange(${i})">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="cd-track-name-${i}" value="${escapeHtml(track.name || '')}" maxlength="24"
+            placeholder="${i === 0 ? '表題曲' : '曲名を入力'}"
+            style="flex:1; padding:5px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;"
+            onchange="onCdTrackNameChange(${i})">
+          <button type="button" class="ghost-btn" style="padding:4px 8px; font-size:10px; white-space:nowrap;"
+            onclick="setRandomTrackName(${i})">ランダム</button>
+        </div>
         <div style="display:flex; gap:8px; margin-top:5px;">
           <label style="flex:1; font-size:10px; font-weight:bold; color:#555;">MV
             <select id="cd-track-mv-${i}" onchange="onCdTrackMvChange(${i})"
@@ -451,6 +473,9 @@ function confirmCdProduction() {
   if (typeof cdProductionTargetPlanKey !== 'undefined' && cdProductionTargetPlanKey
       && typeof productionSchedule !== 'undefined' && productionSchedule[cdProductionTargetPlanKey]) {
     productionSchedule[cdProductionTargetPlanKey].cdProduction = cdProductionModalState;
+    if (cdProductionModalState.tracks && cdProductionModalState.tracks[0]?.name) {
+      productionSchedule[cdProductionTargetPlanKey].songName = cdProductionModalState.tracks[0].name;
+    }
   }
   closeCdProductionModal();
   setLog(`【CD制作】収録${cost.trackCount}曲${cost.useMv ? `・MV${cost.mvTrackCount}曲` : ''} / 制作費 ${formatMoney(cost.totalCost)}（初週売上バフ ×${getCdProductionSalesBuff(cdProductionModalState).toFixed(2)}）に決定しました。`);

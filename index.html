@@ -226,6 +226,7 @@
         <button class="ghost-btn" type="button" onclick="openHelpModal()">ゲーム説明を見る</button>
         <p class="records-help-note">売上計算や動員ルールなど、ゲームの仕様を確認できます。</p>
       </div>
+      <div id="log-box" style="display:none;" aria-live="polite"></div>
     </section>
   </div>
 
@@ -247,10 +248,16 @@
         <input type="text" id="input-setup-groupname" maxlength="20" value="スタースコープ" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
       </label>
       <label style="font-size:11px; font-weight:bold; color:#333;">1stシングル曲名
-        <input type="text" id="input-setup-1st-song" maxlength="24" value="はじまりの光" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+        <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
+          <input type="text" id="input-setup-1st-song" maxlength="24" value="はじまりの光" style="flex:1; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+          <button type="button" class="ghost-btn" style="padding:5px 8px; font-size:10px; white-space:nowrap;" onclick="setRandomSetupSongName('input-setup-1st-song')">ランダム</button>
+        </div>
       </label>
       <label style="font-size:11px; font-weight:bold; color:#333;">2ndシングル曲名
-        <input type="text" id="input-setup-2nd-song" maxlength="24" value="青春の軌跡" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">
+        <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
+          <input type="text" id="input-setup-2nd-song" maxlength="24" value="青春の軌跡" style="flex:1; padding:6px; font-size:12px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+          <button type="button" class="ghost-btn" style="padding:5px 8px; font-size:10px; white-space:nowrap;" onclick="setRandomSetupSongName('input-setup-2nd-song')">ランダム</button>
+        </div>
       </label>
       <label style="font-size:11px; font-weight:bold; color:#333;">ファーストライブ名
         <input type="text" id="input-setup-live-name" maxlength="40" value="1stデビューライブ" style="width:100%; padding:6px; margin-top:3px; box-sizing:border-box; font-size:12px; border:1px solid #ccc; border-radius:4px;">

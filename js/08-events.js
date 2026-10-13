@@ -1704,19 +1704,20 @@ function checkSenbatsuTrigger(date = getGameDateObject()) {
 }
 
 function createSelectionEvent({ trigger = 'manual', year = 0, month = 0, releaseType = null } = {}) {
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
   const currentSelected = idolRoster.filter(member => member.isSelected);
   const currentCenter = idolRoster.find(member => member.isCenter);
   const base = currentSelected.length >= MIN_SELECTION_SIZE
     ? currentSelected
     : [...idolRoster].sort((a, b) => calculateSingleOverall(b.stats) - calculateSingleOverall(a.stats))
         .slice(0, Math.max(MIN_SELECTION_SIZE, 16));
-  const centerId = base.some(member => member.id === currentCenter?.id) ? currentCenter.id : base[0]?.id ?? null;
+  const centerId = base.some(member => Number(member.id) === Number(currentCenter?.id)) ? Number(currentCenter.id) : (base[0] ? Number(base[0].id) : null);
   return {
     trigger,
     year,
     month,
     releaseType,
-    selectedIds: base.map(member => member.id),
+    selectedIds: base.map(member => Number(member.id)),
     centerId
   };
 }

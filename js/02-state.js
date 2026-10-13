@@ -802,6 +802,7 @@ function initializeNewGameStateBase() {
   }
   ensureMemberBirthdays();
   ensureMemberHeights();
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
   ensureMemberVitalState();
   ensureMemberStyleFashion();
   syncMemberAges();
@@ -861,6 +862,7 @@ function applySavedGameBase(data) {
   idolRoster = data.idolRoster || [];
   ensureMemberBirthdays();
   ensureMemberHeights();
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
   ensureMemberVitalState();
   ensureMemberStyleFashion();
   syncMemberAges();

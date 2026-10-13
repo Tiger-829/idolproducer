@@ -1434,7 +1434,10 @@ function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = fa
         
         <div id="release-fields-${m}" style="display: ${hasRelease ? 'block' : 'none'}; margin-top:8px; border-top:1px dashed #eee; paddingTop:6px;">
           <label class="weekly-member-target" for="song-name-${m}">楽曲名
-            <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
+            <div style="display:flex; gap:6px; align-items:center; margin-top:3px;">
+              <input type="text" id="song-name-${m}" maxlength="24" value="${escapeHtml(existingPlan.songName || '')}" placeholder="空欄で自動命名" style="flex:1; padding:6px; font-size:11px; box-sizing:border-box;">
+              <button type="button" class="ghost-btn" style="padding:5px 8px; font-size:10px; white-space:nowrap;" onclick="setRandomPlanSongName(${m})">ランダム</button>
+            </div>
           </label>
           <label class="weekly-member-target" for="rel-date-${m}">発売日
             <input type="date" id="rel-date-${m}" value="${defaultRelDate}" onchange="renderEmbeddedPlanCalendars();" style="width:100%; padding:6px; font-size:11px; margin-top:3px; box-sizing:border-box;">
@@ -1487,6 +1490,21 @@ function onReleaseSelectChange(month) {
     }
   }
   renderEmbeddedPlanCalendars();
+}
+
+async function setRandomPlanSongName(month) {
+  let name = '';
+  if (typeof getRandomSongName === 'function') {
+    name = await getRandomSongName();
+  } else if (typeof getRandomSongNameSync === 'function') {
+    name = getRandomSongNameSync();
+  } else if (typeof SONG_TITLES !== 'undefined' && Array.isArray(SONG_TITLES)) {
+    name = SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)];
+  } else {
+    name = 'はじまりの光';
+  }
+  const input = document.getElementById(`song-name-${month}`);
+  if (input) input.value = name;
 }
 
 // Decisionモーダルを閉じる。
@@ -1881,6 +1899,21 @@ function closeGameSetupModal() {
   const setupModal = document.getElementById('setup-game-modal');
   if (setupModal) setupModal.style.display = 'none';
   pendingActiveSlot = null;
+}
+
+async function setRandomSetupSongName(inputId) {
+  let name = '';
+  if (typeof getRandomSongName === 'function') {
+    name = await getRandomSongName();
+  } else if (typeof getRandomSongNameSync === 'function') {
+    name = getRandomSongNameSync();
+  } else if (typeof SONG_TITLES !== 'undefined' && Array.isArray(SONG_TITLES)) {
+    name = SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)];
+  } else {
+    name = 'はじまりの光';
+  }
+  const input = document.getElementById(inputId);
+  if (input) input.value = name;
 }
 
 // 試合セットアップ計画を送信する。

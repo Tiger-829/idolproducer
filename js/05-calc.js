@@ -286,6 +286,9 @@ function getStatExpProgress(member, statId) {
 }
 
 function ensureMemberVitalState() {
+  if (typeof ensureUniqueMemberIds === 'function') {
+    ensureUniqueMemberIds();
+  }
   idolRoster.forEach(member => {
     if (!member.stats) member.stats = {};
     if (!Number.isFinite(member.stats.recovery)) member.stats.recovery = 40;

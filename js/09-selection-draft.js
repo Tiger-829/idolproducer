@@ -36,24 +36,26 @@ function openSelectionSetup() {
 // 選抜SelectedID群を取得する。
 function getSelectionSelectedIds() {
   if (!pendingSelectionEvent) return new Set();
-  return new Set(pendingSelectionEvent.selectedIds || []);
+  return new Set((pendingSelectionEvent.selectedIds || []).map(Number));
 }
 
 // 選抜のチェックを切り替える
 function toggleSelectionMember(memberId) {
   if (!pendingSelectionEvent) return;
-  const ids = new Set(pendingSelectionEvent.selectedIds || []);
-  if (ids.has(memberId)) {
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
+  const idNum = Number(memberId);
+  const ids = new Set((pendingSelectionEvent.selectedIds || []).map(Number));
+  if (ids.has(idNum)) {
     if (ids.size <= MIN_SELECTION_SIZE) {
       setLog(`【選抜】最少${MIN_SELECTION_SIZE}名は必要です。`);
       return;
     }
-    ids.delete(memberId);
-    if (pendingSelectionEvent.centerId === memberId) {
+    ids.delete(idNum);
+    if (Number(pendingSelectionEvent.centerId) === idNum) {
       pendingSelectionEvent.centerId = ids.values().next().value ?? null;
     }
   } else {
-    ids.add(memberId);
+    ids.add(idNum);
   }
   pendingSelectionEvent.selectedIds = [...ids];
   renderSelectionModal();
@@ -62,28 +64,32 @@ function toggleSelectionMember(memberId) {
 // センターを変更する（選抜内に限定）
 function setSelectionCenter(memberId) {
   if (!pendingSelectionEvent) return;
+  const idNum = Number(memberId);
   const ids = getSelectionSelectedIds();
-  if (!ids.has(memberId)) return;
-  pendingSelectionEvent.centerId = memberId;
+  if (!ids.has(idNum)) return;
+  pendingSelectionEvent.centerId = idNum;
   renderSelectionModal();
 }
 
 // 選抜とセンターを確定する
 function confirmSelection() {
   if (!pendingSelectionEvent) return;
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
   const ids = getSelectionSelectedIds();
   if (ids.size < MIN_SELECTION_SIZE) {
     setLog(`【選抜】少なくとも${MIN_SELECTION_SIZE}名を選んでください。`);
     return;
   }
-  const centerId = ids.has(pendingSelectionEvent.centerId)
-    ? pendingSelectionEvent.centerId
+  const pendingCenter = Number(pendingSelectionEvent.centerId);
+  const centerId = ids.has(pendingCenter)
+    ? pendingCenter
     : [...ids][0];
   idolRoster.forEach(member => {
-    member.isSelected = ids.has(member.id);
-    member.isCenter = member.id === centerId;
+    const mId = Number(member.id);
+    member.isSelected = ids.has(mId);
+    member.isCenter = mId === centerId;
   });
-  const center = idolRoster.find(member => member.id === centerId);
+  const center = idolRoster.find(member => Number(member.id) === centerId);
   const isRelease = pendingSelectionEvent.trigger === 'release';
   const eventYear = pendingSelectionEvent.year;
   const eventMonth = pendingSelectionEvent.month;
@@ -156,6 +162,7 @@ function sortSelectionMembers(members) {
 function renderSelectionModal() {
   const event = pendingSelectionEvent;
   if (!event) return;
+  if (typeof ensureUniqueMemberIds === 'function') ensureUniqueMemberIds();
   const ids = getSelectionSelectedIds();
   const isRelease = event.trigger === 'release';
   const title = isRelease && event.month
@@ -163,19 +170,21 @@ function renderSelectionModal() {
     : '選抜・センターを変更';
   const sortKey = SELECTION_SORT_KEYS.find(key => key.id === event.sortKey) || SELECTION_SORT_KEYS[0];
 
-  const centerOptions = [...ids].map(id => idolRoster.find(member => member.id === id)).filter(Boolean);
-  const centerMember = centerOptions.find(member => member.id === event.centerId);
+  const centerOptions = [...ids].map(id => idolRoster.find(member => Number(member.id) === id)).filter(Boolean);
+  const centerMember = centerOptions.find(member => Number(member.id) === Number(event.centerId));
   const centerRow = centerOptions.length
     ? `<div class="selection-center">
         <div class="selection-subtitle">センターを選ぶ<small>選抜の中から1名</small></div>
         <div class="selection-center-list">
-          ${centerOptions.map(member => `
-            <button type="button" class="selection-center-btn${member.id === event.centerId ? ' active' : ''}"
-              onclick="setSelectionCenter(${member.id})">
+          ${centerOptions.map(member => {
+            const mId = Number(member.id);
+            return `
+            <button type="button" class="selection-center-btn${mId === Number(event.centerId) ? ' active' : ''}"
+              onclick="setSelectionCenter(${mId})">
               ${escapeHtml(formatMemberDisplayName(member))}
               <small>総評${calculateSingleOverall(member.stats)} / 人気${member.stats.popularity || 0}</small>
             </button>
-          `).join('')}
+          `;}).join('')}
         </div>
       </div>`
     : '';
@@ -184,10 +193,11 @@ function renderSelectionModal() {
     const overall = calculateSingleOverall(member.stats);
     const sortValue = Number(sortKey.get(member)) || 0;
     const rInfo = getRankData(overall);
-    const selected = ids.has(member.id);
+    const mId = Number(member.id);
+    const selected = ids.has(mId);
     return `
-      <button type="button" class="selection-member${selected ? ' selected' : ''}" data-member-id="${member.id}"
-        onclick="toggleSelectionMember(${member.id})">
+      <button type="button" class="selection-member${selected ? ' selected' : ''}" data-member-id="${mId}"
+        onclick="toggleSelectionMember(${mId})">
         <span class="selection-check">${selected ? '✓' : ''}</span>
         <span class="selection-name">${escapeHtml(formatMemberDisplayName(member))}${member.isCenter ? '<i class="selection-crown">C</i>' : ''}</span>
         <span class="selection-meta">${member.age}歳 / 体力${member.staminaValue}${member.injury ? ` / ${escapeHtml(member.injury.type)} ${escapeHtml(formatInjuryWeeks(member.injury))}` : ''}</span>

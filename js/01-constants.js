@@ -531,3 +531,83 @@ function getStatExpRequired(level) {
     return Math.round(5000 * Math.pow(1.05, diff));
   }
 }
+
+// ==========================================
+// 過去15年の人気アーティストのシングル・アルバム表題曲（randamname.txt）
+// ==========================================
+let randomSongNamesCache = null;
+
+function setRandomSongNamesCache(list) {
+  if (Array.isArray(list) && list.length > 0) {
+    randomSongNamesCache = list;
+  }
+}
+
+async function loadRandomSongNames() {
+  if (Array.isArray(randomSongNamesCache) && randomSongNamesCache.length > 0) {
+    return randomSongNamesCache;
+  }
+  if (typeof globalThis !== 'undefined' && Array.isArray(globalThis.__RANDOM_SONG_NAMES__) && globalThis.__RANDOM_SONG_NAMES__.length > 0) {
+    randomSongNamesCache = globalThis.__RANDOM_SONG_NAMES__;
+    return randomSongNamesCache;
+  }
+  // ブラウザ環境での fetch 読み込み
+  if (typeof fetch === 'function') {
+    try {
+      const res = await fetch('./randamname.txt');
+      if (res.ok) {
+        const text = await res.text();
+        const list = text.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0 && !s.startsWith('#'));
+        if (list.length > 0) {
+          randomSongNamesCache = list;
+          return list;
+        }
+      }
+    } catch (e) {
+      // file:// 環境やオフライン時のフォールバック
+    }
+  }
+  // Node.js テスト環境での同期読み込み
+  if (typeof require !== 'undefined' && typeof process !== 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const candidates = [
+        path.resolve(process.cwd(), 'randamname.txt'),
+        path.resolve(__dirname, 'randamname.txt'),
+        path.resolve(__dirname, '../randamname.txt')
+      ];
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          const text = fs.readFileSync(p, 'utf8');
+          const list = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+          if (list.length > 0) {
+            randomSongNamesCache = list;
+            return list;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  return SONG_TITLES;
+}
+
+// 同期的にランダム曲名を取得
+function getRandomSongNameSync() {
+  const list = (Array.isArray(randomSongNamesCache) && randomSongNamesCache.length > 0)
+    ? randomSongNamesCache
+    : SONG_TITLES;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// 非同期で確実に randamname.txt からランダム曲名を取得
+async function getRandomSongName() {
+  const list = await loadRandomSongNames();
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// 起動時にプリフェッチ
+try {
+  loadRandomSongNames();
+} catch (e) {}
+

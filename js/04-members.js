@@ -207,6 +207,48 @@ function syncMemberAges(onDate = getGameDateObject()) {
   });
 }
 
+let _lastGeneratedMemberId = 0;
+
+// ユニークなメンバーID（安全な整数）を生成する
+function generateUniqueMemberId() {
+  const existingIds = new Set();
+  if (typeof idolRoster !== 'undefined' && Array.isArray(idolRoster)) {
+    idolRoster.forEach(m => { if (m && m.id != null) existingIds.add(Number(m.id)); });
+  }
+  if (typeof draftState !== 'undefined' && draftState && Array.isArray(draftState.candidatePool)) {
+    draftState.candidatePool.forEach(m => { if (m && m.id != null) existingIds.add(Number(m.id)); });
+  }
+  let candidateId = Math.max(Date.now(), _lastGeneratedMemberId + 1);
+  while (existingIds.has(candidateId)) {
+    candidateId++;
+  }
+  _lastGeneratedMemberId = candidateId;
+  return candidateId;
+}
+
+// メンバーIDの重複を排除し、必ず全員が固有のIDを持つようにする
+function ensureUniqueMemberIds() {
+  if (typeof idolRoster === 'undefined' || !Array.isArray(idolRoster)) return;
+  const seen = new Set();
+  idolRoster.forEach(member => {
+    if (!member) return;
+    const currentId = Number(member.id);
+    if (!member.id || Number.isNaN(currentId) || seen.has(currentId)) {
+      const newId = generateUniqueMemberId();
+      const oldId = member.id;
+      member.id = newId;
+      if (typeof pendingSelectionEvent !== 'undefined' && pendingSelectionEvent && Array.isArray(pendingSelectionEvent.selectedIds)) {
+        if (member.isSelected && !pendingSelectionEvent.selectedIds.includes(newId)) {
+          pendingSelectionEvent.selectedIds.push(newId);
+        }
+      }
+    } else {
+      member.id = currentId;
+    }
+    seen.add(member.id);
+  });
+}
+
 // メンバーを作成する。
 function createMember(age = null, policy = null, birthYear = null) {
   const nameData = generateIdolName();
@@ -225,7 +267,7 @@ function createMember(age = null, policy = null, birthYear = null) {
   const ageValue = calculateAgeFromBirth(birthYearValue, today, birthday.month, birthday.day);
   const height = generateMemberHeight();
   return {
-    id: Date.now() + Math.floor(Math.random() * 10000),
+    id: generateUniqueMemberId(),
     name: nameData.fullName,
     reading: nameData.reading,
     age: ageValue,
@@ -332,6 +374,7 @@ function initializeNewGameState() {
   }
   ensureMemberBirthdays();
   ensureMemberHeights();
+  ensureUniqueMemberIds();
   ensureMemberVitalState();
   ensureMemberStyleFashion();
   syncMemberAges();
@@ -397,6 +440,7 @@ function applySavedGame(data) {
   idolRoster = data.idolRoster || [];
   ensureMemberBirthdays();
   ensureMemberHeights();
+  ensureUniqueMemberIds();
   ensureMemberVitalState();
   ensureMemberStyleFashion();
   syncMemberAges();

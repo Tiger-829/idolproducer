@@ -28,7 +28,8 @@ const ASSETS = [
   './js/19-help.js',
   './js/20-save-sync.js',
   './vendor/qrcode.min.js',
-  './manifest.json'
+  './manifest.json',
+  './randamname.txt'
 ];
 
 self.addEventListener('install', (event) => {
