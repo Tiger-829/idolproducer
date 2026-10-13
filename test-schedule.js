@@ -196,6 +196,56 @@ check('new event slots show their fields and preserve unfinished event details w
     }
   })()
 `) === true);
+check('consecutive event dates can be split into individual sessions', run(`
+  (() => {
+    const saved = {
+      planYearTarget,
+      planStartM,
+      planEndM,
+      planAllowPastMonths,
+      planIsAddMode,
+      planMonthEventDrafts,
+      planMultiSelectModes,
+      planCalendarSelections,
+      modalDisplay: document.getElementById('decision-modal').style.display
+    };
+    try {
+      openDecisionModal('連日イベント分割テスト', 2, 7, 7);
+      addPlanEvent(7);
+      const year = getPlanActualYear();
+      const nameInput = document.getElementById('event-name-7-0-0');
+      const venueInput = document.getElementById('event-ven-7-0-0');
+      nameInput.value = nameInput.options[1].value;
+      venueInput.value = venueInput.options[1].value;
+      addEventShowDate(7, 0);
+      addEventShowDate(7, 0);
+      const dateInputs = document.querySelectorAll('#event-sessions-7-0 .event-show-date-input');
+      const firstDate = year + '-07-12';
+      const secondDate = year + '-07-13';
+      dateInputs[0].value = firstDate;
+      dateInputs[1].value = secondDate;
+
+      splitEventSessions(7, 0);
+      const sessions = getPlanMonthEventDrafts(7)[0].sessions;
+      return sessions.length === 2
+        && sessions[0].dates.length === 1
+        && sessions[0].dates[0] === firstDate
+        && sessions[1].dates.length === 1
+        && sessions[1].dates[0] === secondDate;
+    } finally {
+      closeDecisionModal();
+      planYearTarget = saved.planYearTarget;
+      planStartM = saved.planStartM;
+      planEndM = saved.planEndM;
+      planAllowPastMonths = saved.planAllowPastMonths;
+      planIsAddMode = saved.planIsAddMode;
+      planMonthEventDrafts = saved.planMonthEventDrafts;
+      planMultiSelectModes = saved.planMultiSelectModes;
+      planCalendarSelections = saved.planCalendarSelections;
+      document.getElementById('decision-modal').style.display = saved.modalDisplay;
+    }
+  })()
+`) === true);
 check('monthly report displays a finalized ledger without detail arrays', run(`
   (() => {
     const modal = document.getElementById('monthly-report-modal');

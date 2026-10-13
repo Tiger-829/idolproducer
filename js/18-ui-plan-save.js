@@ -868,11 +868,14 @@ function splitEventSessions(month, index) {
   const current = readEventSlotInputs(month)[index];
   if (!current) return;
   const groups = getConsecutiveDateGroups(current.dates);
-  if (groups.length <= 1) {
-    alert('連続していない日程が複数ある場合に分離できます。');
+  if (groups.length === 1 && groups[0].length === 1) {
+    alert('分離できる開催日がありません。');
     return;
   }
-  drafts[index] = { ...current, sessions: groups.map(dates => ({
+  const sessionDates = groups.length === 1
+    ? groups[0].map(date => [date])
+    : groups;
+  drafts[index] = { ...current, sessions: sessionDates.map(dates => ({
     name: current.name,
     venue: current.venue,
     dates,
