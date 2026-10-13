@@ -1729,10 +1729,6 @@ function applyOfficeAction(actionId) {
     const unitsProduced = activeMembersCount * Math.max(1, currentProdTypes) * 100;
     const productionCost = unitCost * unitsProduced;
 
-    if (funds < productionCost) {
-      return `グッズ制作（資金不足のため未実施）`;
-    }
-
     if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
     const liveUnitsProduced = Math.round(unitsProduced * 3 / 5);
     const eventUnitsProduced = unitsProduced - liveUnitsProduced;
@@ -1744,7 +1740,7 @@ function applyOfficeAction(actionId) {
     if (typeof recordMonthlyExpense === 'function') {
       recordMonthlyExpense('グッズ制作費', productionCost, `${unitsProduced.toLocaleString()}個（ライブ: ${liveUnitsProduced.toLocaleString()}個 / イベント: ${eventUnitsProduced.toLocaleString()}個）を生産`);
     }
-    return `グッズ制作（在庫: ライブ+${liveUnitsProduced.toLocaleString()}個、イベント+${eventUnitsProduced.toLocaleString()}個 / -${formatMoney(productionCost)}）`;
+    return `グッズ制作（在庫: ライブ+${liveUnitsProduced.toLocaleString()}個、イベント+${eventUnitsProduced.toLocaleString()}個 / 月末引き落とし ${formatMoney(productionCost)}）`;
   }
   return '';
 }

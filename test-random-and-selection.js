@@ -379,7 +379,7 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
 
   // 10-2: Goods production cost is 1200 yen per unit and splits 3:2
   run(`
-    funds = 10000000;
+    funds = 1;
     liveMerchandiseStock = 0;
     eventMerchandiseStock = 0;
     merchandiseStock = 0;
@@ -394,10 +394,11 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run('liveMerchandiseStock'), expectedLiveUnits, `Live stock should increase by ${expectedLiveUnits}`);
   assert.strictEqual(run('eventMerchandiseStock'), expectedEventUnits, `Event stock should increase by ${expectedEventUnits}`);
   assert.strictEqual(run('merchandiseStock'), expectedUnits, `Total stock should increase by ${expectedUnits}`);
-  assert.strictEqual(run('funds'), 10000000, 'Goods production should be debited at month end');
+  assert.strictEqual(run('funds'), 1, 'Goods production should not debit funds immediately');
   assert.strictEqual(run(`monthlyLedger.expense.at(-1).amount`), expectedCost, 'Production cost should be recorded for month-end debit');
   assert.strictEqual(run(`monthlyLedger.expense.at(-1).settled`), false, 'Production cost should remain unsettled until month end');
-  assert(prodLog.includes(expectedLiveUnits.toLocaleString()) && prodLog.includes(expectedEventUnits.toLocaleString()), `Log should include produced live and event units: ${prodLog}`);
+  assert(prodLog.includes(expectedLiveUnits.toLocaleString()) && prodLog.includes(expectedEventUnits.toLocaleString())
+    && prodLog.includes('月末引き落とし'), `Log should show production and month-end debit: ${prodLog}`);
   console.log(`PASS: Goods production produces ${expectedUnits} units (live: ${expectedLiveUnits}, event: ${expectedEventUnits}) at 1,200 yen/unit (total cost: ${expectedCost} yen)`);
 
   // 10-3: UI card rendering in group tab
