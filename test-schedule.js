@@ -232,6 +232,7 @@ const coexist = run(`
     promo: nextLivePromotionPoints - promoBefore,
     goods: merchandiseProducts - goodsBefore,
     fundsPaid: fundsBefore - fundsAfterSchedule,
+    developmentExpense: monthlyLedger.expense.filter(item => item.label === 'グッズ開発費').at(-1),
     trained,
     log,
     date: gameDate
@@ -240,8 +241,11 @@ const coexist = run(`
 const coexistResult = JSON.parse(coexist);
 console.log('  ', coexistResult.log);
 check('members still train in the office-work week', coexistResult.trained === true);
-check('the office task is executed in the same week', coexistResult.goods === 1 && coexistResult.fundsPaid === 500000,
-  JSON.stringify({ goods: coexistResult.goods, fundsPaid: coexistResult.fundsPaid }));
+check('the office task is executed in the same week and billed at month end',
+  coexistResult.goods === 1 && coexistResult.fundsPaid === 0
+    && coexistResult.developmentExpense?.amount === 1000000
+    && coexistResult.developmentExpense?.settled === false,
+  JSON.stringify({ goods: coexistResult.goods, fundsPaid: coexistResult.fundsPaid, developmentExpense: coexistResult.developmentExpense }));
 check('the weekly log contains both training and office work',
   /(レッスン|練習|連携|トレーニング|講義)/.test(coexistResult.log) && /事務作業/.test(coexistResult.log), coexistResult.log.slice(0, 200));
 check('live promotion can be combined with lessons too', run(`
@@ -1475,7 +1479,7 @@ check('the initial calendar includes the five requested meet-and-greet presets',
 `) === true);
 check('separated multi-day meet-and-greet sessions charge each session on its first day', run(`
   (() => {
-    const saved = { productionSchedule, funds, recordReleaseBenefitSales, setLog, formatPlanDayLabel };
+    const saved = { productionSchedule, funds, monthlyLedger, recordReleaseBenefitSales, setLog, formatPlanDayLabel };
     const venue = VENUE_DATA.find(item => item.name.includes('パルス'));
     const event = {
       benefitId: 'online-meeguri', name: 'オンラインミーグリ',
@@ -1487,21 +1491,25 @@ check('separated multi-day meet-and-greet sessions charge each session on its fi
     try {
       productionSchedule = { '1-3': { planEvents: [event] } };
       funds = 10000000;
+      monthlyLedger = createMonthlyLedger();
       recordReleaseBenefitSales = () => { salesDays += 1; return { sellThrough: 1 }; };
       setLog = () => {};
       formatPlanDayLabel = date => date;
       processPlanEvents('2027-03-06');
-      const firstSession = !event.completed && funds === 10000000 - 3000000 - sessionVenueCost;
+      const firstSession = !event.completed && funds === 10000000
+        && sumMonthlyLedger(monthlyLedger.expense.filter(item => !item.settled)) === 3000000 + sessionVenueCost;
       processPlanEvents('2027-03-07');
       const secondSessionBefore = funds;
       processPlanEvents('2027-03-20');
-      const secondSession = funds === secondSessionBefore - sessionVenueCost;
+      const secondSession = funds === secondSessionBefore
+        && sumMonthlyLedger(monthlyLedger.expense.filter(item => !item.settled)) === 3000000 + (sessionVenueCost * 2);
       processPlanEvents('2027-03-21');
       return firstSession && secondSession && event.completed
-        && funds === 10000000 - 3000000 - (sessionVenueCost * 2) && salesDays === 4;
+        && funds === 10000000 && salesDays === 4;
     } finally {
       productionSchedule = saved.productionSchedule;
       funds = saved.funds;
+      monthlyLedger = saved.monthlyLedger;
       recordReleaseBenefitSales = saved.recordReleaseBenefitSales;
       setLog = saved.setLog;
       formatPlanDayLabel = saved.formatPlanDayLabel;

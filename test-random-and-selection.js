@@ -323,6 +323,45 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run('merchandiseStock'), 1050, `Total stock after processPlanEvents should be 1050, got ${run('merchandiseStock')}`);
   console.log('PASS: processPlanEvents on real event sells merchandise and updates stock');
 
+  const multiDayEventResult = run(`
+    (() => {
+      const saved = { productionSchedule, funds, monthlyLedger, recordReleaseBenefitSales, setLog, formatPlanDayLabel };
+      const venue = VENUE_DATA.find(item => item.name.includes('パルス'));
+      const event = {
+        benefitId: 'online-meeguri', name: 'オンラインミーグリ',
+        venue: venue.name,
+        date: '2027-03-06', dates: ['2027-03-06', '2027-03-07'], completed: false
+      };
+      const venueCost = getEventPlanStandardCost(event, event.dates);
+      let salesDays = 0;
+      let reportDays = 0;
+      try {
+        productionSchedule = { '1-3': { planEvents: [event] } };
+        funds = 10000000;
+        monthlyLedger = createMonthlyLedger();
+        recordReleaseBenefitSales = () => { salesDays += 1; return { sellThrough: 1 }; };
+        setLog = () => { reportDays += 1; };
+        formatPlanDayLabel = date => date;
+        processPlanEvents('2027-03-06');
+        processPlanEvents('2027-03-07');
+        const expenseTotal = monthlyLedger.expense.reduce((sum, entry) => sum + entry.amount, 0);
+        return event.completed && funds === 10000000
+          && expenseTotal === 3000000 + venueCost
+          && monthlyLedger.expense.every(entry => !entry.settled)
+          && salesDays === 2 && reportDays === 1;
+      } finally {
+        productionSchedule = saved.productionSchedule;
+        funds = saved.funds;
+        monthlyLedger = saved.monthlyLedger;
+        recordReleaseBenefitSales = saved.recordReleaseBenefitSales;
+        setLog = saved.setLog;
+        formatPlanDayLabel = saved.formatPlanDayLabel;
+      }
+    })()
+  `);
+  assert.strictEqual(multiDayEventResult, true, 'Multi-day benefit events should deduct costs and report only on day one');
+  console.log('PASS: multi-day benefit events report expenses only on the first day');
+
   console.log('\n=== 10. Testing Live Goods Price (2400) and Goods Production Unit Cost (1200) ===');
   // 10-1: Live goods unit price is 2400 in sellMerchandiseAtLive
   run(`
@@ -355,7 +394,9 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run('liveMerchandiseStock'), expectedLiveUnits, `Live stock should increase by ${expectedLiveUnits}`);
   assert.strictEqual(run('eventMerchandiseStock'), expectedEventUnits, `Event stock should increase by ${expectedEventUnits}`);
   assert.strictEqual(run('merchandiseStock'), expectedUnits, `Total stock should increase by ${expectedUnits}`);
-  assert.strictEqual(run('funds'), 10000000 - expectedCost, `Funds should be deducted by ${expectedCost}`);
+  assert.strictEqual(run('funds'), 10000000, 'Goods production should be debited at month end');
+  assert.strictEqual(run(`monthlyLedger.expense.at(-1).amount`), expectedCost, 'Production cost should be recorded for month-end debit');
+  assert.strictEqual(run(`monthlyLedger.expense.at(-1).settled`), false, 'Production cost should remain unsettled until month end');
   assert(prodLog.includes(expectedLiveUnits.toLocaleString()) && prodLog.includes(expectedEventUnits.toLocaleString()), `Log should include produced live and event units: ${prodLog}`);
   console.log(`PASS: Goods production produces ${expectedUnits} units (live: ${expectedLiveUnits}, event: ${expectedEventUnits}) at 1,200 yen/unit (total cost: ${expectedCost} yen)`);
 

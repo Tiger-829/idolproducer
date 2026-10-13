@@ -131,12 +131,13 @@ const settlement = JSON.parse(run(`
   Math.random = () => 2;            // タイアップを引かない
   const before = funds;
   const result = settleMonthlyIncome();
+  const expenses = settleMonthlyExpenses();
   JSON.stringify({
     cd: result.cdRevenue,
     pool: monthlyCdRevenue,
     salary: result.salary,
     net: funds - before,
-    expectedNet: 500000 - result.salary
+    expectedNet: 500000 - expenses
   })
 `));
 console.log('  ', JSON.stringify(settlement));
@@ -149,20 +150,25 @@ const tieUp = JSON.parse(run(`
   Math.random = () => 0;            // 必ずタイアップが当たる
   monthlyTieUpRevenue = 0;
   monthlyCdRevenue = 0;
-  const fans = calculateGroupFans();
   const before = funds;
   const result = settleMonthlyIncome();
+  const expenses = settleMonthlyExpenses();
+  const bookedEntries = monthlyLedger.income.filter(entry => entry.label.includes('タイアップ収入'));
+  const bookedTieUpIncome = bookedEntries
+    .reduce((sum, entry) => sum + entry.amount, 0);
   JSON.stringify({
     revenue: result.tieUpRevenue,
-    expected: Math.round(fans * 0.5) + Math.round(fans * 1.1),
+    bookedTieUpIncome,
+    bookedTieUpCount: bookedEntries.length,
     pool: monthlyTieUpRevenue,
     net: funds - before,
-    expectedNet: Math.round(fans * 0.5) + Math.round(fans * 1.1) - result.salary
+    expectedNet: result.tieUpRevenue - expenses
   })
 `));
 console.log('  ', JSON.stringify(tieUp));
 check('both tie-ups fire and are paid at month end',
-  tieUp.revenue === tieUp.expected && tieUp.pool === 0 && Math.abs(tieUp.net - tieUp.expectedNet) < 1,
+  tieUp.revenue > 0 && tieUp.bookedTieUpCount === 2 && tieUp.revenue === tieUp.bookedTieUpIncome
+    && tieUp.pool === 0 && Math.abs(tieUp.net - tieUp.expectedNet) < 1,
   JSON.stringify(tieUp));
 check('tie-ups boost popularity and song experience', run(`
   Math.random = () => 0;

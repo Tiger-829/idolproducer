@@ -346,7 +346,7 @@ function processPlayerLives(fromDate, toDate) {
       if (expenses.streamCost > 0) {
         recordMonthlyExpense('ライブ配信設備費', expenses.streamCost, `${liveDescription} / ${streamDaysCount}公演分`);
       }
-      funds += profit;
+      funds += grossRevenue;
       yearlyStats.audience += grandTotalAudience;
       yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue;
       yearlyStats.streamCost = (yearlyStats.streamCost || 0) + expenses.streamCost;
@@ -444,6 +444,10 @@ function processMonthlyClosing(fromDate, toDate) {
     settleMonthlyIncome();
   }
 
+  if (typeof settleMonthlyExpenses === 'function') {
+    settleMonthlyExpenses();
+  }
+
   let report = null;
   if (typeof finalizeMonthlyLedger === 'function') {
     report = finalizeMonthlyLedger(toDate.getFullYear(), toDate.getMonth() + 1);
@@ -536,11 +540,11 @@ function processReleaseEvents(reachDateStr) {
     const isSingle = (plan.release === 'single');
     const song = ensureScheduledSong(currentYear, currentMonth, plan);
 
-    // CD制作費を発売時に引き落とす（未徴収のみ）。基本費用÷合計制作費を初週売上バフに使う。
+    // CD制作費を月末精算へ計上する（未計上のみ）。基本費用÷合計制作費を初週売上バフに使う。
     if (typeof deductCdProductionCostIfDue === 'function') {
       const cdCost = deductCdProductionCostIfDue(plan);
       if (cdCost > 0) {
-        setLog(`【CD制作費】『${song.title}』の制作費 ${formatMoney(cdCost)} を発売に伴い徴収しました。`);
+        setLog(`【CD制作費】『${song.title}』の制作費 ${formatMoney(cdCost)} を月末引き落とし分として計上しました。`);
       }
     }
     const cdSalesBuff = (typeof getCdProductionSalesBuff === 'function') ? getCdProductionSalesBuff(plan.cdProduction) : 1;
@@ -1239,7 +1243,6 @@ function validateWeeklySchedule() {
   const mealCount = getWeekMealPartyCount();
   const mealCostSingle = typeof MEAL_PARTY_COST !== 'undefined' ? MEAL_PARTY_COST : 1000000;
   if (mealCount > 0) {
-    funds -= mealCount * mealCostSingle;
     if (typeof recordMonthlyExpense === 'function') {
       recordMonthlyExpense(`食事会（${mealCount}回）`, mealCount * mealCostSingle, 'メンバーの親睦・グループ危機回避力の向上');
     }
@@ -1714,7 +1717,6 @@ function applyOfficeAction(actionId) {
     merchandiseItems.push({ createdAt: gameDate });
     merchandiseProducts = merchandiseItems.length;
 
-    funds -= devCost;
     if (typeof recordMonthlyExpense === 'function') {
       recordMonthlyExpense('グッズ開発費', devCost, `ラインナップ ${merchandiseProducts}種`);
     }
@@ -1731,7 +1733,6 @@ function applyOfficeAction(actionId) {
       return `グッズ制作（資金不足のため未実施）`;
     }
 
-    funds -= productionCost;
     if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
     const liveUnitsProduced = Math.round(unitsProduced * 3 / 5);
     const eventUnitsProduced = unitsProduced - liveUnitsProduced;

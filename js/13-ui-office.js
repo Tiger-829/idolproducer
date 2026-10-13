@@ -605,9 +605,13 @@ function upgradeOfficeFacility(facilityId) {
     alert(`資金が足りません。必要資金: ${formatMoney(cost)}`);
     return;
   }
-  funds -= cost;
-  if (typeof recordMonthlyExpense === 'function') {
-    recordMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`);
+  if (typeof recordImmediateMonthlyExpense === 'function') {
+    recordImmediateMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`);
+  } else {
+    funds -= cost;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`, true);
+    }
   }
   if (typeof officeUpgrades !== 'undefined') officeUpgrades[facilityId] = level + 1;
   setLog(`【設備投資】${facility.name}をLv.${level + 1}に強化しました。`);
@@ -647,13 +651,11 @@ function maintainOfficeFacilities() {
   })).filter(item => item.cost > 0);
   const cost = costs.reduce((total, item) => total + item.cost, 0);
   if (!cost) return;
-  funds -= cost;
   if (typeof recordMonthlyExpense === 'function') {
     costs.forEach(({ facility, cost: facilityCost }) =>
       recordMonthlyExpense(`設備維持費（${facility.name}）`, facilityCost)
     );
   }
-  if (funds < 0) setLog(`【維持費】事務所設備の月額維持費 ${formatMoney(cost)}を支払いました。資金が不足しています。`);
 }
 
 function renderOfficeUpgrades() {

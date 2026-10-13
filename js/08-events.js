@@ -17,8 +17,8 @@ const RANDOM_EVENTS = [
     name: '雑誌の表紙掲載',
     text: '有名雑誌からの取材・表紙掲載の打診が届きました。',
     choices: [
-      { label: '有名雑誌の特集ページに出稿する', detail: '資金 -${cost} / 選抜のファッションに経験点+5,000pt', apply: ctx => { funds -= ctx.cost; recordMonthlyExpense('雑誌広告出稿費', ctx.cost); addSelectedStatExp('fashion', 5000); } },
-      { label: 'webメディアに回す', detail: '費用は安くファッション経験点+1,500pt', apply: ctx => { const cost = Math.round(ctx.cost * 0.2); funds -= cost; recordMonthlyExpense('Webメディア広告費', cost); addSelectedStatExp('fashion', 1500); } }
+      { label: '有名雑誌の特集ページに出稿する', detail: '月末引き落とし -${cost} / 選抜のファッションに経験点+5,000pt', apply: ctx => { recordMonthlyExpense('雑誌広告出稿費', ctx.cost); addSelectedStatExp('fashion', 5000); } },
+      { label: 'webメディアに回す', detail: '費用は安く月末引き落とし / ファッション経験点+1,500pt', apply: ctx => { const cost = Math.round(ctx.cost * 0.2); recordMonthlyExpense('Webメディア広告費', cost); addSelectedStatExp('fashion', 1500); } }
     ]
   },
   {
@@ -26,7 +26,7 @@ const RANDOM_EVENTS = [
     name: '握手会に長い行列ができる',
     text: '定期公演の会場で握手会の行列が想定以上に長くなりました。',
     choices: [
-      { label: '時間を追加して握手会を延長する', detail: '資金 -${cost} / 選抜の人気に経験点+4,000pt / 連携に経験点+3,000pt', apply: ctx => { funds -= ctx.cost; recordMonthlyExpense('握手会延長費', ctx.cost); addSelectedStatExp('popularity', 4000); addSelectedStatExp('coordination', 3000); } },
+      { label: '時間を追加して握手会を延長する', detail: '月末引き落とし -${cost} / 選抜の人気に経験点+4,000pt / 連携に経験点+3,000pt', apply: ctx => { recordMonthlyExpense('握手会延長費', ctx.cost); addSelectedStatExp('popularity', 4000); addSelectedStatExp('coordination', 3000); } },
       { label: '予定通り終了する', detail: '効果なし', apply: () => {} }
     ]
   },
@@ -53,7 +53,7 @@ const RANDOM_EVENTS = [
     name: '噂の拡散',
     text: 'メンバーの体調不良に関する未確認の噂がインターネットで広まっています。',
     choices: [
-      { label: '公式に否定する', detail: '連携力に経験点+5,000pt / 資金 -${cost}', apply: ctx => { addAllStatExp('coordination', 5000); const cost = Math.round(ctx.cost * 0.5); funds -= cost; recordMonthlyExpense('噂への公式対応費', cost); } },
+      { label: '公式に否定する', detail: '連携力に経験点+5,000pt / 月末引き落とし -${cost}', apply: ctx => { addAllStatExp('coordination', 5000); const cost = Math.round(ctx.cost * 0.5); recordMonthlyExpense('噂への公式対応費', cost); } },
       { label: '沈黙する', detail: '影響なし', apply: () => {} }
     ]
   },
@@ -62,7 +62,7 @@ const RANDOM_EVENTS = [
     name: '慈善イベントへの出席',
     text: '慈善行事への参加打診が届きました。',
     choices: [
-      { label: '参加する', detail: '資金 -${cost} / 選抜の人気に経験点+3,000pt / 連携に経験点+4,000pt', apply: ctx => { const cost = Math.round(ctx.cost * 0.6); funds -= cost; recordMonthlyExpense('慈善イベント参加費', cost); addSelectedStatExp('popularity', 3000); addSelectedStatExp('coordination', 4000); } },
+      { label: '参加する', detail: '月末引き落とし -${cost} / 選抜の人気に経験点+3,000pt / 連携に経験点+4,000pt', apply: ctx => { const cost = Math.round(ctx.cost * 0.6); recordMonthlyExpense('慈善イベント参加費', cost); addSelectedStatExp('popularity', 3000); addSelectedStatExp('coordination', 4000); } },
       { label: '不参加', detail: '効果なし', apply: () => {} }
     ]
   },
@@ -101,8 +101,7 @@ function applyEquipmentUpgrade(context) {
     setLog(`【設備強化】${facility.name}の提案を資金不足で見送りました。`);
     return;
   }
-  funds -= cost;
-  recordMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`);
+  recordImmediateMonthlyExpense(`設備強化費（${facility.name}）`, cost, `Lv.${level} → Lv.${level + 1} の設備投資`);
   officeUpgrades[facility.id] = level + 1;
   setLog(`【設備強化】${facility.name}をLv.${level + 1}に強化しました（開発費 ${formatMoney(cost)}）。`);
 }
@@ -408,7 +407,6 @@ function applyMonthlySalary() {
   const managerSalary = getTotalManagerMonthlySalary();
   const total = memberSalary + managerSalary;
   if (total <= 0) return { memberSalary: 0, managerSalary: 0, total: 0 };
-  funds -= total;
   yearlyStats.salary = (yearlyStats.salary || 0) + total;
   if (memberSalary > 0) recordMonthlyExpense('メンバー給与', memberSalary, '所属メンバーへの月給');
   if (managerSalary > 0) recordMonthlyExpense('マネージャー給与', managerSalary, '雇用マネージャーへの月給');
@@ -435,12 +433,30 @@ function recordMonthlyIncome(label, amount, detail = '') {
   return value;
 }
 
-function recordMonthlyExpense(label, amount, detail = '') {
+function recordMonthlyExpense(label, amount, detail = '', settled = false) {
   const value = Math.round(Number(amount) || 0);
   if (!value) return 0;
   if (!monthlyLedger || !Array.isArray(monthlyLedger.expense)) monthlyLedger = createMonthlyLedger();
-  monthlyLedger.expense.push({ label, amount: value, detail });
+  monthlyLedger.expense.push({ label, amount: value, detail, settled });
   return value;
+}
+
+function recordImmediateMonthlyExpense(label, amount, detail = '') {
+  const value = Math.round(Number(amount) || 0);
+  if (!value) return 0;
+  funds -= value;
+  return recordMonthlyExpense(label, value, detail, true);
+}
+
+function settleMonthlyExpenses() {
+  if (!monthlyLedger || !Array.isArray(monthlyLedger.expense)) return 0;
+  const dueExpenses = monthlyLedger.expense.filter(entry => !entry.settled);
+  const total = sumMonthlyLedger(dueExpenses);
+  if (total <= 0) return 0;
+  funds -= total;
+  dueExpenses.forEach(entry => { entry.settled = true; });
+  setLog(`【月末精算】当月の月末払い経費 ${formatMoney(total)} を引き落としました。`);
+  return total;
 }
 
 function sumMonthlyLedger(list) {
@@ -920,23 +936,26 @@ function processPlanEvents(reachDate = gameDate) {
     const eventDateGroup = eventDateGroups.find(dates => dates.includes(reachDate)) || [];
     const isEventSessionStart = eventDateGroup[0] === reachDate;
     entry.event.completed = eventDates.every(date => entry.event.completedDates.includes(date));
-    const eventCostTarget = session ? { ...entry.event, venue: session.venue, dates: eventDateGroup } : entry.event;
+    const eventCostTarget = session
+      ? { ...entry.event, name: session.name, venue: session.venue, dates: eventDateGroup }
+      : entry.event;
     const venueCost = isEventSessionStart && typeof getEventPlanStandardCost === 'function'
       ? getEventPlanStandardCost(eventCostTarget, eventDateGroup)
       : 0;
     const baseCost = isFirstEventDate ? type.cost : 0;
     const eventCost = baseCost + venueCost;
     if (baseCost > 0) {
-      funds -= baseCost;
       recordMonthlyExpense(`${type.name}（基本費用）`, baseCost);
     }
     if (venueCost > 0) {
-      funds -= venueCost;
       recordMonthlyExpense(`${type.name}（会場使用料）`, venueCost);
     }
+    const shouldReportEvent = type.kind === 'goods' || isEventSessionStart;
     if (type.kind === 'goods') {
       const goods = sellMerchandiseAtLive();
-      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
+      if (shouldReportEvent) {
+        setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 売上: ${formatMoney(goods.revenue)} / 販売数: ${goods.unitsSold.toLocaleString()}個）。`);
+      }
     } else {
       const isReal = isRealBenefitEvent(type.id, type.profileId);
       const result = recordReleaseBenefitSales(type.profileId || type.id, type.id);
@@ -949,7 +968,9 @@ function processPlanEvents(reachDate = gameDate) {
           goodsInfo = ' / グッズ完売（在庫なし）';
         }
       }
-      setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%${goodsInfo}）。`);
+      if (shouldReportEvent) {
+        setLog(`【${type.name}】${formatPlanDayLabel(entry.event.date)} に開催（基本費用: ${formatMoney(baseCost)} / 会場使用料: ${formatMoney(venueCost)} / 経費合計: ${formatMoney(eventCost)} / 参加メンバー平均完売率 ${Math.round(result.sellThrough * 100)}%${goodsInfo}）。`);
+      }
     }
   });
 }
@@ -1066,7 +1087,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     yearlyStats.audience += totalAudience;
     yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
     yearlyStats.streamCost = (yearlyStats.streamCost || 0) + STREAM_PRODUCTION_COST;
-    funds += profit;
+    funds += totalRevenueWithGoods;
 
     const target0 = entry.isPrimary ? entry.plan : entry.plan.additionalLives[entry.extraIndex];
     if (!target0.liveTotalShowCount) {
@@ -1212,9 +1233,10 @@ function processSpecialLiveEvents(reachDate = gameDate) {
       recordMonthlyIncome('外部ライブ・グッズ売上', merchandiseSales.revenue, `${event.name}（${merchandiseSales.unitsSold.toLocaleString()}個）`);
     }
     recordMonthlyExpense('外部ライブ会場費', venueCost, `${event.name}（${venue.name}）`);
-    const profit = ticketRevenue + merchandiseSales.revenue - venueCost;
+    const grossRevenue = ticketRevenue + merchandiseSales.revenue;
+    const profit = grossRevenue - venueCost;
     yearlyStats.audience += audience;
-    funds += profit;
+    funds += grossRevenue;
     event.completed = true;
     setLog(`【${event.name}】${venue.name}（動員 ${audience.toLocaleString()}人 / 収支 ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);
   });

@@ -157,7 +157,7 @@ function getEventPlanStandardCost(ev, eventDates = null) {
   if (!ev) return 0;
   if (!eventDates && Array.isArray(ev.sessions) && ev.sessions.length) {
     return ev.sessions.reduce((sum, session) => sum + getEventPlanStandardCost(
-      { venue: session.venue, dates: session.dates },
+      { name: session.name, venue: session.venue, dates: session.dates },
       (session.dates || []).filter(Boolean)
     ), 0);
   }
@@ -170,7 +170,10 @@ function getEventPlanStandardCost(ev, eventDates = null) {
     ? ev.dates : (ev.date ? [ev.date] : []);
   const daysCount = dates.length;
   if (daysCount <= 0) return 0;
-  return getVenueFeePerShow(venue) * (daysCount + 1);
+  const multiplier = typeof getEventVenueFeeMultiplier === 'function'
+    ? getEventVenueFeeMultiplier(ev)
+    : 1;
+  return Math.floor(getVenueFeePerShow(venue) * (daysCount + 1) * multiplier);
 }
 
 
@@ -179,7 +182,6 @@ function deductCdProductionCostIfDue(plan) {
   if (!plan || !plan.cdProduction || plan.cdProduction.costDeducted) return 0;
   const cost = calculateCdProductionCost(plan.cdProduction).totalCost;
   plan.cdProduction.costDeducted = true;
-  funds -= cost;
   if (typeof recordMonthlyExpense === 'function') {
     recordMonthlyExpense('CD制作費', cost, `${plan.cdProduction.title || '発売予定CD'}の制作費`);
   }

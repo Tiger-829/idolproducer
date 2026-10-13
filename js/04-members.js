@@ -411,7 +411,13 @@ function applySavedGame(data) {
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
   // 当月の収支明細（旧セーブに無い場合は空から開始）
   monthlyLedger = data.monthlyLedger && Array.isArray(data.monthlyLedger.income)
-    ? { income: data.monthlyLedger.income, expense: data.monthlyLedger.expense || [] }
+    ? {
+      income: data.monthlyLedger.income,
+      expense: (data.monthlyLedger.expense || []).map(entry => ({
+        ...entry,
+        settled: entry.settled ?? true
+      }))
+    }
     : createMonthlyLedger();
   pendingMonthlyReport = data.pendingMonthlyReport || null;
   promoSongId = data.promoSongId || '';

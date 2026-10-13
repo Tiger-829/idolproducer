@@ -439,7 +439,7 @@ function runGraduationPlan(member, choice, regularVenueName) {
     const revenue = copies * 3000;
     const productionCost = copies * 1200 + 500000;
     const profit = revenue - productionCost;
-    funds += profit;
+    funds += revenue;
     recordMonthlyIncome('卒業グッズ売上', revenue, `${member.name}の卒業記念グッズ ${copies.toLocaleString()}個`);
     recordMonthlyExpense('卒業グッズ制作費', productionCost, `${member.name}の卒業記念グッズ制作`);
     setLog(`【卒業グッズ】${member.name}のグッズを${copies.toLocaleString()}個制作（収支: ${profit > 0 ? '+' : ''}${formatMoney(profit)}）。`);
@@ -455,7 +455,6 @@ function runGraduationPlan(member, choice, regularVenueName) {
   const capacity = CAPACITY_MAP[venue.cap];
   const venueFee = Math.floor(capacity * feeRate);
   if (isCeremony) {
-    funds -= venueFee;
     recordMonthlyExpense('卒業セレモニー会場費', venueFee, `${member.name}の卒業セレモニー（${venue.name}）`);
     setLog(`【卒業セレモニー】${member.name}を常設ライブ内で送り出しました（${venue.name} / 会場利用料 ${formatMoney(venueFee)}）。`);
     return;
@@ -467,7 +466,7 @@ function runGraduationPlan(member, choice, regularVenueName) {
   ));
   const revenue = audience * 8000;
   const profit = revenue - venueFee;
-  funds += profit;
+  funds += revenue;
   recordMonthlyIncome('卒業コンサート・チケット売上', revenue, `${member.name}の卒業コンサート（${venue.name} / ${audience.toLocaleString()}人）`);
   recordMonthlyExpense('卒業コンサート会場費', venueFee, `${venue.name}の利用料`);
   yearlyStats.audience += audience;

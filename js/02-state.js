@@ -557,7 +557,6 @@ function levelUpManagerSkill(managerId, skillId) {
   if (!Number.isFinite(manager.skills[skillId])) manager.skills[skillId] = 1;
   const cost = getManagerSkillUpCost(manager, skillId);
   if (cost === null || funds < cost) return;
-  funds -= cost;
   if (typeof recordMonthlyExpense === 'function') {
     recordMonthlyExpense('マネージャー育成費', cost, `${manager.name}の能力強化`);
   }
@@ -596,9 +595,13 @@ function hireManagerFromMarket(candidateId) {
     alert('採用資金が不足しています。');
     return;
   }
-  funds -= MANAGER_HIRE_COST;
-  if (typeof recordMonthlyExpense === 'function') {
-    recordMonthlyExpense('マネージャー採用費', MANAGER_HIRE_COST, `${candidate.name}の採用`);
+  if (typeof recordImmediateMonthlyExpense === 'function') {
+    recordImmediateMonthlyExpense('マネージャー採用費', MANAGER_HIRE_COST, `${candidate.name}の採用`);
+  } else {
+    funds -= MANAGER_HIRE_COST;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense('マネージャー採用費', MANAGER_HIRE_COST, `${candidate.name}の採用`, true);
+    }
   }
   managers.push({
     id: `manager-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -624,9 +627,13 @@ function fireManager(managerId) {
     return;
   }
   if (!confirm(`解雇料 ${formatMoney(cost)} を支払って解雇しますか？`)) return;
-  funds -= cost;
-  if (typeof recordMonthlyExpense === 'function') {
-    recordMonthlyExpense('マネージャー解雇料', cost, `${managers[index].name}の契約終了`);
+  if (typeof recordImmediateMonthlyExpense === 'function') {
+    recordImmediateMonthlyExpense('マネージャー解雇料', cost, `${managers[index].name}の契約終了`);
+  } else {
+    funds -= cost;
+    if (typeof recordMonthlyExpense === 'function') {
+      recordMonthlyExpense('マネージャー解雇料', cost, `${managers[index].name}の契約終了`, true);
+    }
   }
   managers.splice(index, 1);
   updateUI();
@@ -856,7 +863,13 @@ function applySavedGameBase(data) {
   monthlyCdRevenue = data.monthlyCdRevenue || 0;
   monthlyTieUpRevenue = data.monthlyTieUpRevenue || 0;
   monthlyLedger = data.monthlyLedger && Array.isArray(data.monthlyLedger.income)
-    ? { income: data.monthlyLedger.income, expense: data.monthlyLedger.expense || [] }
+    ? {
+      income: data.monthlyLedger.income,
+      expense: (data.monthlyLedger.expense || []).map(entry => ({
+        ...entry,
+        settled: entry.settled ?? true
+      }))
+    }
     : createMonthlyLedger();
   pendingMonthlyReport = data.pendingMonthlyReport || null;
   promoSongId = data.promoSongId || '';

@@ -18,11 +18,17 @@ let customSecondSong = "青春の軌跡";
 let customFirstLiveName = "1stデビューライブ";
 
 const BENEFIT_EVENT_TYPE_OPTIONS = [
-  { id: 'online-meeguri', name: 'オンラインミーグリ', baseCost: 3000000, profileId: 'web-greeting' },
-  { id: 'online-sign', name: 'オンラインサイン会', baseCost: 6000000, profileId: 'web-sign' },
+  { id: 'online-meeguri', name: 'オンラインミーグリ', baseCost: 3000000, profileId: 'web-greeting', venueFeeMultiplier: 1 / 3 },
+  { id: 'online-sign', name: 'オンラインサイン会', baseCost: 6000000, profileId: 'web-sign', venueFeeMultiplier: 1 / 3 },
   { id: 'real-meeguri', name: 'リアルミーグリ', baseCost: 5000000, profileId: 'real-greeting' },
   { id: 'real-sign', name: 'リアルサイン会', baseCost: 10000000, profileId: 'real-sign' }
 ];
+
+function getEventVenueFeeMultiplier(event) {
+  const option = BENEFIT_EVENT_TYPE_OPTIONS.find(item => item.name === event?.name)
+    || BENEFIT_EVENT_TYPE_OPTIONS.find(item => item.id === event?.benefitId);
+  return option?.venueFeeMultiplier ?? 1;
+}
 
 // Presetリリース月を判定する。
 function isPresetReleaseMonth(month) {
@@ -98,7 +104,7 @@ function calculateEventExpenses(eventName, venue, dates) {
   const daysCount = Array.isArray(dates) ? dates.filter(Boolean).length : 0;
   if (venue && daysCount > 0 && typeof getVenueFeePerShow === 'function') {
     const singleFee = getVenueFeePerShow(venue);
-    venueFee = singleFee * (daysCount + 1);
+    venueFee = Math.floor(singleFee * (daysCount + 1) * getEventVenueFeeMultiplier({ name: eventName }));
   }
 
   return {
@@ -1394,7 +1400,7 @@ function requestModifyExistingPlan(pKey, targetDateStr, month, standardCost = 0)
   const addFee = Math.round((standardCost || 0) * addFeeRate);
   let msg = `【予定の変更 (${rangeStr})】\nこの予定の変更を行います。続行しますか？`;
   if (addFeeRate > 0) {
-    msg = `【予定の変更 (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、手数料として ${addFeeRate * 100}%（${formatMoney(addFee)}）の追加料金が徴収されます。続行しますか？`;
+    msg = `【予定の変更 (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、手数料として ${addFeeRate * 100}%（${formatMoney(addFee)}）の追加料金が月末に引き落とされます。続行しますか？`;
   }
 
   if (!confirm(msg)) {
@@ -1402,13 +1408,12 @@ function requestModifyExistingPlan(pKey, targetDateStr, month, standardCost = 0)
   }
 
   if (addFee > 0) {
-    funds -= addFee;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定変更手数料', addFee);
   }
   closeModifyExistingPlansModal();
   closeDecisionModal();
   openDecisionModal(`予定の変更・再調整`, planYearTarget, month, month);
-  setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。${addFee > 0 ? `（手数料 ${formatMoney(addFee)} 徴収）` : ''}`);
+  setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。${addFee > 0 ? `（手数料 ${formatMoney(addFee)} は月末に引き落とし）` : ''}`);
 }
 
 function requestCancelExistingPlan(pKey, targetDateStr, standardCost = 0) {
@@ -1438,7 +1443,7 @@ function requestCancelExistingPlan(pKey, targetDateStr, standardCost = 0) {
   const penalty = Math.round((standardCost || 0) * penaltyRate);
   let msg = `【予定の取り消し (${rangeStr})】\nこの予定を取り消します。ペナルティなしで実行しますか？`;
   if (penaltyRate > 0) {
-    msg = `【予定の取り消し (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、キャンセル料として ${penaltyRate * 100}％（${formatMoney(penalty)}）が徴収されます。実行しますか？`;
+    msg = `【予定の取り消し (${rangeStr})】\n通常会費 ${formatMoney(standardCost || 0)} に対し、キャンセル料として ${penaltyRate * 100}％（${formatMoney(penalty)}）が月末に引き落とされます。実行しますか？`;
   }
 
   if (!confirm(msg)) {
@@ -1446,14 +1451,13 @@ function requestCancelExistingPlan(pKey, targetDateStr, standardCost = 0) {
   }
 
   if (penalty > 0) {
-    funds -= penalty;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定取消料', penalty);
   }
   if (typeof productionSchedule !== 'undefined' && productionSchedule[pKey]) {
     delete productionSchedule[pKey];
   }
 
-  setLog(`【予定取消】 ${pKey} の予定を取り消しました。${penalty > 0 ? `（キャンセル料 ${formatMoney(penalty)} 徴収）` : ''}`);
+  setLog(`【予定取消】 ${pKey} の予定を取り消しました。${penalty > 0 ? `（キャンセル料 ${formatMoney(penalty)} は月末に引き落とし）` : ''}`);
   alert('予定を取り消しました。');
   closeModifyExistingPlansModal();
   if (typeof updateUI === 'function') updateUI();
@@ -1461,7 +1465,7 @@ function requestCancelExistingPlan(pKey, targetDateStr, standardCost = 0) {
 
 // 指定月（ゲーム年yearTarget／月month）に予定を追加するため、その月の計画編集を開く。
 // 「確定済み予定の変更／取消」モーダルから、3か月先〜6か月先の月に対して呼ばれる。
-// 追加モードでは、保存時に通常会費の1.2倍の追加料を徴収する。
+// 追加モードでは、保存時に通常会費の1.2倍の追加料を月末精算へ計上する。
 function openAddPlanForMonth(yearTarget, month) {
   closeModifyExistingPlansModal();
   closeDecisionModal();
@@ -1469,12 +1473,12 @@ function openAddPlanForMonth(yearTarget, month) {
     ? calendarYear + (yearTarget - currentYear)
     : yearTarget;
   openDecisionModal(`予定の追加（${dispY}年${month}月）`, yearTarget, month, month, true, true);
-  setLog(`【予定追加】 ${dispY}年${month}月の予定を追加します。保存時に通常会費の1.2倍の追加料が徴収されます。`);
+  setLog(`【予定追加】 ${dispY}年${month}月の予定を追加します。追加料は月末に引き落とされます。`);
 }
 
 // Decisionモーダルを開く。
 // allowPastMonths=true のときは、現在月より前の月も編集対象とする（当月〜3か月前への予定追加用）。
-// isAddMode=true のときは「予定の追加」モード。保存時に通常会費の1.2倍の追加料を徴収する。
+// isAddMode=true のときは「予定の追加」モード。保存時に通常会費の1.2倍の追加料を計上する。
 function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false, isAddMode = false) {
   try {
     planYearTarget = yearTarget;
@@ -2020,7 +2024,7 @@ function saveDecisionPlan() {
     }
 
     // 「予定の追加」モードでは、この月の通常会費（ライブ＋イベント＋CD制作費）を集計する。
-    // 追加料として通常会費の1.2倍を保存時に即時徴収する。
+    // 追加料として通常会費の1.2倍を保存時に計上する（月末引き落とし）。
     if (planIsAddMode) {
       let monthStandard = 0;
       if (primary && typeof getLivePlanStandardCost === 'function') {
@@ -2042,13 +2046,12 @@ function saveDecisionPlan() {
   const modal = document.getElementById('decision-modal');
   if (modal) modal.style.display = 'none';
 
-  // 「予定の追加」モードでは通常会費の1.2倍の追加料を保存時に即時徴収する。
+  // 「予定の追加」モードの追加料は月末に引き落とす。
   if (planIsAddMode && totalAddStandardCost > 0) {
     const addFee = Math.round(totalAddStandardCost * 1.2);
-    funds -= addFee;
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定追加料', addFee);
     setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
-    setLog(`【予定追加料】通常会費 ${formatMoney(totalAddStandardCost)} に対し、追加料 1.2倍（${formatMoney(addFee)}）を徴収しました。`);
+    setLog(`【予定追加料】通常会費 ${formatMoney(totalAddStandardCost)} に対し、追加料 1.2倍（${formatMoney(addFee)}）を月末に引き落とします。`);
   } else {
     setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   }

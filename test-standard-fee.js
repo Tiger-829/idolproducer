@@ -126,6 +126,116 @@ const eventExpected = run(`
 `);
 check('イベント通常会費 = 会場費×(日数+1)', eventStandard === eventExpected && eventStandard > 0, `got ${eventStandard} / expected ${eventExpected}`);
 
+const onlineEventStandard = run(`
+  (() => {
+    const venue = VENUE_DATA.find(v => v.cap === 'A');
+    return getEventPlanStandardCost({
+      name: 'オンラインミーグリ',
+      venue: venue.name,
+      dates: ['2030-01-10', '2030-01-11']
+    });
+  })()
+`);
+check('オンラインイベント会場費 = 通常会場費の3分の1', onlineEventStandard === Math.floor(eventExpected / 3), `got ${onlineEventStandard} / expected ${Math.floor(eventExpected / 3)}`);
+
+const onlineEventExpense = run(`
+  (() => {
+    const venue = VENUE_DATA.find(v => v.cap === 'A');
+    return calculateEventExpenses('オンラインサイン会', venue, ['2030-01-10', '2030-01-11']).venueFee;
+  })()
+`);
+check('オンラインイベント費用見積もりも会場費を3分の1にする', onlineEventExpense === Math.floor(eventExpected / 3), `got ${onlineEventExpense} / expected ${Math.floor(eventExpected / 3)}`);
+
+const realEventStandard = run(`
+  (() => {
+    const venue = VENUE_DATA.find(v => v.cap === 'A');
+    return getEventPlanStandardCost({
+      name: 'リアルミーグリ',
+      venue: venue.name,
+      dates: ['2030-01-10', '2030-01-11']
+    });
+  })()
+`);
+check('リアルイベント会場費は通常料金のまま', realEventStandard === eventExpected, `got ${realEventStandard} / expected ${eventExpected}`);
+
+const expenseSettlement = run(`
+  (() => {
+    const saved = { funds, monthlyLedger, setLog };
+    try {
+      funds = 1000;
+      monthlyLedger = createMonthlyLedger();
+      setLog = () => {};
+      recordMonthlyExpense('月末払い', 125);
+      recordImmediateMonthlyExpense('即時払い', 50);
+      const afterImmediate = funds;
+      const settledAmount = settleMonthlyExpenses();
+      const afterSettlement = funds;
+      const secondSettlement = settleMonthlyExpenses();
+      return {
+        afterImmediate,
+        settledAmount,
+        afterSettlement,
+        secondSettlement,
+        allSettled: monthlyLedger.expense.every(entry => entry.settled)
+      };
+    } finally {
+      funds = saved.funds;
+      monthlyLedger = saved.monthlyLedger;
+      setLog = saved.setLog;
+    }
+  })()
+`);
+check('契約・設備投資相当の即時費用だけ即時引き落とし', expenseSettlement.afterImmediate === 950);
+check('その他の経費は月末に一度だけ引き落とし', expenseSettlement.settledAmount === 125
+  && expenseSettlement.afterSettlement === 825 && expenseSettlement.secondSettlement === 0
+  && expenseSettlement.allSettled);
+
+const monthlyClosingSettlement = run(`
+  (() => {
+    const saved = {
+      funds,
+      monthlyLedger,
+      pendingReports,
+      maintainOfficeFacilities,
+      settleMonthlyIncome,
+      setLog
+    };
+    try {
+      funds = 1000;
+      monthlyLedger = createMonthlyLedger();
+      pendingReports = [];
+      maintainOfficeFacilities = () => recordMonthlyExpense('設備維持費', 200);
+      settleMonthlyIncome = () => recordMonthlyExpense('給与', 300);
+      setLog = () => {};
+      processMonthlyClosing(new Date(2027, 0, 30), new Date(2027, 0, 31));
+      return funds === 500
+        && pendingReports[0]?.report.expense.reduce((sum, entry) => sum + entry.amount, 0) === 500
+        && pendingReports[0]?.report.expense.every(entry => entry.settled);
+    } finally {
+      funds = saved.funds;
+      monthlyLedger = saved.monthlyLedger;
+      pendingReports = saved.pendingReports;
+      maintainOfficeFacilities = saved.maintainOfficeFacilities;
+      settleMonthlyIncome = saved.settleMonthlyIncome;
+      setLog = saved.setLog;
+    }
+  })()
+`);
+check('給与・設備維持費などは月末処理でまとめて引き落とす', monthlyClosingSettlement);
+
+const mixedSessionEventStandard = run(`
+  (() => {
+    const venue = VENUE_DATA.find(v => v.cap === 'A');
+    return getEventPlanStandardCost({
+      sessions: [
+        { name: 'オンラインミーグリ', venue: venue.name, dates: ['2030-01-10', '2030-01-11'] },
+        { name: 'リアルミーグリ', venue: venue.name, dates: ['2030-01-10', '2030-01-11'] }
+      ]
+    });
+  })()
+`);
+check('複数セッションの会場費は種別ごとの料金を適用', mixedSessionEventStandard === Math.floor(eventExpected / 3) + eventExpected, `got ${mixedSessionEventStandard} / expected ${Math.floor(eventExpected / 3) + eventExpected}`);
+
 // --- 4. 変更手数料 = 通常会費×20% ---
 const changeFee = run(`
   (() => {
@@ -136,10 +246,13 @@ const changeFee = run(`
     const target = new Date(now.getTime() + 150 * 86400000); // 150日後（半年〜3ヶ月前）
     const tStr = target.toISOString().slice(0, 10);
     requestModifyExistingPlan('2099-6', tStr, 6, 100000000);
-    return { before, after: funds };
+    const expense = monthlyLedger.expense[monthlyLedger.expense.length - 1];
+    return { before, after: funds, expense };
   })()
 `);
-check('変更手数料 = 通常会費100M×20% = 20M 徴収', changeFee.before - changeFee.after === 20000000, `diff ${changeFee.before - changeFee.after}`);
+check('変更手数料20Mは月末引き落としに計上', changeFee.before === changeFee.after
+  && changeFee.expense.label === '予定変更手数料' && changeFee.expense.amount === 20000000
+  && changeFee.expense.settled === false, `amount ${changeFee.expense.amount}`);
 
 // --- 5. 取消キャンセル料（3ヶ月〜1ヶ月前＝50%）---
 const cancelFee = run(`
@@ -149,10 +262,13 @@ const cancelFee = run(`
     const tStr = target.toISOString().slice(0, 10);
     const before = funds;
     requestCancelExistingPlan('2099-6', tStr, 100000000);
-    return { before, after: funds };
+    const expense = monthlyLedger.expense[monthlyLedger.expense.length - 1];
+    return { before, after: funds, expense };
   })()
 `);
-check('取消料 = 通常会費100M×50% = 50M 徴収', cancelFee.before - cancelFee.after === 50000000, `diff ${cancelFee.before - cancelFee.after}`);
+check('取消料50Mは月末引き落としに計上', cancelFee.before === cancelFee.after
+  && cancelFee.expense.label === '予定取消料' && cancelFee.expense.amount === 50000000
+  && cancelFee.expense.settled === false, `amount ${cancelFee.expense.amount}`);
 
 // --- 6. 取消キャンセル料（半年〜3ヶ月前＝30%）---
 const cancelFee30 = run(`
@@ -162,10 +278,13 @@ const cancelFee30 = run(`
     const tStr = target.toISOString().slice(0, 10);
     const before = funds;
     requestCancelExistingPlan('2099-6', tStr, 100000000);
-    return { before, after: funds };
+    const expense = monthlyLedger.expense[monthlyLedger.expense.length - 1];
+    return { before, after: funds, expense };
   })()
 `);
-check('取消料 = 通常会費100M×30% = 30M 徴収', cancelFee30.before - cancelFee30.after === 30000000, `diff ${cancelFee30.before - cancelFee30.after}`);
+check('取消料30Mは月末引き落としに計上', cancelFee30.before === cancelFee30.after
+  && cancelFee30.expense.label === '予定取消料' && cancelFee30.expense.amount === 30000000
+  && cancelFee30.expense.settled === false, `amount ${cancelFee30.expense.amount}`);
 
 // --- 7. 追加料 = 通常会費×1.2倍 ---
 const addFeeCheck = run(`
