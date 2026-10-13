@@ -149,6 +149,13 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
   const targetYearNum = Number(year) || 1;
   const baseYear = calendarYear && calendarYear > 2000 ? calendarYear : new Date().getFullYear();
   const actualYear = baseYear + targetYearNum - 1;
+  const generatedMonths = new Set();
+  for (let monthOffset = 0; monthOffset < monthSpan; monthOffset++) {
+    const monthIndex = startMonth - 1 + monthOffset;
+    const generatedYear = actualYear + Math.floor(monthIndex / 12);
+    const generatedMonth = (monthIndex % 12) + 1;
+    generatedMonths.add(`${generatedYear}-${generatedMonth}`);
+  }
 
   const dayWeights = { 0: 12, 6: 12, 5: 8, 2: 5, 3: 5, 4: 3, 1: 1 };
   const venuePool = (typeof VENUE_DATA !== 'undefined' && Array.isArray(VENUE_DATA)) ? VENUE_DATA : [{ name: '市民会館', cap: 'B' }];
@@ -331,7 +338,16 @@ function generateRivalsAndGeneralSchedule(year, startMonth, generateFullYear = f
     });
   }
 
-  rivalLiveBookings = newRivalBookings;
+  const retainedBookings = rivalLiveBookings.filter(booking => {
+    const bookingDates = Array.isArray(booking.venueDates) && booking.venueDates.length
+      ? booking.venueDates
+      : [booking.liveDate];
+    return !bookingDates.some(date => {
+      const [bookingYear, bookingMonth] = String(date || '').split('-').map(Number);
+      return generatedMonths.has(`${bookingYear}-${bookingMonth}`);
+    });
+  });
+  rivalLiveBookings = [...retainedBookings, ...newRivalBookings];
 }
 
 try {

@@ -246,6 +246,99 @@ check('consecutive event dates can be split into individual sessions', run(`
     }
   })()
 `) === true);
+check('live dates can be split into separate slots across a month boundary', run(`
+  (() => {
+    const saved = {
+      currentYear,
+      calendarYear,
+      productionSchedule,
+      planYearTarget,
+      planStartM,
+      planEndM,
+      planAllowPastMonths,
+      planIsAddMode,
+      planMonthEventDrafts,
+      planMultiSelectModes,
+      planCalendarSelections,
+      modalDisplay: document.getElementById('decision-modal').style.display
+    };
+    try {
+      currentYear = 1;
+      calendarYear = 2026;
+      productionSchedule = { ...productionSchedule, '2-8': { release: 'none' } };
+      planMonthEventDrafts = {};
+      planMultiSelectModes = {};
+      planCalendarSelections = {};
+      openDecisionModal('月末ライブ分割テスト', 2, 8, 9);
+      addLiveSlot(8);
+      const venue = VENUE_DATA.find(item => !item.name.includes('球場') && !item.name.includes('ドーム'));
+      document.getElementById('sel-ven-8-0').value = venue.name;
+      onVenueSelectChange(8, 0);
+      addShowDate(8, 0);
+      addShowDate(8, 0);
+      const dateInputs = document.querySelectorAll('#show-dates-8-0 .show-date-input');
+      dateInputs[0].value = '2027-08-31';
+      dateInputs[1].value = '2027-09-01';
+
+      splitLiveSessions(8, 0);
+      const sessions = readLiveSlotInputs(8);
+      const originalBookings = rivalLiveBookings;
+      rivalLiveBookings = [];
+      const validSessions = validatePlanLiveSlots(8, sessions);
+      rivalLiveBookings = originalBookings;
+      return validSessions
+        && sessions.length === 2
+        && sessions[0].liveDates[0] === '2027-08-31'
+        && sessions[1].liveDates[0] === '2027-09-01'
+        && sessions.every(session => session.liveVenue === venue.name)
+        && isConsecutiveLiveDate('2027-08-31', '2027-09-01');
+    } finally {
+      closeDecisionModal();
+      currentYear = saved.currentYear;
+      calendarYear = saved.calendarYear;
+      productionSchedule = saved.productionSchedule;
+      planYearTarget = saved.planYearTarget;
+      planStartM = saved.planStartM;
+      planEndM = saved.planEndM;
+      planAllowPastMonths = saved.planAllowPastMonths;
+      planIsAddMode = saved.planIsAddMode;
+      planMonthEventDrafts = saved.planMonthEventDrafts;
+      planMultiSelectModes = saved.planMultiSelectModes;
+      planCalendarSelections = saved.planCalendarSelections;
+      document.getElementById('decision-modal').style.display = saved.modalDisplay;
+    }
+  })()
+`) === true);
+check('regenerating one half-year retains rival bookings from the other half', run(`
+  (() => {
+    const saved = { currentYear, calendarYear, leagueTeams, rivalLiveBookings };
+    try {
+      currentYear = 1;
+      calendarYear = 2026;
+      leagueTeams = [];
+      const outsideRange = {
+        groupId: 'rival_test', venue: '市民会館', liveDate: '2027-01-15',
+        venueDates: ['2027-01-15']
+      };
+      const replacedRange = {
+        groupId: 'rival_test', venue: '市民会館', liveDate: '2026-07-15',
+        venueDates: ['2026-07-15']
+      };
+      rivalLiveBookings = [outsideRange, replacedRange];
+      generateRivalsAndGeneralSchedule(1, 7, false);
+      const stadium = VENUE_DATA.find(venue => venue.name.includes('ドーム') || venue.name.includes('球場'));
+      return rivalLiveBookings.includes(outsideRange)
+        && !rivalLiveBookings.includes(replacedRange)
+        && findRivalVenueConflict('市民会館', '2027-01-15') === outsideRange
+        && isBaseballGameDay(stadium.name, '2027-05-02');
+    } finally {
+      currentYear = saved.currentYear;
+      calendarYear = saved.calendarYear;
+      leagueTeams = saved.leagueTeams;
+      rivalLiveBookings = saved.rivalLiveBookings;
+    }
+  })()
+`) === true);
 check('monthly report displays a finalized ledger without detail arrays', run(`
   (() => {
     const modal = document.getElementById('monthly-report-modal');

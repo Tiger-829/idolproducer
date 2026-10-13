@@ -968,6 +968,13 @@ function ensureLiveEntryDeterminedFans(entry) {
   }
 }
 
+function isConsecutiveLiveDate(previousDate, currentDate) {
+  if (!previousDate || !currentDate) return false;
+  const yesterday = getGameDateObject(currentDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return previousDate === toDateKey(yesterday);
+}
+
 function processMonthlyReleaseAndLive(reachDate = gameDate) {
   const planKey = `${currentYear}-${currentMonth}`;
   const plan = productionSchedule[planKey] || null;
@@ -1026,9 +1033,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const showDates = getLiveEntryShowDates(entry);
     const totalShowCount = showDates.length;
     const isMultiDay = totalShowCount > 1;
-    const yesterday = new Date(getGameDateObject());
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isConsecutive = lastLiveDate === toDateKey(yesterday);
+    const isConsecutive = isConsecutiveLiveDate(lastLiveDate, gameDate);
     const remainingDates = showDates.filter(dateKey => dateKey !== gameDate);
     const isFinale = isMultiDay && remainingDates.length === 0;
     const priceFactor = getPriceDemandFactor(v, entry);
@@ -1058,6 +1063,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     if (typeof liveMerchandiseStock !== 'undefined') {
       liveMerchandiseStock = nextLiveStock;
     }
+
     if (typeof merchandiseStock !== 'undefined') {
       merchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : nextLiveStock) + (typeof eventMerchandiseStock !== 'undefined' ? eventMerchandiseStock : 0);
     }

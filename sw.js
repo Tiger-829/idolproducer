@@ -1,4 +1,4 @@
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 const CACHE_NAME = `idol-game-${APP_VERSION}`;
 // index.html から読み込む外部ファイルもオフライン動作に含める
 const ASSETS = [
