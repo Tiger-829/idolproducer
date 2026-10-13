@@ -413,7 +413,12 @@ function applyMonthlySalary() {
   return { memberSalary, managerSalary, total };
 }
 
-function openPendingModal() {
+function openPendingModal(allowPlanningPrompt = true) {
+  const currentDate = getGameDateObject();
+  const isPlanningWeek = isFirstWednesdayOfMonth(currentDate)
+    && (currentDate.getMonth() === 0 || currentDate.getMonth() === 6);
+  if (!allowPlanningPrompt && isPlanningWeek) planningPromptWeekKey = gameDate;
+
   if (openNextPendingReport()) return;
   if (pendingMonthlyReport) return openPendingMonthlyReport();
   if (pendingSelectionEvent) return openSelectionModal();
@@ -424,9 +429,8 @@ function openPendingModal() {
   if (pendingPerformanceOffers.length) return openMusicOfferModal();
   if (draftState) return openDraftModal();
 
-  const currentDate = getGameDateObject();
-  if (isFirstWednesdayOfMonth(currentDate)
-    && (currentDate.getMonth() === 0 || currentDate.getMonth() === 8)
+  if (allowPlanningPrompt
+    && isPlanningWeek
     && planningPromptWeekKey !== gameDate) {
     planningPromptWeekKey = gameDate;
     if (typeof updateUI === 'function') updateUI();

@@ -38,8 +38,9 @@ run(`
   document.getElementById('input-setup-2nd-song').value = 'テスト2ndシングル';
   document.getElementById('input-setup-live-name').value = 'テスト初ライブ';
   submitGameSetupAndPlan();
-  document.getElementById('decision-modal').style.display = 'none';
 `);
+check('new game setup does not open the planning modal at launch',
+  window.document.getElementById('decision-modal').style.display !== 'flex');
 check('setup group name appears as the player team name', run('getLeagueRanking().find(team => team.isPlayer)?.name') === 'テストグループ');
 check('setup first single is assigned to the February release', run("productionSchedule['1-2']?.songName") === 'テスト1stシングル');
 check('setup second single is assigned to the June release', run("productionSchedule['1-6']?.songName") === 'テスト2ndシングル');
@@ -48,7 +49,7 @@ check('scheduled release songs use the entered titles', run(`
   ensureScheduledSong(1, 2, productionSchedule['1-2']).title === 'テスト1stシングル'
     && ensureScheduledSong(1, 6, productionSchedule['1-6']).title === 'テスト2ndシングル'
 `));
-check('planning prompts appear on the first Wednesday in January and September and only once per week', run(`
+check('planning prompts appear on the first Wednesday in January and July, not on startup, and only once per week', run(`
   (() => {
     const modal = document.getElementById('decision-modal');
     const saved = {
@@ -97,6 +98,10 @@ check('planning prompts appear on the first Wednesday in January and September a
       gameDate = toDateKey(getFirstWednesday(calendarYear, 0));
       syncGameCalendar();
       planningPromptWeekKey = '';
+      openPendingModal(false);
+      openPendingModal();
+      const startupDoesNotOpen = modal.style.display !== 'flex';
+      planningPromptWeekKey = '';
       openPendingModal();
       const januaryOpens = modal.style.display === 'flex'
         && planYearTarget === 3 && planStartM === 7 && planEndM === 12;
@@ -104,14 +109,21 @@ check('planning prompts appear on the first Wednesday in January and September a
       openPendingModal();
       const januaryDoesNotRepeat = modal.style.display === 'none';
 
-      gameDate = toDateKey(getFirstWednesday(calendarYear, 8));
+      gameDate = toDateKey(getFirstWednesday(calendarYear, 6));
       syncGameCalendar();
       planningPromptWeekKey = '';
       openPendingModal();
-      const septemberOpens = modal.style.display === 'flex'
-        && planYearTarget === 4 && planStartM === 1 && planEndM === 6;
+      const julyOpens = modal.style.display === 'flex'
+        && planYearTarget === 3 && planStartM === 7 && planEndM === 12;
 
-      return januaryOpens && januaryDoesNotRepeat && septemberOpens;
+      gameDate = toDateKey(getFirstWednesday(calendarYear, 8));
+      syncGameCalendar();
+      planningPromptWeekKey = '';
+      closeDecisionModal();
+      openPendingModal();
+      const septemberDoesNotOpen = modal.style.display === 'none';
+
+      return startupDoesNotOpen && januaryOpens && januaryDoesNotRepeat && julyOpens && septemberDoesNotOpen;
     } finally {
       closeDecisionModal();
       currentYear = saved.currentYear;

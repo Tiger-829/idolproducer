@@ -2102,7 +2102,7 @@ function openPlanningManual() {
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
   const planningDate = getGameDateObject();
   if (isFirstWednesdayOfMonth(planningDate)
-    && (planningDate.getMonth() === 0 || planningDate.getMonth() === 8)) {
+    && (planningDate.getMonth() === 0 || planningDate.getMonth() === 6)) {
     planningPromptWeekKey = gameDate;
   }
   if (currentMonth >= 1 && currentMonth <= 8) {
@@ -2389,11 +2389,9 @@ function initGame(slot, startFresh) {
     console.warn('Initial updateUI warning:', e);
   }
 
-  if (startFresh) {
-    openPlanningManual();
-  } else {
+  if (!startFresh) {
     if (typeof openPendingModal === 'function') {
-      openPendingModal();
+      openPendingModal(false);
     }
   }
 }
