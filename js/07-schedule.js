@@ -517,6 +517,9 @@ function processBirthdays(fromDate, toDate) {
   if (typeof syncMemberAges === 'function') {
     syncMemberAges(toDate);
   }
+  if (typeof processAcademicYearGrowth === 'function') {
+    processAcademicYearGrowth(toDate);
+  }
 }
 
 function calculateFanBasedSales(F, n = 0) {

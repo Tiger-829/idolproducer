@@ -207,6 +207,42 @@ function syncMemberAges(onDate = getGameDateObject()) {
   });
 }
 
+function processAcademicYearGrowth(onDate = getGameDateObject()) {
+  if (onDate.getMonth() !== 2 || onDate.getDate() !== 31) return;
+  const year = onDate.getFullYear();
+  idolRoster.forEach(member => {
+    if (!member || !member.stats || member.academicGrowthYear === year) return;
+
+    const age = Number.isFinite(member.age)
+      ? member.age
+      : calculateAgeFromBirth(member.birthYear, onDate, member.birthdayMonth, member.birthdayDay);
+    if (!Number.isFinite(age) || age < 12) return;
+
+    let status = member.academicGrowthStatus;
+    if (!status && age >= 18) {
+      status = (member.stats.academics || 0) >= 60 ? 'university' : 'stopped';
+      member.academicGrowthStatus = status;
+    }
+
+    if (age >= 22) {
+      member.academicGrowthStatus = 'graduated';
+    } else if (age === 18 && status !== 'university' && status !== 'stopped') {
+      if ((member.stats.academics || 0) >= 60) {
+        status = 'university';
+        member.stats.academics = Math.min(100, (member.stats.academics || 0) + 1);
+      } else {
+        status = 'stopped';
+      }
+      member.academicGrowthStatus = status;
+    } else if (age < 18 || status === 'university') {
+      member.stats.academics = Math.min(100, (member.stats.academics || 0) + 1);
+      if (age < 18) member.academicGrowthStatus = 'school';
+    }
+
+    member.academicGrowthYear = year;
+  });
+}
+
 let _lastGeneratedMemberId = 0;
 
 // ユニークなメンバーID（安全な整数）を生成する

@@ -260,6 +260,7 @@ function getStatExpRequired(level) {
 
 function addMemberStatExp(member, statId, amount) {
   if (!member || !Number.isFinite(amount) || amount <= 0) return 0;
+  if (['talk', 'variety', 'academics'].includes(statId)) return 0;
   if (!member.statExp) member.statExp = {};
   const currentLevel = member.stats[statId] || 0;
   if (currentLevel >= 100) return 0;
@@ -279,6 +280,7 @@ function addMemberStatExp(member, statId, amount) {
 }
 
 function getStatExpProgress(member, statId) {
+  if (['talk', 'variety', 'academics'].includes(statId)) return 0;
   const level = member.stats[statId] || 0;
   if (level >= 100) return 1;
   const current = member.statExp?.[statId] || 0;

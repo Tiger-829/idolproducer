@@ -122,4 +122,59 @@ check('migrated save shows the new year in the header', run("document.getElement
 run(`applySavedGame({ currentYear: 2, calendarYear: 2028, gameDate: '2028-12-31', yearEndKohakuProcessed: true, yearlyStats: { sales: 5, audience: 5 }, idolRoster: [] });`);
 check('an up-to-date save is left untouched on load', run('currentYear === 2 && yearEndKohakuProcessed && yearlyStats.sales === 5'));
 
+check('academic growth follows school years and the university admission threshold', run(`
+  (() => {
+    const originalRoster = idolRoster;
+    const makeMember = (birthYear, academics) => ({
+      birthYear,
+      birthdayMonth: 1,
+      birthdayDay: 1,
+      age: calculateAgeFromBirth(birthYear, new Date('2026-03-31T12:00:00'), 1, 1),
+      height: 160,
+      stats: { academics },
+      statExp: {}
+    });
+    try {
+      const highSchoolSenior = makeMember(2009, 59);
+      const ineligible = makeMember(2008, 59);
+      const eligible = makeMember(2008, 60);
+      const graduate = makeMember(2004, 75);
+      idolRoster = [highSchoolSenior, ineligible, eligible, graduate];
+
+      processAcademicYearGrowth(new Date('2026-03-31T12:00:00'));
+      const beforeAdmission = highSchoolSenior.stats.academics === 60;
+      const admissionResults = ineligible.academicGrowthStatus === 'stopped'
+        && ineligible.stats.academics === 59
+        && eligible.academicGrowthStatus === 'university'
+        && eligible.stats.academics === 61;
+      const graduation = graduate.academicGrowthStatus === 'graduated'
+        && graduate.stats.academics === 75;
+      processAcademicYearGrowth(new Date('2026-03-31T12:00:00'));
+      const oncePerYear = highSchoolSenior.stats.academics === 60
+        && eligible.stats.academics === 61;
+
+      syncMemberAges(new Date('2027-03-31T12:00:00'));
+      processAcademicYearGrowth(new Date('2027-03-31T12:00:00'));
+      const nextYear = highSchoolSenior.academicGrowthStatus === 'university'
+        && highSchoolSenior.stats.academics === 61
+        && ineligible.stats.academics === 59
+        && eligible.stats.academics === 62;
+
+      const beforeTalk = eligible.stats.talk || 0;
+      const beforeVariety = eligible.stats.variety || 0;
+      const beforeAcademics = eligible.stats.academics;
+      addMemberStatExp(eligible, 'talk', 10000);
+      addMemberStatExp(eligible, 'variety', 10000);
+      addMemberStatExp(eligible, 'academics', 10000);
+      return beforeAdmission && admissionResults && graduation && oncePerYear && nextYear
+        && (eligible.stats.talk || 0) === beforeTalk
+        && (eligible.stats.variety || 0) === beforeVariety
+        && eligible.stats.academics === beforeAcademics
+        && getStatExpProgress(eligible, 'academics') === 0;
+    } finally {
+      idolRoster = originalRoster;
+    }
+  })()
+`) === true);
+
 dom.window.close();

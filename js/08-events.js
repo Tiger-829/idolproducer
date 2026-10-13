@@ -44,7 +44,7 @@ const RANDOM_EVENTS = [
     name: 'ラジオの深夜放送枠',
     text: '深夜ラジオへの出演打診が届きました。',
     choices: [
-      { label: '出演する', detail: '資金 +${smallGain} / 選抜のトークに経験点+3,000pt', apply: ctx => { funds += ctx.smallGain; recordMonthlyIncome('イベント収入（ラジオ出演料）', ctx.smallGain); addSelectedStatExp('talk', 3000); } },
+      { label: '出演する', detail: '資金 +${smallGain}', apply: ctx => { funds += ctx.smallGain; recordMonthlyIncome('イベント収入（ラジオ出演料）', ctx.smallGain); } },
       { label: '見送る', detail: '効果なし', apply: () => {} }
     ]
   },
