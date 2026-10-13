@@ -1,7 +1,30 @@
 // 共通UI更新・ログ表示
 
+function withPreservedPageScroll(render) {
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  const restoreScroll = () => {
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+      window.scrollTo(scrollX, scrollY);
+    }
+  };
+
+  try {
+    return render();
+  } finally {
+    restoreScroll();
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(restoreScroll);
+    }
+  }
+}
+
 // UIを更新する。
 function updateUI() {
+  return withPreservedPageScroll(updateUIContent);
+}
+
+function updateUIContent() {
   // テキストを設定する。
   const setText = (id, text) => {
     const el = document.getElementById(id);

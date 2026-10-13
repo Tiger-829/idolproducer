@@ -1,5 +1,9 @@
 // 事務所タブ
 function renderWeeklyActionPanel() {
+  return withPreservedPageScroll(renderWeeklyActionPanelContent);
+}
+
+function renderWeeklyActionPanelContent() {
   const panel = document.getElementById('weekly-action-panel');
   if (!panel) return;
 
