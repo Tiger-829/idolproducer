@@ -274,21 +274,15 @@ check('standard prices follow B base x tier rate', run(`
 check('all stand tiers share one price', run(`
   ['stand1','stand2','stand3','stand4'].every(id => getStandardSeatPrice({ cap: 'S' }, id) === 12100)
 `) === true);
-check('stream buyer rate is fixed by weekday (sun/sat 0.9, mon/fri 0.8, tue-wed-thu 0.85)', run(`
-  JSON.stringify([0, 1, 2, 3, 4, 5, 6].map(day => getStreamBuyerRate(new Date(2027, 0, 3 + day))))
-`) === JSON.stringify([0.9, 0.8, 0.85, 0.85, 0.85, 0.8, 0.9]));
-check('stream buyers = fans x (1 - live rate) x weekday rate', run(`
-  const fans = calculateGroupFans();
-  const liveRate = getTierParticipationRate('live');
-  [0, 1, 2, 3, 4, 5, 6].every(day => {
-    const date = new Date(2027, 0, 3 + day);
-    return getStreamTicketBuyers(date) === Math.floor(fans * (1 - liveRate) * getStreamBuyerRate(date));
-  })
-`) === true);
-check('weekend streams sell more than weekday streams', run(`
-  const sunday = new Date(2027, 0, 3);
-  const wednesday = new Date(2027, 0, 6);
-  getStreamTicketBuyers(sunday) > getStreamTicketBuyers(wednesday)
+check('stream buyers = (fans - live attendance) x (0.8 + (stream days - 1) x 0.5)', run(`
+  const original = calculateGroupFans;
+  calculateGroupFans = () => 1000;
+  const oneDay = getStreamTicketBuyers(200, 1);
+  const threeDays = getStreamTicketBuyers(200, 3);
+  const soldOut = getStreamTicketBuyers(1200, 1);
+  const noStream = getStreamTicketBuyers(200, 0);
+  calculateGroupFans = original;
+  oneDay === 640 && threeDays === 1440 && soldOut === 0 && noStream === 0
 `) === true);
 check('stream ticket is 5,000 yen', run('STREAM_TICKET_PRICE') === 5000);
 check('stream ticket revenue is half of the listed ticket price', run(`
@@ -323,7 +317,10 @@ const streamCost = JSON.parse(run(`
   const d = new Date(gameDate + 'T12:00:00'); d.setDate(d.getDate() + 3);
   const dateKey = toDateKey(d);
   const key = currentYear + '-' + currentMonth;
-  productionSchedule[key] = { release: 'none', liveVenue: null, senbatsuAnnounced: false, liveDate: dateKey, liveVenueName: venue.name };
+  productionSchedule[key] = {
+    release: 'none', liveVenue: null, senbatsuAnnounced: false,
+    liveDate: dateKey, liveDates: [], streamDates: [dateKey], liveVenueName: venue.name
+  };
   productionSchedule[key].liveVenue = venue.name;
   productionSchedule[key].liveCompleted = false;
   merchandiseStock = 0;
@@ -334,13 +331,14 @@ const streamCost = JSON.parse(run(`
   JSON.stringify({
     cost: yearlyStats.streamCost,
     revenue: yearlyStats.streamRevenue || 0,
-    buyers: getStreamTicketBuyers(getGameDateObject())
+    attendance: productionSchedule[key].liveTotalAudience,
+    buyers: getStreamTicketBuyers(productionSchedule[key].liveTotalAudience, 1)
   })
 `));
 console.log('  ', JSON.stringify(streamCost));
 check('exactly 100 million yen is charged per show', streamCost.cost === 100000000, JSON.stringify(streamCost));
 check('stream income is half of the full-price ticket sales',
-  streamCost.revenue === streamCost.buyers * STREAM_TICKET_PRICE * 0.5,
+  streamCost.revenue === streamCost.buyers * run('STREAM_TICKET_PRICE') * 0.5,
   JSON.stringify(streamCost));
 check('higher ticket price lowers attendance', run(`
   const venue = VENUE_DATA.find(v => v.cap === 'A');

@@ -140,13 +140,14 @@ console.log('PASS: Toggling member 5 only affects member 5; count changes by exa
 
 console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
 (async () => {
-  run('openCdProductionModal();');
+  run(`openCdProductionModal(createDefaultCdProduction('別の曲名'), '計画済み表題曲');`);
   await run('setRandomTrackName(0);');
   await run('setRandomTrackName(1);');
 
   const track0Val = run(`document.getElementById('cd-track-name-0').value`);
-  assert(typeof track0Val === 'string' && track0Val.length > 0, 'Track 0 should have a random title');
-  console.log(`PASS: setRandomTrackName(0) set track 0 to "${track0Val}"`);
+  assert(track0Val === '計画済み表題曲' && run(`document.getElementById('cd-track-name-0').readOnly`),
+    'Track 0 should keep its scheduled title and remain read-only');
+  console.log(`PASS: Track 0 keeps the scheduled title "${track0Val}"`);
 
   const track1Val = run(`document.getElementById('cd-track-name-1').value`);
   assert(typeof track1Val === 'string' && track1Val.length > 0, 'Track 1 should have a random title');

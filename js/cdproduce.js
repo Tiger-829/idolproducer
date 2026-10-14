@@ -67,7 +67,7 @@ function createDefaultCdProduction(leadTitle = '') {
   };
 }
 
-function prepareCdProductionForModal(cdProduction) {
+function prepareCdProductionForModal(cdProduction, leadTitle = '') {
   const config = cdProduction || createDefaultCdProduction('');
   config.trackCount = clampCdNumber(config.trackCount, CD_TRACK_MIN, CD_TRACK_MAX, CD_TRACK_MIN);
   if (!Array.isArray(config.tracks)) config.tracks = [];
@@ -89,6 +89,7 @@ function prepareCdProductionForModal(cdProduction) {
     }
     if (!Array.isArray(track.performanceMemberIds)) track.performanceMemberIds = [];
     if (track.performanceCenterId == null) track.performanceCenterId = null;
+    if (index === 0 && leadTitle) track.name = leadTitle;
     track.role = index === 0 ? 'lead' : 'normal';
     track.locked = index === 0;
   });
@@ -196,7 +197,7 @@ let cdProductionModalState = null;
 let cdProductionConfirmed = null;
 let cdProductionTargetPlanKey = null;
 
-function openCdProductionModal(cdProduction) {
+function openCdProductionModal(cdProduction, leadTitle = '') {
   let modal = document.getElementById('cd-production-modal');
   if (!modal) {
     modal = document.createElement('div');
@@ -205,7 +206,7 @@ function openCdProductionModal(cdProduction) {
     modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10001; align-items:center; justify-content:center;';
     document.body.appendChild(modal);
   }
-  cdProductionModalState = prepareCdProductionForModal(cdProduction);
+  cdProductionModalState = prepareCdProductionForModal(cdProduction, leadTitle);
   renderCdProductionModal();
   modal.style.display = 'flex';
 }
@@ -216,6 +217,7 @@ function closeCdProductionModal() {
 }
 
 function onCdTrackNameChange(index) {
+  if (index === 0) return;
   const el = document.getElementById(`cd-track-name-${index}`);
   if (el && cdProductionModalState && cdProductionModalState.tracks[index]) {
     cdProductionModalState.tracks[index].name = el.value;
@@ -223,6 +225,7 @@ function onCdTrackNameChange(index) {
 }
 
 async function setRandomTrackName(index) {
+  if (index === 0) return;
   let name = '';
   if (typeof getRandomSongName === 'function') {
     name = await getRandomSongName();
@@ -330,6 +333,7 @@ function onCdTrackCountChange() {
 function renderCdProductionModal() {
   const modal = document.getElementById('cd-production-modal');
   if (!modal) return;
+  const modalScrollTop = modal.querySelector('.modal-content')?.scrollTop || 0;
   const cfg = cdProductionModalState;
   const cost = calculateCdProductionCost(cfg);
 
@@ -368,14 +372,15 @@ function renderCdProductionModal() {
       : '';
     return `
       <div style="padding:7px; margin-bottom:6px; border:1px solid #eee; border-radius:5px;">
-        <div style="font-size:11px; color:#888; margin-bottom:4px;">${i === 0 ? 'リード曲' : `曲${i + 1}`}</div>
+        <div style="font-size:11px; color:#888; margin-bottom:4px;">${i === 0 ? '表題曲（スケジュールで決定済み）' : `曲${i + 1}`}</div>
         <div style="display:flex; gap:6px; align-items:center;">
           <input type="text" id="cd-track-name-${i}" value="${escapeHtml(track.name || '')}" maxlength="24"
             placeholder="${i === 0 ? '表題曲' : '曲名を入力'}"
             style="flex:1; padding:5px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;"
+            ${locked ? 'readonly' : ''}
             onchange="onCdTrackNameChange(${i})">
-          <button type="button" class="ghost-btn" style="padding:4px 8px; font-size:10px; white-space:nowrap;"
-            onclick="setRandomTrackName(${i})">ランダム</button>
+          ${locked ? '' : `<button type="button" class="ghost-btn" style="padding:4px 8px; font-size:10px; white-space:nowrap;"
+            onclick="setRandomTrackName(${i})">ランダム</button>`}
         </div>
         <div style="display:flex; gap:8px; margin-top:5px;">
           <label style="flex:1; font-size:10px; font-weight:bold; color:#555;">MV
@@ -399,7 +404,7 @@ function renderCdProductionModal() {
     `;
   }).join('');
 
-  modal.innerHTML = `
+  const modalMarkup = `
     <div class="modal-content" style="max-width:520px;">
       <h3 class="page-title" style="margin-top:0; font-size:15px;">💿 CD制作の内訳を決定</h3>
       <p style="font-size:11px; color:#666; line-height:1.6; margin:0 0 10px;">
@@ -446,6 +451,16 @@ function renderCdProductionModal() {
       </div>
     </div>
   `;
+  const render = () => {
+    modal.innerHTML = modalMarkup;
+    const updatedModalContent = modal.querySelector('.modal-content');
+    if (updatedModalContent) updatedModalContent.scrollTop = modalScrollTop;
+  };
+  if (typeof withPreservedPageScroll === 'function') {
+    withPreservedPageScroll(render);
+  } else {
+    render();
+  }
 }
 
 function confirmCdProduction() {
@@ -477,14 +492,17 @@ function confirmCdProduction() {
     : null;
   cdProductionModalState.totalCost = cost.totalCost;
   cdProductionModalState.costDeducted = false;
+  const targetPlan = typeof productionSchedule !== 'undefined' && cdProductionTargetPlanKey
+    ? productionSchedule[cdProductionTargetPlanKey]
+    : null;
+  if (targetPlan?.songName && cdProductionModalState.tracks[0]) {
+    cdProductionModalState.tracks[0].name = targetPlan.songName;
+  }
   cdProductionConfirmed = cdProductionModalState;
   // 対象の計画に制作設定を保存する
   if (typeof cdProductionTargetPlanKey !== 'undefined' && cdProductionTargetPlanKey
       && typeof productionSchedule !== 'undefined' && productionSchedule[cdProductionTargetPlanKey]) {
     productionSchedule[cdProductionTargetPlanKey].cdProduction = cdProductionModalState;
-    if (cdProductionModalState.tracks && cdProductionModalState.tracks[0]?.name) {
-      productionSchedule[cdProductionTargetPlanKey].songName = cdProductionModalState.tracks[0].name;
-    }
   }
   closeCdProductionModal();
   setLog(`【CD制作】収録${cost.trackCount}曲${cost.useMv ? `・MV${cost.mvTrackCount}曲` : ''} / 制作費 ${formatMoney(cost.totalCost)}（初週売上バフ ×${getCdProductionSalesBuff(cdProductionModalState).toFixed(2)}）に決定しました。`);

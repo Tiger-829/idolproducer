@@ -1182,17 +1182,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     }
     merchandiseUnitsSold = (merchandiseUnitsSold || 0) + unitsSoldCalc;
 
-    const streamBuyers = getStreamTicketBuyers(getGameDateObject());
-    const streamRevenue = getStreamTicketRevenue(streamBuyers);
-
     const venueCost = getVenueRentalFee(v, totalShowCount, showDates);
-    const totalRevenueWithGoods = totalRevenue + totalMerchandise + streamRevenue;
-    const profit = totalRevenueWithGoods - venueCost - STREAM_PRODUCTION_COST;
-
-    yearlyStats.audience += totalAudience;
-    yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
-    yearlyStats.streamCost = (yearlyStats.streamCost || 0) + STREAM_PRODUCTION_COST;
-    funds += totalRevenueWithGoods;
 
     const target0 = entry.isPrimary ? entry.plan : entry.plan.additionalLives[entry.extraIndex];
     if (!target0.liveTotalShowCount) {
@@ -1202,6 +1192,19 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     const grandShowCount = target0.liveTotalShowCount || totalShowCount;
     target0.liveTotalAudience = (target0.liveTotalAudience || 0) + totalAudience;
     const grandAudience = target0.liveTotalAudience;
+    const streamDateSet = new Set(Array.isArray(entry.streamDates) ? entry.streamDates : showDates);
+    const streamDaysCount = streamDateSet.size;
+    const streamBuyers = remainingDates.length === 0 && streamDaysCount > 0
+      ? getStreamTicketBuyers(grandAudience, streamDaysCount)
+      : 0;
+    const streamRevenue = getStreamTicketRevenue(streamBuyers);
+    const totalRevenueWithGoods = totalRevenue + totalMerchandise + streamRevenue;
+    const profit = totalRevenueWithGoods - venueCost - STREAM_PRODUCTION_COST;
+
+    yearlyStats.audience += totalAudience;
+    yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + streamRevenue;
+    yearlyStats.streamCost = (yearlyStats.streamCost || 0) + STREAM_PRODUCTION_COST;
+    funds += totalRevenueWithGoods;
     const stamina = applyLiveStaminaCost(v, isMultiDay, isConsecutive);
     lastLiveDate = gameDate;
     if (!weeklyRecoveryDone) {
@@ -1449,22 +1452,18 @@ function getLiveAudienceDemand(venue, date = getGameDateObject(), specialRate = 
 const STREAM_TICKET_PRICE = 5000;
 const STREAM_TICKET_PAYOUT_RATE = 0.5;
 const STREAM_PRODUCTION_COST = 100000000;
-const STREAM_BUYER_RATE = { 0: 0.9, 6: 0.9, 1: 0.8, 5: 0.8, 2: 0.85, 3: 0.85, 4: 0.85 };
-const STREAM_BUYER_DEFAULT_RATE = 0.85;
 
 function getStreamTicketRevenue(buyers) {
   return buyers * STREAM_TICKET_PRICE * STREAM_TICKET_PAYOUT_RATE;
 }
 
-function getStreamBuyerRate(date = getGameDateObject()) {
-  if (!date || typeof date.getDay !== 'function') return STREAM_BUYER_DEFAULT_RATE;
-  return STREAM_BUYER_RATE[date.getDay()] ?? STREAM_BUYER_DEFAULT_RATE;
-}
-
-function getStreamTicketBuyers(date = getGameDateObject()) {
+function getStreamTicketBuyers(liveAttendance, streamDays = 1) {
+  const days = Math.max(0, Math.floor(Number(streamDays) || 0));
+  if (days === 0) return 0;
   const fans = calculateGroupFans();
-  const liveRate = getTierParticipationRate('live');
-  return Math.floor(fans * (1 - liveRate) * getStreamBuyerRate(date));
+  const attendance = Math.max(0, Number(liveAttendance) || 0);
+  const streamFanRate = 0.8 + (days - 1) * 0.5;
+  return Math.floor(Math.max(0, fans - attendance) * streamFanRate);
 }
 
 function getEffectiveSeatPrice(venue, entry, seat) {

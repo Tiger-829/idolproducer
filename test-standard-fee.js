@@ -96,6 +96,40 @@ const cdPerformanceSelection = run(`
 `);
 check('CD内訳でアンダー／全員曲のセンターとソロ歌唱者を選べる', cdPerformanceSelection);
 
+const leadTrackLock = run(`
+  (() => {
+    const config = createDefaultCdProduction('以前の曲名');
+    openCdProductionModal(config, '日程策定済みの表題曲');
+    const titleInput = document.getElementById('cd-track-name-0');
+    const titleIsFixed = titleInput.readOnly
+      && titleInput.value === '日程策定済みの表題曲'
+      && !document.querySelector('#cd-track-name-0 + button');
+    titleInput.value = '変更できない曲名';
+    onCdTrackNameChange(0);
+    const titleRemainsFixed = cdProductionModalState.tracks[0].name === '日程策定済みの表題曲';
+    const secondTrackEditable = !document.getElementById('cd-track-name-1').readOnly
+      && Boolean(document.querySelector('#cd-track-name-1 + button'));
+    closeCdProductionModal();
+    return titleIsFixed && titleRemainsFixed && secondTrackEditable;
+  })()
+`);
+check('表題曲は計画済みタイトルで固定し、2曲目から編集できる', leadTrackLock);
+
+const cdModalScroll = run(`
+  (() => {
+    openCdProductionModal(createDefaultCdProduction('表題曲'));
+    const content = document.querySelector('#cd-production-modal .modal-content');
+    content.scrollTop = 48;
+    const typeSelect = document.getElementById('cd-track-performance-type-1');
+    typeSelect.value = 'under';
+    onCdTrackPerformanceTypeChange(1);
+    const preservedScrollTop = document.querySelector('#cd-production-modal .modal-content').scrollTop;
+    closeCdProductionModal();
+    return preservedScrollTop === 48;
+  })()
+`);
+check('CD内訳のドロップダウン変更後もモーダル内スクロール位置を維持する', cdModalScroll);
+
 // --- 2. ライブ通常会費ヘルパー（会場費＋配信費）---
 const liveStandard = run(`
   (() => {

@@ -113,7 +113,7 @@ function confirmSelection() {
     const leadTitle = (plan && plan.songName) || '';
     const existing = (plan && plan.cdProduction) ? plan.cdProduction : createDefaultCdProduction(leadTitle);
     cdProductionTargetPlanKey = planKey;
-    openCdProductionModal(existing);
+    openCdProductionModal(existing, leadTitle);
   }
 }
 

@@ -238,8 +238,6 @@ function processPlayerLives(fromDate, toDate) {
 
       let grandTotalAudience = 0;
       let grandTotalTicketRevenue = 0;
-      let grandTotalStreamBuyers = 0;
-      let grandTotalStreamRevenue = 0;
       const liveCdSalesByDate = [];
 
       let maxDailyAudience = 0;
@@ -291,12 +289,11 @@ function processPlayerLives(fromDate, toDate) {
           maxDailyDateKey = dateKey;
         }
 
-        if (streamDateSet.has(dateKey)) {
-          const dayStreamBuyers = getStreamTicketBuyers(dObj);
-          grandTotalStreamBuyers += dayStreamBuyers;
-          grandTotalStreamRevenue += getStreamTicketRevenue(dayStreamBuyers);
-        }
       });
+      const grandTotalStreamBuyers = streamDaysCount > 0
+        ? getStreamTicketBuyers(grandTotalAudience, streamDaysCount)
+        : 0;
+      const grandTotalStreamRevenue = getStreamTicketRevenue(grandTotalStreamBuyers);
 
       // ライブ実績履歴への保存（ランキング項目⑤用）
       if (!Array.isArray(liveHistory)) liveHistory = [];
