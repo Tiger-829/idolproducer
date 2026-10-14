@@ -2264,28 +2264,21 @@ function openPlanningManual() {
   if (typeof syncGameCalendar === 'function') syncGameCalendar();
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
   const planningDate = getGameDateObject();
-
-  // ① 7月・1月の第1水曜日に計画策定トリガーをセット
   if (isFirstWednesdayOfMonth(planningDate)
     && (planningDate.getMonth() === 0 || planningDate.getMonth() === 6)) {
     planningPromptWeekKey = gameDate;
   }
-
-  // ② 7月〜12月のとき：翌年の上半期（翌年1〜6月）を策定
-  if (currentMonth >= 7 && currentMonth <= 12) {
-    const nextYear = targetYear + 1;
+  if (currentMonth >= 7) {
     try {
-      if (!hasRivalScheduleInRange(nextYear, 1)
+      if (!hasRivalScheduleInRange(targetYear + 1, 1)
           && typeof generateRivalsAndGeneralSchedule === 'function') {
-        generateRivalsAndGeneralSchedule(nextYear, 1, false);
+        generateRivalsAndGeneralSchedule(targetYear + 1, 1, false);
       }
     } catch (e) {
       console.warn('Rival schedule generation warning (Next Jan-Jun):', e);
     }
-    openDecisionModal(`${nextYear}年上半期（1〜6月）の計画策定`, nextYear, 1, 6);
-  } 
-  // ③ 1月〜6月のとき：当年の下半期（当年7〜12月）を策定
-  else {
+    openDecisionModal(`${targetYear + 1}年上半期（1〜6月）の計画策定`, targetYear + 1, 1, 6);
+  } else {
     try {
       if (!hasRivalScheduleInRange(targetYear, 7)
           && typeof generateRivalsAndGeneralSchedule === 'function') {
@@ -2296,10 +2289,6 @@ function openPlanningManual() {
     }
     openDecisionModal(`${targetYear}年下半期（7〜12月）の計画策定`, targetYear, 7, 12);
   }
-}
-// Planningカレンダーを開く。
-function openPlanningCalendar() {
-  openPlanningManual();
 }
 
 // 枠概要を保存する。
