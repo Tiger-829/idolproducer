@@ -364,7 +364,7 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(multiDayEventResult, true, 'Multi-day benefit events should deduct costs and report only on day one');
   console.log('PASS: multi-day benefit events report expenses only on the first day');
 
-  console.log('\n=== 10. Testing Live Goods Price (2400) and Goods Production Unit Cost (1200) ===');
+  console.log('\n=== 10. Testing Live Goods Price (2400) and Goods Production Unit Cost (1350) ===');
   // 10-1: Live goods unit price is 2400 in sellMerchandiseAtLive
   run(`
     merchandiseProducts = 2;
@@ -379,7 +379,7 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run('eventMerchandiseStock'), 50, 'Event stock should remain untouched during live sales');
   console.log(`PASS: sellMerchandiseAtLive uses live goods price 2400 yen (${liveGoodsResult.unitsSold} units -> ${liveGoodsResult.revenue} yen) and only draws from live stock`);
 
-  // 10-2: Goods production cost is 1200 yen per unit and splits 3:2
+  // 10-2: Goods production cost is 1350 yen per unit and splits 4:1
   run(`
     funds = 1;
     liveMerchandiseStock = 0;
@@ -389,9 +389,9 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   `);
   const activeCount = run(`(Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length`);
   const expectedUnits = activeCount * 1 * 100;
-  const expectedLiveUnits = Math.round(expectedUnits * 3 / 5);
+  const expectedLiveUnits = Math.round(expectedUnits * 4 / 5);
   const expectedEventUnits = expectedUnits - expectedLiveUnits;
-  const expectedCost = 1200 * expectedUnits;
+  const expectedCost = 1350 * expectedUnits;
   const prodLog = run(`applyOfficeAction('goods-production')`);
   assert.strictEqual(run('liveMerchandiseStock'), expectedLiveUnits, `Live stock should increase by ${expectedLiveUnits}`);
   assert.strictEqual(run('eventMerchandiseStock'), expectedEventUnits, `Event stock should increase by ${expectedEventUnits}`);
@@ -401,7 +401,7 @@ console.log('\n=== 6. Testing CD Produce modal and Track Random Buttons ===');
   assert.strictEqual(run(`monthlyLedger.expense.at(-1).settled`), false, 'Production cost should remain unsettled until month end');
   assert(prodLog.includes(expectedLiveUnits.toLocaleString()) && prodLog.includes(expectedEventUnits.toLocaleString())
     && prodLog.includes('月末引き落とし'), `Log should show production and month-end debit: ${prodLog}`);
-  console.log(`PASS: Goods production produces ${expectedUnits} units (live: ${expectedLiveUnits}, event: ${expectedEventUnits}) at 1,200 yen/unit (total cost: ${expectedCost} yen)`);
+  console.log(`PASS: Goods production produces ${expectedUnits} units (live: ${expectedLiveUnits}, event: ${expectedEventUnits}) at 1,350 yen/unit (total cost: ${expectedCost} yen)`);
 
   // 10-3: UI card rendering in group tab
   run(`renderGroupTab();`);

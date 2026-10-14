@@ -31,7 +31,7 @@ function syncMerchandiseStock() {
       liveMerchandiseStock = 0;
       eventMerchandiseStock = 0;
     } else if (liveMerchandiseStock === 0 && eventMerchandiseStock === 0) {
-      liveMerchandiseStock = Math.round(merchandiseStock * 3 / 5);
+      liveMerchandiseStock = Math.round(merchandiseStock * 4 / 5);
       eventMerchandiseStock = merchandiseStock - liveMerchandiseStock;
     } else {
       merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
@@ -871,7 +871,7 @@ function applySavedGameBase(data) {
   draftCount = data.draftCount || 0;
   merchandiseProducts = data.merchandiseProducts || 0;
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
-  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 3 / 5);
+  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 4 / 5);
   eventMerchandiseStock = data.eventMerchandiseStock ?? (merchandiseStock - liveMerchandiseStock);
   merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;

@@ -434,7 +434,7 @@ function applySavedGame(data) {
   draftCount = data.draftCount || 0;
   merchandiseProducts = data.merchandiseProducts || 0;
   merchandiseStock = data.merchandiseStock ?? merchandiseProducts * 2000;
-  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 3 / 5);
+  liveMerchandiseStock = data.liveMerchandiseStock ?? Math.round(merchandiseStock * 4 / 5);
   eventMerchandiseStock = data.eventMerchandiseStock ?? (merchandiseStock - liveMerchandiseStock);
   merchandiseStock = liveMerchandiseStock + eventMerchandiseStock;
   merchandiseUnitsSold = data.merchandiseUnitsSold || 0;

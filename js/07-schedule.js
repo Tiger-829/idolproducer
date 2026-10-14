@@ -1736,12 +1736,12 @@ function applyOfficeAction(actionId) {
   if (actionId === 'goods-production') {
     const activeMembersCount = (Array.isArray(idolRoster) ? idolRoster : []).filter(m => m && !m.injury).length;
     const currentProdTypes = typeof merchandiseProducts !== 'undefined' ? merchandiseProducts : 0;
-    const unitCost = typeof MERCHANDISE_PRODUCTION_UNIT_COST !== 'undefined' ? MERCHANDISE_PRODUCTION_UNIT_COST : 1200;
+    const unitCost = typeof MERCHANDISE_PRODUCTION_UNIT_COST !== 'undefined' ? MERCHANDISE_PRODUCTION_UNIT_COST : 1350;
     const unitsProduced = activeMembersCount * Math.max(1, currentProdTypes) * 100;
     const productionCost = unitCost * unitsProduced;
 
     if (typeof syncMerchandiseStock === 'function') syncMerchandiseStock();
-    const liveUnitsProduced = Math.round(unitsProduced * 3 / 5);
+    const liveUnitsProduced = Math.round(unitsProduced * 4 / 5);
     const eventUnitsProduced = unitsProduced - liveUnitsProduced;
 
     liveMerchandiseStock = (typeof liveMerchandiseStock !== 'undefined' ? liveMerchandiseStock : 0) + liveUnitsProduced;
