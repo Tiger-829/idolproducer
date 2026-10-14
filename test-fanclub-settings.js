@@ -15,6 +15,7 @@ const dom = new JSDOM(loadGameHtml(__dirname), {
 });
 const { window } = dom;
 window.alert = () => {};
+window.eval('calculateGroupFans = () => 10000;');
 
 const year = new Date().getFullYear() + 1;
 window.eval(`applySavedGameBase(${JSON.stringify({
@@ -33,12 +34,26 @@ assert.strictEqual(window.document.getElementById('fanclub-modal').style.display
 window.document.getElementById('fanclub-name').value = '星空ファンクラブ';
 window.document.getElementById('fanclub-fee').value = '2500';
 window.document.querySelector('input[name="fanclub-benefit"][value="both"]').checked = true;
+window.eval('updateFanClubPreview()');
+const preview = window.document.getElementById('fanclub-preview').textContent;
+assert(preview.includes('変更後の1人当たり収支: 1,000円/月'));
+assert(preview.includes('予想会員数: 1,075人'));
+assert(preview.includes('予想会員増加数: +975人'));
+assert(preview.includes('予想月収入: 269万円'));
+assert(preview.includes('予想月収入増加数: +254万円'));
+assert(window.eval('getFanClubMemberTarget(500, "both") > getFanClubMemberTarget(500, "none")'));
+assert(window.eval('getFanClubMemberTarget(2500, "both") < getFanClubMemberTarget(500, "both")'));
+window.document.querySelector('input[name="fanclub-benefit"][value="none"]').checked = true;
+window.document.querySelector('input[name="fanclub-benefit"][value="none"]').dispatchEvent(new window.Event('change', { bubbles: true }));
+assert(window.document.getElementById('fanclub-preview').textContent.includes('変更後の1人当たり収支: 2,500円/月'));
+window.document.querySelector('input[name="fanclub-benefit"][value="both"]').checked = true;
 window.eval('resolveFanClub()');
 assert.deepStrictEqual(
   JSON.parse(JSON.stringify(window.eval('[fanClub.name, fanClub.fee, fanClub.benefitId, fanClub.settingsVersion]'))),
   ['星空ファンクラブ', 2500, 'both', 2]
 );
 assert.strictEqual(window.eval('fanClubFoundedYear'), 1);
+assert.strictEqual(window.eval('fanClub.members'), 1075);
 
 window.eval(`
   fanClub.members = 2;

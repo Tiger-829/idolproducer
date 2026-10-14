@@ -356,15 +356,16 @@
         <input id="fanclub-name" type="text" maxlength="30" style="width:100%; margin-top:4px;">
       </label>
       <label for="fanclub-fee" style="font-size:12px;">月会費: <span id="fanclub-fee-value"></span>
-        <input id="fanclub-fee" type="range" min="500" max="10000" step="500" style="width:100%; display:block;" oninput="updateFanClubFeeDisplay()">
+        <input id="fanclub-fee" type="range" min="500" max="10000" step="500" style="width:100%; display:block;" oninput="updateFanClubPreview()">
       </label>
       <fieldset style="border:1px solid #ddd; border-radius:6px; padding:8px; font-size:12px;">
         <legend>特典</legend>
-        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="none"> ① なし</label>
-        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="lottery"> ② 先行抽選枠</label>
-        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="video"> ③ 限定動画の配信</label>
-        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="both"> ④ ②＋③</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="none" onchange="updateFanClubPreview()"> ① なし</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="lottery" onchange="updateFanClubPreview()"> ② 先行抽選枠</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="video" onchange="updateFanClubPreview()"> ③ 限定動画の配信</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="both" onchange="updateFanClubPreview()"> ④ ②＋③</label>
       </fieldset>
+      <div id="fanclub-preview" style="font-size:12px; line-height:1.8; background:#f6f7f9; border-radius:6px; padding:8px;"></div>
       <button class="main-btn" type="button" onclick="resolveFanClub()">設定を確定</button>
     </div>
   </div>

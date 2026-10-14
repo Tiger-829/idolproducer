@@ -260,10 +260,10 @@ function getPlanEventType(eventId, eventName = '') {
 }
 
 const FANCLUB_BENEFITS = {
-  none: { name: 'なし', monthlyCostPerMember: 0 },
-  lottery: { name: '先行抽選枠', monthlyCostPerMember: 500 },
-  video: { name: '限定動画の配信', monthlyCostPerMember: 1000 },
-  both: { name: '先行抽選枠・限定動画の配信', monthlyCostPerMember: 1500 }
+  none: { name: 'なし', monthlyCostPerMember: 0, memberAppeal: 0 },
+  lottery: { name: '先行抽選枠', monthlyCostPerMember: 500, memberAppeal: 0.03 },
+  video: { name: '限定動画の配信', monthlyCostPerMember: 1000, memberAppeal: 0.05 },
+  both: { name: '先行抽選枠・限定動画の配信', monthlyCostPerMember: 1500, memberAppeal: 0.08 }
 };
 
 function escapeFanClubText(value) {
@@ -280,8 +280,30 @@ function getFanClubBenefit(benefitId) {
   return FANCLUB_BENEFITS[benefitId] || FANCLUB_BENEFITS.none;
 }
 
-function getFanClubMemberTarget(fee) {
-  return Math.max(0, Math.round(calculateGroupFans() * (0.25 - fee / 20000)));
+function getFanClubMemberTarget(fee, benefitId = 'none') {
+  const benefit = getFanClubBenefit(benefitId);
+  const conversionRate = Math.max(0, 0.25 - fee / 20000 + benefit.memberAppeal);
+  return Math.max(0, Math.round(calculateGroupFans() * conversionRate));
+}
+
+function getFanClubEstimate(fee, benefitId) {
+  const targetMembers = getFanClubMemberTarget(fee, benefitId);
+  const currentMembers = Number(fanClub?.members) || 0;
+  const expectedMembers = fanClub
+    ? Math.round(currentMembers * 0.5 + targetMembers * 0.5)
+    : targetMembers;
+  const currentMonthlyIncome = currentMembers * (Number(fanClub?.fee) || 0);
+  const expectedMonthlyIncome = expectedMembers * fee;
+  const expectedPerMemberBalance = fee - getFanClubBenefit(benefitId).monthlyCostPerMember;
+  return {
+    currentMembers,
+    expectedMembers,
+    memberChange: expectedMembers - currentMembers,
+    currentMonthlyIncome,
+    expectedMonthlyIncome,
+    monthlyIncomeChange: expectedMonthlyIncome - currentMonthlyIncome,
+    expectedPerMemberBalance
+  };
 }
 
 function openFanClubModal() {
@@ -303,7 +325,7 @@ function openFanClubModal() {
   document.querySelectorAll('input[name="fanclub-benefit"]').forEach(input => {
     input.checked = input.value === benefitId;
   });
-  updateFanClubFeeDisplay();
+  updateFanClubPreview();
   document.getElementById('fanclub-decline')?.remove();
   if (isFounding) {
     const declineButton = document.createElement('button');
@@ -320,6 +342,33 @@ function openFanClubModal() {
 function updateFanClubFeeDisplay() {
   const fee = Number(document.getElementById('fanclub-fee').value);
   document.getElementById('fanclub-fee-value').textContent = `${formatMoney(fee)}/月`;
+}
+
+function formatFanClubMemberChange(value) {
+  if (value === 0) return '±0人';
+  return `${value > 0 ? '+' : '-'}${Math.abs(value).toLocaleString()}人`;
+}
+
+function formatFanClubMoneyChange(value) {
+  if (value === 0) return '±0円';
+  return `${value > 0 ? '+' : '-'}${formatMoney(Math.abs(value))}`;
+}
+
+function updateFanClubPreview() {
+  const feeInput = document.getElementById('fanclub-fee');
+  const preview = document.getElementById('fanclub-preview');
+  if (!feeInput || !preview) return;
+  updateFanClubFeeDisplay();
+  const fee = Number(feeInput.value);
+  const benefitId = document.querySelector('input[name="fanclub-benefit"]:checked')?.value || 'none';
+  const estimate = getFanClubEstimate(fee, benefitId);
+  preview.innerHTML = [
+    `変更後の1人当たり収支: <strong>${formatMoney(estimate.expectedPerMemberBalance)}/月</strong>`,
+    `予想会員数: <strong>${estimate.expectedMembers.toLocaleString()}人</strong>`,
+    `予想会員増加数: <strong>${formatFanClubMemberChange(estimate.memberChange)}</strong>`,
+    `予想月収入: <strong>${formatMoney(estimate.expectedMonthlyIncome)}</strong>`,
+    `予想月収入増加数: <strong>${formatFanClubMoneyChange(estimate.monthlyIncomeChange)}</strong>`
+  ].map(line => `<div>${line}</div>`).join('');
 }
 
 function getFanClubStatusText() {
@@ -354,8 +403,7 @@ function resolveFanClub(tierIndex) {
     const isNew = !fanClub;
     const previousFee = fanClub ? fanClub.fee : 0;
     const previousMembers = fanClub ? fanClub.members : 0;
-    const target = getFanClubMemberTarget(fee);
-    const members = isNew ? target : Math.round(previousMembers * 0.5 + target * 0.5);
+    const members = getFanClubEstimate(fee, benefitId).expectedMembers;
     const previousName = fanClub?.name || 'ファンクラブ';
     fanClub = { name, fee, benefitId, members, settingsVersion: 2 };
     if (event.type !== 'migration') fanClubFoundedYear = currentYear;
