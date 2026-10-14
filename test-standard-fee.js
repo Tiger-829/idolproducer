@@ -326,6 +326,39 @@ const protectedScheduleChange = run(`
 `);
 check('180日以内の確定済み予定はカレンダー操作と通常保存から変更できない', protectedScheduleChange);
 
+const protectedScheduleAddition = run(`
+  (() => {
+    const now = getGameDateObject();
+    const newDate = new Date(now.getTime() + 120 * 86400000).toISOString().slice(0, 10);
+    const month = Number(newDate.slice(5, 7));
+    const yearTarget = currentYear + Number(newDate.slice(0, 4)) - calendarYear;
+    const planKey = yearTarget + '-' + month;
+    const previousPlan = productionSchedule[planKey];
+    const previousAlert = alert;
+    const alerts = [];
+    try {
+      delete productionSchedule[planKey];
+      openDecisionModal('新規日程ロック検証', yearTarget, month, month);
+      planCalendarSelections[month] = [newDate];
+      window.alert = message => alerts.push(message);
+      applyScheduleAction(month, 'release');
+
+      document.getElementById('sel-rel-' + month).value = 'single';
+      document.getElementById('rel-date-' + month).value = newDate;
+      saveDecisionPlan();
+      return productionSchedule[planKey] === undefined
+        && document.getElementById('decision-modal').style.display === 'flex'
+        && alerts.filter(message => message.includes('180日）')).length >= 2;
+    } finally {
+      window.alert = previousAlert;
+      closeDecisionModal();
+      if (previousPlan === undefined) delete productionSchedule[planKey];
+      else productionSchedule[planKey] = previousPlan;
+    }
+  })()
+`);
+check('180日以内の新規日程はカレンダー操作と保存の両方で追加できない', protectedScheduleAddition);
+
 const authorizedScheduleChange = run(`
   (() => {
     const now = getGameDateObject();

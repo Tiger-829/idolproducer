@@ -1120,7 +1120,13 @@ function hasProtectedPlanDateChange(previousPlan, nextPlan) {
   const changedDates = (previous, next, kind) => {
     const previousDates = getScheduledDates(previous, kind);
     const nextDates = getScheduledDates(next, kind);
-    return previousDates.join('|') !== nextDates.join('|') && hasProtectedDate(previousDates);
+    const previousSet = new Set(previousDates);
+    const nextSet = new Set(nextDates);
+    const changedProtectedDates = [
+      ...previousDates.filter(date => !nextSet.has(date)),
+      ...nextDates.filter(date => !previousSet.has(date))
+    ];
+    return hasProtectedDate(changedProtectedDates);
   };
 
   if (changedDates(previousPlan, nextPlan, 'release')) return true;
@@ -1128,13 +1134,13 @@ function hasProtectedPlanDateChange(previousPlan, nextPlan) {
 
   const oldLives = Array.isArray(previousPlan?.additionalLives) ? previousPlan.additionalLives : [];
   const newLives = Array.isArray(nextPlan?.additionalLives) ? nextPlan.additionalLives : [];
-  for (let i = 0; i < oldLives.length; i++) {
+  for (let i = 0; i < Math.max(oldLives.length, newLives.length); i++) {
     if (changedDates(oldLives[i], newLives[i], 'live')) return true;
   }
 
   const oldEvents = Array.isArray(previousPlan?.planEvents) ? previousPlan.planEvents : [];
   const newEvents = Array.isArray(nextPlan?.planEvents) ? nextPlan.planEvents : [];
-  for (let i = 0; i < oldEvents.length; i++) {
+  for (let i = 0; i < Math.max(oldEvents.length, newEvents.length); i++) {
     if (changedDates(oldEvents[i], newEvents[i], 'event')) return true;
   }
   return false;
@@ -1163,18 +1169,11 @@ function applyScheduleAction(month, actionType) {
 
   let targetDates = [...selections];
   const planKey = `${planYearTarget}-${month}`;
-  const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) || {};
-  const protectedDates = [
-    ...getScheduledDates(existingPlan, 'release'),
-    ...getScheduledDates(existingPlan, 'live'),
-    ...(Array.isArray(existingPlan.additionalLives) ? existingPlan.additionalLives : []).flatMap(live => getScheduledDates(live, 'live')),
-    ...(Array.isArray(existingPlan.planEvents) ? existingPlan.planEvents : []).flatMap(event => getScheduledDates(event, 'event'))
-  ];
   if (planAuthorizedChangeKey !== planKey && targetDates.some(date => {
     const diffDays = Math.round((new Date(`${date}T12:00:00`) - currentGameDate) / 86400000);
-    return diffDays >= 0 && diffDays <= 180 && protectedDates.includes(date);
+    return diffDays >= 0 && diffDays <= 180;
   })) {
-    alert('半年（180日）以内の確定済み日程はカレンダーから変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
+    alert('半年（180日）以内の日程はカレンダーから追加・変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
     return;
   }
 
@@ -2141,7 +2140,7 @@ function saveDecisionPlan() {
     };
 
     if (planAuthorizedChangeKey !== planKey && hasProtectedPlanDateChange(previousPlan, plan)) {
-      alert('半年（180日）以内の確定済み日程は直接変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
+      alert('半年（180日）以内の日程は直接追加・変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
       return;
     }
 
