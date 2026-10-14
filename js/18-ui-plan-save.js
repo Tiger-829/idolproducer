@@ -7,6 +7,7 @@ let planStartM = 1;
 let planEndM = 6;
 let planAllowPastMonths = false;
 let planIsAddMode = false;
+let planAuthorizedChangeKey = '';
 let planMonthEventDrafts = {};
 let planMultiSelectModes = {}; 
 let planCalendarSelections = {}; 
@@ -562,7 +563,7 @@ function renderLiveSlotHtml(month, index, slot) {
             <select id="live-participants-${month}-${index}" style="width:100%; padding:5px; font-size:11px; margin-top:3px;">
               <option value="all" ${participantType === 'all' ? 'selected' : ''}>全員</option>
               <option value="senbatsu" ${participantType === 'senbatsu' ? 'selected' : ''}>選抜</option>
-              <option value="under" ${participantType === 'under' ? 'selected' : ''}>選抜外（経験値3倍）</option>
+              <option value="under" ${participantType === 'under' ? 'selected' : ''}>選抜外</option>
             </select>
           </label>
           <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
@@ -1088,6 +1089,57 @@ function validateChangeOrCancel(targetDateStr) {
   return true;
 }
 
+function getScheduledDates(plan, kind) {
+  if (!plan) return [];
+  if (kind === 'release') {
+    return plan.release && plan.release !== 'none'
+      ? [plan.releaseDate].filter(Boolean)
+      : [];
+  }
+  if (kind === 'live') {
+    const dates = Array.isArray(plan.liveDates) ? plan.liveDates : [];
+    return [...new Set(dates.length ? dates : [plan.liveDate].filter(Boolean))].sort();
+  }
+  if (kind === 'event') {
+    const dates = Array.isArray(plan.dates) ? plan.dates : [];
+    const sessionDates = Array.isArray(plan.sessions)
+      ? plan.sessions.flatMap(session => Array.isArray(session?.dates) ? session.dates : [session?.date].filter(Boolean))
+      : [];
+    return [...new Set([...dates, ...sessionDates, plan.date].filter(Boolean))].sort();
+  }
+  return [];
+}
+
+function hasProtectedPlanDateChange(previousPlan, nextPlan) {
+  const now = getGameDateObject();
+  const hasProtectedDate = dates => dates.some(date => {
+    const dateObj = new Date(`${date}T12:00:00`);
+    const diffDays = Math.round((dateObj - now) / 86400000);
+    return diffDays >= 0 && diffDays <= 180;
+  });
+  const changedDates = (previous, next, kind) => {
+    const previousDates = getScheduledDates(previous, kind);
+    const nextDates = getScheduledDates(next, kind);
+    return previousDates.join('|') !== nextDates.join('|') && hasProtectedDate(previousDates);
+  };
+
+  if (changedDates(previousPlan, nextPlan, 'release')) return true;
+  if (changedDates(previousPlan, nextPlan, 'live')) return true;
+
+  const oldLives = Array.isArray(previousPlan?.additionalLives) ? previousPlan.additionalLives : [];
+  const newLives = Array.isArray(nextPlan?.additionalLives) ? nextPlan.additionalLives : [];
+  for (let i = 0; i < oldLives.length; i++) {
+    if (changedDates(oldLives[i], newLives[i], 'live')) return true;
+  }
+
+  const oldEvents = Array.isArray(previousPlan?.planEvents) ? previousPlan.planEvents : [];
+  const newEvents = Array.isArray(nextPlan?.planEvents) ? nextPlan.planEvents : [];
+  for (let i = 0; i < oldEvents.length; i++) {
+    if (changedDates(oldEvents[i], newEvents[i], 'event')) return true;
+  }
+  return false;
+}
+
 // スケジュールActionを適用
 function applyScheduleAction(month, actionType) {
   const actualYear = getPlanActualYear();
@@ -1110,6 +1162,21 @@ function applyScheduleAction(month, actionType) {
   }
 
   let targetDates = [...selections];
+  const planKey = `${planYearTarget}-${month}`;
+  const existingPlan = (typeof productionSchedule !== 'undefined' && productionSchedule[planKey]) || {};
+  const protectedDates = [
+    ...getScheduledDates(existingPlan, 'release'),
+    ...getScheduledDates(existingPlan, 'live'),
+    ...(Array.isArray(existingPlan.additionalLives) ? existingPlan.additionalLives : []).flatMap(live => getScheduledDates(live, 'live')),
+    ...(Array.isArray(existingPlan.planEvents) ? existingPlan.planEvents : []).flatMap(event => getScheduledDates(event, 'event'))
+  ];
+  if (planAuthorizedChangeKey !== planKey && targetDates.some(date => {
+    const diffDays = Math.round((new Date(`${date}T12:00:00`) - currentGameDate) / 86400000);
+    return diffDays >= 0 && diffDays <= 180 && protectedDates.includes(date);
+  })) {
+    alert('半年（180日）以内の確定済み日程はカレンダーから変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
+    return;
+  }
 
   for (const d of targetDates) {
     if (actionType === 'delete' || actionType === 'release' || actionType === 'live') {
@@ -1463,9 +1530,12 @@ function requestModifyExistingPlan(pKey, targetDateStr, month, standardCost = 0)
   if (addFee > 0) {
     if (typeof recordMonthlyExpense === 'function') recordMonthlyExpense('予定変更手数料', addFee);
   }
+  const keyParts = String(pKey).split('-').map(Number);
+  const editYear = Number.isInteger(keyParts[0]) ? keyParts[0] : planYearTarget;
+  const editMonth = Number.isInteger(keyParts[1]) && keyParts[1] >= 1 && keyParts[1] <= 12 ? keyParts[1] : month;
   closeModifyExistingPlansModal();
   closeDecisionModal();
-  openDecisionModal(`予定の変更・再調整`, planYearTarget, month, month);
+  openDecisionModal(`予定の変更・再調整`, editYear, editMonth, editMonth, false, false, pKey);
   setLog(`【予定変更】 ${pKey} の変更手続きを受け付けました。${addFee > 0 ? `（手数料 ${formatMoney(addFee)} は月末に引き落とし）` : ''}`);
 }
 
@@ -1532,13 +1602,14 @@ function openAddPlanForMonth(yearTarget, month) {
 // Decisionモーダルを開く。
 // allowPastMonths=true のときは、現在月より前の月も編集対象とする（当月〜3か月前への予定追加用）。
 // isAddMode=true のときは「予定の追加」モード。保存時に通常会費の1.2倍の追加料を計上する。
-function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false, isAddMode = false) {
+function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = false, isAddMode = false, authorizedChangeKey = '') {
   try {
     planYearTarget = yearTarget;
     planStartM = startM;
     planEndM = endM;
     planAllowPastMonths = allowPastMonths;
     planIsAddMode = isAddMode;
+    planAuthorizedChangeKey = authorizedChangeKey;
     planMonthEventDrafts = {};
     planMultiSelectModes = {};
     planCalendarSelections = {};
@@ -2069,6 +2140,11 @@ function saveDecisionPlan() {
       }))
     };
 
+    if (planAuthorizedChangeKey !== planKey && hasProtectedPlanDateChange(previousPlan, plan)) {
+      alert('半年（180日）以内の確定済み日程は直接変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');
+      return;
+    }
+
     if (primary) plan.liveCompleted = previousPlan.liveCompleted || false;
     if (typeof productionSchedule !== 'undefined') {
       productionSchedule[planKey] = plan;
@@ -2107,6 +2183,7 @@ function saveDecisionPlan() {
     setLog(`【計画確定】${planYearTarget}年${planStartM}月〜${planEndM}月の活動方針を決定しました。`);
   }
   planIsAddMode = false;
+  planAuthorizedChangeKey = '';
 
   if (typeof updateUI === 'function') {
     updateUI();
@@ -2114,6 +2191,25 @@ function saveDecisionPlan() {
 }
 
 // Planningマニュアルを開く。
+function hasRivalScheduleInRange(year, startMonth, monthCount = 6) {
+  const actualYear = typeof calendarYear !== 'undefined'
+    ? calendarYear + (year - currentYear)
+    : year;
+  const monthKeys = new Set(Array.from({ length: monthCount }, (_, index) => {
+    const monthIndex = startMonth - 1 + index;
+    return `${actualYear + Math.floor(monthIndex / 12)}-${(monthIndex % 12) + 1}`;
+  }));
+  return Array.isArray(rivalLiveBookings) && rivalLiveBookings.some(booking => {
+    const dates = Array.isArray(booking.venueDates) && booking.venueDates.length
+      ? booking.venueDates
+      : [booking.liveDate];
+    return dates.some(date => {
+      const [bookingYear, bookingMonth] = String(date || '').split('-').map(Number);
+      return monthKeys.has(`${bookingYear}-${bookingMonth}`);
+    });
+  });
+}
+
 function openPlanningManual() {
   if (typeof syncGameCalendar === 'function') syncGameCalendar();
   const targetYear = typeof currentYear !== 'undefined' ? currentYear : 1;
@@ -2124,7 +2220,8 @@ function openPlanningManual() {
   }
   if (currentMonth >= 1 && currentMonth <= 8) {
     try {
-      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      if (!hasRivalScheduleInRange(targetYear, 7)
+          && typeof generateRivalsAndGeneralSchedule === 'function') {
         generateRivalsAndGeneralSchedule(targetYear, 7, false);
       }
     } catch (e) {
@@ -2133,7 +2230,8 @@ function openPlanningManual() {
     openDecisionModal(`${targetYear}年下半期（7〜12月）の計画策定`, targetYear, 7, 12);
   } else {
     try {
-      if (typeof generateRivalsAndGeneralSchedule === 'function') {
+      if (!hasRivalScheduleInRange(targetYear + 1, 1)
+          && typeof generateRivalsAndGeneralSchedule === 'function') {
         generateRivalsAndGeneralSchedule(targetYear + 1, 1, false);
       }
     } catch (e) {

@@ -288,6 +288,71 @@ check('変更手数料20Mは月末引き落としに計上', changeFee.before ==
   && changeFee.expense.label === '予定変更手数料' && changeFee.expense.amount === 20000000
   && changeFee.expense.settled === false, `amount ${changeFee.expense.amount}`);
 
+const protectedScheduleChange = run(`
+  (() => {
+    const now = getGameDateObject();
+    const protectedDate = new Date(now.getTime() + 120 * 86400000).toISOString().slice(0, 10);
+    const replacementDate = new Date(now.getTime() + 121 * 86400000).toISOString().slice(0, 10);
+    const actualYear = Number(protectedDate.slice(0, 4));
+    const month = Number(protectedDate.slice(5, 7));
+    const yearTarget = currentYear + actualYear - calendarYear;
+    const planKey = yearTarget + '-' + month;
+    const previousPlan = productionSchedule[planKey];
+    const previousAuthKey = planAuthorizedChangeKey;
+    const previousAlert = alert;
+    const alerts = [];
+    try {
+      productionSchedule[planKey] = { release: 'single', releaseDate: protectedDate };
+      openDecisionModal('ロック検証', yearTarget, month, month);
+      planCalendarSelections[month] = [protectedDate];
+      applyScheduleAction(month, 'delete');
+      const calendarDeletionBlocked = planCalendarSelections[month]?.[0] === protectedDate
+        && productionSchedule[planKey].releaseDate === protectedDate;
+      document.getElementById('rel-date-' + month).value = replacementDate;
+      window.alert = message => alerts.push(message);
+      saveDecisionPlan();
+      return calendarDeletionBlocked
+        && productionSchedule[planKey].releaseDate === protectedDate
+        && document.getElementById('decision-modal').style.display === 'flex'
+        && alerts.some(message => message.includes('半年（180日）以内'));
+    } finally {
+      window.alert = previousAlert;
+      closeDecisionModal();
+      planAuthorizedChangeKey = previousAuthKey;
+      if (previousPlan === undefined) delete productionSchedule[planKey];
+      else productionSchedule[planKey] = previousPlan;
+    }
+  })()
+`);
+check('180日以内の確定済み予定はカレンダー操作と通常保存から変更できない', protectedScheduleChange);
+
+const authorizedScheduleChange = run(`
+  (() => {
+    const now = getGameDateObject();
+    const originalDate = new Date(now.getTime() + 120 * 86400000).toISOString().slice(0, 10);
+    const replacementDate = new Date(now.getTime() + 121 * 86400000).toISOString().slice(0, 10);
+    const month = Number(originalDate.slice(5, 7));
+    const yearTarget = currentYear + Number(originalDate.slice(0, 4)) - calendarYear;
+    const planKey = yearTarget + '-' + month;
+    const previousPlan = productionSchedule[planKey];
+    const previousAuthKey = planAuthorizedChangeKey;
+    try {
+      productionSchedule[planKey] = { release: 'single', releaseDate: originalDate };
+      requestModifyExistingPlan(planKey, originalDate, month, 0);
+      document.getElementById('rel-date-' + month).value = replacementDate;
+      saveDecisionPlan();
+      return planAuthorizedChangeKey === ''
+        && productionSchedule[planKey].releaseDate === replacementDate;
+    } finally {
+      closeDecisionModal();
+      planAuthorizedChangeKey = previousAuthKey;
+      if (previousPlan === undefined) delete productionSchedule[planKey];
+      else productionSchedule[planKey] = previousPlan;
+    }
+  })()
+`);
+check('変更手続きで認可された予定は180日以内でも変更できる', authorizedScheduleChange);
+
 // --- 5. 取消キャンセル料（3ヶ月〜1ヶ月前＝50%）---
 const cancelFee = run(`
   (() => {

@@ -844,7 +844,8 @@ check('live participant setting defaults to all and is restored for planned live
     && under[0].participantType === 'under'
     && under[1].participantType === 'senbatsu'
     && html.includes('<option value="all" selected>全員</option>')
-    && html.includes('選抜外（経験値3倍）');
+    && html.includes('value="under"')
+    && html.includes('>選抜外</option>');
 })()`) === true);
 check('selected live participant mode is captured from the planning form', run(`(() => {
   const venue = VENUE_DATA[0];

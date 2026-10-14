@@ -351,7 +351,60 @@ check('regenerating one half-year retains rival bookings from the other half', r
     }
   })()
 `) === true);
-check('second-year rival and dummy bookings use the current calendar year', run(`
+  check('reopening the half-year planning modal keeps rival schedules unchanged', run(`
+    (() => {
+      const saved = {
+        currentYear, currentMonth, gameDate, calendarYear, leagueTeams, rivalLiveBookings,
+        productionSchedule, generator: generateRivalsAndGeneralSchedule,
+        planYearTarget, planStartM, planEndM, planAllowPastMonths, planIsAddMode,
+        planMonthEventDrafts, planMultiSelectModes, planCalendarSelections
+      };
+      try {
+        currentYear = 1;
+        currentMonth = 3;
+        gameDate = '2026-03-04';
+        calendarYear = 2026;
+        leagueTeams = [];
+        const booking = {
+          groupId: 'rival_test', venue: '市民会館', liveDate: '2026-07-15',
+          venueDates: ['2026-07-15']
+        };
+        rivalLiveBookings = [booking];
+        let generationCalls = 0;
+        generateRivalsAndGeneralSchedule = () => { generationCalls += 1; };
+
+        openPlanningManual();
+        closeDecisionModal();
+        const firstOpenBookings = rivalLiveBookings;
+        openPlanningManual();
+        closeDecisionModal();
+
+        return generationCalls === 0
+          && rivalLiveBookings === firstOpenBookings
+          && rivalLiveBookings.length === 1
+          && rivalLiveBookings[0] === booking;
+      } finally {
+        closeDecisionModal();
+        currentYear = saved.currentYear;
+        currentMonth = saved.currentMonth;
+        gameDate = saved.gameDate;
+        calendarYear = saved.calendarYear;
+        leagueTeams = saved.leagueTeams;
+        rivalLiveBookings = saved.rivalLiveBookings;
+        productionSchedule = saved.productionSchedule;
+        generateRivalsAndGeneralSchedule = saved.generator;
+        planYearTarget = saved.planYearTarget;
+        planStartM = saved.planStartM;
+        planEndM = saved.planEndM;
+        planAllowPastMonths = saved.planAllowPastMonths;
+        planIsAddMode = saved.planIsAddMode;
+        planMonthEventDrafts = saved.planMonthEventDrafts;
+        planMultiSelectModes = saved.planMultiSelectModes;
+        planCalendarSelections = saved.planCalendarSelections;
+      }
+    })()
+  `) === true);
+  check('second-year rival and dummy bookings use the current calendar year', run(`
   (() => {
     const saved = { currentYear, calendarYear, leagueTeams, rivalLiveBookings };
     try {
@@ -1663,7 +1716,8 @@ check('the live slot does not reveal audience in advance', run(`
   !html.includes('動員') && !html.includes(predicted)
     && html.includes('id="live-participants-1-0"')
     && html.includes('<option value="all" selected>全員</option>')
-    && html.includes('選抜外（経験値3倍）')
+    && html.includes('value="under"')
+    && html.includes('>選抜外</option>')
 `) === true);
 
 // ---- ファンバーは細目になった ----
