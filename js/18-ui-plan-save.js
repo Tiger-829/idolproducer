@@ -1146,6 +1146,51 @@ function hasProtectedPlanDateChange(previousPlan, nextPlan) {
   return false;
 }
 
+function hasProtectedPlanAddition(previousPlan, nextPlan) {
+  const now = getGameDateObject();
+  const hasProtectedDate = dates => dates.some(date => {
+    const diffDays = Math.round((new Date(`${date}T12:00:00`) - now) / 86400000);
+    return diffDays >= 0 && diffDays <= 180;
+  });
+  const hasMoreDates = (previous, next, kind) => {
+    const previousDates = getScheduledDates(previous, kind);
+    const nextDates = getScheduledDates(next, kind);
+    return nextDates.length > previousDates.length && hasProtectedDate(nextDates);
+  };
+
+  if (hasMoreDates(previousPlan, nextPlan, 'release')) return true;
+  if (hasMoreDates(previousPlan, nextPlan, 'live')) return true;
+
+  const oldLives = Array.isArray(previousPlan?.additionalLives) ? previousPlan.additionalLives : [];
+  const newLives = Array.isArray(nextPlan?.additionalLives) ? nextPlan.additionalLives : [];
+  for (let i = 0; i < newLives.length; i++) {
+    if (i >= oldLives.length) {
+      if (hasProtectedDate(getScheduledDates(newLives[i], 'live'))) return true;
+    } else if (hasMoreDates(oldLives[i], newLives[i], 'live')) {
+      return true;
+    }
+  }
+
+  const oldEvents = Array.isArray(previousPlan?.planEvents) ? previousPlan.planEvents : [];
+  const newEvents = Array.isArray(nextPlan?.planEvents) ? nextPlan.planEvents : [];
+  for (let i = 0; i < newEvents.length; i++) {
+    const nextEventDates = getScheduledDates(newEvents[i], 'event');
+    if (i >= oldEvents.length) {
+      if (hasProtectedDate(nextEventDates)) return true;
+      continue;
+    }
+    if (hasMoreDates(oldEvents[i], newEvents[i], 'event')) return true;
+
+    const oldSessions = Array.isArray(oldEvents[i]?.sessions) ? oldEvents[i].sessions : [];
+    const newSessions = Array.isArray(newEvents[i]?.sessions) ? newEvents[i].sessions : [];
+    for (let j = oldSessions.length; j < newSessions.length; j++) {
+      const dates = Array.isArray(newSessions[j]?.dates) ? newSessions[j].dates : [newSessions[j]?.date].filter(Boolean);
+      if (hasProtectedDate(dates)) return true;
+    }
+  }
+  return false;
+}
+
 // スケジュールActionを適用
 function applyScheduleAction(month, actionType) {
   const actualYear = getPlanActualYear();
@@ -2138,6 +2183,11 @@ function saveDecisionPlan() {
         participantType: slot.participantType
       }))
     };
+
+    if (hasProtectedPlanAddition(previousPlan, plan)) {
+      alert('半年（180日）以内の日程は追加できません。既存予定の変更のみ「上記予定の変更／取消を行う」から手続きしてください。');
+      return;
+    }
 
     if (planAuthorizedChangeKey !== planKey && hasProtectedPlanDateChange(previousPlan, plan)) {
       alert('半年（180日）以内の日程は直接追加・変更できません。「上記予定の変更／取消を行う」から手続きをしてください。');

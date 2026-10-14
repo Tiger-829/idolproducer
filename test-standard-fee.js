@@ -386,6 +386,41 @@ const authorizedScheduleChange = run(`
 `);
 check('変更手続きで認可された予定は180日以内でも変更できる', authorizedScheduleChange);
 
+const authorizedPlanCannotAddSchedule = run(`
+  (() => {
+    const now = getGameDateObject();
+    const originalDate = new Date(now.getTime() + 120 * 86400000).toISOString().slice(0, 10);
+    const addedDate = new Date(now.getTime() + 122 * 86400000).toISOString().slice(0, 10);
+    const month = Number(originalDate.slice(5, 7));
+    const yearTarget = currentYear + Number(originalDate.slice(0, 4)) - calendarYear;
+    const planKey = yearTarget + '-' + month;
+    const previousPlan = productionSchedule[planKey];
+    const previousAlert = alert;
+    const alerts = [];
+    try {
+      productionSchedule[planKey] = { release: 'single', releaseDate: originalDate };
+      requestModifyExistingPlan(planKey, originalDate, month, 0);
+      addLiveSlot(month);
+      const venue = VENUE_DATA.find(item => !item.name.includes('球場') && !item.name.includes('ドーム'));
+      document.getElementById('sel-ven-' + month + '-0').value = venue.name;
+      onVenueSelectChange(month, 0);
+      addShowDate(month, 0);
+      document.querySelector('#show-dates-' + month + '-0 .show-date-input').value = addedDate;
+      window.alert = message => alerts.push(message);
+      saveDecisionPlan();
+      return productionSchedule[planKey].liveVenue !== venue.name
+        && document.getElementById('decision-modal').style.display === 'flex'
+        && alerts.some(message => message.includes('追加できません'));
+    } finally {
+      window.alert = previousAlert;
+      closeDecisionModal();
+      if (previousPlan === undefined) delete productionSchedule[planKey];
+      else productionSchedule[planKey] = previousPlan;
+    }
+  })()
+`);
+check('変更手続き中でも別のライブ日程は追加できない', authorizedPlanCannotAddSchedule);
+
 // --- 5. 取消キャンセル料（3ヶ月〜1ヶ月前＝50%）---
 const cancelFee = run(`
   (() => {
