@@ -41,6 +41,12 @@ function renderFundsTab() {
 
     setText('txt-year-sales', `${(yearlyStats?.sales || 0).toLocaleString()} 枚`);
     setText('txt-year-audience', `${(yearlyStats?.audience || 0).toLocaleString()} 人`);
+    setText(
+      'txt-fanclub',
+      fanClub
+        ? `${fanClub.name || 'ファンクラブ'}（${formatMoney(fanClub.fee)}/月・${Number(fanClub.members || 0).toLocaleString()}人）`
+        : '未設立'
+    );
 
     const streamEl = document.getElementById('txt-year-stream');
     if (streamEl && typeof formatMoney === 'function') {

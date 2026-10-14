@@ -259,14 +259,29 @@ function getPlanEventType(eventId, eventName = '') {
   return PLAN_EVENT_TYPES.find(type => type.id === eventId) || null;
 }
 
-const FANCLUB_TIERS = [
-  { id: 'light', name: 'ライト', fee: 500, benefit: 'デジタル会報の配信' },
-  { id: 'standard', name: 'スタンダード', fee: 1500, benefit: '会報と先行配信' },
-  { id: 'premium', name: 'プレミアム', fee: 3000, benefit: '会報・先行配信・握手会参加権' }
-];
+const FANCLUB_BENEFITS = {
+  none: { name: 'なし', monthlyCostPerMember: 0 },
+  lottery: { name: '先行抽選枠', monthlyCostPerMember: 500 },
+  video: { name: '限定動画の配信', monthlyCostPerMember: 1000 },
+  both: { name: '先行抽選枠・限定動画の配信', monthlyCostPerMember: 1500 }
+};
 
-function getFanClubMemberTarget(tier) {
-  return Math.max(0, Math.round(calculateGroupFans() * (0.25 - tier.fee / 20000)));
+function escapeFanClubText(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
+}
+
+function getFanClubBenefit(benefitId) {
+  return FANCLUB_BENEFITS[benefitId] || FANCLUB_BENEFITS.none;
+}
+
+function getFanClubMemberTarget(fee) {
+  return Math.max(0, Math.round(calculateGroupFans() * (0.25 - fee / 20000)));
 }
 
 function openFanClubModal() {
@@ -274,45 +289,79 @@ function openFanClubModal() {
   const event = pendingFanClubEvent;
   const isFounding = event.type === 'founding';
   const intro = isFounding
-    ? '2年目の幕開けです。応援団体（ファンクラブ）を設立するか決めてください。'
-    : 'ファンクラブの1年が経過しました。会費と特典を見直しましょう。';
+    ? currentYear === 2
+      ? '2年目の幕開けです。応援団体（ファンクラブ）を設立するか決めてください。'
+      : 'ファンクラブを設立するか決めてください。'
+    : event.type === 'migration'
+      ? 'ファンクラブの設定を更新してください。今回に限り、既存の設定を新しい項目に引き継げます。'
+      : 'ファンクラブの1年が経過しました。会費と特典を見直しましょう。';
   document.getElementById('fanclub-text').innerHTML =
     `<div style="margin-bottom:8px;">${intro}</div>${getFanClubStatusText()}`;
-  document.getElementById('fanclub-options').innerHTML = FANCLUB_TIERS.map((tier, index) => `
-    <button class="main-btn" type="button" style="text-align:left; padding:10px;" onclick="resolveFanClub(${index})">
-      <div style="font-size:13px;">${tier.name}（会費 ${formatMoney(tier.fee)}/月）</div>
-      <div style="font-size:10px; font-weight:normal; opacity:0.9; margin-top:2px;">特典: ${tier.benefit}${fanClub && fanClub.tierId === tier.id ? '（継続）' : ''}</div>
-    </button>`).join('')
-    + (isFounding ? '<button class="danger-btn" type="button" onclick="resolveFanClub(-1)">ファンクラブを設けない</button>' : '');
+  document.getElementById('fanclub-name').value = fanClub?.name || 'ファンクラブ';
+  document.getElementById('fanclub-fee').value = fanClub?.fee || 500;
+  const benefitId = FANCLUB_BENEFITS[fanClub?.benefitId] ? fanClub.benefitId : 'none';
+  document.querySelectorAll('input[name="fanclub-benefit"]').forEach(input => {
+    input.checked = input.value === benefitId;
+  });
+  updateFanClubFeeDisplay();
+  document.getElementById('fanclub-decline')?.remove();
+  if (isFounding) {
+    const declineButton = document.createElement('button');
+    declineButton.id = 'fanclub-decline';
+    declineButton.className = 'danger-btn';
+    declineButton.type = 'button';
+    declineButton.textContent = 'ファンクラブを設けない';
+    declineButton.onclick = () => resolveFanClub(-1);
+    document.getElementById('fanclub-options').appendChild(declineButton);
+  }
   document.getElementById('fanclub-modal').style.display = 'flex';
+}
+
+function updateFanClubFeeDisplay() {
+  const fee = Number(document.getElementById('fanclub-fee').value);
+  document.getElementById('fanclub-fee-value').textContent = `${formatMoney(fee)}/月`;
 }
 
 function getFanClubStatusText() {
   if (!fanClub) return '<div style="color:#777;">ファンクラブは未設立です</div>';
-  return `<div>現在の会費: <strong>${formatMoney(fanClub.fee)}/月</strong> / 会員数: <strong>${Number(fanClub.members || 0).toLocaleString()}人</strong> / 毎月の収入: <strong>${formatMoney(fanClub.members * fanClub.fee)}</strong></div>`;
+  const name = escapeFanClubText(fanClub.name || 'ファンクラブ');
+  const benefit = escapeFanClubText(getFanClubBenefit(fanClub.benefitId).name);
+  return `<div>現在の設定: <strong>${name}</strong> / 会費 <strong>${formatMoney(fanClub.fee)}/月</strong> / 特典 <strong>${benefit}</strong> / 会員数: <strong>${Number(fanClub.members || 0).toLocaleString()}人</strong> / 毎月の収入: <strong>${formatMoney(fanClub.members * fanClub.fee)}</strong></div>`;
 }
 
 function resolveFanClub(tierIndex) {
   if (!pendingFanClubEvent) return;
   const event = pendingFanClubEvent;
-  pendingFanClubEvent = null;
-  document.getElementById('fanclub-modal').style.display = 'none';
 
   if (tierIndex < 0) {
+    if (event.type !== 'founding') return;
+    pendingFanClubEvent = null;
+    document.getElementById('fanclub-modal').style.display = 'none';
     fanClub = null;
+    fanClubFoundedYear = currentYear;
     setLog('【ファンクラブ】設立を見送りました。');
   } else {
-    const tier = FANCLUB_TIERS[tierIndex];
+    const name = document.getElementById('fanclub-name').value.trim();
+    if (!name) {
+      document.getElementById('fanclub-name').focus();
+      return;
+    }
+    const fee = Number(document.getElementById('fanclub-fee').value);
+    const benefitId = document.querySelector('input[name="fanclub-benefit"]:checked')?.value;
+    if (!Number.isFinite(fee) || !FANCLUB_BENEFITS[benefitId]) return;
+    pendingFanClubEvent = null;
+    document.getElementById('fanclub-modal').style.display = 'none';
     const isNew = !fanClub;
     const previousFee = fanClub ? fanClub.fee : 0;
     const previousMembers = fanClub ? fanClub.members : 0;
-    const target = getFanClubMemberTarget(tier);
+    const target = getFanClubMemberTarget(fee);
     const members = isNew ? target : Math.round(previousMembers * 0.5 + target * 0.5);
-    fanClub = { tierId: tier.id, fee: tier.fee, members };
-    fanClubFoundedYear = currentYear;
+    const previousName = fanClub?.name || 'ファンクラブ';
+    fanClub = { name, fee, benefitId, members, settingsVersion: 2 };
+    if (event.type !== 'migration') fanClubFoundedYear = currentYear;
     setLog(isNew
-      ? `【ファンクラブ】${tier.name}プランで設立しました（会費 ${formatMoney(tier.fee)}/月 / 会員 ${members.toLocaleString()}人）。`
-      : `【ファンクラブ】会費を見直しました（${formatMoney(previousFee)} → ${formatMoney(tier.fee)}/月 / 会員 ${previousMembers.toLocaleString()} → ${members.toLocaleString()}人）。`);
+      ? `【ファンクラブ】${name}を設立しました（会費 ${formatMoney(fee)}/月 / 会員 ${members.toLocaleString()}人）。`
+      : `【ファンクラブ】設定を見直しました（${previousName} → ${name} / 会費 ${formatMoney(previousFee)} → ${formatMoney(fee)}/月 / 会員 ${previousMembers.toLocaleString()} → ${members.toLocaleString()}人）。`);
   }
   updateUI();
 }
@@ -320,8 +369,8 @@ function resolveFanClub(tierIndex) {
 function checkFanClubYearlyEvent() {
   if (pendingFanClubEvent) return;
   if (currentYear < 2) return;
-  const isFounding = !fanClub && fanClubFoundedYear === 0;
-  if (!isFounding && fanClubFoundedYear === currentYear) return;
+  if (fanClubFoundedYear === currentYear) return;
+  const isFounding = !fanClub;
   pendingFanClubEvent = {
     type: isFounding ? 'founding' : 'renewal',
     tierId: fanClub ? fanClub.tierId : null
@@ -333,6 +382,10 @@ function applyFanClubMonthlyIncome() {
   const income = fanClub.members * fanClub.fee;
   funds += income;
   yearlyStats.fanClubIncome = (yearlyStats.fanClubIncome || 0) + income;
+  const monthlyBenefitCost = fanClub.members * getFanClubBenefit(fanClub.benefitId).monthlyCostPerMember;
+  if (monthlyBenefitCost > 0) {
+    recordMonthlyExpense('ファンクラブ特典費', monthlyBenefitCost, `${fanClub.members.toLocaleString()}人分の特典提供費`);
+  }
   return income;
 }
 

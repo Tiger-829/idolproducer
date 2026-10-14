@@ -907,6 +907,9 @@ function applySavedGameBase(data) {
   fanClub = data.fanClub || null;
   fanClubFoundedYear = data.fanClubFoundedYear || 0;
   pendingFanClubEvent = data.pendingFanClubEvent || null;
+  if (fanClub && fanClub.settingsVersion !== 2 && !pendingFanClubEvent) {
+    pendingFanClubEvent = { type: 'migration', tierId: fanClub.tierId || null };
+  }
   industryOfferCheckWeekKey = data.industryOfferCheckWeekKey || '';
   pendingIndustryOffer = data.pendingIndustryOffer || null;
   specialLiveEvents = data.specialLiveEvents || [];

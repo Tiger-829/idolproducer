@@ -351,7 +351,22 @@
   <div class="modal-content">
     <h3 class="page-title" style="margin:0 0 8px;">ファンクラブ</h3>
     <p id="fanclub-text" style="font-size:12px; color:#555; line-height:1.7;"></p>
-    <div id="fanclub-options" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
+    <div id="fanclub-options" style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+      <label style="font-size:12px;">ファンクラブ名
+        <input id="fanclub-name" type="text" maxlength="30" style="width:100%; margin-top:4px;">
+      </label>
+      <label for="fanclub-fee" style="font-size:12px;">月会費: <span id="fanclub-fee-value"></span>
+        <input id="fanclub-fee" type="range" min="500" max="10000" step="500" style="width:100%; display:block;" oninput="updateFanClubFeeDisplay()">
+      </label>
+      <fieldset style="border:1px solid #ddd; border-radius:6px; padding:8px; font-size:12px;">
+        <legend>特典</legend>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="none"> ① なし</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="lottery"> ② 先行抽選枠</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="video"> ③ 限定動画の配信</label>
+        <label style="display:block; margin:4px 0;"><input type="radio" name="fanclub-benefit" value="both"> ④ ②＋③</label>
+      </fieldset>
+      <button class="main-btn" type="button" onclick="resolveFanClub()">設定を確定</button>
+    </div>
   </div>
 </div>
 
@@ -409,20 +424,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="./js/00-shortcut.js?v=8"></script>
 <script src="./js/01-constants.js?v=11"></script>
-<script src="./js/02-state.js?v=9"></script>
+<script src="./js/02-state.js?v=10"></script>
 <script src="./js/03-venue.js?v=8"></script>
-<script src="./js/04-members.js?v=10"></script>
+<script src="./js/04-members.js?v=11"></script>
 <script src="./js/05-calc.js?v=8"></script>
 <script src="./js/06-progress.js?v=8"></script>
 <script src="./js/07-schedule.js?v=12"></script>
-<script src="./js/08-events.js?v=13"></script>
+<script src="./js/08-events.js?v=14"></script>
 <script src="./js/09-selection-draft.js?v=10"></script>
 <script src="./js/cdproduce.js?v=12"></script>
 <script src="./js/10-ui-navigation.js?v=10"></script>
 <script src="./js/11-ui-group.js?v=10"></script>
 <script src="./js/12-ui-formation.js?v=11"></script>
 <script src="./js/13-ui-office.js?v=11"></script>
-<script src="./js/14-ui-funds.js?v=10"></script>
+<script src="./js/14-ui-funds.js?v=11"></script>
 <script src="./js/15-ui-ranking.js?v=10"></script>
 <script src="./js/16-ui-records.js?v=11"></script>
 <script src="./js/17-ui-core.js?v=10"></script>
