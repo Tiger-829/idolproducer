@@ -261,9 +261,9 @@ function getPlanEventType(eventId, eventName = '') {
 
 const FANCLUB_BENEFITS = {
   none: { name: 'なし', monthlyCostPerMember: 0, memberAppeal: 0 },
-  lottery: { name: '先行抽選枠', monthlyCostPerMember: 500, memberAppeal: 0.03 },
-  video: { name: '限定動画の配信', monthlyCostPerMember: 1000, memberAppeal: 0.05 },
-  both: { name: '先行抽選枠・限定動画の配信', monthlyCostPerMember: 1500, memberAppeal: 0.08 }
+  lottery: { name: '先行抽選枠', monthlyCostPerMember: 100, memberAppeal: 0.03 },
+  video: { name: '限定動画の配信', monthlyCostPerMember: 500, memberAppeal: 0.05 },
+  both: { name: '先行抽選枠・限定動画の配信', monthlyCostPerMember: 700, memberAppeal: 0.08 }
 };
 
 function escapeFanClubText(value) {
@@ -294,7 +294,13 @@ function getFanClubEstimate(fee, benefitId) {
     : targetMembers;
   const currentMonthlyIncome = currentMembers * (Number(fanClub?.fee) || 0);
   const expectedMonthlyIncome = expectedMembers * fee;
+  const currentMonthlyBenefitCost = currentMembers
+    * getFanClubBenefit(fanClub?.benefitId).monthlyCostPerMember;
+  const expectedMonthlyBenefitCost = expectedMembers
+    * getFanClubBenefit(benefitId).monthlyCostPerMember;
   const expectedPerMemberBalance = fee - getFanClubBenefit(benefitId).monthlyCostPerMember;
+  const currentMonthlyBalance = currentMonthlyIncome - currentMonthlyBenefitCost;
+  const expectedMonthlyBalance = expectedMonthlyIncome - expectedMonthlyBenefitCost;
   return {
     currentMembers,
     expectedMembers,
@@ -302,6 +308,8 @@ function getFanClubEstimate(fee, benefitId) {
     currentMonthlyIncome,
     expectedMonthlyIncome,
     monthlyIncomeChange: expectedMonthlyIncome - currentMonthlyIncome,
+    expectedMonthlyBalance,
+    monthlyBalanceChange: expectedMonthlyBalance - currentMonthlyBalance,
     expectedPerMemberBalance
   };
 }
@@ -365,9 +373,9 @@ function updateFanClubPreview() {
   preview.innerHTML = [
     `変更後の1人当たり収支: <strong>${formatMoney(estimate.expectedPerMemberBalance)}/月</strong>`,
     `予想会員数: <strong>${estimate.expectedMembers.toLocaleString()}人</strong>`,
-    `予想会員増加数: <strong>${formatFanClubMemberChange(estimate.memberChange)}</strong>`,
+    `予想会員増減: <strong>${formatFanClubMemberChange(estimate.memberChange)}</strong>`,
     `予想月収入: <strong>${formatMoney(estimate.expectedMonthlyIncome)}</strong>`,
-    `予想月収入増加数: <strong>${formatFanClubMoneyChange(estimate.monthlyIncomeChange)}</strong>`
+    `予想月収支: <strong>${formatMoney(estimate.expectedMonthlyBalance)}</strong>（増減 ${formatFanClubMoneyChange(estimate.monthlyBalanceChange)}）`
   ].map(line => `<div>${line}</div>`).join('');
 }
 

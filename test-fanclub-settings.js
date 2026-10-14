@@ -32,28 +32,34 @@ window.eval('openFanClubModal()');
 assert.strictEqual(window.document.getElementById('fanclub-modal').style.display, 'flex');
 
 window.document.getElementById('fanclub-name').value = '星空ファンクラブ';
-window.document.getElementById('fanclub-fee').value = '2500';
+window.document.getElementById('fanclub-fee').value = '1000';
 window.document.querySelector('input[name="fanclub-benefit"][value="both"]').checked = true;
 window.eval('updateFanClubPreview()');
 const preview = window.document.getElementById('fanclub-preview').textContent;
-assert(preview.includes('変更後の1人当たり収支: 1,000円/月'));
-assert(preview.includes('予想会員数: 1,075人'));
-assert(preview.includes('予想会員増加数: +975人'));
-assert(preview.includes('予想月収入: 269万円'));
-assert(preview.includes('予想月収入増加数: +254万円'));
+assert.strictEqual(window.document.getElementById('fanclub-fee').min, '500');
+assert.strictEqual(window.document.getElementById('fanclub-fee').max, '1200');
+assert.strictEqual(window.document.getElementById('fanclub-fee').step, '10');
+assert(preview.includes('変更後の1人当たり収支: 300円/月'));
+assert(preview.includes('予想会員数: 1,450人'));
+assert(preview.includes('予想会員増減: +1,350人'));
+assert(preview.includes('予想月収入: 145万円'));
+assert(preview.includes('予想月収支: 43.5万円（増減 +28.5万円）'));
 assert(window.eval('getFanClubMemberTarget(500, "both") > getFanClubMemberTarget(500, "none")'));
 assert(window.eval('getFanClubMemberTarget(2500, "both") < getFanClubMemberTarget(500, "both")'));
+assert.strictEqual(window.eval('getFanClubBenefit("lottery").monthlyCostPerMember'), 100);
+assert.strictEqual(window.eval('getFanClubBenefit("video").monthlyCostPerMember'), 500);
+assert.strictEqual(window.eval('getFanClubBenefit("both").monthlyCostPerMember'), 700);
 window.document.querySelector('input[name="fanclub-benefit"][value="none"]').checked = true;
 window.document.querySelector('input[name="fanclub-benefit"][value="none"]').dispatchEvent(new window.Event('change', { bubbles: true }));
-assert(window.document.getElementById('fanclub-preview').textContent.includes('変更後の1人当たり収支: 2,500円/月'));
+assert(window.document.getElementById('fanclub-preview').textContent.includes('変更後の1人当たり収支: 1,000円/月'));
 window.document.querySelector('input[name="fanclub-benefit"][value="both"]').checked = true;
 window.eval('resolveFanClub()');
 assert.deepStrictEqual(
   JSON.parse(JSON.stringify(window.eval('[fanClub.name, fanClub.fee, fanClub.benefitId, fanClub.settingsVersion]'))),
-  ['星空ファンクラブ', 2500, 'both', 2]
+  ['星空ファンクラブ', 1000, 'both', 2]
 );
 assert.strictEqual(window.eval('fanClubFoundedYear'), 1);
-assert.strictEqual(window.eval('fanClub.members'), 1075);
+assert.strictEqual(window.eval('fanClub.members'), 1450);
 
 window.eval(`
   fanClub.members = 2;
@@ -62,8 +68,8 @@ window.eval(`
   monthlyLedger = createMonthlyLedger();
   applyFanClubMonthlyIncome();
 `);
-assert.strictEqual(window.eval('funds'), 15000);
-assert.strictEqual(window.eval('monthlyLedger.expense[0].amount'), 3000);
+assert.strictEqual(window.eval('funds'), 12000);
+assert.strictEqual(window.eval('monthlyLedger.expense[0].amount'), 1400);
 
 window.eval(`
   currentYear = 3;
