@@ -1213,7 +1213,7 @@ function processMonthlyReleaseAndLive(reachDate = gameDate) {
     }
 
     if (!remainingDates.length) {
-      liveExperience = applyLiveExperience(v, grandAudience, grandShowCount);
+      liveExperience = applyLiveExperience(v, grandAudience, grandShowCount, entry.participantType);
     }
 
     const target = entry.isPrimary ? entry.plan : entry.plan.additionalLives[entry.extraIndex];

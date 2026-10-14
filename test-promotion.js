@@ -790,6 +790,78 @@ check('live experience is split across the performance-related stats', run(`(() 
     && result.memberCount > 0
     && after !== before;
 })()`) === true);
+check('live experience follows all/senbatsu/under participant selection and triples under-member EXP', run(`(() => {
+  const venue = VENUE_DATA.find(x => x.cap === 'D');
+  const savedSelected = idolRoster.map(member => member.isSelected);
+  const originalAddExp = addMemberStatExp;
+  const awards = [];
+  try {
+    idolRoster.forEach((member, index) => { member.isSelected = index < 3; });
+    addMemberStatExp = (member, statId, amount) => {
+      awards.push({ member, statId, amount });
+      return 0;
+    };
+
+    const allResult = applyLiveExperience(venue, 0, 1);
+    const allAwarded = awards.length === idolRoster.length * Object.keys(LIVE_STAT_WEIGHTS).length
+      && idolRoster.every(member => awards.some(award => award.member === member))
+      && allResult.total === getLiveExperienceGain(venue, 0, 1);
+
+    awards.length = 0;
+    const selectedResult = applyLiveExperience(venue, 0, 1, 'senbatsu');
+    const selectedAwarded = selectedResult.memberCount === 3
+      && awards.length === 3 * Object.keys(LIVE_STAT_WEIGHTS).length
+      && awards.every(award => award.member.isSelected)
+      && selectedResult.total === getLiveExperienceGain(venue, 0, 1);
+
+    awards.length = 0;
+    const underResult = applyLiveExperience(venue, 0, 1, 'under');
+    const underMembers = idolRoster.filter(member => !member.isSelected);
+    const underAwarded = underResult.memberCount === underMembers.length
+      && awards.length === underMembers.length * Object.keys(LIVE_STAT_WEIGHTS).length
+      && awards.every(award => !award.member.isSelected)
+      && underResult.total === getLiveExperienceGain(venue, 0, 1) * 3
+      && Object.entries(LIVE_STAT_WEIGHTS).every(([statId, weight]) =>
+        underResult.gained[statId] === Math.max(1, Math.round(underResult.total * weight))
+      );
+    return allAwarded && selectedAwarded && underAwarded;
+  } finally {
+    addMemberStatExp = originalAddExp;
+    idolRoster.forEach((member, index) => { member.isSelected = savedSelected[index]; });
+  }
+})()`) === true);
+check('live participant setting defaults to all and is restored for planned lives', run(`(() => {
+  const venue = VENUE_DATA[0];
+  const all = getMonthLiveEntries({ liveVenue: venue.name, liveDate: '2027-01-10' })[0];
+  const under = getMonthLiveEntries({
+    liveVenue: venue.name,
+    liveDate: '2027-01-10',
+    participantType: 'under',
+    additionalLives: [{ liveVenue: venue.name, liveDate: '2027-01-11', participantType: 'senbatsu' }]
+  });
+  const html = renderLiveSlotHtml(1, 0, { liveVenue: venue.name, liveDate: '2027-01-10' });
+  return all.participantType === 'all'
+    && under[0].participantType === 'under'
+    && under[1].participantType === 'senbatsu'
+    && html.includes('<option value="all" selected>全員</option>')
+    && html.includes('選抜外（経験値3倍）');
+})()`) === true);
+check('selected live participant mode is captured from the planning form', run(`(() => {
+  const venue = VENUE_DATA[0];
+  const container = document.createElement('div');
+  container.id = 'live-slots-9';
+  container.innerHTML = \`
+    <div class="live-slot" data-slot-index="0">
+      <select id="sel-ven-9-0"><option value="\${venue.name}" selected>\${venue.name}</option></select>
+      <select id="live-participants-9-0"><option value="under" selected>選抜外</option></select>
+    </div>\`;
+  document.body.appendChild(container);
+  try {
+    return readLiveSlotInputs(9)[0].participantType === 'under';
+  } finally {
+    container.remove();
+  }
+})()`) === true);
 check('live experience is granted once, after the final show only', run(`(() => {
   const v = VENUE_DATA.find(x => x.cap === 'D');
   const member = idolRoster.find(m => m.isSelected);

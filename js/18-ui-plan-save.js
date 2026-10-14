@@ -518,6 +518,9 @@ function renderLiveSlotHtml(month, index, slot) {
   const slotVenue = venues.find(v => v.name === slot.liveVenue) || null;
   const streamDates = new Set(Array.isArray(slot.streamDates) ? slot.streamDates : []);
   const seatTypes = typeof SEAT_TYPES !== 'undefined' ? SEAT_TYPES : [];
+  const participantType = ['all', 'senbatsu', 'under'].includes(slot.participantType)
+    ? slot.participantType
+    : 'all';
   const hasDates = Array.isArray(slot.liveDates) && slot.liveDates.length > 0;
   const hasVenue = Boolean(slot.liveVenue);
   const showDetails = hasVenue || hasDates;
@@ -555,6 +558,13 @@ function renderLiveSlotHtml(month, index, slot) {
           </div>
         ` : ''}
         <div style="margin-top:6px; font-size:11px;">
+          <label style="display:block; color:#555; margin-bottom:6px;">参加メンバー
+            <select id="live-participants-${month}-${index}" style="width:100%; padding:5px; font-size:11px; margin-top:3px;">
+              <option value="all" ${participantType === 'all' ? 'selected' : ''}>全員</option>
+              <option value="senbatsu" ${participantType === 'senbatsu' ? 'selected' : ''}>選抜</option>
+              <option value="under" ${participantType === 'under' ? 'selected' : ''}>選抜外（経験値3倍）</option>
+            </select>
+          </label>
           <div style="color:#555; margin-bottom:3px;">公演日・配信設定</div>
           <div id="show-dates-${month}-${index}" class="show-date-list">
              ${(slot.liveDates || []).map((dateKey, dateIndex) => 
@@ -688,6 +698,7 @@ function readLiveSlotInputs(month) {
   return Array.from(container.querySelectorAll('.live-slot')).map(slotEl => {
     const index = Number(slotEl.dataset.slotIndex);
     const venueVal = (document.getElementById(`sel-ven-${month}-${index}`) || {}).value || '';
+    const participantType = document.getElementById(`live-participants-${month}-${index}`)?.value;
     
     const dateInputs = slotEl.querySelectorAll('.show-date-input');
     const streamInputs = slotEl.querySelectorAll('.show-stream-input');
@@ -730,7 +741,8 @@ function readLiveSlotInputs(month) {
       liveDates: liveDates,
       streamDates: streamDates,
       seatPrices,
-      seatOptions
+      seatOptions,
+      participantType: ['all', 'senbatsu', 'under'].includes(participantType) ? participantType : 'all'
     };
   }).filter(Boolean);
 }
@@ -961,7 +973,8 @@ function addLiveSlot(month) {
     liveDates: [],
     streamDates: [],
     seatPrices: {},
-    seatOptions: {}
+    seatOptions: {},
+    participantType: 'all'
   };
   const tempWrapper = document.createElement('div');
   tempWrapper.innerHTML = renderLiveSlotHtml(month, currentCount, newSlot);
@@ -1709,7 +1722,9 @@ function openDecisionModal(title, yearTarget, startM, endM, allowPastMonths = fa
         liveDates: e.liveDates || [],
         streamDates: Array.isArray(e.streamDates) ? e.streamDates : [],
         seatPrices: e.seatPrices || {},
-        seatOptions: e.seatOptions || {}
+        seatOptions: e.seatOptions || {},
+        participantType: e.participantType || 'all',
+        participantType: e.participantType || 'all'
       })) : [];
 
       const defaultRelDate = existingPlan.releaseDate || (releaseValue !== 'none' ? getPlanReleaseDefaultWednesday(m) : '');
@@ -2041,6 +2056,7 @@ function saveDecisionPlan() {
       streamDates: primary ? (Array.isArray(primary.streamDates) ? primary.streamDates : []) : [],
       seatPrices: primary ? primary.seatPrices : {},
       seatOptions: primary ? primary.seatOptions : {},
+      participantType: primary ? primary.participantType : 'all',
       additionalLives: liveSlots.slice(1).map(slot => ({
         liveVenue: slot.liveVenue,
         liveName: slot.liveName || slot.liveVenue,
@@ -2048,7 +2064,8 @@ function saveDecisionPlan() {
         liveDates: slot.liveDates,
         streamDates: Array.isArray(slot.streamDates) ? slot.streamDates : [],
         seatPrices: slot.seatPrices,
-        seatOptions: slot.seatOptions
+        seatOptions: slot.seatOptions,
+        participantType: slot.participantType
       }))
     };
 

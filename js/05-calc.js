@@ -393,10 +393,17 @@ function getLiveExperienceGain(venue, audience, showDays = 1) {
   ));
 }
 
-function applyLiveExperience(venue, audience, showDays = 1) {
-  const total = getLiveExperienceGain(venue, audience, showDays);
+function applyLiveExperience(venue, audience, showDays = 1, participantType = 'all') {
+  const type = ['all', 'senbatsu', 'under'].includes(participantType) ? participantType : 'all';
+  const baseTotal = getLiveExperienceGain(venue, audience, showDays);
+  const experienceMultiplier = type === 'under' ? 3 : 1;
+  const total = baseTotal * experienceMultiplier;
   const selected = idolRoster.filter(member => member.isSelected);
-  const participants = selected.length ? selected : idolRoster;
+  const participants = type === 'senbatsu'
+    ? selected
+    : type === 'under'
+      ? idolRoster.filter(member => !member.isSelected)
+      : idolRoster;
   let levelUps = 0;
   const gained = {};
   Object.entries(LIVE_STAT_WEIGHTS).forEach(([statId, weight]) => {

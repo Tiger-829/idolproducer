@@ -349,7 +349,7 @@ function processPlayerLives(fromDate, toDate) {
       yearlyStats.streamRevenue = (yearlyStats.streamRevenue || 0) + grandTotalStreamRevenue;
       yearlyStats.streamCost = (yearlyStats.streamCost || 0) + expenses.streamCost;
 
-      applyLiveExperience(v, grandTotalAudience, totalShowCount);
+      applyLiveExperience(v, grandTotalAudience, totalShowCount, entry.participantType);
       applyLiveStaminaCost(v, isMultiDay, false);
 
       entry.completed = true;

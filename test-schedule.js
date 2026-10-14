@@ -1661,6 +1661,9 @@ check('the live slot does not reveal audience in advance', run(`
   const slot = { liveVenue: venue.name, seatPrices: {}, seatOptions: {} };
   const html = renderLiveSlotHtml(1, 0, slot);
   !html.includes('動員') && !html.includes(predicted)
+    && html.includes('id="live-participants-1-0"')
+    && html.includes('<option value="all" selected>全員</option>')
+    && html.includes('選抜外（経験値3倍）')
 `) === true);
 
 // ---- ファンバーは細目になった ----
