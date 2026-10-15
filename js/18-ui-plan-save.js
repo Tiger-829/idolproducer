@@ -2259,6 +2259,21 @@ function hasRivalScheduleInRange(year, startMonth, monthCount = 6) {
   });
 }
 
+// 1月・7月の初週に計画策定モーダルを強制的に開く判定関数
+function checkAndForcePlanningModal() {
+  const isTargetMonth = (currentMonth === 1 || currentMonth === 7);
+  const isFirstWeek = (currentWeek === 1);
+
+  if (isTargetMonth && isFirstWeek) {
+    const currentWeekKey = `${currentYear}-${currentMonth}-${currentWeek}`;
+    // 同一週内で多重オープンしないよう防護
+    if (typeof planningPromptWeekKey === 'undefined' || planningPromptWeekKey !== currentWeekKey) {
+      planningPromptWeekKey = currentWeekKey;
+      openPlanningManual();
+    }
+  }
+}
+
 // Planningマニュアルを開く。
 function openPlanningManual() {
   if (typeof syncGameCalendar === 'function') syncGameCalendar();
