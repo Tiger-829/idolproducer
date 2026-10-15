@@ -105,6 +105,9 @@ function advanceUntilNextSchedulePoint() {
   resetWeeklySchedule();
   updateWeeklyGroupFans();
   updateUI();
+  if (typeof checkAndForcePlanningModal === 'function') {
+    checkAndForcePlanningModal();
+  }
   openPendingModal();
 }
 
