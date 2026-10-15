@@ -2481,7 +2481,7 @@ function returnToTitle() {
   openTitleScreen();
 }
 
-// init試合を処理する。
+
 function initGame(slot, startFresh) {
   const slotCount = typeof SAVE_SLOT_COUNT !== 'undefined' ? SAVE_SLOT_COUNT : 3;
   if (!Number.isInteger(slot) || slot < 1 || slot > slotCount) return;
@@ -2510,6 +2510,11 @@ function initGame(slot, startFresh) {
 
     if (typeof generateRivalsAndGeneralSchedule === 'function') {
       generateRivalsAndGeneralSchedule(1, 1, true);
+    }
+    if (typeof checkAndForcePlanningModal === 'function') {
+      checkAndForcePlanningModal();
+    } else if (typeof openPlanningManual === 'function') {
+      openPlanningManual();
     }
   } else {
     const raw = localStorage.getItem(saveSlotKey(slot));
